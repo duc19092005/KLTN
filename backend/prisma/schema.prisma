@@ -115,6 +115,33 @@ model AiModelInfo {
   updatedAt     DateTime @updatedAt
 }
 
+// AI Model Registry - Quản lý IP hash của các model AI
+model AiModelRegistry {
+  id                String   @id @default(uuid())
+  modelId           String   @unique @default(uuid()) // Auto-generated identifier for blockchain
+  modelName         String
+  modelVersion      String
+  recommendedSpecialty String? // Medical specialty recommended for this model
+  
+  // IP Hash - Encrypted with AES-256
+  ipHashEncrypted   String   // Encrypted IP hash stored in database
+  ipHashPlain       String?  // Plain IP hash (only shown once during creation)
+  
+  // Blockchain tracking
+  blockchainTxHash  String?  // Transaction hash when registered on-chain
+  isActiveOnChain   Boolean  @default(false) // Whether model is active on blockchain
+  
+  // Metadata
+  description       String?
+  createdBy         String   // Admin user ID who created this model
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([modelId])
+  @@index([isActiveOnChain])
+}
+
 model AiDiagnosis {
   id                          String   @id @default(uuid())
   doctorId                    String

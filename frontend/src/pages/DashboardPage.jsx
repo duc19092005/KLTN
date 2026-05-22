@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useThemeLang } from '../contexts/ThemeLangContext';
 import Sidebar from '../components/Sidebar';
 import CreateDoctorModal from '../components/CreateDoctorModal';
+import CreateAiModelModal from '../components/CreateAiModelModal';
 import api from '../services/api';
 
 const ADMIN_NAV = [
@@ -20,6 +21,7 @@ export default function DashboardPage() {
   const [data, setData] = useState({ doctors: [], diagnoses: [], transactions: [], aimodels: [] });
   const [loading, setLoading] = useState(true);
   const [showCreateDoctor, setShowCreateDoctor] = useState(false);
+  const [showCreateAiModel, setShowCreateAiModel] = useState(false);
 
   useEffect(() => { loadHospitalData(); }, []);
 
@@ -29,7 +31,7 @@ export default function DashboardPage() {
         api.get('/hospital/doctors'),
         api.get('/hospital/diagnoses'),
         api.get('/hospital/transactions'),
-        api.get('/hospital/aimodels'),
+        api.get('/ai-model/list'),
       ]);
       setData({
         doctors:      docRes.data,
@@ -149,34 +151,26 @@ export default function DashboardPage() {
             <>
               <thead style={{ background: 'rgba(0,0,0,0.2)' }}>
                 <tr>
-                  {['Model ID', 'Tên Hệ Thống AI', 'Phiên Bản', 'Độ Chính Xác', 'Trạng Thái'].map((h) => (
+                  {['Model ID', 'Tên Hệ Thống AI', 'Phiên Bản', 'Chuyên Khoa Đề Xuất', 'Blockchain', 'Tx Hash'].map((h) => (
                     <th key={h} style={thStyle}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {data.aimodels.length === 0 && <EmptyRow cols={5} />}
+                {data.aimodels.length === 0 && <EmptyRow cols={6} />}
                 {data.aimodels.map((m) => (
                   <tr key={m.id} style={rowStyle} className="hover:bg-elevated">
-                    <td style={tdStyle}><span className="mono">#{formatShortId(m.id)}</span></td>
+                    <td style={tdStyle}><span className="mono">{m.modelId || formatShortId(m.id)}</span></td>
                     <td style={{ ...tdStyle, fontWeight: 500, color: 'var(--info)' }}>{m.name || m.modelName}</td>
-                    <td style={{ ...tdStyle }} className="mono">{m.version}</td>
+                    <td style={{ ...tdStyle }} className="mono">{m.modelVersion || m.version || 'Chưa cập nhật'}</td>
+                    <td style={tdStyle}>{m.recommendedSpecialty || 'Chưa cập nhật'}</td>
                     <td style={tdStyle}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 90, height: 6, background: 'var(--bg-elevated)', borderRadius: 'var(--radius-full)' }}>
-                          <div style={{
-                            width: `${m.accuracy ?? 0}%`, height: '100%',
-                            background: 'var(--success)',
-                            borderRadius: 'var(--radius-full)', transition: 'width 0.5s ease',
-                          }} />
-                        </div>
-                        <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600 }}>{m.accuracy ?? 0}%</span>
-                      </div>
-                    </td>
-                    <td style={tdStyle}>
-                      <span className={`badge ${m.status === 'ACTIVE' ? 'badge-success' : 'badge-danger'}`}>
-                        {m.status || 'UNKNOWN'}
+                      <span className={`badge ${getAiModelStatus(m) === 'ON_CHAIN' ? 'badge-success' : 'badge-warning'}`}>
+                        {getAiModelStatus(m)}
                       </span>
+                    </td>
+                    <td style={{ ...tdStyle }} className="mono text-muted">
+                      {formatHash(m.blockchainTxHash)}
                     </td>
                   </tr>
                 ))}
@@ -243,6 +237,16 @@ export default function DashboardPage() {
               + Thêm bác sĩ
             </button>
           )}
+
+          {activeTab === 'ai' && (
+            <button
+              className="btn btn-primary dashboard-create-btn"
+              onClick={() => setShowCreateAiModel(true)}
+              style={{ whiteSpace: 'nowrap', padding: '10px 20px', fontWeight: 700 }}
+            >
+              + Thêm Model AI
+            </button>
+          )}
         </div>
 
         {tableContent}
@@ -256,6 +260,15 @@ export default function DashboardPage() {
         onSuccess={async () => {
           await loadHospitalData();
           setShowCreateDoctor(false);
+        }}
+      />
+
+      <CreateAiModelModal
+        open={showCreateAiModel}
+        onClose={() => setShowCreateAiModel(false)}
+        onSuccess={async () => {
+          await loadHospitalData();
+          setShowCreateAiModel(false);
         }}
       />
     </div>
@@ -372,12 +385,14 @@ function MobileDataList({ activeTab, data }) {
               <span className="mobile-card-kicker">#{formatShortId(model.id)}</span>
               <h2>{model.name || model.modelName || 'Chưa cập nhật'}</h2>
             </div>
-            <span className={`badge ${model.status === 'ACTIVE' ? 'badge-success' : 'badge-danger'}`}>
-              {model.status || 'UNKNOWN'}
+            <span className={`badge ${getAiModelStatus(model) === 'ON_CHAIN' ? 'badge-success' : 'badge-warning'}`}>
+              {getAiModelStatus(model)}
             </span>
           </div>
-          <MobileField label="Phiên bản" value={model.version || 'Chưa cập nhật'} mono />
-          <MobileField label="Độ chính xác" value={`${model.accuracy ?? 0}%`} />
+          <MobileField label="Model ID" value={model.modelId || 'Chưa cập nhật'} mono />
+          <MobileField label="Phiên bản" value={model.modelVersion || model.version || 'Chưa cập nhật'} mono />
+          <MobileField label="Chuyên khoa đề xuất" value={model.recommendedSpecialty || 'Chưa cập nhật'} />
+          <MobileField label="Tx Hash" value={formatHash(model.blockchainTxHash)} mono />
         </article>
       ))}
     </div>
@@ -415,6 +430,10 @@ function getDoctorStatus(doctor) {
 
 function getTransactionStatus(tx) {
   return tx.status || tx.blockchainStatus || 'UNKNOWN';
+}
+
+function getAiModelStatus(model) {
+  return model.isActiveOnChain ? 'ON_CHAIN' : 'PENDING';
 }
 
 function formatHash(hash) {

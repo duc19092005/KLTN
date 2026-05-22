@@ -33,14 +33,24 @@ async function main() {
   const registryAddress = await registry.getAddress();
   console.log("IdentityRegistry deployed to:", registryAddress);
 
+  // Deploy AI Model Registry
+  console.log("\n--- Deploying AiModelRegistry ---");
+  const AiModelRegistry = await hre.ethers.getContractFactory("AiModelRegistry");
+  const aiModelRegistry = await AiModelRegistry.deploy(registryAddress);
+  await aiModelRegistry.waitForDeployment();
+  const aiModelRegistryAddress = await aiModelRegistry.getAddress();
+  console.log("AiModelRegistry deployed to:", aiModelRegistryAddress);
+
   // Summary
   console.log("\n========== Deployment Summary ==========");
   console.log(`Verifier (${useMock ? "Mock" : "Groth16"}): ${verifierAddress}`);
   console.log(`IdentityRegistry: ${registryAddress}`);
+  console.log(`AiModelRegistry: ${aiModelRegistryAddress}`);
   console.log(`Admin: ${deployer.address}`);
   console.log("=========================================");
   console.log("\nAdd these to your backend .env:");
   console.log(`IDENTITY_REGISTRY_ADDRESS=${registryAddress}`);
+  console.log(`AI_MODEL_REGISTRY_ADDRESS=${aiModelRegistryAddress}`);
   console.log(`VERIFIER_ADDRESS=${verifierAddress}`);
 }
 

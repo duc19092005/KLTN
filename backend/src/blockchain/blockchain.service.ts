@@ -33,6 +33,13 @@ export class BlockchainService implements OnModuleInit {
       console.warn('⚠️ IDENTITY_REGISTRY_ADDRESS not set. Blockchain features disabled.');
     }
 
+    const aiModelAddress = process.env.AI_MODEL_REGISTRY_ADDRESS;
+    if (aiModelAddress) {
+      this.initAiModelContract(aiModelAddress);
+    } else {
+      console.warn('⚠️ AI_MODEL_REGISTRY_ADDRESS not set. AI Model blockchain features disabled.');
+    }
+
     // Initialize Super Admin signer for relayer operations
     const superAdminKey = process.env.SUPER_ADMIN_PRIVATE_KEY;
     if (superAdminKey && superAdminKey !== 'your_super_admin_private_key_here') {
@@ -177,4 +184,141 @@ export class BlockchainService implements OnModuleInit {
   getAbi() {
     return this.abi;
   }
+
+  // ============================================================
+  // AI MODEL REGISTRY METHODS
+  // ============================================================
+
+  private aiModelContract: ethers.Contract | null = null;
+  private readonly aiModelAbi = [
+    'function registerModel(string _modelId, string _modelHash) external',
+    'function addModelHash(string _modelId, string _modelHash) external',
+    'function deactivateModelHash(string _modelId, string _modelHash) external',
+    'function activateModelHash(string _modelId, string _modelHash) external',
+    'function isModelHashActive(string _modelId, string _modelHash) external view returns (bool)',
+    'event ModelRegistered(string indexed modelId, string modelHash, uint256 timestamp)',
+    'event ModelHashAdded(string indexed modelId, string modelHash, uint256 timestamp)',
+    'event ModelHashDeactivated(string indexed modelId, string modelHash, uint256 timestamp)',
+    'event ModelHashActivated(string indexed modelId, string modelHash, uint256 timestamp)',
+  ];
+
+  /**
+   * Initialize AI Model Registry contract
+   * Call this after deploying AiModelRegistry.sol
+   */
+  initAiModelContract(contractAddress: string) {
+    if (!contractAddress) {
+      console.warn('⚠️ AI_MODEL_REGISTRY_ADDRESS not provided');
+      return;
+    }
+
+    this.aiModelContract = new ethers.Contract(
+      contractAddress,
+      this.aiModelAbi,
+      this.provider,
+    );
+    console.log(`✅ Connected to AiModelRegistry at ${contractAddress}`);
+  }
+
+  /**
+   * Register AI model on blockchain
+   * @param modelId Unique model identifier
+   * @param ipHash Hashed IP (SHA-256 of original IP hash)
+   */
+  async registerAiModel(
+    modelId: string,
+    ipHash: string,
+  ) {
+    if (!this.aiModelContract) {
+      return { success: false, error: 'AI Model Registry not initialized' };
+    }
+
+    if (!this.superAdminSigner) {
+      return { success: false, error: 'Super Admin signer not configured' };
+    }
+
+    try {
+      const contract = this.aiModelContract.connect(this.superAdminSigner) as ethers.Contract;
+      const tx = await contract.registerModel(modelId, ipHash);
+      const receipt = await tx.wait();
+
+      console.log(`[Blockchain] Registered AI model ${modelId} on-chain`);
+      return {
+        success: true,
+        txHash: tx.hash,
+        blockNumber: receipt.blockNumber,
+      };
+    } catch (err: any) {
+      console.error(`[Blockchain] Failed to register AI model:`, err);
+      return {
+        success: false,
+        error: err.message || 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Add new IP hash for existing model
+   */
+  async addAiModelHash(modelId: string, ipHash: string) {
+    if (!this.aiModelContract || !this.superAdminSigner) {
+      return { success: false, error: 'Contract or signer not initialized' };
+    }
+
+    try {
+      const contract = this.aiModelContract.connect(this.superAdminSigner) as ethers.Contract;
+      const tx = await contract.addModelHash(modelId, ipHash);
+      const receipt = await tx.wait();
+
+      console.log(`[Blockchain] Added hash for model ${modelId}`);
+      return {
+        success: true,
+        txHash: tx.hash,
+        blockNumber: receipt.blockNumber,
+      };
+    } catch (err: any) {
+      console.error(`[Blockchain] Failed to add model hash:`, err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Deactivate IP hash for a model
+   */
+  async deactivateAiModelHash(modelId: string, ipHash: string) {
+    if (!this.aiModelContract || !this.superAdminSigner) {
+      return { success: false, error: 'Contract or signer not initialized' };
+    }
+
+    try {
+      const contract = this.aiModelContract.connect(this.superAdminSigner) as ethers.Contract;
+      const tx = await contract.deactivateModelHash(modelId, ipHash);
+      const receipt = await tx.wait();
+
+      console.log(`[Blockchain] Deactivated hash for model ${modelId}`);
+      return {
+        success: true,
+        txHash: tx.hash,
+        blockNumber: receipt.blockNumber,
+      };
+    } catch (err: any) {
+      console.error(`[Blockchain] Failed to deactivate model hash:`, err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Check if model hash is active on blockchain
+   */
+  async isAiModelHashActive(modelId: string, ipHash: string): Promise<boolean> {
+    if (!this.aiModelContract) return false;
+
+    try {
+      return await this.aiModelContract.isModelHashActive(modelId, ipHash);
+    } catch (err) {
+      console.error(`[Blockchain] Failed to check model hash:`, err);
+      return false;
+    }
+  }
+
 }

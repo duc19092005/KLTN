@@ -26,6 +26,7 @@ JWT_EXPIRATION=1h
 
 # Blockchain Smart Contract Address
 IDENTITY_REGISTRY_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
+AI_MODEL_REGISTRY_ADDRESS=0x...
 
 # Hardhat Account #0 Private Key (Super Admin Relayer)
 SUPER_ADMIN_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
@@ -78,7 +79,7 @@ npm run node
 cd blockchain
 npm run deploy:local
 ```
-*Ghi lại địa chỉ Smart Contract `IdentityRegistry` được xuất ra màn hình (mặc định là `0x5FbDB2315678afecb367f032d93F642f64180aa3`) và cập nhật vào file `.env` nếu có thay đổi.*
+*Ghi lại địa chỉ Smart Contract `IdentityRegistry` và `AiModelRegistry` được xuất ra màn hình, sau đó cập nhật `IDENTITY_REGISTRY_ADDRESS` và `AI_MODEL_REGISTRY_ADDRESS` trong file `.env` nếu có thay đổi.*
 
 ### 🖥️ Terminal 3: Chạy Backend (NestJS)
 ```bash
