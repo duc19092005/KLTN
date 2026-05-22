@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
+import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import AuthenticatePage from './pages/AuthenticatePage';
@@ -45,6 +46,7 @@ export default function App() {
       {token && <Navbar />}
       <main style={{ paddingTop: token ? '64px' : '0' }}>
         <Routes>
+          <Route path="/" element={!token ? <HomePage /> : <Navigate to="/dashboard" />} />
           <Route path="/login" element={!token ? <LoginPage /> : <Navigate to="/dashboard" />} />
           
           <Route path="/register" element={
@@ -63,7 +65,7 @@ export default function App() {
           
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           
-          <Route path="*" element={<Navigate to={token ? "/dashboard" : "/login"} />} />
+          <Route path="*" element={<Navigate to={token ? "/dashboard" : "/"} />} />
         </Routes>
       </main>
     </div>
