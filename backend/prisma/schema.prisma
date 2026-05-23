@@ -151,6 +151,13 @@ model AiDiagnosis {
   aiModelId                   String
   aiModel                     AiModelInfo @relation(fields: [aiModelId], references: [id])
 
+  // Patient information
+  patientName                 String?  // Họ tên bệnh nhân
+  clinicalSymptoms            String?  // Bệnh lý lâm sàng
+  preliminaryTreatment        String?  // Phác đồ & Thuốc điều trị sơ bộ
+  doctorNotes                 String?  // Ghi chú bác sĩ
+
+  // AI Analysis
   inputImageHash              String
   aiDiagnoseConfidentResults  String   // JSON string
   aiDiagnoseSegmentImageHash  String
