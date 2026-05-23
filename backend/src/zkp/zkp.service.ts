@@ -112,15 +112,21 @@ export class ZkpService {
   }
 
   /**
-   * Finalize registration: set firstLogin to false and registrationStep to done
+   * Finalize registration: set firstLogin to false and registrationStep to done.
+   * Admin done step = 4 (face→wallet→zkp→done)
+   * Doctor done step = 3 (password→face→done)
    */
   async completeRegistration(userId: string) {
+    // Determine the user's role to set the correct done step
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    const doneStep = user?.role === 'ADMIN' ? 4 : 3;
+
     // Invalidate invite token after registration is complete
     return this.prisma.user.update({
       where: { id: userId },
       data: {
         firstLogin: false,
-        registrationStep: 4, // 1:face, 2:wallet, 3:zkp, 4:done
+        registrationStep: doneStep,
         inviteToken: null,
         inviteTokenExpiry: null,
       },

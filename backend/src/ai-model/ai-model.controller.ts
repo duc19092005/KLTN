@@ -39,10 +39,10 @@ export class AiModelController {
   /**
    * GET /ai-model/list
    * List all registered AI models
-   * Admin only
+   * Admin and Doctor
    */
   @Get('list')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'DOCTOR')
   async listModels() {
     return this.aiModelService.listModels();
   }
@@ -63,10 +63,10 @@ export class AiModelController {
   /**
    * GET /ai-model/:modelId
    * Get details of a specific model
-   * Admin only
+   * Admin and Doctor
    */
   @Get(':modelId')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'DOCTOR')
   async getModel(@Param('modelId') modelId: string) {
     return this.aiModelService.getModel(modelId);
   }

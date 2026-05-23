@@ -6,6 +6,7 @@ import { useThemeLang } from '../contexts/ThemeLangContext';
 import WalletConnect from '../components/WalletConnect';
 import FaceCapture from '../components/FaceCapture';
 import { authService } from '../services/authService';
+import { ethers } from 'ethers';
 
 export default function AuthenticatePage() {
   const { user, token, updateToken } = useAuth();
@@ -14,8 +15,12 @@ export default function AuthenticatePage() {
   const { theme, toggleTheme, lang, toggleLang } = useThemeLang();
 
   const isAdmin = user?.role === 'ADMIN';
+  const isDoctor = user?.role === 'DOCTOR';
 
-  const [walletVerified, setWalletVerified] = useState(isAdmin ? true : false);
+  // Doctors do NOT need wallet authentication.
+  // All blockchain operations are signed server-side using the private key in .env.
+  // Wallet step is Admin-only. Skip directly to face scan for doctors.
+  const [walletVerified, setWalletVerified] = useState(isAdmin ? true : true);
   const [verifiedWalletAddress, setVerifiedWalletAddress] = useState(
     isAdmin ? (user?.walletAddress || '') : ''
   );
@@ -46,7 +51,7 @@ export default function AuthenticatePage() {
       setStatus('Đang ký tin nhắn xác thực...');
       const message = `ZKP Identity Verification\nTimestamp: ${Date.now()}\nAddress: ${addr}`;
 
-      const provider = new (await import('ethers')).BrowserProvider(window.ethereum);
+      const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const signature = await signer.signMessage(message);
 
@@ -227,20 +232,21 @@ export default function AuthenticatePage() {
 
       <div className="auth-page-intro">
         <h1 className="auth-title">
-          {isAdmin ? 'Xác thực Sinh trắc học Admin' : 'Xác thực Bảo mật 2 Lớp'}
+          {isAdmin ? 'Xác thực Sinh trắc học Admin' : 'Xác thực Khuôn Mặt Bác Sĩ'}
         </h1>
         <p className="auth-subtitle">
           {isAdmin
             ? 'Ví đã được xác thực on-chain khi đăng nhập. Hãy quét khuôn mặt để hoàn tất.'
-            : 'Để truy cập trang quản trị hệ thống, vui lòng hoàn thành xác thực ví và trắc sinh học.'
+            : 'Quét khuôn mặt để xác thực danh tính sinh trắc học và truy cập Cổng Lâm Sàng.'
           }
         </p>
       </div>
 
       <div className="auth-glass-card">
+        {/* Stepper: Admin has 2 segments (wallet + face), Doctor has 1 (face only) */}
         <div className="stepper-container">
+          {isAdmin && <div className="step-segment active" />}
           <div className="step-segment active" />
-          <div className={`step-segment ${walletVerified ? 'active' : ''}`} />
         </div>
 
         {/* STEP 1: WALLET SELECTION */}
@@ -292,11 +298,10 @@ export default function AuthenticatePage() {
             </div>
           </div>
         ) : (
-          /* STEP 2: FACE CAPTURE */
           <div>
             <div className="card-header-pane">
               <h2 className="step-heading">
-                {isAdmin ? 'Xác thực sinh học khuôn mặt' : 'Bước 2: Quét Face trắc sinh học'}
+                {isAdmin ? 'Xác thực sinh học khuôn mặt' : 'Quét khuôn mặt để xác thực'}
               </h2>
               <p className="step-desc">
                 Vui lòng nhìn thẳng vào camera điều hướng để đối khớp lớp bảo mật liveness dữ liệu mã hóa.
@@ -308,7 +313,8 @@ export default function AuthenticatePage() {
                 <FaceCapture onCapture={handleFaceVerify} requireLiveness={true} />
               </div>
 
-              {!isAdmin && (
+              {/* Rollback to wallet step only makes sense for Admin */}
+              {isAdmin && (
                 <button className="rollback-link" onClick={handleRollback} disabled={loading}>
                   Quay lại thay đổi Ví xác thực
                 </button>
@@ -330,7 +336,9 @@ export default function AuthenticatePage() {
             onClick={() => navigate('/recovery')}
             style={{ background: 'none', border: 'none', color: 'var(--warning)', fontSize: '0.825rem', fontWeight: 600, cursor: 'pointer' }}
           >
-            {isAdmin ? 'Yêu cầu khôi phục quyền Admin gốc' : 'Mất thiết bị hoặc Ví? Khôi phục qua ZKP Gate'} →
+            {isAdmin
+              ? 'Yêu cầu khôi phục quyền Admin gốc'
+              : 'Quên mật khẩu? Khôi phục qua nhận diện khuôn mặt'} →
           </button>
         </div>
 

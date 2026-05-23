@@ -27,28 +27,31 @@ interface MulterFile {
 
 @Controller('hospital')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN')
 export class HospitalController {
   constructor(private readonly hospitalService: HospitalService) {}
 
   // ── READ ─────────────────────────────────────────────────────────────────
 
   @Get('doctors')
+  @Roles('ADMIN', 'DOCTOR')
   async getDoctors() {
     return this.hospitalService.getDoctors();
   }
 
   @Get('diagnoses')
+  @Roles('ADMIN', 'DOCTOR')
   async getDiagnoses() {
     return this.hospitalService.getDiagnoses();
   }
 
   @Get('transactions')
+  @Roles('ADMIN', 'DOCTOR')
   async getTransactions() {
     return this.hospitalService.getBlockchainTransactions();
   }
 
   @Get('aimodels')
+  @Roles('ADMIN', 'DOCTOR')
   async getAiModels() {
     return this.hospitalService.getAiModels();
   }
@@ -61,6 +64,7 @@ export class HospitalController {
    * Fields: all CreateDoctorDto fields + optional portrait (image file)
    */
   @Post('doctors')
+  @Roles('ADMIN')
   @UseInterceptors(
     FileInterceptor('portrait', {
       limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB max

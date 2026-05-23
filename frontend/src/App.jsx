@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import AuthenticatePage from './pages/AuthenticatePage';
 import DashboardPage from './pages/DashboardPage';
+import DoctorDashboardPage from './pages/DoctorDashboardPage';
 import RecoveryPage from './pages/RecoveryPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 
@@ -39,7 +40,7 @@ function ProtectedRoute({ children, requiredRole, pageType = 'secure' }) {
 }
 
 export default function App() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const location = useLocation();
   const isDashboard = location.pathname === '/dashboard';
 
@@ -60,7 +61,9 @@ export default function App() {
           } />
           
           <Route path="/dashboard" element={
-            <ProtectedRoute pageType="secure"><DashboardPage /></ProtectedRoute>
+            <ProtectedRoute pageType="secure">
+              {user?.role === 'ADMIN' ? <DashboardPage /> : <DoctorDashboardPage />}
+            </ProtectedRoute>
           } />
           
           <Route path="/recovery" element={<RecoveryPage />} />

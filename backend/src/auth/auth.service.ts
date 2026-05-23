@@ -283,7 +283,8 @@ export class AuthService {
     const hashed = await bcrypt.hash(newPassword, 10);
     await this.prisma.user.update({
       where: { id: userId },
-      data: { password: hashed },
+      // Also advance registrationStep so re-login after partial setup resumes at face scan
+      data: { password: hashed, registrationStep: Math.max(user.registrationStep ?? 1, 2) },
     });
 
     return { message: 'Password changed successfully' };

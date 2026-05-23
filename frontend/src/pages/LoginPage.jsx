@@ -5,6 +5,7 @@ import { useThemeLang } from '../contexts/ThemeLangContext';
 import { authService } from '../services/authService';
 import SecretCodeModal from '../components/SecretCodeModal';
 import api from '../services/api';
+import { ethers } from 'ethers';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -56,8 +57,7 @@ export default function LoginPage() {
     if (!window.ethereum) return setError(t('login.noMetamask'));
     try {
       setWalletConnecting(true);
-      const { BrowserProvider } = await import('ethers');
-      const provider = new BrowserProvider(window.ethereum);
+      const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
       

@@ -37,6 +37,25 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
 
   // ============================================================
+  // SHARED: Navigate to dashboard after registration complete
+  // Ensures firstLogin is cleared in DB before redirecting.
+  // This also fixes existing accounts whose DB still has firstLogin:true.
+  // ============================================================
+  const handleGoToDashboard = async () => {
+    if (isDoctor && user?.firstLogin) {
+      // Call /zkp/complete to set firstLogin=false in DB for this account.
+      // Safe to call multiple times (idempotent update).
+      try {
+        await zkpService.completeRegistration();
+      } catch (e) {
+        console.warn('completeRegistration during navigation failed, proceeding anyway:', e.message);
+      }
+      updateToken(token, { firstLogin: false });
+    }
+    navigate('/dashboard');
+  };
+
+  // ============================================================
   // Step definitions differ by role
   // ============================================================
   const adminSteps = [
@@ -89,7 +108,21 @@ export default function RegisterPage() {
       await faceApiService.registerFace(embedding);
       setFaceEmbedding(embedding);
       const nextStep = isAdmin ? 2 : 3; // Admin goes to Wallet (2), Doctor goes to Complete (3)
-      updateToken(token, { registrationStep: nextStep });
+
+      if (isDoctor) {
+        // Doctor registration is complete after face scan.
+        // Call /zkp/complete to set firstLogin=false in the database,
+        // then update local state so the ProtectedRoute no longer blocks navigation.
+        try {
+          await zkpService.completeRegistration();
+        } catch (completeErr) {
+          console.warn('completeRegistration call failed, proceeding anyway:', completeErr.message);
+        }
+        updateToken(token, { firstLogin: false, registrationStep: nextStep });
+      } else {
+        updateToken(token, { registrationStep: nextStep });
+      }
+
       setStep(nextStep);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to register face');
@@ -407,7 +440,7 @@ export default function RegisterPage() {
             )}
           </div>
 
-          <button className="btn btn-primary btn-lg" onClick={() => navigate('/dashboard')} style={{ marginTop: 16 }}>
+          <button className="btn btn-primary btn-lg" onClick={handleGoToDashboard} style={{ marginTop: 16 }}>
             Vào Dashboard →
           </button>
         </div>
