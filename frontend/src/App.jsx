@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
 import HomePage from './pages/HomePage';
@@ -23,13 +23,13 @@ function ProtectedRoute({ children, requiredRole, pageType = 'secure' }) {
   }
   
   // Rule 3: Nếu chưa xác thực Layer 2, bắt buộc phải vào authenticate (hoặc trang recovery để khôi phục ví)
-  if (!user?.verified) {
+  if (user?.role !== 'ADMIN' && !user?.verified) {
     if (pageType === 'authenticate' || pageType === 'recovery') return children;
     return <Navigate to="/authenticate" replace />;
   }
 
   // Rule 4: Nếu đã xác thực Layer 2 rồi, không cho phép truy cập lại register hay authenticate
-  if (user?.verified) {
+  if (user?.role === 'ADMIN' || user?.verified) {
     if (pageType === 'authenticate' || pageType === 'register') {
       return <Navigate to="/dashboard" replace />;
     }
@@ -40,11 +40,13 @@ function ProtectedRoute({ children, requiredRole, pageType = 'secure' }) {
 
 export default function App() {
   const { token } = useAuth();
+  const location = useLocation();
+  const isDashboard = location.pathname === '/dashboard';
 
   return (
     <div className="app">
-      {token && <Navbar />}
-      <main style={{ paddingTop: token ? '64px' : '0' }}>
+      {token && !isDashboard && <Navbar />}
+      <main style={{ paddingTop: (token && !isDashboard) ? '64px' : '0' }}>
         <Routes>
           <Route path="/" element={!token ? <HomePage /> : <Navigate to="/dashboard" />} />
           <Route path="/login" element={!token ? <LoginPage /> : <Navigate to="/dashboard" />} />

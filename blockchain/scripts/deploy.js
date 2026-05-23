@@ -41,16 +41,26 @@ async function main() {
   const aiModelRegistryAddress = await aiModelRegistry.getAddress();
   console.log("AiModelRegistry deployed to:", aiModelRegistryAddress);
 
+  // Deploy DB Backup Registry
+  console.log("\n--- Deploying DbBackupRegistry ---");
+  const DbBackupRegistry = await hre.ethers.getContractFactory("DbBackupRegistry");
+  const dbBackupRegistry = await DbBackupRegistry.deploy();
+  await dbBackupRegistry.waitForDeployment();
+  const dbBackupRegistryAddress = await dbBackupRegistry.getAddress();
+  console.log("DbBackupRegistry deployed to:", dbBackupRegistryAddress);
+
   // Summary
   console.log("\n========== Deployment Summary ==========");
   console.log(`Verifier (${useMock ? "Mock" : "Groth16"}): ${verifierAddress}`);
   console.log(`IdentityRegistry: ${registryAddress}`);
   console.log(`AiModelRegistry: ${aiModelRegistryAddress}`);
+  console.log(`DbBackupRegistry: ${dbBackupRegistryAddress}`);
   console.log(`Admin: ${deployer.address}`);
   console.log("=========================================");
   console.log("\nAdd these to your backend .env:");
   console.log(`IDENTITY_REGISTRY_ADDRESS=${registryAddress}`);
   console.log(`AI_MODEL_REGISTRY_ADDRESS=${aiModelRegistryAddress}`);
+  console.log(`DB_BACKUP_REGISTRY_ADDRESS=${dbBackupRegistryAddress}`);
   console.log(`VERIFIER_ADDRESS=${verifierAddress}`);
 }
 

@@ -6,13 +6,22 @@ import "./IdentityRegistry.sol";
 /**
  * @title AiModelRegistry
  * @notice Manages AI Model IP hashes on blockchain
- * @dev Implements mapping(modelId => mapping(modelHash => bool isActive))
+ * @dev Implements mapping(modelId => Model)
  */
 contract AiModelRegistry {
     IdentityRegistry public identityRegistry;
 
-    // modelId => (modelHash => isActive)
-    mapping(string => mapping(string => bool)) public modelHashes;
+    struct ModelStatus {
+        string modelHash;
+        bool isActived;
+    }
+
+    struct Model {
+        ModelStatus status;
+    }
+
+    // modelId => Model Info
+    mapping(string => Model) public modelHashes;
 
     // Events
     event ModelRegistered(
@@ -67,9 +76,12 @@ contract AiModelRegistry {
     ) external onlyAdmin {
         require(bytes(_modelId).length > 0, "AiModelRegistry: empty modelId");
         require(bytes(_modelHash).length > 0, "AiModelRegistry: empty modelHash");
-        require(!modelHashes[_modelId][_modelHash], "AiModelRegistry: hash already exists");
+        require(bytes(modelHashes[_modelId].status.modelHash).length == 0, "AiModelRegistry: hash already exists");
 
-        modelHashes[_modelId][_modelHash] = true;
+        modelHashes[_modelId].status = ModelStatus({
+            modelHash: _modelHash,
+            isActived: true
+        });
 
         emit ModelRegistered(_modelId, _modelHash, block.timestamp);
     }
@@ -85,9 +97,12 @@ contract AiModelRegistry {
     ) external onlyAdmin {
         require(bytes(_modelId).length > 0, "AiModelRegistry: empty modelId");
         require(bytes(_modelHash).length > 0, "AiModelRegistry: empty modelHash");
-        require(!modelHashes[_modelId][_modelHash], "AiModelRegistry: hash already exists");
+        require(keccak256(bytes(modelHashes[_modelId].status.modelHash)) != keccak256(bytes(_modelHash)), "AiModelRegistry: hash already exists");
 
-        modelHashes[_modelId][_modelHash] = true;
+        modelHashes[_modelId].status = ModelStatus({
+            modelHash: _modelHash,
+            isActived: true
+        });
 
         emit ModelHashAdded(_modelId, _modelHash, block.timestamp);
     }
@@ -101,9 +116,13 @@ contract AiModelRegistry {
         string memory _modelId,
         string memory _modelHash
     ) external onlyAdmin {
-        require(modelHashes[_modelId][_modelHash], "AiModelRegistry: hash not active");
+        require(
+            keccak256(bytes(modelHashes[_modelId].status.modelHash)) == keccak256(bytes(_modelHash)) &&
+            modelHashes[_modelId].status.isActived,
+            "AiModelRegistry: hash not active"
+        );
 
-        modelHashes[_modelId][_modelHash] = false;
+        modelHashes[_modelId].status.isActived = false;
 
         emit ModelHashDeactivated(_modelId, _modelHash, block.timestamp);
     }
@@ -119,9 +138,13 @@ contract AiModelRegistry {
     ) external onlyAdmin {
         require(bytes(_modelId).length > 0, "AiModelRegistry: empty modelId");
         require(bytes(_modelHash).length > 0, "AiModelRegistry: empty modelHash");
-        require(!modelHashes[_modelId][_modelHash], "AiModelRegistry: hash already active");
+        require(
+            keccak256(bytes(modelHashes[_modelId].status.modelHash)) == keccak256(bytes(_modelHash)),
+            "AiModelRegistry: hash mismatch"
+        );
+        require(!modelHashes[_modelId].status.isActived, "AiModelRegistry: hash already active");
 
-        modelHashes[_modelId][_modelHash] = true;
+        modelHashes[_modelId].status.isActived = true;
 
         emit ModelHashActivated(_modelId, _modelHash, block.timestamp);
     }
@@ -136,7 +159,17 @@ contract AiModelRegistry {
         string memory _modelId,
         string memory _modelHash
     ) external view returns (bool) {
-        return modelHashes[_modelId][_modelHash];
+        return (keccak256(bytes(modelHashes[_modelId].status.modelHash)) == keccak256(bytes(_modelHash))) && modelHashes[_modelId].status.isActived;
     }
 
+    /**
+     * @notice Get stored model details (hash and active state)
+     * @param _modelId Unique identifier for the model
+     */
+    function getModelDetails(
+        string memory _modelId
+    ) external view returns (string memory modelHash, bool isActived) {
+        return (modelHashes[_modelId].status.modelHash, modelHashes[_modelId].status.isActived);
+    }
 }
+

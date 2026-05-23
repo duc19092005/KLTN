@@ -132,14 +132,26 @@ Mở MetaMask → Nhấp vào hình đại diện tài khoản → **Import acco
 Vì Admin **không dùng mật khẩu**, hệ thống cần đăng ký khuôn mặt và ví lần đầu. Đầu tiên, bạn phải kích hoạt tài khoản Admin gốc (Bootstrap).
 
 ### ⚡ Bước 1: Gọi API Bootstrap
-Khi hệ thống mới tinh và chưa có Admin nào, gọi API Bootstrap bằng cURL hoặc Postman:
+Khi hệ thống mới tinh và chưa có Admin nào, gọi API Bootstrap bằng cURL hoặc Postman. 
+
+Bạn có thể gọi một cách đơn giản chỉ với mã khóa bí mật `superAdminSecret` (các trường `username` và `email` là không bắt buộc, hệ thống sẽ tự động lấy mặc định là `admin` và `admin@hospital.vn` nếu không truyền vào):
 
 ```bash
 curl -X POST http://localhost:3001/api/auth/bootstrap \
   -H "Content-Type: application/json" \
   -d '{
-    "username": "admin",
-    "email": "admin@hospital.vn",
+    "superAdminSecret": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+  }'
+```
+
+Hoặc nếu bạn muốn tùy biến thông tin Admin đầu tiên:
+
+```bash
+curl -X POST http://localhost:3001/api/auth/bootstrap \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "custom_admin",
+    "email": "custom@hospital.vn",
     "superAdminSecret": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
   }'
 ```

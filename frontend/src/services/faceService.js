@@ -22,16 +22,25 @@ export async function loadModels() {
 
 /**
  * Detect a face and extract 128-dimensional embedding from video element
- * @param {HTMLVideoElement} videoEl
+ * @param {HTMLVideoElement|HTMLCanvasElement|HTMLImageElement} videoEl
  * @returns {Float32Array|null} 128-dim face embedding or null if no face found
  */
 export async function detectFace(videoEl) {
   if (!modelsLoaded) await loadModels();
 
-  const detection = await faceapi
-    .detectSingleFace(videoEl)
+  // Try first with default/standard confidence threshold (0.4)
+  let detection = await faceapi
+    .detectSingleFace(videoEl, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }))
     .withFaceLandmarks()
     .withFaceDescriptor();
+
+  // Fallback to a lower confidence threshold (0.2) if not found (helps with turned/tilted faces)
+  if (!detection) {
+    detection = await faceapi
+      .detectSingleFace(videoEl, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.2 }))
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+  }
 
   if (!detection) return null;
 
@@ -44,3 +53,4 @@ export async function detectFace(videoEl) {
 export function areModelsLoaded() {
   return modelsLoaded;
 }
+

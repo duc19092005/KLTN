@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionService } from '../encryption/encryption.service';
+import { BlockchainService } from '../blockchain/blockchain.service';
 import { RegisterModelDto } from './dto/register-model.dto';
 import { AddHashDto } from './dto/add-hash.dto';
 import { VerifyHashDto } from './dto/verify-hash.dto';
@@ -10,6 +11,7 @@ export class AiModelService {
   constructor(
     private prisma: PrismaService,
     private encryption: EncryptionService,
+    private blockchainService: BlockchainService,
   ) {}
 
   /**
@@ -50,6 +52,7 @@ export class AiModelService {
         description: dto.description,
         createdBy,
         isActiveOnChain: false,
+        type: dto.type,
       },
     });
 
@@ -79,6 +82,28 @@ export class AiModelService {
       throw new NotFoundException('Model not found');
     }
 
+    let integrityVerified = false;
+    let blockchainHash = null;
+    let errorLog = null;
+
+    if (model.isActiveOnChain && this.blockchainService.aiModelContract) {
+      try {
+        const [onChainHash, onChainActive] = await this.blockchainService.aiModelContract.getModelDetails(model.modelId);
+        blockchainHash = onChainHash;
+
+        if (onChainActive && onChainHash) {
+          const decryptedHash = this.encryption.decrypt(model.ipHashEncrypted);
+          const computedHash = this.encryption.hash(decryptedHash);
+          if (computedHash === onChainHash) {
+            integrityVerified = true;
+          }
+        }
+      } catch (err) {
+        console.error('Blockchain integrity check failed:', err);
+        errorLog = err.message;
+      }
+    }
+
     return {
       id: model.id,
       modelId: model.modelId,
@@ -91,6 +116,10 @@ export class AiModelService {
       createdBy: model.createdBy,
       createdAt: model.createdAt,
       updatedAt: model.updatedAt,
+      type: model.type,
+      integrityVerified,
+      blockchainHash,
+      verificationError: errorLog,
     };
   }
 
@@ -111,6 +140,8 @@ export class AiModelService {
       description: model.description,
       isActiveOnChain: model.isActiveOnChain,
       blockchainTxHash: model.blockchainTxHash,
+      type: model.type,
+      createdBy: model.createdBy,
       createdAt: model.createdAt,
     }));
   }
@@ -190,7 +221,7 @@ export class AiModelService {
   /**
    * Update blockchain transaction hash after successful on-chain registration
    */
-  async updateBlockchainStatus(modelId: string, txHash: string) {
+  async updateBlockchainStatus(modelId: string, txHash: string, isActiveOnChain: boolean = true) {
     const model = await this.prisma.aiModelRegistry.findUnique({
       where: { modelId },
     });
@@ -203,7 +234,7 @@ export class AiModelService {
       where: { modelId },
       data: {
         blockchainTxHash: txHash,
-        isActiveOnChain: true,
+        isActiveOnChain,
       },
     });
 
@@ -246,6 +277,65 @@ export class AiModelService {
       };
     } catch (error) {
       throw new BadRequestException('Failed to decrypt hash');
+    }
+  }
+
+  /**
+   * Update AI model metadata/configuration details in DB
+   */
+  async updateModel(modelId: string, dto: {
+    modelName?: string;
+    modelVersion?: string;
+    recommendedSpecialty?: string;
+    description?: string;
+    type?: string;
+    ipHash?: string;
+  }) {
+    const existing = await this.prisma.aiModelRegistry.findUnique({
+      where: { modelId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Model not found');
+    }
+
+    const updateData: any = {
+      modelName: dto.modelName !== undefined ? dto.modelName : existing.modelName,
+      modelVersion: dto.modelVersion !== undefined ? dto.modelVersion : existing.modelVersion,
+      recommendedSpecialty: dto.recommendedSpecialty !== undefined ? dto.recommendedSpecialty : existing.recommendedSpecialty,
+      description: dto.description !== undefined ? dto.description : existing.description,
+      type: dto.type !== undefined ? dto.type : existing.type,
+    };
+
+    if (dto.ipHash !== undefined && dto.ipHash.trim() !== '') {
+      updateData.ipHashEncrypted = this.encryption.encrypt(dto.ipHash);
+      updateData.ipHashPlain = dto.ipHash;
+      updateData.isActiveOnChain = false;
+    }
+
+    const updated = await this.prisma.aiModelRegistry.update({
+      where: { modelId },
+      data: updateData,
+    });
+
+    return updated;
+  }
+
+  /**
+   * Decrypt and return the plain IP/API Key config (admin only, for editing purposes)
+   */
+  async getPlainHash(modelId: string) {
+    const model = await this.prisma.aiModelRegistry.findUnique({
+      where: { modelId },
+    });
+    if (!model) {
+      throw new NotFoundException('Model not found');
+    }
+    try {
+      const plainHash = this.encryption.decrypt(model.ipHashEncrypted);
+      return { plainHash };
+    } catch (err) {
+      throw new BadRequestException('Failed to decrypt plain hash');
     }
   }
 }

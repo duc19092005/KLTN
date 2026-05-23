@@ -109,13 +109,8 @@ export class AiModelBlockchainController {
   @HttpCode(HttpStatus.OK)
   async deactivateHashOnBlockchain(
     @Param('modelId') modelId: string,
-    @Body('ipHash') ipHash: string,
   ) {
-    if (!ipHash) {
-      throw new BadRequestException('ipHash is required');
-    }
-
-    const ipHashForBlockchain = this.aiModelService.hashForBlockchain(ipHash);
+    const { ipHashForBlockchain } = await this.aiModelService.getDecryptedHash(modelId);
 
     const result = await this.blockchainService.deactivateAiModelHash(
       modelId,
@@ -125,6 +120,9 @@ export class AiModelBlockchainController {
     if (!result.success) {
       throw new BadRequestException(`Failed to deactivate hash: ${result.error}`);
     }
+
+    // Also update database status
+    await this.aiModelService.updateBlockchainStatus(modelId, result.txHash, false);
 
     return {
       message: 'Hash deactivated on blockchain successfully',

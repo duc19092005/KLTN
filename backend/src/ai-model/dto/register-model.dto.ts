@@ -25,4 +25,8 @@ export class RegisterModelDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @IsString()
+  @IsOptional()
+  type?: string;
 }

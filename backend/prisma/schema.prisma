@@ -134,6 +134,7 @@ model AiModelRegistry {
   // Metadata
   description       String?
   createdBy         String   // Admin user ID who created this model
+  type              String?  // API provider type (e.g., openai, anthropic) or IP type
   
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

@@ -20,6 +20,25 @@ export default function LivenessCheck({ onLivenessPass, onError }) {
   const intervalRef = useRef(null);
   const holdStartRef = useRef(null);
   const tsCounterRef = useRef(1);
+  const capturedCanvasRef = useRef(null);
+
+  const captureVideoFrame = () => {
+    if (!videoRef.current) return null;
+    try {
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        return canvas;
+      }
+    } catch (e) {
+      console.error('Failed to capture video frame:', e);
+    }
+    return null;
+  };
 
   const stateRef = useRef({
     directions: [],
@@ -149,6 +168,14 @@ export default function LivenessCheck({ onLivenessPass, onError }) {
         const dir = classifyDirection(yawRatio, pitchRatio);
         setDisplayDir(dir);
 
+        // Capture a candidate front-facing frame if the user is looking straight (center)
+        if (dir === 'center') {
+          const canvas = captureVideoFrame();
+          if (canvas) {
+            capturedCanvasRef.current = canvas;
+          }
+        }
+
         const targetDir = s.directions[s.currentIdx];
         if (!targetDir) return;
 
@@ -173,6 +200,10 @@ export default function LivenessCheck({ onLivenessPass, onError }) {
               s.allPassed = true;
               setAllPassedUI(true);
               setMessage('Xác thực thành công');
+              if (!capturedCanvasRef.current) {
+                const canvas = captureVideoFrame();
+                capturedCanvasRef.current = canvas;
+              }
             } else {
               s.currentIdx++;
               setDisplayIdx(s.currentIdx);
@@ -198,7 +229,7 @@ export default function LivenessCheck({ onLivenessPass, onError }) {
   useEffect(() => {
     if (allPassedUI && videoRef.current) {
       const timer = setTimeout(() => {
-        onLivenessPass?.(videoRef.current);
+        onLivenessPass?.(capturedCanvasRef.current || videoRef.current);
       }, 1500);
       return () => clearTimeout(timer);
     }

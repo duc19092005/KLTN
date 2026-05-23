@@ -4,6 +4,7 @@ services:
   db:
     image: postgres:16-alpine
     container_name: zkp-postgres
+    user: root
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=YourPassword123!
@@ -12,6 +13,13 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - wal_archive:/var/lib/postgresql/wal_archive
+    command: >
+      sh -c "
+      mkdir -p /var/lib/postgresql/wal_archive &&
+      chown -R postgres:postgres /var/lib/postgresql/wal_archive &&
+      exec docker-entrypoint.sh postgres -c wal_level=replica -c archive_mode=on -c \"archive_command=cp %p /var/lib/postgresql/wal_archive/%f\"
+      "
 
   blockchain:
     build:
@@ -30,6 +38,7 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+      - wal_archive:/wal_archive
     environment:
       - NODE_ENV=development
       - PORT=3001
@@ -39,6 +48,7 @@ services:
       - BLOCKCHAIN_RPC_URL=http://blockchain:8545
       - IDENTITY_REGISTRY_ADDRESS=${IDENTITY_REGISTRY_ADDRESS}
       - AI_MODEL_REGISTRY_ADDRESS=${AI_MODEL_REGISTRY_ADDRESS}
+      - DB_BACKUP_REGISTRY_ADDRESS=${DB_BACKUP_REGISTRY_ADDRESS}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - SUPER_ADMIN_PRIVATE_KEY=${SUPER_ADMIN_PRIVATE_KEY}
       - SMTP_HOST=smtp.ethereal.email
@@ -69,3 +79,4 @@ services:
 
 volumes:
   postgres_data:
+  wal_archive:

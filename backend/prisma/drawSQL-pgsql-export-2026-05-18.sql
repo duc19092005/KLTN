@@ -43,6 +43,8 @@ CREATE TABLE "DoctorProfile"(
     "userId" VARCHAR(255) NOT NULL,
     "doctorName" VARCHAR(255) NOT NULL,
     "licenseId" VARCHAR(255) NOT NULL,
+    "portraitImage" TEXT NULL,
+    "blockchainHash" VARCHAR(255) NULL,
     "faceEmbedding" TEXT NULL,
     "faceEmbeddingHash" VARCHAR(255) NULL,
     "dateOfBirth" TIMESTAMP(3) NOT NULL,
@@ -85,6 +87,27 @@ CREATE TABLE "AiModelInfo"(
     "updatedAt" TIMESTAMP(3) NOT NULL
 );
 ALTER TABLE "AiModelInfo" ADD PRIMARY KEY("id");
+
+CREATE TABLE "AiModelRegistry"(
+    "id" VARCHAR(255) NOT NULL,
+    "modelId" VARCHAR(255) NOT NULL,
+    "modelName" VARCHAR(255) NOT NULL,
+    "modelVersion" VARCHAR(255) NOT NULL,
+    "recommendedSpecialty" VARCHAR(255) NULL,
+    "ipHashEncrypted" TEXT NOT NULL,
+    "ipHashPlain" TEXT NULL,
+    "blockchainTxHash" VARCHAR(255) NULL,
+    "isActiveOnChain" BOOLEAN NOT NULL DEFAULT FALSE,
+    "description" TEXT NULL,
+    "createdBy" VARCHAR(255) NOT NULL,
+    "type" VARCHAR(255) NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL
+);
+ALTER TABLE "AiModelRegistry" ADD PRIMARY KEY("id");
+ALTER TABLE "AiModelRegistry" ADD CONSTRAINT "aimodelregistry_modelid_unique" UNIQUE("modelId");
+CREATE INDEX "aimodelregistry_modelid_idx" ON "AiModelRegistry"("modelId");
+CREATE INDEX "aimodelregistry_isactiveonchain_idx" ON "AiModelRegistry"("isActiveOnChain");
 
 CREATE TABLE "AiDiagnosis"(
     "id" VARCHAR(255) NOT NULL,

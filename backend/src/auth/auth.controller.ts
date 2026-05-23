@@ -20,11 +20,11 @@ export class AuthController {
    */
   @Post('bootstrap')
   async bootstrapFirstAdmin(
-    @Body() body: { username: string; email: string; superAdminSecret: string },
+    @Body() body: { username?: string; email?: string; superAdminSecret: string },
   ) {
     return this.authService.bootstrapFirstAdmin(
-      body.username,
-      body.email,
+      body.username || 'admin',
+      body.email || 'admin@hospital.vn',
       body.superAdminSecret,
     );
   }

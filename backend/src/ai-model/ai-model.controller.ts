@@ -8,6 +8,7 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { AiModelService } from './ai-model.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -31,7 +32,7 @@ export class AiModelController {
   @Roles('ADMIN')
   @HttpCode(HttpStatus.CREATED)
   async registerModel(@Body() dto: RegisterModelDto, @Request() req) {
-    const adminId = req.user.userId;
+    const adminId = req.user.sub;
     return this.aiModelService.registerModel(dto, adminId);
   }
 
@@ -47,6 +48,19 @@ export class AiModelController {
   }
 
   /**
+   * GET /ai-model/config
+   * Get AI Model configuration (including contract address)
+   * Admin only
+   */
+  @Get('config')
+  @Roles('ADMIN')
+  async getConfig() {
+    return {
+      aiModelRegistryAddress: process.env.AI_MODEL_REGISTRY_ADDRESS,
+    };
+  }
+
+  /**
    * GET /ai-model/:modelId
    * Get details of a specific model
    * Admin only
@@ -55,6 +69,28 @@ export class AiModelController {
   @Roles('ADMIN')
   async getModel(@Param('modelId') modelId: string) {
     return this.aiModelService.getModel(modelId);
+  }
+
+  /**
+   * POST /ai-model/update/:modelId
+   * Update metadata/config of a model
+   * Admin only
+   */
+  @Post('update/:modelId')
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.OK)
+  async updateModel(
+    @Param('modelId') modelId: string,
+    @Body() dto: {
+      modelName?: string;
+      modelVersion?: string;
+      recommendedSpecialty?: string;
+      description?: string;
+      type?: string;
+      ipHash?: string;
+    }
+  ) {
+    return this.aiModelService.updateModel(modelId, dto);
   }
 
   /**
@@ -78,7 +114,7 @@ export class AiModelController {
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async addHash(@Body() dto: AddHashDto, @Request() req) {
-    const adminId = req.user.userId;
+    const adminId = req.user.sub;
     return this.aiModelService.addHash(dto, adminId);
   }
 
@@ -93,8 +129,10 @@ export class AiModelController {
   async updateBlockchainStatus(
     @Param('modelId') modelId: string,
     @Body('txHash') txHash: string,
+    @Body('isActiveOnChain') isActiveOnChain?: boolean,
   ) {
-    return this.aiModelService.updateBlockchainStatus(modelId, txHash);
+    const active = isActiveOnChain !== undefined ? isActiveOnChain : true;
+    return this.aiModelService.updateBlockchainStatus(modelId, txHash, active);
   }
 
   /**
@@ -119,5 +157,91 @@ export class AiModelController {
   @Roles('ADMIN')
   async getBlockchainHash(@Param('modelId') modelId: string) {
     return this.aiModelService.getDecryptedHash(modelId);
+  }
+
+  /**
+   * GET /ai-model/:modelId/plain-hash
+   * Get decrypted plain IP hash / API config for editing
+   * Admin only
+   */
+  @Get(':modelId/plain-hash')
+  @Roles('ADMIN')
+  async getPlainHash(@Param('modelId') modelId: string) {
+    return this.aiModelService.getPlainHash(modelId);
+  }
+
+  /**
+   * POST /ai-model/test-provider
+   * Test API Key connection to the selected AI provider
+   * Admin only
+   */
+  @Post('test-provider')
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.OK)
+  async testProvider(
+    @Body('provider') provider: string,
+    @Body('apiKey') apiKey: string,
+    @Body('baseUrl') baseUrl?: string,
+  ) {
+    if (!provider || !apiKey) {
+      throw new BadRequestException('provider and apiKey are required');
+    }
+
+    try {
+      let url = '';
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (provider === 'openai') {
+        const base = baseUrl ? baseUrl.replace(/\/$/, '') : 'https://api.openai.com/v1';
+        url = `${base}/models`;
+        headers['Authorization'] = `Bearer ${apiKey}`;
+      } else if (provider === 'anthropic') {
+        const base = baseUrl ? baseUrl.replace(/\/$/, '') : 'https://api.anthropic.com/v1';
+        url = `${base}/models`;
+        headers['x-api-key'] = apiKey;
+        headers['anthropic-version'] = '2023-06-01';
+      } else if (provider === 'gemini') {
+        const base = baseUrl ? baseUrl.replace(/\/$/, '') : 'https://generativelanguage.googleapis.com/v1beta';
+        url = `${base}/models?key=${apiKey}`;
+      } else if (provider === 'deepseek') {
+        const base = baseUrl ? baseUrl.replace(/\/$/, '') : 'https://api.deepseek.com';
+        url = `${base}/models`;
+        headers['Authorization'] = `Bearer ${apiKey}`;
+      } else {
+        throw new BadRequestException(`Unsupported provider: ${provider}`);
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 seconds timeout
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          success: false,
+          status: response.status,
+          message: `Lỗi từ nhà cung cấp: ${response.statusText} (${errorText.substring(0, 100)})`,
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Kết nối thành công! API Key hợp lệ.',
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: `Không thể kết nối đến nhà cung cấp: ${err.message || err}`,
+      };
+    }
   }
 }

@@ -40,6 +40,13 @@ export class BlockchainService implements OnModuleInit {
       console.warn('⚠️ AI_MODEL_REGISTRY_ADDRESS not set. AI Model blockchain features disabled.');
     }
 
+    const dbBackupAddress = process.env.DB_BACKUP_REGISTRY_ADDRESS;
+    if (dbBackupAddress) {
+      this.initDbBackupContract(dbBackupAddress);
+    } else {
+      console.warn('⚠️ DB_BACKUP_REGISTRY_ADDRESS not set. DB backup blockchain features disabled.');
+    }
+
     // Initialize Super Admin signer for relayer operations
     const superAdminKey = process.env.SUPER_ADMIN_PRIVATE_KEY;
     if (superAdminKey && superAdminKey !== 'your_super_admin_private_key_here') {
@@ -185,17 +192,22 @@ export class BlockchainService implements OnModuleInit {
     return this.abi;
   }
 
+  getSuperAdminAddress(): string | null {
+    return this.superAdminSigner ? this.superAdminSigner.address : null;
+  }
+
   // ============================================================
   // AI MODEL REGISTRY METHODS
   // ============================================================
 
-  private aiModelContract: ethers.Contract | null = null;
+  public aiModelContract: ethers.Contract | null = null;
   private readonly aiModelAbi = [
     'function registerModel(string _modelId, string _modelHash) external',
     'function addModelHash(string _modelId, string _modelHash) external',
     'function deactivateModelHash(string _modelId, string _modelHash) external',
     'function activateModelHash(string _modelId, string _modelHash) external',
     'function isModelHashActive(string _modelId, string _modelHash) external view returns (bool)',
+    'function getModelDetails(string _modelId) external view returns (string, bool)',
     'event ModelRegistered(string indexed modelId, string modelHash, uint256 timestamp)',
     'event ModelHashAdded(string indexed modelId, string modelHash, uint256 timestamp)',
     'event ModelHashDeactivated(string indexed modelId, string modelHash, uint256 timestamp)',
@@ -321,4 +333,88 @@ export class BlockchainService implements OnModuleInit {
     }
   }
 
+  // ============================================================
+  // DB BACKUP REGISTRY METHODS
+  // ============================================================
+
+  private dbBackupContract: ethers.Contract | null = null;
+  private readonly dbBackupAbi = [
+    'function mintBackupNFT(address to, string memory tokenURI, string memory ipfsCID, bytes32 fileHash) public returns (uint256)',
+    'function addHourlyBackup(string memory dateKey, string memory ipfsCID) public',
+    'function getHourlyBackups(string memory dateKey) public view returns (string[] memory)',
+    'event DailyBackupMinted(uint256 indexed tokenId, string ipfsCID, bytes32 fileHash)',
+    'event HourlyBackupAdded(string indexed dateKey, string ipfsCID, uint256 timestamp)',
+  ];
+
+  initDbBackupContract(contractAddress: string) {
+    if (!contractAddress) return;
+    this.dbBackupContract = new ethers.Contract(
+      contractAddress,
+      this.dbBackupAbi,
+      this.provider,
+    );
+    console.log(`✅ Connected to DbBackupRegistry at ${contractAddress}`);
+  }
+
+  async mintBackupNFT(recipient: string, tokenURI: string, ipfsCID: string, fileHash: string) {
+    if (!this.dbBackupContract) {
+      return { success: false, error: 'DB Backup Registry not initialized' };
+    }
+    if (!this.superAdminSigner) {
+      return { success: false, error: 'Super Admin signer not configured' };
+    }
+
+    try {
+      const contract = this.dbBackupContract.connect(this.superAdminSigner) as ethers.Contract;
+      // Convert file hash to bytes32 format (it should be a hex string starting with 0x)
+      const formattedHash = fileHash.startsWith('0x') ? fileHash : `0x${fileHash}`;
+      const tx = await contract.mintBackupNFT(recipient, tokenURI, ipfsCID, formattedHash);
+      const receipt = await tx.wait();
+
+      console.log(`[Blockchain] Minted DB Backup NFT, token ID recorded, tx: ${tx.hash}`);
+      return {
+        success: true,
+        txHash: tx.hash,
+        blockNumber: receipt.blockNumber,
+      };
+    } catch (err: any) {
+      console.error(`[Blockchain] Failed to mint DB Backup NFT:`, err);
+      return { success: false, error: err.message || 'Unknown error' };
+    }
+  }
+
+  async addHourlyBackup(dateKey: string, ipfsCID: string) {
+    if (!this.dbBackupContract) {
+      return { success: false, error: 'DB Backup Registry not initialized' };
+    }
+    if (!this.superAdminSigner) {
+      return { success: false, error: 'Super Admin signer not configured' };
+    }
+
+    try {
+      const contract = this.dbBackupContract.connect(this.superAdminSigner) as ethers.Contract;
+      const tx = await contract.addHourlyBackup(dateKey, ipfsCID);
+      const receipt = await tx.wait();
+
+      console.log(`[Blockchain] Added hourly backup CID ${ipfsCID} for date ${dateKey}`);
+      return {
+        success: true,
+        txHash: tx.hash,
+        blockNumber: receipt.blockNumber,
+      };
+    } catch (err: any) {
+      console.error(`[Blockchain] Failed to add hourly backup:`, err);
+      return { success: false, error: err.message || 'Unknown error' };
+    }
+  }
+
+  async getHourlyBackups(dateKey: string): Promise<string[]> {
+    if (!this.dbBackupContract) return [];
+    try {
+      return await this.dbBackupContract.getHourlyBackups(dateKey);
+    } catch (err) {
+      console.error(`[Blockchain] Failed to get hourly backups:`, err);
+      return [];
+    }
+  }
 }

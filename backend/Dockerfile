@@ -1,6 +1,6 @@
 FROM node:18-alpine
 # Cài đặt openssl và thư viện tương thích để Prisma Engine chạy thành công trên Alpine Linux
-RUN apk add --no-cache openssl libc6-compat
+RUN apk add --no-cache openssl libc6-compat postgresql-client
 WORKDIR /app
 COPY package*.json ./
 RUN npm install

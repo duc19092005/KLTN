@@ -1,3 +1,10 @@
+import * as crypto from 'crypto';
+if (!global.crypto) {
+  Object.defineProperty(global, 'crypto', {
+    value: crypto.webcrypto || crypto,
+  });
+}
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';

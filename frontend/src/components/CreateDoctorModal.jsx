@@ -102,7 +102,7 @@ export default function CreateDoctorModal({ open, onClose, onSuccess }) {
   if (success) {
     return (
       <Backdrop onClick={handleClose}>
-        <div className="saas-modal-box scale-up" style={{ maxWidth: 460, padding: '32px 24px' }}>
+        <div className="saas-modal-box scale-up" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460, padding: '32px 24px' }}>
           <div style={{ textAlign: 'center' }}>
             <div className="success-pulse-icon">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -147,7 +147,7 @@ export default function CreateDoctorModal({ open, onClose, onSuccess }) {
   // ── Form Screen ─────────────────────────────────────────────────────────
   return (
     <Backdrop onClick={handleClose}>
-      <div className="saas-modal-box scale-up" style={{ maxWidth: 760 }}>
+      <div className="saas-modal-box scale-up" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 760 }}>
         
         {/* INJECTED PREMIUM & RESPONSIVE STYLES */}
         <style>{`
