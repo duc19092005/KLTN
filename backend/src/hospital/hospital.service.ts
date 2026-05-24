@@ -8,12 +8,14 @@ import { BlockchainService } from '../blockchain/blockchain.service';
 import { CreateDoctorDto } from './dto/create-doctor.dto';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import { EncryptionService } from '../encryption/encryption.service';
 
 @Injectable()
 export class HospitalService {
   constructor(
     private prisma: PrismaService,
     private blockchainService: BlockchainService,
+    private encryptionService: EncryptionService,
   ) { }
 
   // ── READ ──────────────────────────────────────────────────────────────────
@@ -26,12 +28,26 @@ export class HospitalService {
     });
   }
 
-  async getDiagnoses() {
+  async getDiagnoses(status?: string, doctorId?: string) {
+    const where: any = {};
+    
+    if (status) {
+      where.diagnoseStatus = status;
+    }
+    
+    if (doctorId) {
+      where.doctorId = doctorId;
+    }
+
     return this.prisma.aiDiagnosis.findMany({
+      where,
       include: {
         doctor: true,
         aiModel: true,
         finalConclude: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
       },
     });
   }
@@ -43,7 +59,7 @@ export class HospitalService {
   }
 
   async getAiModels() {
-    return this.prisma.aiModelInfo.findMany();
+    return this.prisma.aiModelRegistry.findMany();
   }
 
   // ── CREATE DOCTOR ─────────────────────────────────────────────────────────
@@ -258,7 +274,7 @@ export class HospitalService {
     }
 
     // Verify AI Model exists
-    const aiModel = await this.prisma.aiModelInfo.findUnique({
+    const aiModel = await this.prisma.aiModelRegistry.findUnique({
       where: { id: aiModelId },
     });
 
@@ -272,45 +288,88 @@ export class HospitalService {
       .update(imageBuffer)
       .digest('hex');
 
-    // 2. Call AI Model API (external service)
-    const aiApiUrl = process.env.PATIENT_API_URL || 'http://localhost:8001/patients';
+    // 2. Call AI Model API using stored provider config
     let aiResults: any = {};
-    let segmentImageHash = '';
+    let segmentImageHash = crypto.randomBytes(32).toString('hex'); // Mock segment hash for now
 
     try {
-      // TODO: Replace with actual AI API call
-      // For now, simulate AI response
-      const response = await fetch(`${aiApiUrl}/diagnose`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          patientName,
-          clinicalSymptoms,
-          imageHash: inputImageHash,
-          modelId: aiModelId,
-        }),
-      });
+      if (aiModel.ipHashEncrypted) {
+        const plainHash = this.encryptionService.decrypt(aiModel.ipHashEncrypted);
+        let config;
+        try {
+          config = JSON.parse(plainHash);
+        } catch (e) {
+          throw new BadRequestException('Invalid AI Model configuration format');
+        }
 
-      if (response.ok) {
-        const data = await response.json();
-        aiResults = data.results || {};
-        segmentImageHash = data.segmentImageHash || '';
+        if (config && config.apiKey && config.model) {
+          let baseUrl = 'https://api.openai.com/v1';
+          if (config.baseUrl) {
+            baseUrl = config.baseUrl.endsWith('/') ? config.baseUrl.slice(0, -1) : config.baseUrl;
+          }
+          const apiUrl = `${baseUrl}/chat/completions`;
+          
+          let authHeader = `Bearer ${config.apiKey}`;
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'Authorization': authHeader,
+          };
+
+          if (config.provider === 'anthropic') {
+            headers['x-api-key'] = config.apiKey;
+            headers['anthropic-version'] = '2023-06-01';
+            delete headers['Authorization'];
+          }
+
+          const prompt = `Bạn là một bác sĩ chẩn đoán AI. Hãy chẩn đoán dựa trên thông tin sau:
+Tên bệnh nhân: ${patientName}
+Triệu chứng lâm sàng: ${clinicalSymptoms}
+Điều trị sơ bộ: ${preliminaryTreatment}
+Ghi chú bác sĩ: ${doctorNotes || 'Không có'}
+Mã băm hình ảnh: ${inputImageHash}
+
+Trình bày kết quả chẩn đoán bắt buộc dưới dạng JSON CHUẨN, KHÔNG CÓ BẤT KỲ VĂN BẢN NÀO KHÁC BÊN NGOÀI.
+Các key là tên bệnh, value là tỷ lệ phần trăm tự tin (từ 0.0 đến 1.0).
+Ví dụ: {"Viêm phổi": 0.85, "Bình thường": 0.15}`;
+
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              model: config.model,
+              messages: [{ role: 'user', content: prompt }],
+              temperature: 0.2
+            }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            const content = config.provider === 'anthropic' 
+              ? data.content[0].text 
+              : data.choices[0].message.content;
+            
+            // Clean up backticks if model returns markdown block
+            const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
+            
+            try {
+              aiResults = JSON.parse(cleanContent);
+            } catch (err) {
+              console.warn('[Hospital] Failed to parse AI JSON:', cleanContent);
+              aiResults = { "Kết quả": cleanContent };
+            }
+          } else {
+            const errorText = await response.text();
+            throw new Error(`AI API failed: ${response.status} - ${errorText}`);
+          }
+        } else {
+          throw new BadRequestException('AI Model missing credentials');
+        }
       } else {
-        // Fallback: mock results if AI service unavailable
-        aiResults = {
-          pneumonia: 0.85,
-          normal: 0.15,
-        };
-        segmentImageHash = crypto.randomBytes(32).toString('hex');
+         throw new BadRequestException('AI Model has no configuration');
       }
     } catch (err) {
-      console.warn('[Hospital] AI API unavailable, using mock results:', err.message);
-      // Mock results for development
-      aiResults = {
-        disease_detected: 0.78,
-        normal: 0.22,
-      };
-      segmentImageHash = crypto.randomBytes(32).toString('hex');
+      console.warn('[Hospital] AI Provider fetch failed:', err.message);
+      throw new BadRequestException(`Không thể kết nối API của AI Model: ${err.message}`);
     }
 
     // 3. Create AiDiagnosis record with patient info

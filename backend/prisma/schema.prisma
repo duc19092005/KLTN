@@ -103,17 +103,7 @@ model BlockchainHistory {
   updatedAt           DateTime @updatedAt
 }
 
-model AiModelInfo {
-  id            String   @id @default(uuid())
-  modelName     String
-  version       String
 
-  diagnoses     AiDiagnosis[]
-  aiQualities   AiQuality[]
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
 
 // AI Model Registry - Quản lý IP hash của các model AI
 model AiModelRegistry {
@@ -138,6 +128,9 @@ model AiModelRegistry {
   
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+
+  diagnoses         AiDiagnosis[]
+  aiQualities       AiQuality[]
   
   @@index([modelId])
   @@index([isActiveOnChain])
@@ -149,7 +142,7 @@ model AiDiagnosis {
   doctor                      DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   aiModelId                   String
-  aiModel                     AiModelInfo @relation(fields: [aiModelId], references: [id])
+  aiModel                     AiModelRegistry @relation(fields: [aiModelId], references: [id])
 
   // Patient information
   patientName                 String?  // Họ tên bệnh nhân
@@ -191,7 +184,7 @@ model AiQuality {
   doctor                    DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   aiModelId                 String
-  aiModel                   AiModelInfo @relation(fields: [aiModelId], references: [id])
+  aiModel                   AiModelRegistry @relation(fields: [aiModelId], references: [id])
 
   doctorConclusionAboutModel String
   trustablePercent          Float

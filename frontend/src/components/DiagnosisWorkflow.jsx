@@ -3,12 +3,13 @@ import { useThemeLang } from '../contexts/ThemeLangContext';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 
-export default function DiagnosisWorkflow({ doctorId, onClose, onSuccess }) {
+export default function DiagnosisWorkflow({ doctorId, onClose, onSuccess, existingDiagnosis = null }) {
   const { theme } = useThemeLang();
   const { user } = useAuth();
   const dark = theme === 'dark';
 
-  const [step, setStep] = useState(1);
+  // If reviewing existing diagnosis, start at step 2
+  const [step, setStep] = useState(existingDiagnosis ? 2 : 1);
 
   // Step 1 state
   const [query, setQuery]           = useState('');
@@ -39,6 +40,19 @@ export default function DiagnosisWorkflow({ doctorId, onClose, onSuccess }) {
   useEffect(() => {
     api.get('/ai-model/list').then(r => setModels(r.data || [])).catch(() => {});
   }, []);
+
+  // Load existing diagnosis data if in review mode
+  useEffect(() => {
+    if (existingDiagnosis) {
+      setDiagId(existingDiagnosis.id || existingDiagnosis.diagnosisId);
+      setAiResult(existingDiagnosis.aiResults || existingDiagnosis);
+      // Pre-populate patient info if available
+      if (existingDiagnosis.patientName) {
+        setSelPatient({ name: existingDiagnosis.patientName });
+        setQuery(existingDiagnosis.patientName);
+      }
+    }
+  }, [existingDiagnosis]);
 
   // Search patients with debounce
   useEffect(() => {
@@ -141,10 +155,13 @@ export default function DiagnosisWorkflow({ doctorId, onClose, onSuccess }) {
           <div className="flex items-start justify-between">
             <div>
               <h2 className={`text-base font-bold ${dark ? 'text-[#d8e2ff]' : 'text-slate-800'}`}>
-                Chẩn Đoán AI Lâm Sàng
+                {existingDiagnosis ? 'Xem Lại & Kết Luận Chẩn Đoán' : 'Chẩn Đoán AI Lâm Sàng'}
               </h2>
               <p className={`text-xs mt-0.5 ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
-                Bước {step}/2 · {step === 1 ? 'Chuẩn đoán sơ bộ bằng AI' : 'Kết luận chuyên môn & Blockchain'}
+                {existingDiagnosis 
+                  ? 'Xem lại kết quả AI · Đưa ra kết luận chuyên môn & Xác nhận Blockchain'
+                  : `Bước ${step}/2 · ${step === 1 ? 'Chuẩn đoán sơ bộ bằng AI' : 'Kết luận chuyên môn & Blockchain'}`
+                }
               </p>
             </div>
             <button onClick={onClose}
@@ -155,23 +172,25 @@ export default function DiagnosisWorkflow({ doctorId, onClose, onSuccess }) {
             </button>
           </div>
 
-          {/* Step bar */}
-          <div className="flex items-center gap-3 mt-4">
-            {[1, 2].map((n, i) => (
-              <div key={n} className={`flex items-center gap-2 ${i === 1 ? 'flex-1' : ''}`}>
-                {i === 1 && <div className={`flex-1 h-px ${step >= 2 ? 'bg-teal-500' : dark ? 'bg-white/10' : 'bg-slate-200'}`}/>}
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all
-                  ${step > n  ? 'bg-teal-500 border-teal-500 text-white'
-                  : step === n ? 'bg-transparent border-teal-500 text-teal-500'
-                  : dark ? 'bg-transparent border-white/20 text-slate-500' : 'bg-transparent border-slate-200 text-slate-400'}`}>
-                  {step > n ? '✓' : n}
+          {/* Step bar - only show when creating new diagnosis */}
+          {!existingDiagnosis && (
+            <div className="flex items-center gap-3 mt-4">
+              {[1, 2].map((n, i) => (
+                <div key={n} className={`flex items-center gap-2 ${i === 1 ? 'flex-1' : ''}`}>
+                  {i === 1 && <div className={`flex-1 h-px ${step >= 2 ? 'bg-teal-500' : dark ? 'bg-white/10' : 'bg-slate-200'}`}/>}
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all
+                    ${step > n  ? 'bg-teal-500 border-teal-500 text-white'
+                    : step === n ? 'bg-transparent border-teal-500 text-teal-500'
+                    : dark ? 'bg-transparent border-white/20 text-slate-500' : 'bg-transparent border-slate-200 text-slate-400'}`}>
+                    {step > n ? '✓' : n}
+                  </div>
+                  <span className={`text-xs font-semibold hidden sm:block ${step === n ? (dark ? 'text-[#d8e2ff]' : 'text-slate-700') : (dark ? 'text-slate-500' : 'text-slate-400')}`}>
+                    {n === 1 ? 'Sơ bộ AI' : 'Kết luận'}
+                  </span>
                 </div>
-                <span className={`text-xs font-semibold hidden sm:block ${step === n ? (dark ? 'text-[#d8e2ff]' : 'text-slate-700') : (dark ? 'text-slate-500' : 'text-slate-400')}`}>
-                  {n === 1 ? 'Sơ bộ AI' : 'Kết luận'}
-                </span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── Body ── */}
@@ -356,14 +375,16 @@ export default function DiagnosisWorkflow({ doctorId, onClose, onSuccess }) {
               </div>
 
               <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => setStep(1)} disabled={loading}
-                  className={`flex-1 py-3 rounded-xl text-sm font-semibold border transition-colors
-                    ${dark ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                  Quay lại
-                </button>
+                {!existingDiagnosis && (
+                  <button type="button" onClick={() => setStep(1)} disabled={loading}
+                    className={`flex-1 py-3 rounded-xl text-sm font-semibold border transition-colors
+                      ${dark ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                    Quay lại
+                  </button>
+                )}
                 <button type="submit"
                   disabled={loading || !conclusion || !treatment}
-                  className="flex-[2] py-3 rounded-xl text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
+                  className={`${existingDiagnosis ? 'flex-1' : 'flex-[2]'} py-3 rounded-xl text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2`}>
                   {loading
                     ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>Đang ghi blockchain...</>
                     : 'Xác Nhận & Ghi Blockchain'}

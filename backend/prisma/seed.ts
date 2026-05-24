@@ -116,79 +116,15 @@ async function main() {
 
   console.log(`  ✅ Created 3 Doctor accounts (temp password: doctor123)`);
 
-  // ============================================================
-  // Seed AI Models
-  // ============================================================
-  console.log('🌱 Seeding AI Models...');
 
-  await prisma.aiModelInfo.upsert({
-    where: { id: 'ai-xray-pneumonia' },
-    update: {},
-    create: {
-      id: 'ai-xray-pneumonia',
-      modelName: 'X-Ray Pneumonia Detector',
-      version: 'v2.1.4',
-    },
-  });
-
-  await prisma.aiModelInfo.upsert({
-    where: { id: 'ai-ecg-arrhythmia' },
-    update: {},
-    create: {
-      id: 'ai-ecg-arrhythmia',
-      modelName: 'ECG Arrhythmia Classifier',
-      version: 'v1.0.8',
-    },
-  });
-
-  await prisma.aiModelInfo.upsert({
-    where: { id: 'ai-mri-brain' },
-    update: {},
-    create: {
-      id: 'ai-mri-brain',
-      modelName: 'MRI Brain Tumor SegNet',
-      version: 'v3.0.0',
-    },
-  });
-
-  console.log('  ✅ Created 3 AI Models');
-
-  // ============================================================
-  // Seed sample AiDiagnosis records
-  // ============================================================
-  console.log('🌱 Seeding sample Diagnoses...');
-
-  await prisma.aiDiagnosis.create({
-    data: {
-      doctorId: doc1Profile.id,
-      aiModelId: 'ai-xray-pneumonia',
-      inputImageHash: crypto.randomBytes(32).toString('hex'),
-      aiDiagnoseConfidentResults: JSON.stringify({ pneumonia: 0.92, normal: 0.08 }),
-      aiDiagnoseSegmentImageHash: crypto.randomBytes(32).toString('hex'),
-      diagnoseStatus: 'COMPLETED',
-    },
-  });
-
-  await prisma.aiDiagnosis.create({
-    data: {
-      doctorId: doc2Profile.id,
-      aiModelId: 'ai-ecg-arrhythmia',
-      inputImageHash: crypto.randomBytes(32).toString('hex'),
-      aiDiagnoseConfidentResults: JSON.stringify({ arrhythmia: 0.85, normal: 0.15 }),
-      aiDiagnoseSegmentImageHash: crypto.randomBytes(32).toString('hex'),
-      diagnoseStatus: 'PENDING',
-    },
-  });
-
-  console.log('  ✅ Created 2 sample Diagnoses');
 
   console.log('\n🌱 Seeding finished successfully!');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('📋 Summary:');
   console.log('   - Admins: None (create via Super Admin API)');
   console.log('   - Doctors: 3 (password: doctor123)');
-  console.log('   - AI Models: 3');
-  console.log('   - Diagnoses: 2');
+  console.log('   - AI Models: Seeded manually or via API');
+  console.log('   - Diagnoses: Seeded manually or via API');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 }
 

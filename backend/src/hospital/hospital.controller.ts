@@ -41,8 +41,11 @@ export class HospitalController {
 
   @Get('diagnoses')
   @Roles('ADMIN', 'DOCTOR')
-  async getDiagnoses() {
-    return this.hospitalService.getDiagnoses();
+  async getDiagnoses(
+    @Query('status') status?: string,
+    @Query('doctorId') doctorId?: string,
+  ) {
+    return this.hospitalService.getDiagnoses(status, doctorId);
   }
 
   /**
