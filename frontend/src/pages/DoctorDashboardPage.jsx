@@ -151,6 +151,8 @@ export default function DoctorDashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showViewAiModel, setShowViewAiModel] = useState(false);
   const [selectedAiModelId, setSelectedAiModelId] = useState(null);
+  const [showDiagDetail, setShowDiagDetail] = useState(false);
+  const [selectedDiagDetail, setSelectedDiagDetail] = useState(null);
   
   // State for simulated New Diagnosis Modal
   const [showCreateDiagnosis, setShowCreateDiagnosis] = useState(false);
@@ -191,6 +193,11 @@ export default function DoctorDashboardPage() {
   };
 
   const tLocal = (key) => dict[lang]?.[key] || key;
+
+  const handleViewDiagnosis = (diagnosis) => {
+    setSelectedDiagDetail(diagnosis);
+    setShowDiagDetail(true);
+  };
 
   // Filter diagnoses specific to this doctor
   const currentDoctorProfile = data.doctors.find(doc => doc.userId === user?.id || doc.user?.id === user?.id);
@@ -462,6 +469,7 @@ export default function DoctorDashboardPage() {
                   <th className="p-4 text-xs font-semibold">{tLocal('colAiModel')}</th>
                   <th className="p-4 text-xs font-semibold">{tLocal('colTime')}</th>
                   <th className="p-4 text-xs font-semibold">{tLocal('colStatus')}</th>
+                  <th className="p-4 text-xs font-semibold text-right">{tLocal('colActions')}</th>
                 </tr>
               )}
               {activeTab === 'blockchain' && (
@@ -497,6 +505,15 @@ export default function DoctorDashboardPage() {
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${d.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'}`}>
                       {d.status || 'PENDING'}
                     </span>
+                  </td>
+                  <td className="p-4 text-sm align-middle text-right">
+                    <button
+                      type="button"
+                      onClick={() => handleViewDiagnosis(d)}
+                      className="px-2.5 py-1 text-xs font-semibold rounded bg-teal-500/10 text-teal-600 border border-teal-500/20 hover:bg-teal-500/20 transition-colors"
+                    >
+                      {tLocal('colActions')}
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -843,6 +860,19 @@ export default function DoctorDashboardPage() {
           onClose={() => setShowCreateDiagnosis(false)}
           onSuccess={() => {
             setShowCreateDiagnosis(false);
+            loadClinicalData();
+          }}
+        />
+      )}
+
+      {/* Diagnosis Detail Modal */}
+      {showDiagDetail && selectedDiagDetail && (
+        <DiagnosisWorkflow
+          doctorId={currentDoctorProfile?.id}
+          existingDiagnosis={selectedDiagDetail}
+          onClose={() => setShowDiagDetail(false)}
+          onSuccess={() => {
+            setShowDiagDetail(false);
             loadClinicalData();
           }}
         />

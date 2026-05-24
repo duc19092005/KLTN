@@ -10,10 +10,7 @@ patients = [
         "age": 32,
         "gender": "Nam",
         "phone": "0912345678",
-        "address": "TP Hồ Chí Minh",
-        "diagnosis": "Mụn trứng cá",
-        "doctor": "BS Nguyễn Văn A",
-        "status": "Đang điều trị"
+        "address": "TP Hồ Chí Minh"
     },
     {
         "id": 2,
@@ -22,10 +19,7 @@ patients = [
         "age": 28,
         "gender": "Nữ",
         "phone": "0987654321",
-        "address": "Hà Nội",
-        "diagnosis": "Viêm da cơ địa",
-        "doctor": "BS Trần Minh B",
-        "status": "Đã khám"
+        "address": "Hà Nội"
     },
     {
         "id": 3,
@@ -34,10 +28,7 @@ patients = [
         "age": 45,
         "gender": "Nam",
         "phone": "0901112233",
-        "address": "Đà Nẵng",
-        "diagnosis": "Vảy nến",
-        "doctor": "BS Lê Thị C",
-        "status": "Tái khám"
+        "address": "Đà Nẵng"
     },
     {
         "id": 4,
@@ -46,10 +37,7 @@ patients = [
         "age": 36,
         "gender": "Nữ",
         "phone": "0933334444",
-        "address": "Cần Thơ",
-        "diagnosis": "Nấm da",
-        "doctor": "BS Nguyễn Văn A",
-        "status": "Đang điều trị"
+        "address": "Cần Thơ"
     }
 ]
 

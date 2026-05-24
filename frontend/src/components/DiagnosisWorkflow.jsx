@@ -332,23 +332,61 @@ export default function DiagnosisWorkflow({ doctorId, onClose, onSuccess, existi
               {/* AI Results */}
               {aiResult && (() => {
                 let parsed = {};
-                try { parsed = JSON.parse(aiResult.aiDiagnoseConfidentResults || '{}'); } catch {}
+                let findings = '';
+                let explanation = '';
+                let recommendations = '';
+                
+                try {
+                  const fullResult = JSON.parse(aiResult.aiDiagnoseConfidentResults || '{}');
+                  parsed = fullResult.diagnoses || fullResult;
+                  findings = fullResult.findings || '';
+                  explanation = fullResult.explanation || '';
+                  recommendations = fullResult.recommendations || '';
+                } catch {}
+                
                 return Object.keys(parsed).length > 0 ? (
-                  <div className={`p-4 rounded-xl border ${dark ? 'bg-[#0a192f] border-white/10' : 'bg-slate-50 border-slate-200'}`}>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400 mb-3">Kết Quả AI</p>
-                    <div className="flex flex-col gap-2">
-                      {Object.entries(parsed).map(([k, v]) => (
-                        <div key={k} className="flex items-center gap-3">
-                          <span className={`text-xs w-32 truncate ${dark ? 'text-slate-400' : 'text-slate-500'}`}>{k}</span>
-                          <div className={`flex-1 h-1.5 rounded-full overflow-hidden ${dark ? 'bg-white/10' : 'bg-slate-200'}`}>
-                            <div className="h-full rounded-full bg-teal-500 transition-all" style={{ width: `${Math.round(Number(v)*100)}%` }}/>
+                  <div className="flex flex-col gap-4">
+                    {/* Diagnoses */}
+                    <div className={`p-4 rounded-xl border ${dark ? 'bg-[#0a192f] border-white/10' : 'bg-slate-50 border-slate-200'}`}>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400 mb-3">Kết Quả Chẩn Đoán AI</p>
+                      <div className="flex flex-col gap-2">
+                        {Object.entries(parsed).map(([k, v]) => (
+                          <div key={k} className="flex items-center gap-3">
+                            <span className={`text-xs w-32 truncate ${dark ? 'text-slate-400' : 'text-slate-500'}`}>{k}</span>
+                            <div className={`flex-1 h-1.5 rounded-full overflow-hidden ${dark ? 'bg-white/10' : 'bg-slate-200'}`}>
+                              <div className="h-full rounded-full bg-teal-500 transition-all" style={{ width: `${Math.round(Number(v)*100)}%` }}/>
+                            </div>
+                            <span className={`text-xs font-bold font-mono w-12 text-right ${dark ? 'text-[#d8e2ff]' : 'text-slate-700'}`}>
+                              {(Number(v)*100).toFixed(1)}%
+                            </span>
                           </div>
-                          <span className={`text-xs font-bold font-mono w-12 text-right ${dark ? 'text-[#d8e2ff]' : 'text-slate-700'}`}>
-                            {(Number(v)*100).toFixed(1)}%
-                          </span>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
+
+                    {/* Findings */}
+                    {findings && (
+                      <div className={`p-4 rounded-xl border ${dark ? 'bg-[#0a192f] border-white/10' : 'bg-slate-50 border-slate-200'}`}>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2">Phát Hiện Từ Ảnh</p>
+                        <p className={`text-sm ${dark ? 'text-slate-300' : 'text-slate-700'}`}>{findings}</p>
+                      </div>
+                    )}
+
+                    {/* Explanation */}
+                    {explanation && (
+                      <div className={`p-4 rounded-xl border ${dark ? 'bg-[#0a192f] border-white/10' : 'bg-slate-50 border-slate-200'}`}>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 mb-2">Giải Thích</p>
+                        <p className={`text-sm ${dark ? 'text-slate-300' : 'text-slate-700'}`}>{explanation}</p>
+                      </div>
+                    )}
+
+                    {/* Recommendations */}
+                    {recommendations && (
+                      <div className={`p-4 rounded-xl border ${dark ? 'bg-[#0a192f] border-white/10' : 'bg-slate-50 border-slate-200'}`}>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400 mb-2">Đề Xuất</p>
+                        <p className={`text-sm ${dark ? 'text-slate-300' : 'text-slate-700'}`}>{recommendations}</p>
+                      </div>
+                    )}
                   </div>
                 ) : null;
               })()}

@@ -282,13 +282,17 @@ export class HospitalService {
       throw new BadRequestException('AI Model not found');
     }
 
-    // 1. Hash input image
+    // 1. Hash input image (for blockchain record)
     const inputImageHash = crypto
       .createHash('sha256')
       .update(imageBuffer)
       .digest('hex');
 
-    // 2. Call AI Model API using stored provider config
+    // 2. Convert image to base64 for AI vision APIs
+    const imageBase64 = imageBuffer.toString('base64');
+    const imageMimeType = 'image/jpeg'; // Assume JPEG, could be detected from buffer
+
+    // 3. Call AI Model API using stored provider config
     let aiResults: any = {};
     let segmentImageHash = crypto.randomBytes(32).toString('hex'); // Mock segment hash for now
 
@@ -303,59 +307,207 @@ export class HospitalService {
         }
 
         if (config && config.apiKey && config.model) {
-          let baseUrl = 'https://api.openai.com/v1';
+          // Xác định base URL dựa trên provider
+          let baseUrl = '';
           if (config.baseUrl) {
             baseUrl = config.baseUrl.endsWith('/') ? config.baseUrl.slice(0, -1) : config.baseUrl;
+          } else {
+            // Default URLs cho từng provider
+            switch (config.provider) {
+              case 'openai':
+                baseUrl = 'https://api.openai.com/v1';
+                break;
+              case 'anthropic':
+                baseUrl = 'https://api.anthropic.com/v1';
+                break;
+              case 'gemini':
+                baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+                break;
+              case 'deepseek':
+                baseUrl = 'https://api.deepseek.com';
+                break;
+              default:
+                baseUrl = 'https://api.openai.com/v1';
+            }
           }
-          const apiUrl = `${baseUrl}/chat/completions`;
-          
-          let authHeader = `Bearer ${config.apiKey}`;
+
+          // Xác định endpoint và headers dựa trên provider
+          let apiUrl = '';
           const headers: Record<string, string> = {
             'Content-Type': 'application/json',
-            'Authorization': authHeader,
           };
 
+          // Cấu hình riêng cho từng provider
           if (config.provider === 'anthropic') {
+            apiUrl = `${baseUrl}/messages`;
             headers['x-api-key'] = config.apiKey;
             headers['anthropic-version'] = '2023-06-01';
-            delete headers['Authorization'];
+          } else if (config.provider === 'gemini') {
+            apiUrl = `${baseUrl}/models/${config.model}:generateContent?key=${config.apiKey}`;
+          } else {
+            // OpenAI, DeepSeek và các provider tương thích OpenAI API
+            apiUrl = `${baseUrl}/chat/completions`;
+            headers['Authorization'] = `Bearer ${config.apiKey}`;
           }
 
-          const prompt = `Bạn là một bác sĩ chẩn đoán AI. Hãy chẩn đoán dựa trên thông tin sau:
-Tên bệnh nhân: ${patientName}
-Triệu chứng lâm sàng: ${clinicalSymptoms}
-Điều trị sơ bộ: ${preliminaryTreatment}
-Ghi chú bác sĩ: ${doctorNotes || 'Không có'}
-Mã băm hình ảnh: ${inputImageHash}
+          // Prompt chi tiết hơn
+          const textPrompt = `Bạn là một bác sĩ chuyên khoa chẩn đoán hình ảnh y tế. Hãy phân tích ảnh y tế được cung cấp và đưa ra chẩn đoán chi tiết.
 
-Trình bày kết quả chẩn đoán bắt buộc dưới dạng JSON CHUẨN, KHÔNG CÓ BẤT KỲ VĂN BẢN NÀO KHÁC BÊN NGOÀI.
-Các key là tên bệnh, value là tỷ lệ phần trăm tự tin (từ 0.0 đến 1.0).
-Ví dụ: {"Viêm phổi": 0.85, "Bình thường": 0.15}`;
+**THÔNG TIN BỆNH NHÂN:**
+- Tên: ${patientName}
+- Triệu chứng lâm sàng: ${clinicalSymptoms}
+- Điều trị sơ bộ: ${preliminaryTreatment}
+- Ghi chú bác sĩ: ${doctorNotes || 'Không có'}
+
+**YÊU CẦU PHÂN TÍCH:**
+1. Quan sát kỹ ảnh y tế (X-quang, CT, MRI, hoặc ảnh lâm sàng)
+2. Xác định các bất thường hoặc dấu hiệu bệnh lý
+3. Đưa ra chẩn đoán khả dĩ với mức độ tự tin
+4. Giải thích ngắn gọn lý do chẩn đoán
+5. Đề xuất các xét nghiệm bổ sung nếu cần
+
+**ĐỊNH DẠNG KẾT QUẢ (JSON):**
+Trả về JSON với cấu trúc sau:
+{
+  "diagnoses": {
+    "Tên bệnh 1": 0.85,
+    "Tên bệnh 2": 0.12,
+    "Bình thường": 0.03
+  },
+  "findings": "Mô tả các phát hiện quan trọng từ ảnh",
+  "explanation": "Giải thích ngắn gọn về chẩn đoán chính",
+  "recommendations": "Đề xuất xét nghiệm hoặc điều trị tiếp theo"
+}
+
+**LƯU Ý:** 
+- Tổng các giá trị confidence phải bằng 1.0
+- Chỉ trả về JSON thuần, không có markdown hay text khác
+- Nếu không thể phân tích ảnh, trả về {"error": "Lý do"}`;
+
+          // Tạo request body dựa trên provider (với ảnh)
+          let requestBody: any;
+          
+          if (config.provider === 'anthropic') {
+            // Anthropic Claude Vision API
+            requestBody = {
+              model: config.model,
+              max_tokens: 2048,
+              messages: [{
+                role: 'user',
+                content: [
+                  {
+                    type: 'image',
+                    source: {
+                      type: 'base64',
+                      media_type: imageMimeType,
+                      data: imageBase64,
+                    }
+                  },
+                  {
+                    type: 'text',
+                    text: textPrompt
+                  }
+                ]
+              }],
+              temperature: 0.2
+            };
+          } else if (config.provider === 'gemini') {
+            // Google Gemini Vision API
+            requestBody = {
+              contents: [{
+                parts: [
+                  {
+                    inline_data: {
+                      mime_type: imageMimeType,
+                      data: imageBase64
+                    }
+                  },
+                  { text: textPrompt }
+                ]
+              }],
+              generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 2048,
+              }
+            };
+          } else {
+            // OpenAI GPT-4 Vision / DeepSeek (nếu hỗ trợ vision)
+            requestBody = {
+              model: config.model,
+              messages: [{
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: textPrompt
+                  },
+                  {
+                    type: 'image_url',
+                    image_url: {
+                      url: `data:${imageMimeType};base64,${imageBase64}`,
+                      detail: 'high' // high detail for medical images
+                    }
+                  }
+                ]
+              }],
+              temperature: 0.2,
+              max_tokens: 2048
+            };
+          }
 
           const response = await fetch(apiUrl, {
             method: 'POST',
             headers,
-            body: JSON.stringify({
-              model: config.model,
-              messages: [{ role: 'user', content: prompt }],
-              temperature: 0.2
-            }),
+            body: JSON.stringify(requestBody),
           });
 
           if (response.ok) {
             const data = await response.json();
-            const content = config.provider === 'anthropic' 
-              ? data.content[0].text 
-              : data.choices[0].message.content;
+            let content = '';
+
+            // Parse response dựa trên provider
+            if (config.provider === 'anthropic') {
+              content = data.content[0].text;
+            } else if (config.provider === 'gemini') {
+              content = data.candidates[0].content.parts[0].text;
+            } else {
+              // OpenAI, DeepSeek format
+              content = data.choices[0].message.content;
+            }
             
             // Clean up backticks if model returns markdown block
             const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
             
             try {
-              aiResults = JSON.parse(cleanContent);
+              const parsedResult = JSON.parse(cleanContent);
+              
+              // Kiểm tra nếu có error từ AI
+              if (parsedResult.error) {
+                throw new Error(parsedResult.error);
+              }
+              
+              // Chuẩn hóa kết quả: lấy diagnoses hoặc toàn bộ object
+              if (parsedResult.diagnoses) {
+                // Format mới: có cấu trúc chi tiết
+                aiResults = {
+                  diagnoses: parsedResult.diagnoses,
+                  findings: parsedResult.findings || '',
+                  explanation: parsedResult.explanation || '',
+                  recommendations: parsedResult.recommendations || ''
+                };
+              } else {
+                // Format cũ: chỉ có key-value đơn giản
+                aiResults = { diagnoses: parsedResult };
+              }
             } catch (err) {
               console.warn('[Hospital] Failed to parse AI JSON:', cleanContent);
-              aiResults = { "Kết quả": cleanContent };
+              // Fallback: lưu raw text
+              aiResults = { 
+                diagnoses: { "Không thể phân tích": 1.0 },
+                findings: cleanContent,
+                explanation: "AI trả về format không hợp lệ",
+                recommendations: "Vui lòng kiểm tra lại cấu hình model"
+              };
             }
           } else {
             const errorText = await response.text();

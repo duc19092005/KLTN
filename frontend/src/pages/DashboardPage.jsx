@@ -146,6 +146,8 @@ export default function DashboardPage() {
   const [showEditAiModel, setShowEditAiModel] = useState(false);
   const [selectedAiModelId, setSelectedAiModelId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showDiagDetail, setShowDiagDetail] = useState(false);
+  const [selectedDiagDetail, setSelectedDiagDetail] = useState(null);
 
   useEffect(() => { loadHospitalData(); }, []);
 
@@ -173,6 +175,11 @@ export default function DashboardPage() {
   };
 
   const tLocal = (key) => dict[lang]?.[key] || key;
+
+  const handleViewDiagnosis = (diagnosis) => {
+    setSelectedDiagDetail(diagnosis);
+    setShowDiagDetail(true);
+  };
 
   const countLabel = {
     doctor: lang === 'vi' 
@@ -274,6 +281,7 @@ export default function DashboardPage() {
                   <th className="p-4 text-xs font-semibold">{tLocal('colTreatment')}</th>
                   <th className="p-4 text-xs font-semibold">{tLocal('colDoctorInCharge')}</th>
                   <th className="p-4 text-xs font-semibold">{tLocal('colStatus')}</th>
+                  <th className="p-4 text-xs font-semibold text-right">{tLocal('colActions')}</th>
                 </tr>
               )}
               {activeTab === 'blockchain' && (
@@ -323,6 +331,15 @@ export default function DashboardPage() {
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${d.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'}`}>
                       {d.status}
                     </span>
+                  </td>
+                  <td className="p-4 text-sm align-middle text-right">
+                    <button
+                      type="button"
+                      onClick={() => handleViewDiagnosis(d)}
+                      className="px-2.5 py-1 text-xs font-semibold rounded bg-teal-500/10 text-teal-600 border border-teal-500/20 hover:bg-teal-500/20 transition-colors"
+                    >
+                      {tLocal('colActions')}
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -728,6 +745,59 @@ export default function DashboardPage() {
           setSelectedAiModelId(null);
         }}
       />
+
+      {/* ── Diagnosis Detail Modal ── */}
+      {showDiagDetail && selectedDiagDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowDiagDetail(false)}>
+          <div className={`relative w-full max-w-lg mx-4 rounded-2xl shadow-2xl border overflow-hidden ${theme === 'dark' ? 'bg-surface-container border-outline-variant/20 text-on-surface' : 'bg-white border-slate-200 text-slate-800'}`}
+            onClick={(e) => e.stopPropagation()}>
+            <div className={`flex items-center justify-between p-5 border-b ${theme === 'dark' ? 'border-outline-variant/10' : 'border-slate-100'}`}>
+              <h3 className="font-headline-md text-headline-md font-bold">Chi tiết chẩn đoán</h3>
+              <button onClick={() => setShowDiagDetail(false)} className={`p-1 rounded-full ${theme === 'dark' ? 'hover:bg-surface-container-high' : 'hover:bg-slate-100'}`}>
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${theme === 'dark' ? 'text-on-surface-variant' : 'text-slate-500'}`}>Mã bệnh án</p>
+                  <p className="font-mono text-sm">#{formatShortId(selectedDiagDetail.id)}</p>
+                </div>
+                <div>
+                  <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${theme === 'dark' ? 'text-on-surface-variant' : 'text-slate-500'}`}>Trạng thái</p>
+                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${selectedDiagDetail.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                    {selectedDiagDetail.status}
+                  </span>
+                </div>
+                <div>
+                  <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${theme === 'dark' ? 'text-on-surface-variant' : 'text-slate-500'}`}>Bệnh nhân</p>
+                  <p className="text-sm font-semibold">{selectedDiagDetail.patientName}</p>
+                </div>
+                <div>
+                  <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${theme === 'dark' ? 'text-on-surface-variant' : 'text-slate-500'}`}>Bác sĩ phụ trách</p>
+                  <p className="text-sm">{selectedDiagDetail.doctor?.doctorName || selectedDiagDetail.doctor?.name || 'Chưa cập nhật'}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${theme === 'dark' ? 'text-on-surface-variant' : 'text-slate-500'}`}>Bệnh lý</p>
+                  <p className="text-sm font-semibold text-info">{selectedDiagDetail.disease}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${theme === 'dark' ? 'text-on-surface-variant' : 'text-slate-500'}`}>Điều trị</p>
+                  <p className="text-sm">{selectedDiagDetail.treatment}</p>
+                </div>
+              </div>
+            </div>
+            <div className={`flex justify-end gap-3 p-5 border-t ${theme === 'dark' ? 'border-outline-variant/10' : 'border-slate-100'}`}>
+              <button
+                onClick={() => setShowDiagDetail(false)}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${theme === 'dark' ? 'bg-surface-container-high text-on-surface hover:bg-surface-container-higher' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
