@@ -127,26 +127,7 @@ export class AuthController {
     return result;
   }
 
-  /**
-   * Public endpoint to verify face against doctor profiles for password recovery.
-   * Returns a temporary access token for Reset Password page.
-   */
-  @Post('doctor-recover-init')
-  async doctorRecoverInit(
-    @Body() body: { embedding: number[] },
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const result = await this.authService.doctorRecoverInit(body.embedding);
-    if (result.access_token) {
-      res.cookie('recovery_token', result.access_token, {
-        httpOnly: true,
-        secure: false, // Set to true in production
-        sameSite: 'lax',
-        maxAge: 900000, // 15 mins
-      });
-    }
-    return result;
-  }
+
 
   /**
    * Reset password using temporary reset token

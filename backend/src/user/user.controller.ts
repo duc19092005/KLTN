@@ -32,19 +32,6 @@ export class UserController {
         user: result.user,
         inviteToken: result.inviteToken, // Also return for dev convenience
       };
-    } else if ('tempPassword' in result) {
-      // Send temp password via email (Doctor uses password)
-      await this.emailService.sendCredentials(dto.email, dto.username, result.tempPassword);
-
-      return {
-        message: 'User created successfully. Credentials sent via email.',
-        user: result.user,
-      };
-    } else {
-      return {
-        message: 'User created successfully.',
-        user: result.user,
-      };
     }
   }
 

@@ -14,7 +14,7 @@ export class FaceService {
   async registerFace(userId: string, embedding: number[]) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { adminProfile: true, doctorProfile: true },
+      include: { adminProfile: true },
     });
     if (!user) throw new Error('User not found');
 
@@ -29,15 +29,6 @@ export class FaceService {
       await this.prisma.user.update({
         where: { id: userId },
         data: { registrationStep: 2 },
-      });
-    } else if (user.doctorProfile) {
-      await this.prisma.doctorProfile.update({
-        where: { userId },
-        data: { faceEmbedding, faceEmbeddingHash: faceHash },
-      });
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { registrationStep: 3 },
       });
     } else {
       // Fallback: update user registration step only
@@ -56,7 +47,7 @@ export class FaceService {
   async verifyFace(userId: string, embedding: number[]) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { adminProfile: true, doctorProfile: true },
+      include: { adminProfile: true },
     });
     if (!user) return { match: false, similarity: 0, message: 'User not found' };
 
@@ -66,10 +57,8 @@ export class FaceService {
     if (user.role === 'ADMIN' && user.adminProfile) {
       storedEmbedding = user.adminProfile.faceEmbedding;
       storedFaceHash = user.adminProfile.faceHash;
-    } else if (user.doctorProfile) {
-      storedEmbedding = user.doctorProfile.faceEmbedding;
-      storedFaceHash = user.doctorProfile.faceEmbeddingHash;
     }
+
 
     if (!storedEmbedding) {
       return { match: false, similarity: 0, message: 'No face registered' };

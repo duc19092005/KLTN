@@ -8,10 +8,7 @@ import { ZkpModule } from './zkp/zkp.module';
 import { BlockchainModule } from './blockchain/blockchain.module';
 import { EmailModule } from './email/email.module';
 import { PrismaModule } from './prisma/prisma.module';
-import { HospitalModule } from './hospital/hospital.module';
 import { EncryptionModule } from './encryption/encryption.module';
-import { AiModelModule } from './ai-model/ai-model.module';
-import { BackupModule } from './backup/backup.module';
 
 @Module({
   imports: [
@@ -24,10 +21,7 @@ import { BackupModule } from './backup/backup.module';
     ZkpModule,
     BlockchainModule,
     EmailModule,
-    HospitalModule,
     EncryptionModule,
-    AiModelModule,
-    BackupModule,
   ],
 })
 export class AppModule {}

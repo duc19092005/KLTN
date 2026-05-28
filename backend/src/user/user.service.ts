@@ -22,7 +22,7 @@ export class UserService {
     if (role === 'ADMIN') {
       return this.createAdminUser(username, email);
     } else {
-      return this.createDoctorUser(username, email, role);
+      throw new ConflictException('Only Admin role is supported');
     }
   }
 
@@ -60,35 +60,12 @@ export class UserService {
     };
   }
 
-  /**
-   * Create Doctor user with temporary password
-   */
-  private async createDoctorUser(username: string, email: string, role: string) {
-    const tempPassword = 'anhduc9A@5'; // For easy local testing
-    const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
-    const user = await this.prisma.user.create({
-      data: {
-        username,
-        email,
-        password: hashedPassword,
-        role,
-        status: 'PENDING',
-        firstLogin: true,
-        registrationStep: 1,
-      },
-    });
-
-    return {
-      user: { id: user.id, username: user.username, email: user.email, role: user.role },
-      tempPassword,
-    };
-  }
 
   async findById(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: { adminProfile: true, doctorProfile: true },
+      include: { adminProfile: true },
     });
     if (!user) throw new NotFoundException('User not found');
     return user;
@@ -130,7 +107,7 @@ export class UserService {
   async updateFaceData(userId: string, faceEmbedding: string, faceHash: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { adminProfile: true, doctorProfile: true },
+      include: { adminProfile: true },
     });
     if (!user) throw new NotFoundException('User not found');
 
@@ -138,11 +115,6 @@ export class UserService {
       await this.prisma.adminProfile.update({
         where: { userId },
         data: { faceEmbedding, faceHash },
-      });
-    } else if (user.doctorProfile) {
-      await this.prisma.doctorProfile.update({
-        where: { userId },
-        data: { faceEmbedding, faceEmbeddingHash: faceHash },
       });
     }
 
@@ -182,7 +154,7 @@ export class UserService {
   async getProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { adminProfile: true, doctorProfile: true },
+      include: { adminProfile: true },
     });
     if (!user) throw new NotFoundException('User not found');
 
@@ -205,13 +177,6 @@ export class UserService {
         hasWallet: !!user.adminProfile.walletAddress,
         hasZkp: !!user.adminProfile.zkpCommitment,
       };
-    } else if (user.doctorProfile) {
-      return {
-        ...baseProfile,
-        hasFace: !!user.doctorProfile.faceEmbedding,
-        hasWallet: false,
-        hasZkp: false,
-      };
     }
 
     return baseProfile;
@@ -225,15 +190,14 @@ export class UserService {
   async rollbackStep(userId: string, currentStep: number) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { adminProfile: true, doctorProfile: true },
+      include: { adminProfile: true },
     });
     if (!user) throw new NotFoundException('User not found');
 
     if (user.role === 'ADMIN' && user.adminProfile) {
       return this.rollbackAdminStep(userId, currentStep);
-    } else {
-      return this.rollbackDoctorStep(userId, currentStep);
     }
+    return this.prisma.user.findUnique({ where: { id: userId } });
   }
 
   private async rollbackAdminStep(userId: string, currentStep: number) {
@@ -271,24 +235,5 @@ export class UserService {
     return this.prisma.user.findUnique({ where: { id: userId } });
   }
 
-  private async rollbackDoctorStep(userId: string, currentStep: number) {
-    if (currentStep === 3) {
-      // Rollback to face step
-      await this.prisma.doctorProfile.update({
-        where: { userId },
-        data: { faceEmbedding: null, faceEmbeddingHash: null },
-      });
-      return this.prisma.user.update({
-        where: { id: userId },
-        data: { registrationStep: 2 },
-      });
-    } else if (currentStep === 2) {
-      // Rollback to password step
-      return this.prisma.user.update({
-        where: { id: userId },
-        data: { registrationStep: 1 },
-      });
-    }
-    return this.prisma.user.findUnique({ where: { id: userId } });
-  }
+
 }

@@ -175,7 +175,7 @@ export class AuthService {
       where: {
         OR: [{ username }, { email: username }],
       },
-      include: { doctorProfile: true },
+      include: {  },
     });
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
@@ -213,7 +213,7 @@ export class AuthService {
         role: user.role,
         email: user.email,
         status: user.status,
-        hasFace: !!user.doctorProfile?.faceEmbedding,
+        hasFace: false,
         registrationStep: user.registrationStep,
       },
     };
@@ -225,7 +225,7 @@ export class AuthService {
   async verifyFace(userId: string, embedding: number[]) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { adminProfile: true, doctorProfile: true },
+      include: { adminProfile: true },
     });
     if (!user) throw new UnauthorizedException('User not found');
 
@@ -233,8 +233,6 @@ export class AuthService {
 
     if (user.role === 'ADMIN' && user.adminProfile) {
       storedEmbedding = user.adminProfile.faceEmbedding;
-    } else if (user.doctorProfile) {
-      storedEmbedding = user.doctorProfile.faceEmbedding;
     }
 
     if (!storedEmbedding) {
@@ -473,63 +471,6 @@ export class AuthService {
     };
   }
 
-  // ============================================================
-  // DOCTOR: Password Recovery initialization (Public)
-  // ============================================================
-  async doctorRecoverInit(embedding: number[]) {
-    // Fetch all doctors with a registered face embedding
-    const doctors = await this.prisma.user.findMany({
-      where: {
-        role: 'DOCTOR',
-        doctorProfile: {
-          faceEmbedding: { not: null },
-        },
-      },
-      include: { doctorProfile: true },
-    });
-
-    let matchedUser = null;
-    let highestSimilarity = 0;
-
-    for (const user of doctors) {
-      if (!user.doctorProfile?.faceEmbedding) continue;
-      try {
-        const stored: number[] = JSON.parse(user.doctorProfile.faceEmbedding);
-        const similarity = this.cosineSimilarity(embedding, stored);
-        if (similarity > highestSimilarity) {
-          highestSimilarity = similarity;
-          matchedUser = user;
-        }
-      } catch (err) {
-        // Skip malformed profiles
-      }
-    }
-
-    // Check strict threshold
-    if (!matchedUser || highestSimilarity < 0.92) {
-      throw new UnauthorizedException(
-        'Không nhận diện được khuôn mặt Bác sĩ phù hợp trong cơ sở dữ liệu.'
-      );
-    }
-
-    // Issue temporary token for password reset
-    const payload = {
-      sub: matchedUser.id,
-      username: matchedUser.username,
-      role: matchedUser.role,
-      verified: false,
-      canResetPassword: true,
-    };
-
-    return {
-      access_token: this.jwtService.sign(payload),
-      user: {
-        id: matchedUser.id,
-        username: matchedUser.username,
-        role: matchedUser.role,
-      }
-    };
-  }
 
   // ============================================================
   // DOCTOR: Reset Password (JWT protected)

@@ -6,7 +6,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import AuthenticatePage from './pages/AuthenticatePage';
 import DashboardPage from './pages/DashboardPage';
-import DoctorDashboardPage from './pages/DoctorDashboardPage';
+
 import RecoveryPage from './pages/RecoveryPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 
@@ -62,7 +62,7 @@ export default function App() {
           
           <Route path="/dashboard" element={
             <ProtectedRoute pageType="secure">
-              {user?.role === 'ADMIN' ? <DashboardPage /> : <DoctorDashboardPage />}
+              <DashboardPage />
             </ProtectedRoute>
           } />
           

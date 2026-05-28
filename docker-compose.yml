@@ -7,7 +7,7 @@ services:
     user: root
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=YourPassword123!
+      - POSTGRES_PASSWORD=19092005
       - POSTGRES_DB=zkp_identity
     ports:
       - "5432:5432"
@@ -44,11 +44,9 @@ services:
       - PORT=3001
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRATION=1h
-      - DATABASE_URL=postgresql://postgres:YourPassword123!@db:5432/zkp_identity?schema=public
+      - DATABASE_URL=postgresql://postgres:19092005@db:5432/zkp_identity?schema=public
       - BLOCKCHAIN_RPC_URL=http://blockchain:8545
       - IDENTITY_REGISTRY_ADDRESS=${IDENTITY_REGISTRY_ADDRESS}
-      - AI_MODEL_REGISTRY_ADDRESS=${AI_MODEL_REGISTRY_ADDRESS}
-      - DB_BACKUP_REGISTRY_ADDRESS=${DB_BACKUP_REGISTRY_ADDRESS}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - SUPER_ADMIN_PRIVATE_KEY=${SUPER_ADMIN_PRIVATE_KEY}
       - SMTP_HOST=smtp.ethereal.email

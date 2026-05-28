@@ -11,8 +11,8 @@ model User {
   id              String   @id @default(uuid())
   username        String   @unique
   email           String   @unique
-  password        String?  // NULL for Admin (wallet-only auth), required for Doctor
-  role            String   @default("DOCTOR") // ADMIN | DOCTOR | PATIENT
+  password        String?  // NULL for Admin (wallet-only auth)
+  role            String   @default("ADMIN") // ADMIN
 
   status          String   @default("PENDING") // PENDING | ACTIVE | SUSPENDED
   firstLogin      Boolean  @default(true)
@@ -26,7 +26,6 @@ model User {
   updatedAt       DateTime @updatedAt
 
   adminProfile    AdminProfile?
-  doctorProfile   DoctorProfile?
   passwordResets  PasswordResetStatus[]
 }
 
@@ -55,143 +54,7 @@ model AdminProfile {
   updatedAt       DateTime @updatedAt
 }
 
-model DoctorProfile {
-  id                  String   @id @default(uuid())
-  userId              String   @unique
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  doctorName          String
-  licenseId           String   @unique
-  portraitImage        String?  // Base64-encoded portrait photo
-  blockchainHash       String?  // SHA256(licenseId + position + faceHash + doctorId)
-
-  faceEmbedding       String?  // JSON array of face embedding vectors (for face login)
-  faceEmbeddingHash   String?  // Hash of face embedding (legacy)
-  dateOfBirth         DateTime
-  identityNumber      String   @unique
-  specialties         String
-  degree              String
-  facultyOfWork       String
-  position            String
-  workingStartDate    DateTime
-  doctorStatus        String   @default("ACTIVE")
-
-  // Blockchain history linked to doctor
-  blockchainHistoryId String?  @unique
-  blockchainHistory   BlockchainHistory? @relation("DoctorBlockchain", fields: [blockchainHistoryId], references: [id])
-
-  diagnoses           AiDiagnosis[]
-  aiQualities         AiQuality[]
-
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-}
-
-model BlockchainHistory {
-  id                  String   @id @default(uuid())
-  transactionId       String   @unique
-  confirmTime         DateTime
-  blockchainStatus    String   // SUCCESS | FAILED | PENDING
-  errorReason         String?
-  errorLog            String?
-  retryCount          Int      @default(0)
-
-  doctorProfile       DoctorProfile? @relation("DoctorBlockchain")
-  doctorConclude      DoctorFinalConclude? @relation("ConcludeBlockchain")
-
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-}
-
-
-
-// AI Model Registry - Quản lý IP hash của các model AI
-model AiModelRegistry {
-  id                String   @id @default(uuid())
-  modelId           String   @unique @default(uuid()) // Auto-generated identifier for blockchain
-  modelName         String
-  modelVersion      String
-  recommendedSpecialty String? // Medical specialty recommended for this model
-  
-  // IP Hash - Encrypted with AES-256
-  ipHashEncrypted   String   // Encrypted IP hash stored in database
-  ipHashPlain       String?  // Plain IP hash (only shown once during creation)
-  
-  // Blockchain tracking
-  blockchainTxHash  String?  // Transaction hash when registered on-chain
-  isActiveOnChain   Boolean  @default(false) // Whether model is active on blockchain
-  
-  // Metadata
-  description       String?
-  createdBy         String   // Admin user ID who created this model
-  type              String?  // API provider type (e.g., openai, anthropic) or IP type
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  diagnoses         AiDiagnosis[]
-  aiQualities       AiQuality[]
-  
-  @@index([modelId])
-  @@index([isActiveOnChain])
-}
-
-model AiDiagnosis {
-  id                          String   @id @default(uuid())
-  doctorId                    String
-  doctor                      DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  aiModelId                   String
-  aiModel                     AiModelRegistry @relation(fields: [aiModelId], references: [id])
-
-  // Patient information
-  patientName                 String?  // Họ tên bệnh nhân
-  clinicalSymptoms            String?  // Bệnh lý lâm sàng
-  preliminaryTreatment        String?  // Phác đồ & Thuốc điều trị sơ bộ
-  doctorNotes                 String?  // Ghi chú bác sĩ
-
-  // AI Analysis
-  inputImageHash              String
-  aiDiagnoseConfidentResults  String   // JSON string
-  aiDiagnoseSegmentImageHash  String
-  diagnoseStatus              String   @default("PENDING")
-
-  finalConclude               DoctorFinalConclude?
-
-  createdAt                   DateTime @default(now())
-  updatedAt                   DateTime @updatedAt
-}
-
-model DoctorFinalConclude {
-  id                          String   @id @default(uuid())
-  diagnoseId                  String   @unique
-  diagnose                    AiDiagnosis @relation(fields: [diagnoseId], references: [id], onDelete: Cascade)
-
-  finalConclusionMessageHash  String
-  treatmentRegimen            String
-  note                        String?
-
-  blockchainHistoryId         String?  @unique
-  blockchainHistory           BlockchainHistory? @relation("ConcludeBlockchain", fields: [blockchainHistoryId], references: [id])
-
-  createdAt                   DateTime @default(now())
-  updatedAt                   DateTime @updatedAt
-}
-
-model AiQuality {
-  id                        String   @id @default(uuid())
-  doctorId                  String
-  doctor                    DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  aiModelId                 String
-  aiModel                   AiModelRegistry @relation(fields: [aiModelId], references: [id])
-
-  doctorConclusionAboutModel String
-  trustablePercent          Float
-
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
-}
 
 model PasswordResetStatus {
   id            String   @id @default(uuid())

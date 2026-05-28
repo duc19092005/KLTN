@@ -4,7 +4,6 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { FaceService } from '../face/face.service';
 import { UserService } from '../user/user.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
-
 @Controller('zkp')
 export class ZkpController {
   constructor(
@@ -27,8 +26,6 @@ export class ZkpController {
     let faceHash: string | null = null;
     if (user.adminProfile?.faceHash) {
       faceHash = user.adminProfile.faceHash;
-    } else if (user.doctorProfile?.faceEmbeddingHash) {
-      faceHash = user.doctorProfile.faceEmbeddingHash;
     }
 
     if (!faceHash) {
@@ -66,7 +63,6 @@ export class ZkpController {
     await this.userService.updateWalletAddress(req.user.sub, body.newAddress);
     return { message: 'Wallet address updated in database' };
   }
-
   @UseGuards(JwtAuthGuard)
   @Post('register-onchain')
   async registerOnChain(@Body() body: { commitment: string; address: string }) {
