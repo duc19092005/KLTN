@@ -11,6 +11,8 @@ import { DepartmentModule } from './modules/department/department.module';
 import { StaffEnterpriseModule } from './modules/staff/staff.module';
 import { DoctorModule } from './modules/doctor/doctor.module';
 import { ClinicalRoomModule } from './modules/clinical-room/clinical-room.module';
+import { PatientModule } from './modules/patient/patient.module';
+import { VisitModule } from './modules/visit/visit.module';
 import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
@@ -24,6 +26,8 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
     StaffEnterpriseModule,
     DoctorModule,
     ClinicalRoomModule,
+    PatientModule,
+    VisitModule,
   ],
   controllers: [AppController],
   providers: [

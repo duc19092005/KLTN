@@ -102,11 +102,42 @@ model DoctorProfile {
   yearsExperience Int?
 
   clinicalRoom    ClinicalRoom? @relation("RoomDoctor")
+  visits          Visit[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   @@index([specialty])
+}
+
+enum VisitStatus {
+  WAITING
+  IN_PROGRESS
+  WAITING_TEST_RESULT
+  WAITING_CONCLUSION
+  COMPLETED
+  CANCELLED
+}
+
+model Patient {
+  id               String   @id @default(uuid())
+  patientCode      String   @unique
+  fullName         String
+  gender           String
+  birthDate        DateTime
+  citizenId        String?  @unique
+  phone            String?
+  address          String?
+  insuranceNumber  String?
+  emergencyContact String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  visits           Visit[]
+
+  @@index([fullName])
+  @@index([citizenId])
+  @@index([phone])
 }
 
 model AdminProfile {
@@ -148,6 +179,7 @@ model ClinicalRoom {
 
   doctorId          String?         @unique
   doctor            DoctorProfile?  @relation("RoomDoctor", fields: [doctorId], references: [id])
+  visits            Visit[]
 
   floor             String?
   description       String?
@@ -156,4 +188,30 @@ model ClinicalRoom {
 
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+}
+
+model Visit {
+  id             String       @id @default(uuid())
+  visitCode      String       @unique
+
+  patientId      String
+  patient        Patient      @relation(fields: [patientId], references: [id])
+
+  clinicalRoomId String
+  clinicalRoom   ClinicalRoom @relation(fields: [clinicalRoomId], references: [id])
+
+  doctorId       String
+  doctor         DoctorProfile @relation(fields: [doctorId], references: [id])
+
+  symptoms       String?
+  status         VisitStatus  @default(WAITING)
+  checkInAt      DateTime     @default(now())
+  completedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([clinicalRoomId])
+  @@index([status])
 }
