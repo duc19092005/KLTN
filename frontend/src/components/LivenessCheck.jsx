@@ -14,7 +14,7 @@ import {
 /**
  * LivenessCheck - Modern Fintech / Apple FaceID Aesthetic
  */
-export default function LivenessCheck({ onLivenessPass, onError }) {
+export default function LivenessCheck({ onLivenessPass, onError, disabled = false }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const intervalRef = useRef(null);
@@ -129,7 +129,7 @@ export default function LivenessCheck({ onLivenessPass, onError }) {
     intervalRef.current = setInterval(() => {
       try {
         const s = stateRef.current;
-        if (s.allPassed) return;
+        if (s.allPassed || disabled) return;
         if (!videoRef.current || videoRef.current.readyState < 2) return;
 
         tsCounterRef.current += 80;
@@ -229,11 +229,11 @@ export default function LivenessCheck({ onLivenessPass, onError }) {
   useEffect(() => {
     if (allPassedUI && videoRef.current) {
       const timer = setTimeout(() => {
-        onLivenessPass?.(capturedCanvasRef.current || videoRef.current);
+        if (!disabled) onLivenessPass?.(capturedCanvasRef.current || videoRef.current);
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [allPassedUI, onLivenessPass]);
+  }, [allPassedUI, onLivenessPass, disabled]);
 
   // ============================================================
   // Soft Geometric Icons
@@ -269,184 +269,346 @@ export default function LivenessCheck({ onLivenessPass, onError }) {
   const currentDirection = directions[displayIdx];
 
   return (
-    <div className="liveness-fintech-card">
+    <div className="liveness-shell">
       <style>{`
-        .liveness-fintech-card {
-          width: 100%; max-width: 400px; margin: 0 auto;
-          background: var(--bg-card, #ffffff);
-          border-radius: 24px;
-          padding: 32px 20px;
-          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0,0,0,0.02);
-          display: flex; flex-direction: column; align-items: center;
-          border: 1px solid var(--border-color, #f1f5f9);
+        .liveness-shell {
+          width: 100%;
+          max-width: 560px;
+          margin: 0 auto;
+          padding: 18px;
+          border-radius: 28px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          background:
+            radial-gradient(circle at 24% 10%, rgba(94, 234, 212, 0.16), transparent 28rem),
+            radial-gradient(circle at 85% 22%, rgba(129, 140, 248, 0.20), transparent 24rem),
+            rgba(15, 23, 42, 0.64);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 24px 70px rgba(0,0,0,0.28);
+          backdrop-filter: blur(18px);
         }
 
-        .fintech-title {
-          font-size: 1.15rem; font-weight: 700; color: var(--text-main, #0f172a);
-          margin-bottom: 28px; text-align: center; letter-spacing: -0.01em;
+        .liveness-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          margin-bottom: 18px;
+        }
+
+        .liveness-kicker {
+          margin: 0 0 6px;
+          color: #5eead4;
+          font-size: 0.72rem;
+          font-weight: 900;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+        }
+
+        .liveness-title {
+          margin: 0;
+          color: #f8fbff;
+          font-size: clamp(1.35rem, 3vw, 1.75rem);
+          font-weight: 850;
+          letter-spacing: -0.04em;
+        }
+
+        .liveness-step-pill {
+          flex: 0 0 auto;
+          padding: 10px 12px;
+          color: #cffafe;
+          font-size: 0.78rem;
+          font-weight: 850;
+          border: 1px solid rgba(94, 234, 212, 0.28);
+          border-radius: 999px;
+          background: rgba(8, 47, 73, 0.42);
+          box-shadow: 0 0 24px rgba(45, 212, 191, 0.10);
+        }
+
+        .liveness-stage {
+          position: relative;
+          display: grid;
+          place-items: center;
+          min-height: 390px;
+          border-radius: 26px;
+          overflow: hidden;
+          border: 1px solid rgba(148, 163, 184, 0.18);
+          background:
+            linear-gradient(180deg, rgba(15, 23, 42, 0.18), rgba(2, 6, 23, 0.46)),
+            radial-gradient(circle at center, rgba(34, 211, 238, 0.12), rgba(99, 102, 241, 0.08) 48%, rgba(2, 6, 23, 0.48));
+        }
+
+        .liveness-stage::before {
+          content: '';
+          position: absolute;
+          inset: 18px;
+          border-radius: 24px;
+          border: 1px solid rgba(255,255,255,0.08);
+          pointer-events: none;
         }
 
         .camera-oval-pod {
           position: relative;
-          width: 240px; height: 320px;
-          border-radius: 160px; /* Makes it a perfect pill/oval */
-          background: #f8fafc;
-          display: flex; align-items: center; justify-content: center;
-          box-shadow: 0 0 0 6px var(--bg-card, #ffffff), 0 0 0 8px ${ringColor}, 0 20px 40px rgba(0,0,0,0.08);
-          transition: box-shadow 0.4s ease;
-          z-index: 10;
+          width: min(78vw, 300px);
+          height: min(96vw, 360px);
+          max-height: 360px;
+          border-radius: 46% / 38%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: visible;
+          background: rgba(2, 6, 23, 0.72);
+          box-shadow:
+            0 0 0 1px rgba(255,255,255,0.08),
+            0 0 0 6px rgba(15,23,42,0.92),
+            0 0 0 9px ${ringColor},
+            0 28px 70px rgba(0,0,0,0.42),
+            0 0 80px rgba(34, 211, 238, 0.13);
+          transition: box-shadow 0.35s ease, transform 0.35s ease;
+          z-index: 2;
         }
 
-        /* Pulse animation when scanning properly */
         .camera-oval-pod.scanning {
-          animation: podPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+          animation: podPulse 1.6s ease-in-out infinite;
         }
+
         @keyframes podPulse {
-          0%, 100% { box-shadow: 0 0 0 6px var(--bg-card, #ffffff), 0 0 0 8px #3b82f6, 0 20px 40px rgba(59, 130, 246, 0.15); }
-          50% { box-shadow: 0 0 0 6px var(--bg-card, #ffffff), 0 0 0 12px rgba(59, 130, 246, 0.4), 0 20px 40px rgba(59, 130, 246, 0.25); }
+          0%, 100% {
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 0 0 6px rgba(15,23,42,0.92), 0 0 0 9px #38bdf8, 0 28px 70px rgba(0,0,0,0.42), 0 0 82px rgba(56,189,248,0.18);
+          }
+          50% {
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 0 0 6px rgba(15,23,42,0.92), 0 0 0 15px rgba(56,189,248,0.34), 0 28px 70px rgba(0,0,0,0.42), 0 0 98px rgba(56,189,248,0.26);
+          }
+        }
+
+        .camera-oval-mask {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          border-radius: inherit;
         }
 
         .hardware-feed-clean {
-          width: 100%; height: 100%; object-fit: cover;
-          border-radius: 160px; transform: scaleX(-1);
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transform: scaleX(-1);
+          filter: contrast(1.08) saturate(1.05);
           opacity: ${status === 'loading' ? '0' : '1'};
-          transition: opacity 0.5s ease;
+          transition: opacity 0.45s ease;
         }
 
-        .instruction-text {
-          margin-top: 32px; font-size: 1.05rem; font-weight: 600;
-          color: var(--text-main, #1e293b); text-align: center;
-          min-height: 28px; display: flex; align-items: center; justify-content: center; gap: 8px;
-          transition: color 0.3s ease;
-        }
-        .instruction-text.warn { color: #ef4444; }
-        .instruction-text.success { color: #10b981; }
-
-        .progress-dots-container {
-          display: flex; gap: 12px; margin-top: 24px;
-        }
-        .progress-dot {
-          width: 10px; height: 10px; border-radius: 50%;
-          background: #e2e8f0; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .progress-dot.passed { background: #10b981; transform: scale(1.1); }
-        .progress-dot.active { background: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
-
-        .loading-glass {
-          position: absolute; inset: 0; border-radius: 160px;
-          display: flex; flex-direction: column; align-items: center; justify-content: center;
-          background: rgba(255,255,255,0.8); backdrop-filter: blur(4px); z-index: 20;
+        .scan-sheen {
+          position: absolute;
+          left: 10%;
+          right: 10%;
+          height: 2px;
+          top: 14%;
+          border-radius: 999px;
+          background: linear-gradient(90deg, transparent, #67e8f9, transparent);
+          box-shadow: 0 0 18px rgba(103,232,249,0.9);
+          opacity: ${status === 'active' && !allPassedUI ? 1 : 0};
+          animation: scanSheen 2.2s ease-in-out infinite;
         }
 
+        @keyframes scanSheen { 0%,100% { top: 14%; } 50% { top: 84%; } }
+
+        .loading-glass,
         .success-glass {
-          position: absolute; inset: 0; border-radius: 160px;
-          display: flex; flex-direction: column; align-items: center; justify-content: center;
-          background: rgba(255,255,255,0.9); backdrop-filter: blur(8px); z-index: 20;
-          animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          z-index: 20;
+          backdrop-filter: blur(10px);
         }
-        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        .loading-glass { background: rgba(2, 6, 23, 0.76); }
+        .success-glass {
+          background: rgba(6, 78, 59, 0.62);
+          animation: popIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes popIn { from { transform: scale(0.86); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
         .spinner-clean {
-          width: 36px; height: 36px; border: 3px solid #e2e8f0; border-top-color: #3b82f6;
-          border-radius: 50%; animation: spin 0.8s linear infinite;
+          width: 42px;
+          height: 42px;
+          border: 3px solid rgba(148, 163, 184, 0.28);
+          border-top-color: #5eead4;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Floating Arrow */
         .floating-arrow {
-          position: absolute; background: #ffffff; color: #3b82f6;
-          border-radius: 50%; width: 48px; height: 48px;
-          display: flex; align-items: center; justify-content: center;
-          box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 15;
-          animation: floatArrow 1.5s ease-in-out infinite;
+          position: absolute;
+          width: 58px;
+          height: 58px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #06111f;
+          border-radius: 22px;
+          background: linear-gradient(135deg, #5eead4, #93c5fd 52%, #c4b5fd);
+          box-shadow: 0 18px 38px rgba(45, 212, 191, 0.24), 0 0 0 1px rgba(255,255,255,0.26) inset;
+          z-index: 15;
         }
-        @keyframes floatArrow { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(0, -6px); } }
+        .floating-arrow.left { left: -30px; top: 50%; margin-top: -29px; animation: floatLeft 1.2s ease-in-out infinite; }
+        .floating-arrow.right { right: -30px; top: 50%; margin-top: -29px; animation: floatRight 1.2s ease-in-out infinite; }
+        .floating-arrow.up { top: -30px; left: 50%; margin-left: -29px; animation: floatUp 1.2s ease-in-out infinite; }
+        .floating-arrow.down { bottom: -30px; left: 50%; margin-left: -29px; animation: floatDown 1.2s ease-in-out infinite; }
+        @keyframes floatLeft { 0%,100% { transform: translateX(0); } 50% { transform: translateX(-8px); } }
+        @keyframes floatRight { 0%,100% { transform: translateX(0); } 50% { transform: translateX(8px); } }
+        @keyframes floatUp { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes floatDown { 0%,100% { transform: translateY(0); } 50% { transform: translateY(8px); } }
 
-        .floating-arrow.left { left: -24px; top: 50%; margin-top: -24px; animation: floatLeft 1.5s ease-in-out infinite; }
-        .floating-arrow.right { right: -24px; top: 50%; margin-top: -24px; animation: floatRight 1.5s ease-in-out infinite; }
-        .floating-arrow.up { top: -24px; left: 50%; margin-left: -24px; animation: floatUp 1.5s ease-in-out infinite; }
-        .floating-arrow.down { bottom: -24px; left: 50%; margin-left: -24px; animation: floatDown 1.5s ease-in-out infinite; }
+        .instruction-panel {
+          margin-top: 18px;
+          padding: 16px;
+          border: 1px solid rgba(255,255,255,0.10);
+          border-radius: 20px;
+          background: rgba(255,255,255,0.055);
+        }
 
-        @keyframes floatLeft { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-6px); } }
-        @keyframes floatRight { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(6px); } }
-        @keyframes floatUp { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-        @keyframes floatDown { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+        .instruction-text {
+          min-height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin: 0;
+          color: #e0f2fe;
+          text-align: center;
+          font-size: 1rem;
+          font-weight: 750;
+          letter-spacing: -0.01em;
+        }
+        .instruction-text.warn { color: #fecaca; }
+        .instruction-text.success { color: #bbf7d0; }
+
+        .progress-dots-container {
+          display: flex;
+          justify-content: center;
+          gap: 10px;
+          margin-top: 14px;
+        }
+        .progress-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 999px;
+          background: rgba(148, 163, 184, 0.35);
+          transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .progress-dot.passed { width: 28px; background: #5eead4; box-shadow: 0 0 18px rgba(94,234,212,.38); }
+        .progress-dot.active { background: #93c5fd; box-shadow: 0 0 0 4px rgba(147,197,253,.18); }
+
+        .hold-progress {
+          width: min(100%, 260px);
+          height: 7px;
+          margin: 16px auto 0;
+          overflow: hidden;
+          border-radius: 999px;
+          background: rgba(148, 163, 184, 0.22);
+        }
+        .hold-progress-bar {
+          height: 100%;
+          width: ${displayProgress}%;
+          border-radius: inherit;
+          background: linear-gradient(90deg, #5eead4, #93c5fd, #c4b5fd);
+          box-shadow: 0 0 20px rgba(94,234,212,.35);
+          transition: width 0.1s linear;
+        }
+
+        .retry-button {
+          width: 100%;
+          margin-top: 14px;
+          padding: 13px 16px;
+          border: 0;
+          border-radius: 16px;
+          color: #06111f;
+          font-weight: 850;
+          cursor: pointer;
+          background: linear-gradient(135deg, #5eead4, #93c5fd 48%, #c4b5fd);
+        }
+
+        @media (max-width: 560px) {
+          .liveness-shell { padding: 14px; }
+          .liveness-header { align-items: flex-start; flex-direction: column; }
+          .liveness-stage { min-height: 350px; }
+          .camera-oval-pod { width: 235px; height: 310px; }
+        }
       `}</style>
 
-      <div className="fintech-title">
-        Xác minh danh tính
-      </div>
-
-      <div className={`camera-oval-pod ${displayProgress > 0 && !allPassedUI ? 'scanning' : ''}`}>
-        <video ref={videoRef} className="hardware-feed-clean" muted playsInline />
-
-        {status === 'loading' && (
-          <div className="loading-glass">
-            <div className="spinner-clean" />
-          </div>
-        )}
-
-        {allPassedUI && (
-          <div className="success-glass">
-            {successShield}
-          </div>
-        )}
-
-        {/* Floating Direction Arrow */}
-        {status === 'active' && !allPassedUI && faceDetected && !distanceWarn && currentDirection && (
-          <div className={`floating-arrow ${currentDirection}`}>
-            {renderArrow(currentDirection)}
-          </div>
-        )}
-      </div>
-
-      {/* Main Instruction Area */}
-      <div className={`instruction-text ${distanceWarn || !faceDetected ? 'warn' : allPassedUI ? 'success' : ''}`}>
-        {message}
-      </div>
-
-      {/* Clean Progress Dots */}
-      {status === 'active' && directions.length > 0 && (
-        <div className="progress-dots-container">
-          {directions.map((dir, idx) => {
-            const isPassed = displayPassed.includes(dir);
-            const isCurrent = idx === displayIdx && !allPassedUI;
-            return (
-              <div 
-                key={`${dir}-${idx}`} 
-                className={`progress-dot ${isPassed ? 'passed' : isCurrent ? 'active' : ''}`} 
-              />
-            );
-          })}
+      <div className="liveness-header">
+        <div>
+          <p className="liveness-kicker">LIVE BIOMETRIC CHECK</p>
+          <h3 className="liveness-title">Xác minh khuôn mặt</h3>
         </div>
-      )}
-
-      {/* Smooth Progress Bar for Hold Duration (Optional visual flair) */}
-      {status === 'active' && !allPassedUI && (
-        <div style={{ width: '120px', height: '4px', background: '#f1f5f9', borderRadius: '2px', marginTop: '20px', overflow: 'hidden' }}>
-          <div style={{ 
-            height: '100%', 
-            background: '#3b82f6', 
-            width: `${displayProgress}%`, 
-            transition: 'width 0.1s linear',
-            borderRadius: '2px'
-          }} />
+        <div className="liveness-step-pill">
+          Bước {Math.min(displayIdx + 1, directions.length)} / {directions.length}
         </div>
-      )}
+      </div>
 
-      {/* Error Fallback */}
-      {status === 'error' && (
-        <button 
-          onClick={() => window.location.reload()} 
-          style={{
-            marginTop: 24, padding: '10px 24px', borderRadius: '12px',
-            background: '#eff6ff', color: '#2563eb', border: 'none',
-            fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem'
-          }}
-        >
-          Thử lại
-        </button>
-      )}
+      <div className="liveness-stage">
+        <div className={`camera-oval-pod ${displayProgress > 0 && !allPassedUI ? 'scanning' : ''}`}>
+          <div className="camera-oval-mask">
+            <video ref={videoRef} className="hardware-feed-clean" muted playsInline />
+            <div className="scan-sheen" />
+          </div>
+
+          {status === 'loading' && (
+            <div className="loading-glass">
+              <div className="spinner-clean" />
+            </div>
+          )}
+
+          {allPassedUI && (
+            <div className="success-glass">
+              {successShield}
+            </div>
+          )}
+
+          {status === 'active' && !allPassedUI && faceDetected && !distanceWarn && currentDirection && (
+            <div className={`floating-arrow ${currentDirection}`}>
+              {renderArrow(currentDirection)}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="instruction-panel">
+        <p className={`instruction-text ${distanceWarn || !faceDetected ? 'warn' : allPassedUI ? 'success' : ''}`}>
+          {message}
+        </p>
+
+        {status === 'active' && directions.length > 0 && (
+          <div className="progress-dots-container">
+            {directions.map((dir, idx) => {
+              const isPassed = displayPassed.includes(dir);
+              const isCurrent = idx === displayIdx && !allPassedUI;
+              return (
+                <div
+                  key={`${dir}-${idx}`}
+                  className={`progress-dot ${isPassed ? 'passed' : isCurrent ? 'active' : ''}`}
+                />
+              );
+            })}
+          </div>
+        )}
+
+        {status === 'active' && !allPassedUI && (
+          <div className="hold-progress">
+            <div className="hold-progress-bar" />
+          </div>
+        )}
+
+        {status === 'error' && (
+          <button type="button" className="retry-button" onClick={() => window.location.reload()}>
+            Thử lại camera
+          </button>
+        )}
+      </div>
     </div>
   );
 }

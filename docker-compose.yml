@@ -1,82 +1,66 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:16-alpine
-    container_name: zkp-postgres
-    user: root
+    container_name: admin-auth-postgres
+    restart: unless-stopped
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=YourPassword123!
-      - POSTGRES_DB=zkp_identity
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: YourPassword123!
+      POSTGRES_DB: zkp_identity
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - wal_archive:/var/lib/postgresql/wal_archive
-    command: >
-      sh -c "
-      mkdir -p /var/lib/postgresql/wal_archive &&
-      chown -R postgres:postgres /var/lib/postgresql/wal_archive &&
-      exec docker-entrypoint.sh postgres -c wal_level=replica -c archive_mode=on -c \"archive_command=cp %p /var/lib/postgresql/wal_archive/%f\"
-      "
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d zkp_identity"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   blockchain:
     build:
       context: ./blockchain
-    container_name: zkp-blockchain
+    container_name: admin-auth-blockchain
+    restart: unless-stopped
     ports:
       - "8545:8545"
-    command: sh -c "dos2unix start.sh && chmod +x start.sh && ./start.sh"
 
   backend:
     build:
       context: ./backend
-    container_name: zkp-backend
+    container_name: admin-auth-backend
+    restart: unless-stopped
     ports:
       - "3001:3001"
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
-      - wal_archive:/wal_archive
     environment:
-      - NODE_ENV=development
-      - PORT=3001
-      - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRATION=1h
-      - DATABASE_URL=postgresql://postgres:YourPassword123!@db:5432/zkp_identity?schema=public
-      - BLOCKCHAIN_RPC_URL=http://blockchain:8545
-      - IDENTITY_REGISTRY_ADDRESS=${IDENTITY_REGISTRY_ADDRESS}
-      - AI_MODEL_REGISTRY_ADDRESS=${AI_MODEL_REGISTRY_ADDRESS}
-      - DB_BACKUP_REGISTRY_ADDRESS=${DB_BACKUP_REGISTRY_ADDRESS}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - SUPER_ADMIN_PRIVATE_KEY=${SUPER_ADMIN_PRIVATE_KEY}
-      - SMTP_HOST=smtp.ethereal.email
-      - SMTP_PORT=587
-      - SMTP_USER=
-      - SMTP_PASS=
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://postgres:YourPassword123!@db:5432/zkp_identity?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      SUPER_ADMIN_PRIVATE_KEY: ${SUPER_ADMIN_PRIVATE_KEY}
+      IDENTITY_REGISTRY_ADDRESS: ${IDENTITY_REGISTRY_ADDRESS}
+      BLOCKCHAIN_RPC_URL: http://blockchain:8545
     depends_on:
-      - db
-      - blockchain
-    command: sh -c "echo '⏳ Waiting for PostgreSQL (db:5432)...' && until nc -z db 5432; do sleep 2; done && echo '🔥 PostgreSQL is ready! Running Prisma migrations...' && npx prisma db push && npx prisma db seed && npm run start:dev"
+      db:
+        condition: service_healthy
+      blockchain:
+        condition: service_started
 
   frontend:
     build:
       context: ./frontend
-    container_name: zkp-frontend
+    container_name: admin-auth-frontend
+    restart: unless-stopped
     ports:
       - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     environment:
-      - VITE_API_URL=http://localhost:3001/api
-      - VITE_IDENTITY_REGISTRY_ADDRESS=${IDENTITY_REGISTRY_ADDRESS}
-      - VITE_NETWORK_RPC_URL=http://localhost:8545
-      - VITE_CHAIN_ID=31337
+      VITE_API_URL: http://localhost:3001/api
+      VITE_IDENTITY_REGISTRY_ADDRESS: ${IDENTITY_REGISTRY_ADDRESS}
+      VITE_NETWORK_RPC_URL: http://localhost:8545
+      VITE_CHAIN_ID: 31337
     depends_on:
       - backend
 
 volumes:
   postgres_data:
-  wal_archive:

@@ -4,14 +4,8 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
 
 const cookieExtractor = (req: Request): string | null => {
-  let token = null;
-  if (req && req.cookies) {
-    token = req.cookies['token'] || req.cookies['recovery_token'];
-  }
-  if (!token) {
-    token = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
-  }
-  return token;
+  const token = req?.cookies?.token;
+  return token || ExtractJwt.fromAuthHeaderAsBearerToken()(req);
 };
 
 @Injectable()

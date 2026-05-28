@@ -5,7 +5,7 @@ import LivenessCheck from './LivenessCheck';
 /**
  * FaceCapture component with premium balanced layout and no emojis
  */
-export default function FaceCapture({ onCapture, onError, autoStart = false, requireLiveness = true }) {
+export default function FaceCapture({ onCapture, onError, autoStart = false, requireLiveness = true, disabled = false, label }) {
   const videoRef = useRef(null);
   const imageRef = useRef(null);
   
@@ -150,6 +150,7 @@ export default function FaceCapture({ onCapture, onError, autoStart = false, req
           <LivenessCheck
             onLivenessPass={handleLivenessPass}
             onError={onError}
+            disabled={disabled}
           />
         </div>
         {extractingEmbedding && (
@@ -161,7 +162,7 @@ export default function FaceCapture({ onCapture, onError, autoStart = false, req
           }}>
             <div className="processing-spinner" />
             <p style={{ marginTop: 16, color: 'var(--text-main)', fontWeight: 600, fontSize: '0.95rem', letterSpacing: '-0.01em' }}>
-              Extracting cryptographic face token...
+              {label || 'Extracting cryptographic face token...'}
             </p>
           </div>
         )}
