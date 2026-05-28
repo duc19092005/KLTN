@@ -15,12 +15,16 @@ model User {
   status            String   @default("PENDING")
   firstLogin        Boolean  @default(true)
   registrationStep  Int      @default(1)
+  tokenVersion      Int      @default(0)
   inviteToken       String?  @unique
   inviteTokenExpiry DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   adminProfile      AdminProfile?
+
+  @@index([role])
+  @@index([status])
 }
 
 model AdminProfile {
@@ -32,7 +36,12 @@ model AdminProfile {
   faceEmbedding  String?
   faceHash       String?
   nonce          String?
+  nonceExpiresAt DateTime?
+  noncePurpose   String?
   mfaSecret      String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@index([walletAddress])
+  @@index([noncePurpose, nonceExpiresAt])
 }

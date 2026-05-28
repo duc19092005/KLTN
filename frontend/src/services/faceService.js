@@ -8,16 +8,14 @@ let modelsLoaded = false;
 export async function loadModels() {
   if (modelsLoaded) return;
 
-  // Sử dụng CDN chính thức của jsdelivr thay vì local path để tránh việc người dùng phải tải thủ công
-  const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+  const MODEL_URL = '/models';
   await Promise.all([
-    faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
-    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+    faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
     faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
   ]);
 
   modelsLoaded = true;
-  console.log('✅ Face-api models loaded');
 }
 
 /**
@@ -28,17 +26,20 @@ export async function loadModels() {
 export async function detectFace(videoEl) {
   if (!modelsLoaded) await loadModels();
 
-  // Try first with default/standard confidence threshold (0.4)
+  const detectorOptions = new faceapi.TinyFaceDetectorOptions({
+    inputSize: 416,
+    scoreThreshold: 0.45,
+  });
+
   let detection = await faceapi
-    .detectSingleFace(videoEl, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }))
-    .withFaceLandmarks()
+    .detectSingleFace(videoEl, detectorOptions)
+    .withFaceLandmarks(true)
     .withFaceDescriptor();
 
-  // Fallback to a lower confidence threshold (0.2) if not found (helps with turned/tilted faces)
   if (!detection) {
     detection = await faceapi
-      .detectSingleFace(videoEl, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.2 }))
-      .withFaceLandmarks()
+      .detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.25 }))
+      .withFaceLandmarks(true)
       .withFaceDescriptor();
   }
 
@@ -53,4 +54,3 @@ export async function detectFace(videoEl) {
 export function areModelsLoaded() {
   return modelsLoaded;
 }
-

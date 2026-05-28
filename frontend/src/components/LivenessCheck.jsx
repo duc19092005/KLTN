@@ -21,6 +21,7 @@ export default function LivenessCheck({ onLivenessPass, onError, disabled = fals
   const holdStartRef = useRef(null);
   const tsCounterRef = useRef(1);
   const capturedCanvasRef = useRef(null);
+  const passSentRef = useRef(false);
 
   const captureVideoFrame = () => {
     if (!videoRef.current) return null;
@@ -227,9 +228,17 @@ export default function LivenessCheck({ onLivenessPass, onError, disabled = fals
   };
 
   useEffect(() => {
-    if (allPassedUI && videoRef.current) {
+    if (allPassedUI && videoRef.current && !passSentRef.current) {
       const timer = setTimeout(() => {
-        if (!disabled) onLivenessPass?.(capturedCanvasRef.current || videoRef.current);
+        if (disabled || passSentRef.current) return;
+        passSentRef.current = true;
+        stopLoop();
+        const frame = capturedCanvasRef.current || captureVideoFrame();
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(t => t.stop());
+          streamRef.current = null;
+        }
+        onLivenessPass?.(frame || videoRef.current);
       }, 1500);
       return () => clearTimeout(timer);
     }

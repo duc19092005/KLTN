@@ -13,6 +13,9 @@ export class BlockchainService implements OnModuleInit {
     'function revokeAdmin(address wallet) external',
     'function isAuthorized(address wallet) external view returns (bool)',
     'function owner() external view returns (address)',
+    'function pendingOwner() external view returns (address)',
+    'function transferOwnership(address newOwner) external',
+    'function acceptOwnership() external',
   ];
 
   async onModuleInit() {
@@ -40,7 +43,7 @@ export class BlockchainService implements OnModuleInit {
   async isAuthorized(walletAddress: string): Promise<boolean> {
     if (!this.contract) return false;
     try {
-      return await this.contract.isAuthorized(walletAddress);
+      return await this.contract.isAuthorized(ethers.getAddress(walletAddress));
     } catch {
       return false;
     }
@@ -51,15 +54,24 @@ export class BlockchainService implements OnModuleInit {
       return { success: false, error: 'IdentityRegistry or Super Admin signer not configured' };
     }
 
-    const writableContract = this.contract.connect(this.superAdminSigner) as ethers.Contract;
-    const tx = await writableContract.authorizeAdmin(walletAddress);
-    const receipt = await tx.wait();
+    try {
+      const normalizedWalletAddress = ethers.getAddress(walletAddress);
+      if (await this.isAuthorized(normalizedWalletAddress)) {
+        return { success: true, alreadyAuthorized: true };
+      }
 
-    return {
-      success: true,
-      txHash: tx.hash,
-      blockNumber: receipt.blockNumber,
-    };
+      const writableContract = this.contract.connect(this.superAdminSigner) as ethers.Contract;
+      const tx = await writableContract.authorizeAdmin(normalizedWalletAddress);
+      const receipt = await tx.wait();
+
+      return {
+        success: true,
+        txHash: tx.hash,
+        blockNumber: receipt.blockNumber,
+      };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to authorize wallet' };
+    }
   }
 
   async revokeAdmin(walletAddress: string) {
@@ -67,15 +79,24 @@ export class BlockchainService implements OnModuleInit {
       return { success: false, error: 'IdentityRegistry or Super Admin signer not configured' };
     }
 
-    const writableContract = this.contract.connect(this.superAdminSigner) as ethers.Contract;
-    const tx = await writableContract.revokeAdmin(walletAddress);
-    const receipt = await tx.wait();
+    try {
+      const normalizedWalletAddress = ethers.getAddress(walletAddress);
+      if (!(await this.isAuthorized(normalizedWalletAddress))) {
+        return { success: true, alreadyRevoked: true };
+      }
 
-    return {
-      success: true,
-      txHash: tx.hash,
-      blockNumber: receipt.blockNumber,
-    };
+      const writableContract = this.contract.connect(this.superAdminSigner) as ethers.Contract;
+      const tx = await writableContract.revokeAdmin(normalizedWalletAddress);
+      const receipt = await tx.wait();
+
+      return {
+        success: true,
+        txHash: tx.hash,
+        blockNumber: receipt.blockNumber,
+      };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to revoke wallet' };
+    }
   }
 
   getContractAddress(): string {

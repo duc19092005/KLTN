@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
+import { PrismaService } from '../prisma/prisma.service';
+import { getJwtSecret } from './auth-security';
 
 const cookieExtractor = (req: Request): string | null => {
   const token = req?.cookies?.token;
@@ -10,21 +12,36 @@ const cookieExtractor = (req: Request): string | null => {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(private readonly prisma: PrismaService) {
     super({
       jwtFromRequest: cookieExtractor,
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'default_secret',
+      secretOrKey: getJwtSecret(),
     });
   }
 
   async validate(payload: any) {
+    if (!payload?.sub || typeof payload.tokenVersion !== 'number') {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: { adminProfile: true },
+    });
+
+    if (!user || user.status === 'SUSPENDED' || user.tokenVersion !== payload.tokenVersion) {
+      throw new UnauthorizedException('Invalid session');
+    }
+
     return {
-      sub: payload.sub,
-      username: payload.username,
-      role: payload.role,
-      verified: payload.verified,
-      walletAddress: payload.walletAddress,
+      sub: user.id,
+      username: user.username,
+      role: user.role,
+      verified: Boolean(payload.verified),
+      walletAddress: payload.walletAddress || user.adminProfile?.walletAddress,
+      firstLogin: user.firstLogin,
+      tokenVersion: user.tokenVersion,
     };
   }
 }

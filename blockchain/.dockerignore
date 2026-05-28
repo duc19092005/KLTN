@@ -1,11 +1,6 @@
 node_modules
 artifacts
 cache
-typechain-types
-.git
-.gitignore
-Dockerfile
-README.md
+coverage
 .env
-*.log
 npm-debug.log*

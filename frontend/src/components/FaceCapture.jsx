@@ -8,6 +8,8 @@ import LivenessCheck from './LivenessCheck';
 export default function FaceCapture({ onCapture, onError, autoStart = false, requireLiveness = true, disabled = false, label }) {
   const videoRef = useRef(null);
   const imageRef = useRef(null);
+  const streamRef = useRef(null);
+  const mountedRef = useRef(true);
   
   const [mode, setMode] = useState('upload');
   const [status, setStatus] = useState('idle');
@@ -16,20 +18,86 @@ export default function FaceCapture({ onCapture, onError, autoStart = false, req
   const [message, setMessage] = useState('Select an option to initialize system.');
   const [extractingEmbedding, setExtractingEmbedding] = useState(false);
 
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    if (mountedRef.current) {
+      setStream(null);
+      setStatus('idle');
+    }
+  }, []);
+
+  const startCamera = useCallback(async () => {
+    setStatus('loading');
+    setMessage('Loading core identification models...');
+
+    try {
+      await loadModels();
+      setMessage('Requesting hardware access...');
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480, facingMode: 'user' },
+      });
+
+      if (!mountedRef.current) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        return;
+      }
+
+      streamRef.current = mediaStream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+        videoRef.current.play().catch(e => {
+          if (e.name !== 'AbortError') console.warn('Camera context aborted:', e);
+        });
+      }
+
+      setStream(mediaStream);
+      setStatus('ready');
+      setMessage('Biometric feed is active. Ready to analyze.');
+    } catch (err) {
+      if (!mountedRef.current) return;
+      setStatus('error');
+      setMessage(err.message || 'Hardware initialization failed');
+      onError?.(err.message);
+    }
+  }, [onError]);
+
   useEffect(() => {
-    if (!requireLiveness && autoStart && mode === 'camera') startCamera();
-    return () => stopCamera();
-  }, [mode, requireLiveness]);
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      stopCamera();
+    };
+  }, [stopCamera]);
+
+  useEffect(() => {
+    if (!requireLiveness && autoStart && mode === 'camera') {
+      startCamera();
+      return;
+    }
+
+    if (requireLiveness || mode !== 'camera') {
+      stopCamera();
+    }
+  }, [autoStart, mode, requireLiveness, startCamera, stopCamera]);
 
   // ── Liveness mode: after liveness passes, extract face embedding ──
   const handleLivenessPass = async (videoElement) => {
     setExtractingEmbedding(true);
     try {
       await loadModels();
+      if (!mountedRef.current) return;
       const embedding = await detectFace(videoElement);
 
       if (!embedding) {
         await new Promise(r => setTimeout(r, 500));
+        if (!mountedRef.current) return;
         const retry = await detectFace(videoElement);
         if (!retry) {
           setExtractingEmbedding(false);
@@ -43,51 +111,18 @@ export default function FaceCapture({ onCapture, onError, autoStart = false, req
     } catch (err) {
       onError?.('Extraction error: ' + err.message);
     } finally {
-      setExtractingEmbedding(false);
+      if (mountedRef.current) setExtractingEmbedding(false);
     }
   };
-
-  // ── Legacy camera mode (requireLiveness=false) ──
-  const startCamera = async () => {
-    setStatus('loading');
-    setMessage('Loading core identification models...');
-
-    try {
-      await loadModels();
-      setMessage('Requesting hardware access...');
-
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480, facingMode: 'user' },
-      });
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        videoRef.current.play().catch(e => {
-          if (e.name !== 'AbortError') console.warn('Camera context aborted:', e);
-        });
-      }
-
-      setStream(mediaStream);
-      setStatus('ready');
-      setMessage('Biometric feed is active. Ready to analyze.');
-    } catch (err) {
-      setStatus('error');
-      setMessage(err.message || 'Hardware initialization failed');
-      onError?.(err.message);
-    }
-  };
-
-  const stopCamera = useCallback(() => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-    setStatus('idle');
-  }, [stream]);
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+      setStatus('error');
+      setMessage('Please select an image file smaller than 5 MB.');
+      return;
+    }
 
     setStatus('loading');
     setMessage('Processing file matrix...');

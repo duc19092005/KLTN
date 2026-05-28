@@ -1,10 +1,23 @@
-import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '../prisma/prisma.service';
-import { ZkpService } from '../zkp/zkp.service';
-import { BlockchainService } from '../blockchain/blockchain.service';
+import { AdminProfile, User } from '@prisma/client';
 import * as crypto from 'crypto';
 import { ethers } from 'ethers';
+import { BlockchainService } from '../blockchain/blockchain.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { ZkpService } from '../zkp/zkp.service';
+
+type UserWithProfile = User & { adminProfile: AdminProfile | null };
+
+const INVITE_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const WALLET_NONCE_TTL_MS = 5 * 60 * 1000;
+const WALLET_PURPOSE_BIND = 'BIND_ADMIN_WALLET';
+const WALLET_PURPOSE_LOGIN = 'WALLET_LOGIN';
 
 @Injectable()
 export class AuthService {
@@ -16,13 +29,13 @@ export class AuthService {
   ) {}
 
   async bootstrapFirstAdmin(username: string, email: string, superAdminSecret: string) {
-    const envKey = process.env.SUPER_ADMIN_PRIVATE_KEY;
-    if (!envKey || envKey === 'your_super_admin_private_key_here') {
-      throw new ForbiddenException('SUPER_ADMIN_PRIVATE_KEY not configured in .env');
+    const bootstrapSecret = process.env.BOOTSTRAP_ADMIN_SECRET || process.env.SUPER_ADMIN_PRIVATE_KEY;
+    if (!bootstrapSecret || bootstrapSecret === 'your_super_admin_private_key_here') {
+      throw new ForbiddenException('BOOTSTRAP_ADMIN_SECRET or SUPER_ADMIN_PRIVATE_KEY is not configured');
     }
 
-    if (superAdminSecret !== envKey) {
-      throw new ForbiddenException('Invalid Super Admin secret key');
+    if (!this.timingSafeEquals(superAdminSecret, bootstrapSecret)) {
+      throw new ForbiddenException('Invalid bootstrap secret');
     }
 
     const existingAdmin = await this.prisma.user.findFirst({ where: { role: 'ADMIN' } });
@@ -30,34 +43,37 @@ export class AuthService {
       throw new ForbiddenException('An Admin account already exists.');
     }
 
-    const inviteToken = crypto.randomBytes(32).toString('hex');
-    const inviteTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const rawInviteToken = crypto.randomBytes(32).toString('hex');
+    const inviteTokenExpiry = new Date(Date.now() + INVITE_TOKEN_TTL_MS);
 
     const user = await this.prisma.user.create({
       data: {
-        username,
-        email,
+        username: username.trim(),
+        email: email.trim().toLowerCase(),
         role: 'ADMIN',
         status: 'PENDING',
         firstLogin: true,
         registrationStep: 1,
-        inviteToken,
+        inviteToken: this.hashInviteToken(rawInviteToken),
         inviteTokenExpiry,
-        adminProfile: { create: { adminUserName: username } },
+        adminProfile: { create: { adminUserName: username.trim() } },
       },
     });
 
     return {
       message: 'First Admin account created successfully.',
       user: { id: user.id, username: user.username, email: user.email, role: user.role },
-      inviteToken,
+      inviteToken: rawInviteToken,
+      inviteTokenExpiresAt: inviteTokenExpiry.toISOString(),
       flow: ['invite-login', 'register-face', 'verify-wallet', 'generate-secret', 'wallet-login', 'verify-face'],
     };
   }
 
   async loginWithInviteToken(inviteToken: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { inviteToken },
+    const trimmedToken = inviteToken.trim();
+    const tokenHash = this.hashInviteToken(trimmedToken);
+    const user = await this.prisma.user.findFirst({
+      where: { inviteToken: { in: [tokenHash, trimmedToken] } },
       include: { adminProfile: true },
     });
 
@@ -68,253 +84,280 @@ export class AuthService {
       throw new UnauthorizedException('Invite token has expired');
     }
 
-    const payload = {
-      sub: user.id,
-      username: user.username,
-      role: user.role,
-      verified: false,
-      isFirstLogin: true,
-    };
+    if (user.inviteToken !== tokenHash) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { inviteToken: tokenHash },
+      });
+    }
 
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: this.signAccessToken(user, {
+        verified: false,
+        isFirstLogin: true,
+      }),
       firstLogin: true,
       requireRegistration: true,
-      user: {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        email: user.email,
-        status: user.status,
-        registrationStep: user.registrationStep,
-        hasFace: Boolean(user.adminProfile?.faceEmbedding),
-        hasWallet: Boolean(user.adminProfile?.walletAddress),
-      },
+      user: this.toPublicUser(user, false),
     };
   }
 
   async registerFace(userId: string, embedding: number[]) {
     const descriptor = this.validateFaceDescriptor(embedding);
+    const user = await this.getAdminUser(userId);
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { adminProfile: true },
-    });
-    if (!user || user.role !== 'ADMIN' || !user.adminProfile) {
-      throw new UnauthorizedException('Admin not found');
+    if (!user.firstLogin && user.adminProfile?.faceEmbedding) {
+      throw new ForbiddenException('Face data is already registered');
     }
 
-    const faceEmbedding = JSON.stringify(descriptor);
-    const faceHash = crypto.createHash('sha256').update(faceEmbedding).digest('hex');
+    const faceEmbeddingJson = JSON.stringify(descriptor);
+    const faceHash = crypto.createHash('sha256').update(faceEmbeddingJson).digest('hex');
+    const encryptedFaceEmbedding = this.zkpService.encryptSecret(faceEmbeddingJson);
 
-    await this.prisma.adminProfile.update({
-      where: { userId },
-      data: { faceEmbedding, faceHash },
-    });
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { registrationStep: Math.max(user.registrationStep ?? 1, 2) },
-    });
+    await this.prisma.$transaction([
+      this.prisma.adminProfile.update({
+        where: { userId },
+        data: { faceEmbedding: encryptedFaceEmbedding, faceHash },
+      }),
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { registrationStep: Math.max(user.registrationStep ?? 1, 2) },
+      }),
+    ]);
 
     return {
       registered: true,
       algorithm: 'face-api/tiny-face-detector+landmark68tiny+recognition-128d',
       descriptorLength: descriptor.length,
-      faceHash,
       registrationStep: 2,
     };
   }
 
-  async verifyWallet(userId: string, address: string, signature: string, message: string) {
-    const recovered = ethers.verifyMessage(message, signature);
-    if (recovered.toLowerCase() !== address.toLowerCase()) {
-      throw new UnauthorizedException('Invalid wallet signature');
-    }
+  async walletBindChallenge(userId: string, address: string) {
+    const walletAddress = this.normalizeWalletAddress(address);
+    const user = await this.getAdminUser(userId);
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { adminProfile: true },
-    });
-    if (!user || user.role !== 'ADMIN' || !user.adminProfile) {
-      throw new UnauthorizedException('Admin not found');
+    if (!user.firstLogin) {
+      throw new ForbiddenException('Wallet binding is only available during first admin setup');
     }
-    if (!user.adminProfile.faceEmbedding) {
+    if (!user.adminProfile?.faceEmbedding) {
       throw new UnauthorizedException('Please register face before binding wallet');
     }
-
     if (
       user.adminProfile.walletAddress &&
-      user.adminProfile.walletAddress.toLowerCase() !== address.toLowerCase()
+      user.adminProfile.walletAddress.toLowerCase() !== walletAddress.toLowerCase()
     ) {
       throw new UnauthorizedException('Wallet address does not match registered address');
     }
 
-    const chainResult = await this.blockchainService.authorizeAdmin(address);
+    const existingWallet = await this.prisma.adminProfile.findFirst({
+      where: {
+        walletAddress: { equals: walletAddress, mode: 'insensitive' },
+        userId: { not: userId },
+      },
+    });
+    if (existingWallet) {
+      throw new UnauthorizedException('Wallet is already bound to another admin');
+    }
+
+    return this.createWalletChallenge(user.adminProfile.id, walletAddress, WALLET_PURPOSE_BIND, user.id);
+  }
+
+  async verifyWallet(userId: string, address: string, signature: string, message: string) {
+    const walletAddress = this.normalizeWalletAddress(address);
+    const user = await this.getAdminUser(userId);
+
+    if (!user.firstLogin) {
+      throw new ForbiddenException('Wallet binding is only available during first admin setup');
+    }
+    if (!user.adminProfile?.faceEmbedding) {
+      throw new UnauthorizedException('Please register face before binding wallet');
+    }
+    if (
+      user.adminProfile.walletAddress &&
+      user.adminProfile.walletAddress.toLowerCase() !== walletAddress.toLowerCase()
+    ) {
+      throw new UnauthorizedException('Wallet address does not match registered address');
+    }
+
+    await this.consumeWalletChallenge(
+      user.adminProfile,
+      walletAddress,
+      signature,
+      message,
+      WALLET_PURPOSE_BIND,
+      user.id,
+    );
+
+    const chainResult = await this.blockchainService.authorizeAdmin(walletAddress);
     if (!chainResult.success) {
       throw new UnauthorizedException(chainResult.error || 'Failed to authorize wallet on-chain');
     }
 
-    await this.prisma.adminProfile.update({
-      where: { userId },
-      data: { walletAddress: address },
-    });
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { registrationStep: 3 },
-    });
-
-    const payload = {
-      sub: user.id,
-      username: user.username,
-      role: user.role,
-      verified: false,
-      isFirstLogin: true,
-      walletAddress: address,
-    };
+    const [updatedProfile, updatedUser] = await this.prisma.$transaction([
+      this.prisma.adminProfile.update({
+        where: { userId },
+        data: { walletAddress },
+      }),
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { registrationStep: 3 },
+        include: { adminProfile: true },
+      }),
+    ]);
 
     return {
-      access_token: this.jwtService.sign(payload),
-      verified: true,
+      access_token: this.signAccessToken(updatedUser, {
+        verified: false,
+        isFirstLogin: true,
+        walletAddress,
+      }),
+      verified: false,
       onChain: chainResult,
       registrationStep: 3,
+      user: this.toPublicUser({ ...updatedUser, adminProfile: updatedProfile }, false),
     };
   }
 
   async walletChallenge(walletAddress: string) {
+    const normalizedWalletAddress = this.normalizeWalletAddress(walletAddress);
     const adminProfile = await this.prisma.adminProfile.findFirst({
-      where: { walletAddress: { equals: walletAddress, mode: 'insensitive' } },
+      where: { walletAddress: { equals: normalizedWalletAddress, mode: 'insensitive' } },
       include: { user: true },
     });
 
     if (!adminProfile) throw new UnauthorizedException('Wallet address not registered');
-    if (adminProfile.user.status === 'SUSPENDED') throw new UnauthorizedException('Account suspended');
+    if (adminProfile.user.status !== 'ACTIVE' || adminProfile.user.firstLogin) {
+      throw new UnauthorizedException('Admin setup is not complete');
+    }
+    if (!adminProfile.faceEmbedding) {
+      throw new UnauthorizedException('Face data is not registered');
+    }
 
-    const isOnChainAuthorized = await this.blockchainService.isAuthorized(walletAddress);
+    const isOnChainAuthorized = await this.blockchainService.isAuthorized(normalizedWalletAddress);
     if (!isOnChainAuthorized) {
       throw new UnauthorizedException('Wallet not authorized on blockchain.');
     }
 
-    const nonce = `ZKP-Auth-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    await this.prisma.adminProfile.update({
-      where: { id: adminProfile.id },
-      data: { nonce },
-    });
-
-    return { nonce, message: `Sign this message to authenticate:\n${nonce}` };
+    return this.createWalletChallenge(adminProfile.id, normalizedWalletAddress, WALLET_PURPOSE_LOGIN);
   }
 
   async walletLogin(walletAddress: string, signature: string, message: string) {
+    const normalizedWalletAddress = this.normalizeWalletAddress(walletAddress);
     const adminProfile = await this.prisma.adminProfile.findFirst({
-      where: { walletAddress: { equals: walletAddress, mode: 'insensitive' } },
+      where: { walletAddress: { equals: normalizedWalletAddress, mode: 'insensitive' } },
       include: { user: true },
     });
 
     if (!adminProfile) throw new UnauthorizedException('Wallet not registered');
-    if (!adminProfile.nonce || !message.includes(adminProfile.nonce)) {
-      throw new UnauthorizedException('Invalid or expired nonce');
+    if (adminProfile.user.status !== 'ACTIVE' || adminProfile.user.firstLogin) {
+      throw new UnauthorizedException('Admin setup is not complete');
     }
 
-    const isOnChainAuthorized = await this.blockchainService.isAuthorized(walletAddress);
+    await this.consumeWalletChallenge(
+      adminProfile,
+      normalizedWalletAddress,
+      signature,
+      message,
+      WALLET_PURPOSE_LOGIN,
+    );
+
+    const isOnChainAuthorized = await this.blockchainService.isAuthorized(normalizedWalletAddress);
     if (!isOnChainAuthorized) {
       throw new UnauthorizedException('Wallet not authorized on blockchain.');
     }
 
-    const recovered = ethers.verifyMessage(message, signature);
-    if (recovered.toLowerCase() !== walletAddress.toLowerCase()) {
-      throw new UnauthorizedException('Invalid wallet signature');
-    }
-
-    await this.prisma.adminProfile.update({
-      where: { id: adminProfile.id },
-      data: { nonce: null },
-    });
-
-    const payload = {
-      sub: adminProfile.user.id,
-      username: adminProfile.adminUserName,
-      role: 'ADMIN',
-      verified: false,
-      walletAddress,
-    };
-
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: this.signAccessToken(adminProfile.user, {
+        verified: false,
+        walletAddress: normalizedWalletAddress,
+      }),
       requireVerification: true,
-      user: {
-        id: adminProfile.user.id,
-        username: adminProfile.adminUserName,
-        role: 'ADMIN',
-        email: adminProfile.user.email,
-        status: adminProfile.user.status,
-        walletAddress,
-        hasFace: Boolean(adminProfile.faceEmbedding),
-      },
+      user: this.toPublicUser(
+        { ...adminProfile.user, adminProfile: { ...adminProfile, walletAddress: normalizedWalletAddress } },
+        false,
+      ),
     };
   }
 
-  async verifyFace(userId: string, embedding: number[]) {
+  async verifyFace(userId: string, embedding: number[], tokenWalletAddress?: string) {
+    if (!tokenWalletAddress) {
+      throw new UnauthorizedException('Wallet authentication is required before face verification');
+    }
+
     const descriptor = this.validateFaceDescriptor(embedding);
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { adminProfile: true },
-    });
-    if (!user || !user.adminProfile?.faceEmbedding) {
-      throw new UnauthorizedException('No face data registered');
+    const user = await this.getAdminUser(userId);
+
+    if (user.status !== 'ACTIVE' || user.firstLogin) {
+      throw new UnauthorizedException('Admin setup is not complete');
+    }
+    if (!user.adminProfile?.faceEmbedding || !user.adminProfile.walletAddress) {
+      throw new UnauthorizedException('Face or wallet data is not registered');
+    }
+    if (user.adminProfile.walletAddress.toLowerCase() !== tokenWalletAddress.toLowerCase()) {
+      throw new UnauthorizedException('Wallet session mismatch');
     }
 
-    const stored = this.validateFaceDescriptor(JSON.parse(user.adminProfile.faceEmbedding));
+    const stored = this.decodeStoredDescriptor(user.adminProfile.faceEmbedding);
     const distance = this.euclideanDistance(descriptor, stored);
-    const threshold = Number(process.env.FACE_MATCH_THRESHOLD ?? 0.6);
+    const threshold = this.getFaceMatchThreshold();
     if (distance > threshold) {
-      throw new UnauthorizedException(`Face verification failed (distance: ${distance.toFixed(3)}, threshold: ${threshold})`);
+      throw new UnauthorizedException('Face verification failed');
     }
-
-    const payload = {
-      sub: user.id,
-      username: user.username,
-      role: user.role,
-      verified: true,
-      walletAddress: user.adminProfile.walletAddress,
-    };
 
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: this.signAccessToken(user, {
+        verified: true,
+        walletAddress: user.adminProfile.walletAddress,
+      }),
       verified: true,
       algorithm: 'face-api/euclidean-distance',
-      distance,
-      threshold,
+      user: this.toPublicUser(user, true),
     };
   }
 
   async generateMfaSecret(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { adminProfile: true },
-    });
-    if (!user || user.role !== 'ADMIN' || !user.adminProfile) {
-      throw new UnauthorizedException('Admin not found');
+    const user = await this.getAdminUser(userId);
+
+    if (!user.firstLogin) {
+      throw new ForbiddenException('Recovery secret has already been generated');
+    }
+    if (!user.adminProfile?.faceEmbedding) {
+      throw new UnauthorizedException('Please register face before generating recovery secret');
     }
     if (!user.adminProfile.walletAddress) {
       throw new UnauthorizedException('Please bind wallet before generating recovery secret');
     }
-
     if (user.adminProfile.mfaSecret) {
-      return { secret: this.zkpService.decryptSecret(user.adminProfile.mfaSecret) };
+      throw new ForbiddenException('Recovery secret has already been generated');
     }
 
     const secret = this.zkpService.generateSecret();
     const encrypted = this.zkpService.encryptSecret(secret);
 
-    await this.prisma.adminProfile.update({
-      where: { userId },
-      data: { mfaSecret: encrypted },
-    });
-    await this.prisma.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { id: userId },
-      data: { firstLogin: false, status: 'ACTIVE', registrationStep: 4, inviteToken: null, inviteTokenExpiry: null },
+      data: {
+        firstLogin: false,
+        status: 'ACTIVE',
+        registrationStep: 4,
+        inviteToken: null,
+        inviteTokenExpiry: null,
+        adminProfile: { update: { mfaSecret: encrypted } },
+      },
+      include: { adminProfile: true },
     });
 
-    return { secret, activated: true, registrationStep: 4 };
+    return {
+      access_token: this.signAccessToken(updatedUser, {
+        verified: true,
+        walletAddress: updatedUser.adminProfile?.walletAddress,
+      }),
+      secret,
+      activated: true,
+      registrationStep: 4,
+      user: this.toPublicUser(updatedUser, true),
+    };
   }
 
   async getMe(userId: string, verified: boolean) {
@@ -324,33 +367,233 @@ export class AuthService {
     });
     if (!user) throw new UnauthorizedException('User not found');
 
-    return {
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        verified,
-        firstLogin: user.firstLogin,
-        registrationStep: user.registrationStep,
-        walletAddress: user.adminProfile?.walletAddress,
-        hasFace: Boolean(user.adminProfile?.faceEmbedding),
+    const isVerified = Boolean(verified) && user.status === 'ACTIVE' && !user.firstLogin;
+    return { user: this.toPublicUser(user, isVerified) };
+  }
+
+  async logout(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+    });
+  }
+
+  async logoutToken(token?: string) {
+    if (!token) return;
+
+    try {
+      const payload = this.jwtService.verify<{ sub?: string }>(token);
+      if (payload.sub) {
+        await this.logout(payload.sub);
+      }
+    } catch {
+      // Expired or malformed tokens still get cleared from the browser by the controller.
+    }
+  }
+
+  private async getAdminUser(userId: string): Promise<UserWithProfile> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { adminProfile: true },
+    });
+
+    if (!user || user.role !== 'ADMIN' || !user.adminProfile) {
+      throw new UnauthorizedException('Admin not found');
+    }
+    if (user.status === 'SUSPENDED') {
+      throw new UnauthorizedException('Account suspended');
+    }
+
+    return user;
+  }
+
+  private async createWalletChallenge(
+    adminProfileId: string,
+    walletAddress: string,
+    purpose: string,
+    userId?: string,
+  ) {
+    const nonce = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + WALLET_NONCE_TTL_MS);
+    const message = this.buildWalletMessage(purpose, walletAddress, nonce, expiresAt, userId);
+
+    await this.prisma.adminProfile.update({
+      where: { id: adminProfileId },
+      data: {
+        nonce,
+        noncePurpose: purpose,
+        nonceExpiresAt: expiresAt,
       },
+    });
+
+    return {
+      walletAddress,
+      nonce,
+      expiresAt: expiresAt.toISOString(),
+      message,
     };
+  }
+
+  private async consumeWalletChallenge(
+    adminProfile: AdminProfile,
+    walletAddress: string,
+    signature: string,
+    message: string,
+    purpose: string,
+    userId?: string,
+  ) {
+    const now = new Date();
+    if (
+      !adminProfile.nonce ||
+      !adminProfile.nonceExpiresAt ||
+      adminProfile.nonceExpiresAt < now ||
+      adminProfile.noncePurpose !== purpose
+    ) {
+      throw new UnauthorizedException('Invalid or expired wallet challenge');
+    }
+
+    const expectedMessage = this.buildWalletMessage(
+      purpose,
+      walletAddress,
+      adminProfile.nonce,
+      adminProfile.nonceExpiresAt,
+      userId,
+    );
+    if (message !== expectedMessage) {
+      throw new UnauthorizedException('Invalid wallet challenge message');
+    }
+
+    let recovered: string;
+    try {
+      recovered = ethers.verifyMessage(message, signature);
+    } catch {
+      throw new UnauthorizedException('Invalid wallet signature');
+    }
+
+    if (ethers.getAddress(recovered) !== walletAddress) {
+      throw new UnauthorizedException('Invalid wallet signature');
+    }
+
+    const result = await this.prisma.adminProfile.updateMany({
+      where: {
+        id: adminProfile.id,
+        nonce: adminProfile.nonce,
+        noncePurpose: purpose,
+        nonceExpiresAt: { gte: now },
+      },
+      data: {
+        nonce: null,
+        noncePurpose: null,
+        nonceExpiresAt: null,
+      },
+    });
+
+    if (result.count !== 1) {
+      throw new UnauthorizedException('Wallet challenge has already been used');
+    }
+  }
+
+  private buildWalletMessage(
+    purpose: string,
+    walletAddress: string,
+    nonce: string,
+    expiresAt: Date,
+    userId?: string,
+  ) {
+    const lines = [
+      `${process.env.AUTH_MESSAGE_DOMAIN || 'KLTN Admin Auth'} admin authentication`,
+      `Purpose: ${purpose}`,
+      `Wallet: ${walletAddress}`,
+    ];
+
+    if (userId) {
+      lines.push(`Admin User ID: ${userId}`);
+    }
+
+    lines.push(`Nonce: ${nonce}`, `Expires At: ${expiresAt.toISOString()}`);
+    return lines.join('\n');
+  }
+
+  private signAccessToken(
+    user: Pick<User, 'id' | 'username' | 'role' | 'firstLogin' | 'tokenVersion'>,
+    options: { verified: boolean; walletAddress?: string | null; isFirstLogin?: boolean },
+  ) {
+    return this.jwtService.sign({
+      sub: user.id,
+      username: user.username,
+      role: user.role,
+      verified: options.verified,
+      isFirstLogin: options.isFirstLogin ?? user.firstLogin,
+      walletAddress: options.walletAddress || undefined,
+      tokenVersion: user.tokenVersion,
+    });
+  }
+
+  private toPublicUser(user: UserWithProfile, verified: boolean) {
+    return {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      email: user.email,
+      status: user.status,
+      verified,
+      firstLogin: user.firstLogin,
+      registrationStep: user.registrationStep,
+      walletAddress: user.adminProfile?.walletAddress,
+      hasFace: Boolean(user.adminProfile?.faceEmbedding),
+      hasWallet: Boolean(user.adminProfile?.walletAddress),
+    };
+  }
+
+  private normalizeWalletAddress(address: string): string {
+    try {
+      return ethers.getAddress(address);
+    } catch {
+      throw new BadRequestException('Invalid wallet address');
+    }
+  }
+
+  private hashInviteToken(inviteToken: string): string {
+    return `sha256:${crypto.createHash('sha256').update(inviteToken).digest('hex')}`;
+  }
+
+  private timingSafeEquals(leftValue: string, rightValue: string) {
+    const left = crypto.createHash('sha256').update(leftValue).digest();
+    const right = crypto.createHash('sha256').update(rightValue).digest();
+    return crypto.timingSafeEqual(left, right);
   }
 
   private validateFaceDescriptor(embedding: unknown): number[] {
     if (!Array.isArray(embedding) || embedding.length !== 128) {
-      throw new UnauthorizedException('Invalid face descriptor. Expected 128D face-api descriptor.');
+      throw new BadRequestException('Invalid face descriptor. Expected 128D face-api descriptor.');
     }
 
     return embedding.map((value) => {
       const numberValue = Number(value);
-      if (!Number.isFinite(numberValue)) {
-        throw new UnauthorizedException('Invalid face descriptor value');
+      if (!Number.isFinite(numberValue) || numberValue < -2 || numberValue > 2) {
+        throw new BadRequestException('Invalid face descriptor value');
       }
       return Number(numberValue.toFixed(6));
     });
+  }
+
+  private decodeStoredDescriptor(faceEmbedding: string): number[] {
+    try {
+      const plaintext = faceEmbedding.trim().startsWith('[')
+        ? faceEmbedding
+        : this.zkpService.decryptSecret(faceEmbedding);
+      return this.validateFaceDescriptor(JSON.parse(plaintext));
+    } catch {
+      throw new UnauthorizedException('Stored face descriptor is invalid');
+    }
+  }
+
+  private getFaceMatchThreshold(): number {
+    const threshold = Number(process.env.FACE_MATCH_THRESHOLD ?? 0.6);
+    if (!Number.isFinite(threshold) || threshold <= 0 || threshold > 1) {
+      return 0.6;
+    }
+    return threshold;
   }
 
   private euclideanDistance(a: number[], b: number[]): number {

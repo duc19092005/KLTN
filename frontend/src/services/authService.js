@@ -11,6 +11,8 @@ export const authService = {
 
   walletChallenge: (address) => api.get(`/auth/wallet-challenge/${address}`),
 
+  walletBindChallenge: (address) => api.post('/auth/wallet-bind-challenge', { address }),
+
   walletLogin: (walletAddress, signature, message) =>
     api.post('/auth/wallet-login', { walletAddress, signature, message }),
 
