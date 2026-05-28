@@ -121,7 +121,7 @@ export class AuthController {
     this.rateLimiter.assertAllowed(key, 5, 10 * 60 * 1000);
 
     try {
-      const result = await this.authService.verifyFace(req.user.sub, body.embedding, req.user.walletAddress);
+      const result = await this.authService.verifyFace(req.user.sub, body.embedding as number[], req.user.walletAddress);
       this.rateLimiter.reset(key);
       this.setAuthCookie(res, result.access_token);
       return this.stripToken(result);

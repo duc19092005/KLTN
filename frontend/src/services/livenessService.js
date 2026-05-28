@@ -22,6 +22,11 @@ export const THRESHOLDS = {
 
   // Hold duration in ms
   HOLD_DURATION: 1000,
+  CENTER_HOLD_DURATION: 450,
+
+  // Center pose is intentionally wider because exact front-facing ratios vary per camera/person
+  CENTER_MAX_YAW_DEVIATION: 0.42,
+  CENTER_MAX_PITCH_DEVIATION: 0.30,
 
   // Face inside oval tolerance
   FACE_BOUNDS_TOLERANCE: 0.25,
@@ -38,6 +43,10 @@ const LM = {
   RIGHT_MOUTH: 291,
   LEFT_EYE_INNER: 133,
   RIGHT_EYE_INNER: 362,
+  LEFT_EYE_UPPER: 159,
+  LEFT_EYE_LOWER: 145,
+  RIGHT_EYE_UPPER: 386,
+  RIGHT_EYE_LOWER: 374,
 };
 
 /**
@@ -206,6 +215,30 @@ export function checkFaceDistance(landmarks) {
 }
 
 /**
+ * Estimate eye openness using normalized eyelid distance.
+ * Lower value means eyes are closed or nearly closed.
+ * @param {Array} landmarks
+ * @returns {number}
+ */
+export function computeEyeOpenness(landmarks) {
+  const leftOuter = landmarks[LM.LEFT_EYE_OUTER];
+  const leftInner = landmarks[LM.LEFT_EYE_INNER];
+  const leftUpper = landmarks[LM.LEFT_EYE_UPPER];
+  const leftLower = landmarks[LM.LEFT_EYE_LOWER];
+  const rightOuter = landmarks[LM.RIGHT_EYE_OUTER];
+  const rightInner = landmarks[LM.RIGHT_EYE_INNER];
+  const rightUpper = landmarks[LM.RIGHT_EYE_UPPER];
+  const rightLower = landmarks[LM.RIGHT_EYE_LOWER];
+
+  const leftWidth = Math.abs(leftInner.x - leftOuter.x) + 0.0001;
+  const rightWidth = Math.abs(rightInner.x - rightOuter.x) + 0.0001;
+  const leftOpen = Math.abs(leftLower.y - leftUpper.y) / leftWidth;
+  const rightOpen = Math.abs(rightLower.y - rightUpper.y) / rightWidth;
+
+  return (leftOpen + rightOpen) / 2;
+}
+
+/**
  * Check if face center is roughly within the oval guide
  * @param {Array} landmarks
  * @returns {boolean}
@@ -225,17 +258,19 @@ export function isFaceInOval(landmarks) {
 
 /**
  * Generate a random selection of directions for liveness check
- * @param {number} count - How many directions to pick (default: 3)
- * @returns {string[]} - e.g. ['right', 'up', 'left']
+ * @param {number} count - How many directions to pick (default: 4 = all directions)
+ * @returns {string[]} - e.g. ['right', 'up', 'left', 'down']
  */
-export function generateRandomDirections(count = 3) {
-  const all = ['left', 'right', 'up', 'down'];
+export function generateRandomDirections(count = 4, options = {}) {
+  const all = options.includeCenter
+    ? ['left', 'right', 'up', 'down', 'center']
+    : ['left', 'right', 'up', 'down'];
   // Shuffle using Fisher-Yates
   for (let i = all.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [all[i], all[j]] = [all[j], all[i]];
   }
-  return all.slice(0, count);
+  return all.slice(0, Math.min(count, all.length));
 }
 
 /**
@@ -268,6 +303,12 @@ export function getDirectionInfo(direction) {
       labelVi: 'XUỐNG',
       arrow: '↓',
       instruction: 'Hãy cúi mặt XUỐNG',
+    },
+    center: {
+      label: 'CENTER',
+      labelVi: 'THẲNG',
+      arrow: '•',
+      instruction: 'Hãy nhìn THẲNG vào camera',
     },
   };
   return map[direction] || map.left;

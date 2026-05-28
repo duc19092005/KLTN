@@ -26,9 +26,10 @@ export async function loadModels() {
 export async function detectFace(videoEl) {
   if (!modelsLoaded) await loadModels();
 
+  // Primary: high quality detection
   const detectorOptions = new faceapi.TinyFaceDetectorOptions({
     inputSize: 416,
-    scoreThreshold: 0.45,
+    scoreThreshold: 0.50,  // Stricter: only confident detections
   });
 
   let detection = await faceapi
@@ -37,8 +38,9 @@ export async function detectFace(videoEl) {
     .withFaceDescriptor();
 
   if (!detection) {
+    // Fallback with slightly lower threshold, but NOT low enough to accept blurry/angled faces
     detection = await faceapi
-      .detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.25 }))
+      .detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.40 }))
       .withFaceLandmarks(true)
       .withFaceDescriptor();
   }

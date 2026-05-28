@@ -35,10 +35,7 @@ export class InviteLoginDto {
 
 export class FaceDescriptorDto {
   @IsArray()
-  @ArrayMinSize(128)
-  @ArrayMaxSize(128)
-  @IsNumber({ allowInfinity: false, allowNaN: false }, { each: true })
-  embedding: number[];
+  embedding: number[] | number[][];
 }
 
 export class WalletChallengeDto {

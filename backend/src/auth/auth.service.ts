@@ -102,15 +102,15 @@ export class AuthService {
     };
   }
 
-  async registerFace(userId: string, embedding: number[]) {
-    const descriptor = this.validateFaceDescriptor(embedding);
+  async registerFace(userId: string, embedding: number[] | number[][]) {
+    const descriptors = this.validateFaceDescriptorSet(embedding);
     const user = await this.getAdminUser(userId);
 
     if (!user.firstLogin && user.adminProfile?.faceEmbedding) {
       throw new ForbiddenException('Face data is already registered');
     }
 
-    const faceEmbeddingJson = JSON.stringify(descriptor);
+    const faceEmbeddingJson = JSON.stringify(descriptors);
     const faceHash = crypto.createHash('sha256').update(faceEmbeddingJson).digest('hex');
     const encryptedFaceEmbedding = this.zkpService.encryptSecret(faceEmbeddingJson);
 
@@ -127,8 +127,9 @@ export class AuthService {
 
     return {
       registered: true,
-      algorithm: 'face-api/tiny-face-detector+landmark68tiny+recognition-128d',
-      descriptorLength: descriptor.length,
+      algorithm: 'face-api/tiny-face-detector+landmark68tiny+recognition-128d/multi-sample',
+      descriptorLength: descriptors[0].length,
+      descriptorCount: descriptors.length,
       registrationStep: 2,
     };
   }
@@ -298,9 +299,13 @@ export class AuthService {
       throw new UnauthorizedException('Wallet session mismatch');
     }
 
-    const stored = this.decodeStoredDescriptor(user.adminProfile.faceEmbedding);
-    const distance = this.euclideanDistance(descriptor, stored);
+    const storedDescriptors = this.decodeStoredDescriptors(user.adminProfile.faceEmbedding);
+    const distances = storedDescriptors.map((stored) => this.euclideanDistance(descriptor, stored));
+    const distance = Math.min(...distances);
     const threshold = this.getFaceMatchThreshold();
+
+    console.log(`[FaceVerify] userId=${userId} distance=${distance.toFixed(4)} threshold=${threshold} result=${distance <= threshold ? 'PASS' : 'FAIL'}`);
+
     if (distance > threshold) {
       throw new UnauthorizedException('Face verification failed');
     }
@@ -311,7 +316,8 @@ export class AuthService {
         walletAddress: user.adminProfile.walletAddress,
       }),
       verified: true,
-      algorithm: 'face-api/euclidean-distance',
+      algorithm: 'face-api/euclidean-distance/min-of-multi-sample',
+      matchedDescriptorCount: storedDescriptors.length,
       user: this.toPublicUser(user, true),
     };
   }
@@ -577,21 +583,37 @@ export class AuthService {
     });
   }
 
-  private decodeStoredDescriptor(faceEmbedding: string): number[] {
+  private validateFaceDescriptorSet(embedding: unknown): number[][] {
+    if (!Array.isArray(embedding)) {
+      throw new BadRequestException('Invalid face descriptor payload.');
+    }
+
+    const candidates = Array.isArray(embedding[0]) ? embedding : [embedding];
+    if (candidates.length < 3 || candidates.length > 15) {
+      throw new BadRequestException('Expected 3 to 15 face descriptors for reliable enrollment.');
+    }
+
+    return candidates.map((candidate) => this.validateFaceDescriptor(candidate));
+  }
+
+  private decodeStoredDescriptors(faceEmbedding: string): number[][] {
     try {
       const plaintext = faceEmbedding.trim().startsWith('[')
         ? faceEmbedding
         : this.zkpService.decryptSecret(faceEmbedding);
-      return this.validateFaceDescriptor(JSON.parse(plaintext));
+      const parsed = JSON.parse(plaintext);
+      return this.validateFaceDescriptorSet(parsed);
     } catch {
       throw new UnauthorizedException('Stored face descriptor is invalid');
     }
   }
 
   private getFaceMatchThreshold(): number {
-    const threshold = Number(process.env.FACE_MATCH_THRESHOLD ?? 0.6);
+    // face-api euclidean distance: <0.42 = same person, 0.42-0.5 = borderline, >0.5 = different person
+    // Default 0.45 balances security vs usability; override via FACE_MATCH_THRESHOLD env var
+    const threshold = Number(process.env.FACE_MATCH_THRESHOLD ?? 0.45);
     if (!Number.isFinite(threshold) || threshold <= 0 || threshold > 1) {
-      return 0.6;
+      return 0.45;
     }
     return threshold;
   }
