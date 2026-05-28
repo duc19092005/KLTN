@@ -1,0 +1,46 @@
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { Roles } from '../../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { DepartmentService } from '../services/department.service';
+import { AssignManagerDto, CreateDepartmentDto, DepartmentQueryDto, UpdateDepartmentDto } from '../dto/department.dto';
+
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ADMIN')
+@ApiTags('Departments')
+@ApiBearerAuth()
+@Controller('departments')
+export class DepartmentController {
+  constructor(private readonly service: DepartmentService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a department' })
+  create(@Body() dto: CreateDepartmentDto, @Req() req: any) {
+    return this.service.create(dto, req.user?.sub);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List departments with pagination and search' })
+  findAll(@Query() query: DepartmentQueryDto) {
+    return this.service.findAll(query);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update a department' })
+  update(@Param('id') id: string, @Body() dto: UpdateDepartmentDto, @Req() req: any) {
+    return this.service.update(id, dto, req.user?.sub);
+  }
+
+  @Patch(':id/manager')
+  @ApiOperation({ summary: 'Assign or clear department manager' })
+  assignManager(@Param('id') id: string, @Body() dto: AssignManagerDto, @Req() req: any) {
+    return this.service.assignManager(id, dto, req.user?.sub);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete an empty department' })
+  remove(@Param('id') id: string, @Req() req: any) {
+    return this.service.remove(id, req.user?.sub);
+  }
+}

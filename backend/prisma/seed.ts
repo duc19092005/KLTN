@@ -3,14 +3,19 @@ import * as crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
-const departments = ['X-Ray', 'MRI', 'Blood Test', 'Dermatology Lab'];
+const departments = [
+  { departmentCode: 'PB-XRAY', name: 'X-Ray', floor: '2' },
+  { departmentCode: 'PB-MRI', name: 'MRI', floor: '2' },
+  { departmentCode: 'PB-LAB', name: 'Blood Test', floor: '3' },
+  { departmentCode: 'PB-DERM', name: 'Dermatology Lab', floor: '4' },
+];
 
 async function main() {
-  for (const name of departments) {
+  for (const department of departments) {
     await prisma.department.upsert({
-      where: { name },
-      update: {},
-      create: { name },
+      where: { departmentCode: department.departmentCode },
+      update: { name: department.name, floor: department.floor, status: 'ACTIVE' },
+      create: { ...department, status: 'ACTIVE' },
     });
   }
 

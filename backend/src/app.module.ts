@@ -1,13 +1,18 @@
 import 'dotenv/config';
 import { Module } from '@nestjs/common';
-import { AuthModule } from './auth/auth.module';
-import { BlockchainModule } from './blockchain/blockchain.module';
-import { PrismaModule } from './prisma/prisma.module';
-import { ZkpModule } from './zkp/zkp.module';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { AuthModule } from './modules/auth/auth.module';
+import { BlockchainModule } from './infrastructure/blockchain/blockchain.module';
+import { PrismaModule } from './infrastructure/prisma/prisma.module';
+import { ZkpModule } from './modules/zkp/zkp.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { DepartmentsModule } from './departments/departments.module';
-import { StaffModule } from './staff/staff.module';
+import { DepartmentModule } from './modules/department/department.module';
+import { StaffEnterpriseModule } from './modules/staff/staff.module';
+import { DoctorModule } from './modules/doctor/doctor.module';
+import { ClinicalRoomModule } from './modules/clinical-room/clinical-room.module';
+import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 @Module({
   imports: [
@@ -15,10 +20,16 @@ import { StaffModule } from './staff/staff.module';
     BlockchainModule,
     ZkpModule,
     AuthModule,
-    DepartmentsModule,
-    StaffModule,
+    DepartmentModule,
+    StaffEnterpriseModule,
+    DoctorModule,
+    ClinicalRoomModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_INTERCEPTOR, useClass: ApiResponseInterceptor },
+    { provide: APP_FILTER, useClass: GlobalExceptionFilter },
+  ],
 })
 export class AppModule {}

@@ -73,6 +73,20 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const loginWithPassword = async (username, password) => {
+    setLoading(true);
+    try {
+      const response = await api.post('/auth/staff-login', { username, password });
+      persistSession(response.data.user);
+      return { success: true, ...response.data };
+    } catch (err) {
+      clearSession();
+      return { success: false, error: err.response?.data?.message || 'Invalid credentials' };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updateSession = (userData = null) => {
     setToken(COOKIE_SESSION);
     setUser((currentUser) => (userData ? { ...currentUser, ...userData } : currentUser));
@@ -97,6 +111,7 @@ export function AuthProvider({ children }) {
         loading,
         loginWithWallet,
         loginWithInvite,
+        loginWithPassword,
         logout,
         updateToken,
         updateSession,

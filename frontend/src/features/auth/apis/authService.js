@@ -6,6 +6,10 @@ export const authService = {
 
   inviteLogin: (inviteToken) => api.post('/auth/invite-login', { inviteToken }),
 
+  staffLogin: (username, password) => api.post('/auth/staff-login', { username, password }),
+
+  changePassword: (currentPassword, newPassword) => api.post('/auth/change-password', { currentPassword, newPassword }),
+
   verifyWallet: (address, signature, message) =>
     api.post('/auth/verify-wallet', { address, signature, message }),
 

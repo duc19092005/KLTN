@@ -5,17 +5,8 @@ import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { useAuth } from '../../../providers/AuthProvider';
 import { departmentService } from '../apis/departmentService';
 import { staffService } from '../apis/staffService';
+import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 
-const navItems = [
-  { id: 'overview', label: 'Tổng quan', icon: 'grid' },
-  { id: 'departments', label: 'Phòng ban', icon: 'file' },
-  { id: 'staff', label: 'Nhân sự', icon: 'users' }
-];
-
-function go(navigate, id) {
-  const routes = { overview: '/admin', departments: '/admin/departments', staff: '/admin/staff' };
-  navigate(routes[id] || '/admin');
-}
 
 function getStaffItems(data) {
   return Array.isArray(data) ? data : data?.items || [];
@@ -42,7 +33,7 @@ export default function AdminPage() {
       setError('');
       try {
         const [departmentRes, staffRes] = await Promise.all([departmentService.list(), staffService.search()]);
-        setDepartments(departmentRes.data || []);
+        setDepartments(Array.isArray(departmentRes.data) ? departmentRes.data : departmentRes.data?.items || []);
         setStaffs(getStaffItems(staffRes.data));
       } catch (err) {
         setError(err?.response?.data?.message || err.message || 'Không tải được thống kê');
@@ -54,7 +45,7 @@ export default function AdminPage() {
   }, []);
 
   return (
-    <DashboardLayout user={user} navItems={navItems} activeItem="overview" onNavigate={(id) => go(navigate, id)} onLogout={logout}>
+    <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="overview" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
       <div className="max-w-7xl mx-auto space-y-6">
         <section className="relative overflow-hidden rounded-[28px] border border-blue-100 bg-gradient-to-br from-white via-blue-50 to-cyan-50 p-8 shadow-sm">
           <p className="text-[11px] font-black text-blue-600 uppercase tracking-[0.24em] mb-3">System analytics</p>

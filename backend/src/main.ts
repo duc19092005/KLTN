@@ -7,6 +7,7 @@ if (!global.crypto) {
 
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
@@ -35,6 +36,15 @@ async function bootstrap() {
   );
 
   app.setGlobalPrefix('api');
+
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('Hospital AI Blockchain API')
+    .setDescription('Admin APIs for hospital staff, department, doctor, and clinical room management')
+    .setVersion('1.0.0')
+    .addBearerAuth()
+    .build();
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, swaggerDocument);
 
   const port = process.env.PORT || 3001;
   await app.listen(port);

@@ -12,7 +12,6 @@ enum UserRole {
   RECEPTIONIST
   DOCTOR
   LAB_MANAGER
-  TECHNICIAN
 }
 
 enum UserStatus {
@@ -33,6 +32,8 @@ model User {
   tokenVersion      Int        @default(0)
   inviteToken       String?    @unique
   inviteTokenExpiry DateTime?
+  faceEmbedding     String?
+  faceHash          String?
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 
@@ -44,16 +45,21 @@ model User {
 }
 
 model Department {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  description String?
-  managerId   String?  @unique
+  id             String   @id @default(uuid())
+  departmentCode String   @unique
+  name           String   @unique
+  floor          String?
+  status         String   @default("ACTIVE")
+  description    String?
+  managerId      String?  @unique
 
-  manager     StaffProfile?  @relation("DepartmentManager", fields: [managerId], references: [id])
-  staffs      StaffProfile[] @relation("DepartmentStaffs")
+  manager        StaffProfile?  @relation("DepartmentManager", fields: [managerId], references: [id])
+  staffs         StaffProfile[] @relation("DepartmentStaffs")
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status])
 }
 
 model StaffProfile {
@@ -70,6 +76,7 @@ model StaffProfile {
   citizenId      String  @unique
   birthDate      DateTime
   address        String?
+  avatarUrl      String
   employeeCode   String  @unique
   position       String?
 
@@ -77,9 +84,29 @@ model StaffProfile {
   updatedAt      DateTime @updatedAt
 
   managedDepartment Department? @relation("DepartmentManager")
+  doctorProfile     DoctorProfile?
 
   @@index([departmentId])
   @@index([fullName])
+}
+
+model DoctorProfile {
+  id              String       @id @default(uuid())
+
+  staffProfileId  String       @unique
+  staffProfile    StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+
+  specialty       String
+  licenseNumber   String       @unique
+  qualification   String
+  yearsExperience Int?
+
+  clinicalRoom    ClinicalRoom? @relation("RoomDoctor")
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([specialty])
 }
 
 model AdminProfile {
@@ -88,8 +115,6 @@ model AdminProfile {
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   adminUserName  String   @unique
   walletAddress  String?  @unique
-  faceEmbedding  String?
-  faceHash       String?
   nonce          String?
   nonceExpiresAt DateTime?
   noncePurpose   String?
@@ -113,4 +138,22 @@ model AuditLog {
   @@index([actorId])
   @@index([entity, entityId])
   @@index([action])
+}
+
+model ClinicalRoom {
+  id                String          @id @default(uuid())
+
+  roomCode          String          @unique
+  roomName          String
+
+  doctorId          String?         @unique
+  doctor            DoctorProfile?  @relation("RoomDoctor", fields: [doctorId], references: [id])
+
+  floor             String?
+  description       String?
+
+  status            String          @default("ACTIVE")
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 }
