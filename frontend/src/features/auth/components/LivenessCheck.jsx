@@ -10,8 +10,8 @@ import {
   destroyFaceMesh,
   THRESHOLDS,
   computeEyeOpenness,
-} from '../services/livenessService';
-import LoadingIndicator from './LoadingIndicator';
+} from '../apis/livenessService';
+import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 
 /**
  * LivenessCheck - Phiên bản Premium Clinical Tech (Xanh Y Tế Cao Cấp)

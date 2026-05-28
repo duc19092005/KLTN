@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ethers } from 'ethers';
-import { authService } from '../services/authService';
-import { useAuth } from '../contexts/AuthContext';
+import { authService } from '../apis/authService';
+import { useAuth } from '../../../providers/AuthProvider';
 import FaceCapture from '../components/FaceCapture';
-import LoadingIndicator from '../components/LoadingIndicator';
+import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 
 export default function AuthenticatePage() {
   const navigate = useNavigate();

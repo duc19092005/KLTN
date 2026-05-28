@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { loadModels, detectFace } from '../services/faceService';
+import { loadModels, detectFace } from '../apis/faceService';
 import LivenessCheck from './LivenessCheck';
-import LoadingIndicator from './LoadingIndicator';
+import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 
 /**
  * FaceCapture - Clinical Blue UX/UI (Tailwind CSS)

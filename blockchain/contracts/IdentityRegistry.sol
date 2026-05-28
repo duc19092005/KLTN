@@ -10,6 +10,7 @@ contract IdentityRegistry {
     event AdminRevoked(address indexed wallet);
     event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event ActionRecorded(bytes32 indexed actionHash, address indexed signer);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "IdentityRegistry: caller is not owner");
@@ -36,6 +37,11 @@ contract IdentityRegistry {
 
     function isAuthorized(address wallet) external view returns (bool) {
         return authorizedAdmins[wallet];
+    }
+
+    function recordAction(bytes32 actionHash) external onlyOwner {
+        require(actionHash != bytes32(0), "IdentityRegistry: empty action hash");
+        emit ActionRecorded(actionHash, msg.sender);
     }
 
     function transferOwnership(address newOwner) external onlyOwner {

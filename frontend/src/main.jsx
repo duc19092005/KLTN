@@ -2,8 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import axios from 'axios';
-import App from './App';
-import { AuthProvider } from './contexts/AuthContext';
+import App from './routes/AppRoutes';
+import { AuthProvider } from './providers/AuthProvider';
 import './index.css';
 
 axios.defaults.withCredentials = true;

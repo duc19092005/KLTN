@@ -406,7 +406,7 @@ export class AuthService {
     if (!user || user.role !== 'ADMIN' || !user.adminProfile) {
       throw new UnauthorizedException('Admin not found');
     }
-    if (user.status === 'SUSPENDED') {
+    if (user.status === 'INACTIVE') {
       throw new UnauthorizedException('Account suspended');
     }
 

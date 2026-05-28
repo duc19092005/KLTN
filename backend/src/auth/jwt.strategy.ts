@@ -30,7 +30,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       include: { adminProfile: true },
     });
 
-    if (!user || user.status === 'SUSPENDED' || user.tokenVersion !== payload.tokenVersion) {
+    if (!user || user.status === 'INACTIVE' || user.tokenVersion !== payload.tokenVersion) {
       throw new UnauthorizedException('Invalid session');
     }
 

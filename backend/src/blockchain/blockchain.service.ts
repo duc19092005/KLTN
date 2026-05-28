@@ -16,6 +16,7 @@ export class BlockchainService implements OnModuleInit {
     'function pendingOwner() external view returns (address)',
     'function transferOwnership(address newOwner) external',
     'function acceptOwnership() external',
+    'function recordAction(bytes32 actionHash) external',
   ];
 
   async onModuleInit() {
@@ -96,6 +97,30 @@ export class BlockchainService implements OnModuleInit {
       };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to revoke wallet' };
+    }
+  }
+
+  async recordActionAsSuperAdmin(actionPayload: unknown) {
+    if (!this.contract || !this.superAdminSigner) {
+      return { success: false, error: 'IdentityRegistry or Super Admin signer not configured' };
+    }
+
+    try {
+      const canonicalPayload = JSON.stringify(actionPayload);
+      const actionHash = ethers.keccak256(ethers.toUtf8Bytes(canonicalPayload));
+      const writableContract = this.contract.connect(this.superAdminSigner) as ethers.Contract;
+      const tx = await writableContract.recordAction(actionHash);
+      const receipt = await tx.wait();
+
+      return {
+        success: true,
+        signer: this.superAdminSigner.address,
+        actionHash,
+        txHash: tx.hash,
+        blockNumber: receipt.blockNumber,
+      };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to record backend-signed action' };
     }
   }
 

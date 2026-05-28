@@ -1,4 +1,4 @@
-import api from './api';
+import api from '../../../shared/apis/api';
 
 export const authService = {
   bootstrapAdmin: (username, email, superAdminSecret) =>

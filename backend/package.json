@@ -6,10 +6,11 @@
     "build": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node dist/src/main.js",
     "prisma:generate": "npx prisma generate",
     "prisma:migrate": "npx prisma migrate dev",
     "prisma:push": "npx prisma db push",
+    "prisma:seed": "ts-node prisma/seed.ts",
     "test": "jest",
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
@@ -53,6 +54,9 @@
     "multer": "^2.1.1",
     "qs": "^6.15.2",
     "ws": "^8.21.0"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   },
   "jest": {
     "moduleFileExtensions": [

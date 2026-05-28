@@ -7,24 +7,79 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id                String   @id @default(uuid())
-  username          String   @unique
-  email             String   @unique
-  role              String   @default("ADMIN")
-  status            String   @default("PENDING")
-  firstLogin        Boolean  @default(true)
-  registrationStep  Int      @default(1)
-  tokenVersion      Int      @default(0)
-  inviteToken       String?  @unique
-  inviteTokenExpiry DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+enum UserRole {
+  ADMIN
+  RECEPTIONIST
+  DOCTOR
+  LAB_MANAGER
+  TECHNICIAN
+}
 
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+model User {
+  id                String     @id @default(uuid())
+  username          String     @unique
+  email             String     @unique
+  passwordHash      String?
+  role              UserRole
+  status            UserStatus @default(PENDING)
+  firstLogin        Boolean    @default(true)
+  registrationStep  Int        @default(1)
+  tokenVersion      Int        @default(0)
+  inviteToken       String?    @unique
+  inviteTokenExpiry DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  staffProfile      StaffProfile?
   adminProfile      AdminProfile?
 
   @@index([role])
   @@index([status])
+}
+
+model Department {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  managerId   String?  @unique
+
+  manager     StaffProfile?  @relation("DepartmentManager", fields: [managerId], references: [id])
+  staffs      StaffProfile[] @relation("DepartmentStaffs")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model StaffProfile {
+  id             String  @id @default(uuid())
+  userId         String  @unique
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  departmentId   String?
+  department     Department? @relation("DepartmentStaffs", fields: [departmentId], references: [id])
+
+  fullName       String
+  phone          String
+  gender         String
+  citizenId      String  @unique
+  birthDate      DateTime
+  address        String?
+  employeeCode   String  @unique
+  position       String?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  managedDepartment Department? @relation("DepartmentManager")
+
+  @@index([departmentId])
+  @@index([fullName])
 }
 
 model AdminProfile {
@@ -44,4 +99,18 @@ model AdminProfile {
 
   @@index([walletAddress])
   @@index([noncePurpose, nonceExpiresAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([entity, entityId])
+  @@index([action])
 }

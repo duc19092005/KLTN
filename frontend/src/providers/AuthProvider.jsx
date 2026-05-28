@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import api from '../services/api';
+import api from '../shared/apis/api';
 
 const AuthContext = createContext(null);
 const COOKIE_SESSION = 'cookie_session';

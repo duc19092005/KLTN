@@ -1,9 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './contexts/AuthContext';
-import LoginPage from './pages/LoginPage';
-import AuthenticatePage from './pages/AuthenticatePage';
-import AdminPage from './pages/AdminPage';
-import LoadingIndicator from './components/LoadingIndicator';
+import { useAuth } from '../providers/AuthProvider';
+import { LoginPage, AuthenticatePage } from '../features/auth';
+import { AdminPage, DepartmentsPage, StaffPage } from '../features/admin';
+import LoadingIndicator from '../shared/components/LoadingIndicator';
 
 function ProtectedRoute({ children, requireVerified = false }) {
   const { token, user, loading } = useAuth();
@@ -23,6 +22,8 @@ export default function App() {
         <Route path="/login" element={!isAuthenticated || loading ? <LoginPage /> : <Navigate to="/admin" replace />} />
         <Route path="/authenticate" element={<ProtectedRoute><AuthenticatePage /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute requireVerified><AdminPage /></ProtectedRoute>} />
+        <Route path="/admin/departments" element={<ProtectedRoute requireVerified><DepartmentsPage /></ProtectedRoute>} />
+        <Route path="/admin/staff" element={<ProtectedRoute requireVerified><StaffPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to={isAuthenticated ? '/admin' : '/login'} replace />} />
       </Routes>
     </div>
