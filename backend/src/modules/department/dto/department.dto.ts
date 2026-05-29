@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { DepartmentType } from '@prisma/client';
+import { DepartmentType, OperationalStatus } from '@prisma/client';
 import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { PaginationQueryDto } from '../../shared/pagination.dto';
@@ -21,11 +21,10 @@ export class CreateDepartmentDto {
   @MaxLength(40)
   floor?: string;
 
-  @ApiPropertyOptional({ example: 'ACTIVE' })
+  @ApiPropertyOptional({ enum: OperationalStatus, example: OperationalStatus.ACTIVE })
   @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  status?: string;
+  @IsEnum(OperationalStatus)
+  status?: OperationalStatus;
 
   @ApiPropertyOptional({ enum: DepartmentType, example: DepartmentType.CLINICAL })
   @IsOptional()
@@ -69,11 +68,10 @@ export class UpdateDepartmentDto {
   @MaxLength(40)
   floor?: string;
 
-  @ApiPropertyOptional({ example: 'ACTIVE' })
+  @ApiPropertyOptional({ enum: OperationalStatus, example: OperationalStatus.ACTIVE })
   @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  status?: string;
+  @IsEnum(OperationalStatus)
+  status?: OperationalStatus;
 
   @ApiPropertyOptional({ enum: DepartmentType, example: DepartmentType.CLINICAL })
   @IsOptional()
@@ -111,10 +109,10 @@ export class DepartmentQueryDto extends PaginationQueryDto {
   @IsString()
   name?: string;
 
-  @ApiPropertyOptional({ example: 'ACTIVE' })
+  @ApiPropertyOptional({ enum: OperationalStatus, example: OperationalStatus.ACTIVE })
   @IsOptional()
-  @IsString()
-  status?: string;
+  @IsEnum(OperationalStatus)
+  status?: OperationalStatus;
 
   @ApiPropertyOptional({ enum: DepartmentType, example: DepartmentType.LABORATORY })
   @IsOptional()

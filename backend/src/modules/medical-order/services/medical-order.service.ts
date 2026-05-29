@@ -5,10 +5,16 @@ import { CreateMedicalOrderDto, CreateMedicalResultDto, MedicalOrderQueryDto } f
 
 type AuthUser = { sub: string; role: UserRole | string };
 type UploadedMedicalResultFile = {
-  filename: string;
+  buffer: Buffer;
   originalname: string;
   mimetype: string;
   size: number;
+};
+
+type CloudinaryUploadResult = {
+  public_id: string;
+  secure_url: string;
+  resource_type: string;
 };
 
 @Injectable()
@@ -84,12 +90,9 @@ export class MedicalOrderService {
   async updateStatus(id: string, status: MedicalOrderStatus, user: AuthUser) {
     const order = await this.ensureOrder(id);
     await this.assertCanManageOrder(order, user);
-    if (status === MedicalOrderStatus.COMPLETED && user.role === UserRole.LAB_MANAGER && !order.results?.length) {
-      throw new BadRequestException('LAB_MANAGER cannot complete a medical order before uploading at least one result');
-    }
     return this.prisma.medicalOrder.update({
       where: { id },
-      data: { status, completedAt: status === MedicalOrderStatus.COMPLETED || status === MedicalOrderStatus.CANCELLED ? new Date() : undefined },
+      data: { status, completedAt: status === MedicalOrderStatus.RESULT_READY || status === MedicalOrderStatus.CANCELLED ? new Date() : undefined },
       include: this.includeRelations(),
     });
   }
@@ -97,8 +100,8 @@ export class MedicalOrderService {
   async createResult(orderId: string, dto: CreateMedicalResultDto, user: AuthUser) {
     const order = await this.ensureOrder(orderId);
     await this.assertCanManageOrder(order, user);
-    if (order.status === MedicalOrderStatus.COMPLETED || order.status === MedicalOrderStatus.CANCELLED) {
-      throw new BadRequestException('Cannot return result for completed/cancelled order');
+    if (([MedicalOrderStatus.RESULT_READY, MedicalOrderStatus.CANCELLED] as MedicalOrderStatus[]).includes(order.status)) {
+      throw new BadRequestException('Cannot return result for an order that is already ready/completed/cancelled');
     }
     if (!dto.files?.length) throw new BadRequestException('At least one result PDF/image file is required');
 
@@ -140,15 +143,78 @@ export class MedicalOrderService {
     });
   }
 
-  mapUploadedResultFiles(orderId: string, files: UploadedMedicalResultFile[]) {
+  async mapUploadedResultFiles(orderId: string, files: UploadedMedicalResultFile[]) {
     if (!files.length) throw new BadRequestException('Please upload at least one PDF/image file');
-    return files.map((file) => ({
-      fileName: file.filename,
+    const order = await this.ensureOrder(orderId);
+    if (([MedicalOrderStatus.RESULT_READY, MedicalOrderStatus.CANCELLED] as MedicalOrderStatus[]).includes(order.status)) {
+      throw new BadRequestException('Cannot upload files for an order that is already ready/completed/cancelled');
+    }
+
+    const uploadedFiles = await Promise.all(files.map((file) => this.uploadFileToCloudinary(file, orderId)));
+
+    return uploadedFiles.map(({ file, cloudinary }) => ({
+      fileName: cloudinary.public_id,
       originalName: file.originalname,
       mimeType: file.mimetype,
       size: file.size,
-      url: `/uploads/medical-results/${file.filename}`,
+      url: cloudinary.secure_url,
     }));
+  }
+
+  private uploadFileToCloudinary(file: UploadedMedicalResultFile, orderId: string): Promise<{ file: UploadedMedicalResultFile; cloudinary: CloudinaryUploadResult }> {
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+    const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET;
+    if (!cloudName || !apiKey || !apiSecret) {
+      throw new BadRequestException('Cloudinary upload is not configured');
+    }
+
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const folder = 'medical-results';
+    const publicId = `${orderId}-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const resourceType = file.mimetype === 'application/pdf' ? 'raw' : 'image';
+    const paramsToSign: Record<string, string> = { folder, public_id: publicId, timestamp };
+    if (uploadPreset) paramsToSign.upload_preset = uploadPreset;
+    const signature = this.signCloudinaryParams(paramsToSign, apiSecret);
+    const form = new FormData();
+    const fileBuffer = file.buffer.buffer.slice(file.buffer.byteOffset, file.buffer.byteOffset + file.buffer.byteLength) as ArrayBuffer;
+    form.append('file', new Blob([fileBuffer], { type: file.mimetype }), file.originalname);
+    form.append('api_key', apiKey);
+    form.append('timestamp', timestamp);
+    form.append('folder', folder);
+    form.append('public_id', publicId);
+    form.append('signature', signature);
+    if (uploadPreset) form.append('upload_preset', uploadPreset);
+
+    return fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
+      method: 'POST',
+      body: form,
+    }).then(async (response) => {
+      const bodyText = await response.text();
+      const body = this.tryParseJson(bodyText);
+      if (!response.ok) {
+        throw new BadRequestException(`Cloudinary upload failed (${response.status}): ${body?.error?.message || bodyText}`);
+      }
+      return { file, cloudinary: body as CloudinaryUploadResult };
+    });
+  }
+
+  private signCloudinaryParams(params: Record<string, string>, apiSecret: string) {
+    const crypto = require('crypto') as typeof import('crypto');
+    const payload = Object.keys(params)
+      .sort()
+      .map((key) => `${key}=${params[key]}`)
+      .join('&');
+    return crypto.createHash('sha1').update(`${payload}${apiSecret}`).digest('hex');
+  }
+
+  private tryParseJson(value: string) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return undefined;
+    }
   }
 
   private async ensureDepartment(id: string) {
@@ -167,7 +233,7 @@ export class MedicalOrderService {
       where: {
         visitId,
         status: {
-          notIn: [MedicalOrderStatus.CANCELLED, MedicalOrderStatus.RESULT_READY, MedicalOrderStatus.COMPLETED],
+          notIn: [MedicalOrderStatus.CANCELLED, MedicalOrderStatus.RESULT_READY],
         },
       },
       select: { id: true },

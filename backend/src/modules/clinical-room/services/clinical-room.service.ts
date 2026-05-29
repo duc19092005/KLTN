@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { OperationalStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { getPagination, paginated } from '../../shared/pagination.dto';
 import { AssignRoomDoctorDto, ClinicalRoomQueryDto, CreateClinicalRoomDto, UpdateClinicalRoomDto } from '../dto/clinical-room.dto';
@@ -24,7 +24,7 @@ export class ClinicalRoomService {
           doctorId: dto.doctorId || null,
           floor: dto.floor?.trim(),
           description: dto.description?.trim(),
-          status: dto.status?.trim() || 'ACTIVE',
+          status: dto.status || OperationalStatus.ACTIVE,
         },
         include: this.includeRelations(),
       });
@@ -71,7 +71,7 @@ export class ClinicalRoomService {
           ...(dto.doctorId !== undefined ? { doctorId: dto.doctorId || null } : {}),
           ...(dto.floor !== undefined ? { floor: dto.floor?.trim() } : {}),
           ...(dto.description !== undefined ? { description: dto.description?.trim() } : {}),
-          ...(dto.status !== undefined ? { status: dto.status.trim() } : {}),
+          ...(dto.status !== undefined ? { status: dto.status } : {}),
         },
         include: this.includeRelations(),
       });

@@ -29,6 +29,11 @@ enum DepartmentType {
   OTHER
 }
 
+enum OperationalStatus {
+  ACTIVE
+  INACTIVE
+}
+
 model User {
   id                String     @id @default(uuid())
   username          String     @unique
@@ -59,7 +64,7 @@ model Department {
   departmentCode String   @unique
   name           String   @unique
   floor            String?
-  status           String         @default("ACTIVE")
+  status           OperationalStatus @default(ACTIVE)
   type             DepartmentType @default(CLINICAL)
   canReceiveOrders Boolean        @default(false)
   description      String?
@@ -205,7 +210,7 @@ model ClinicalRoom {
   floor             String?
   description       String?
 
-  status            String          @default("ACTIVE")
+  status            OperationalStatus @default(ACTIVE)
 
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
@@ -316,7 +321,6 @@ enum MedicalOrderStatus {
   ORDERED
   IN_PROGRESS
   RESULT_READY
-  COMPLETED
   CANCELLED
 }
 

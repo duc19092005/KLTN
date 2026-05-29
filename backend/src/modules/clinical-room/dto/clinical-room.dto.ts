@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { OperationalStatus } from '@prisma/client';
+import { IsEnum, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { PaginationQueryDto } from '../../shared/pagination.dto';
 
 export class CreateClinicalRoomDto {
@@ -30,11 +31,10 @@ export class CreateClinicalRoomDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ example: 'ACTIVE' })
+  @ApiPropertyOptional({ enum: OperationalStatus, example: OperationalStatus.ACTIVE })
   @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  status?: string;
+  @IsEnum(OperationalStatus)
+  status?: OperationalStatus;
 }
 
 export class UpdateClinicalRoomDto {
@@ -67,11 +67,10 @@ export class UpdateClinicalRoomDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ example: 'ACTIVE' })
+  @ApiPropertyOptional({ enum: OperationalStatus, example: OperationalStatus.ACTIVE })
   @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  status?: string;
+  @IsEnum(OperationalStatus)
+  status?: OperationalStatus;
 }
 
 export class AssignRoomDoctorDto {
@@ -93,8 +92,8 @@ export class ClinicalRoomQueryDto extends PaginationQueryDto {
   @IsString()
   roomName?: string;
 
-  @ApiPropertyOptional({ example: 'ACTIVE' })
+  @ApiPropertyOptional({ enum: OperationalStatus, example: OperationalStatus.ACTIVE })
   @IsOptional()
-  @IsString()
-  status?: string;
+  @IsEnum(OperationalStatus)
+  status?: OperationalStatus;
 }

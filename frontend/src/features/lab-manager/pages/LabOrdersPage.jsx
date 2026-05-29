@@ -6,18 +6,32 @@ import { useAuth } from '../../../providers/AuthProvider';
 import { medicalOrderService } from '../../medical-order/apis/medicalOrderService';
 import { LAB_MANAGER_NAV_ITEMS, labManagerRouteFor } from '../constants/navigation';
 
-const STATUS_FILTERS = ['', 'ORDERED', 'IN_PROGRESS', 'RESULT_READY', 'COMPLETED'];
+const STATUS_FILTERS = ['', 'ORDERED', 'IN_PROGRESS', 'RESULT_READY', 'CANCELLED'];
 const emptyResult = { files: [], note: '' };
-function getItems(data) { return Array.isArray(data) ? data : data?.items || []; }
-function statusCls(status) { const map = { ORDERED: 'bg-amber-50 text-amber-700 border-amber-100', IN_PROGRESS: 'bg-blue-50 text-blue-700 border-blue-100', RESULT_READY: 'bg-emerald-50 text-emerald-700 border-emerald-100', COMPLETED: 'bg-slate-100 text-slate-700 border-slate-200', CANCELLED: 'bg-red-50 text-red-700 border-red-100' }; return map[status] || map.ORDERED; }
+
+function getItems(data) {
+  return Array.isArray(data) ? data : data?.items || [];
+}
+
+function getStatusUI(status) {
+  const map = {
+    ORDERED: { label: 'MỚI TẠO', cls: 'bg-amber-100 text-amber-800 border-amber-200' },
+    IN_PROGRESS: { label: 'ĐANG XỬ LÝ', cls: 'bg-blue-100 text-blue-800 border-blue-200' },
+    RESULT_READY: { label: 'ĐÃ CÓ KẾT QUẢ', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+    CANCELLED: { label: 'ĐÃ HỦY', cls: 'bg-red-100 text-red-800 border-red-200' }
+  };
+  return map[status] || map.ORDERED;
+}
 
 export default function LabOrdersPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
   const [orders, setOrders] = useState([]);
   const [activeOrder, setActiveOrder] = useState(null);
   const [filter, setFilter] = useState('ORDERED');
   const [query, setQuery] = useState('');
+
   const [form, setForm] = useState(emptyResult);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -30,56 +44,367 @@ export default function LabOrdersPage() {
       const res = await medicalOrderService.list(filter ? { status: filter } : {});
       const items = getItems(res.data);
       setOrders(items);
-      setActiveOrder((current) => current ? (items.find((o) => o.id === current.id) || items[0] || null) : (items[0] || null));
-    } catch (err) { setError(err.response?.data?.message || 'Không tải được chỉ định xét nghiệm'); }
-    finally { setLoading(false); }
+
+      if (activeOrder) {
+        const updatedActive = items.find((o) => o.id === activeOrder.id);
+        setActiveOrder(updatedActive || null);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Không tải được chỉ định xét nghiệm');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, [filter]);
 
-  const filtered = useMemo(() => {
+  useEffect(() => { setForm(emptyResult); setError(''); setSuccess(''); }, [activeOrder?.id]);
+
+  const filteredOrders = useMemo(() => {
     const text = query.trim().toLowerCase();
     if (!text) return orders;
-    return orders.filter((o) => [o.orderCode, o.orderType, o.patient?.fullName, o.patient?.patientCode, o.doctor?.staffProfile?.fullName].filter(Boolean).some((v) => v.toLowerCase().includes(text)));
+    return orders.filter((o) =>
+      [o.orderCode, o.orderType, o.patient?.fullName, o.patient?.patientCode, o.doctor?.staffProfile?.fullName]
+        .filter(Boolean)
+        .some((v) => v.toLowerCase().includes(text))
+    );
   }, [orders, query]);
 
   const updateStatus = async (status) => {
     if (!activeOrder) return;
     setBusy(true); setError(''); setSuccess('');
-    try { await medicalOrderService.updateStatus(activeOrder.id, status); setSuccess(`Đã chuyển trạng thái sang ${status}.`); await load(); }
-    catch (err) { setError(err.response?.data?.message || 'Không cập nhật được trạng thái'); }
-    finally { setBusy(false); }
+    try {
+      await medicalOrderService.updateStatus(activeOrder.id, status);
+      setSuccess(`Đã cập nhật trạng thái: ${getStatusUI(status).label}.`);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Không cập nhật được trạng thái');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const submitResult = async (event) => {
     event.preventDefault();
     if (!activeOrder) return;
+
     setBusy(true); setError(''); setSuccess('');
     try {
-      if (!form.files?.length) { setError('Vui lòng upload ít nhất một file PDF hoặc ảnh kết quả.'); return; }
+      if (!form.files?.length) {
+        setError('Vui lòng upload ít nhất một file PDF hoặc ảnh kết quả.');
+        return;
+      }
       const uploadRes = await medicalOrderService.uploadResultFiles(activeOrder.id, form.files);
       await medicalOrderService.createResult(activeOrder.id, { files: uploadRes.data, note: form.note });
-      setSuccess('Đã upload kết quả và trả MedicalResult cho bác sĩ.');
+
+      setSuccess('Đã trả kết quả về cho Bác sĩ thành công.');
       setForm(emptyResult);
       await load();
-    } catch (err) { setError(err.response?.data?.message || err.message || 'Không trả được kết quả'); }
-    finally { setBusy(false); }
+
+      // Có thể tự động đóng modal sau khi thành công nếu muốn:
+      // setActiveOrder(null);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Lỗi hệ thống khi trả kết quả');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  return <DashboardLayout user={user} navItems={LAB_MANAGER_NAV_ITEMS} activeItem="orders" onNavigate={(id) => navigate(labManagerRouteFor(id))} onLogout={logout}>
-    <div className="max-w-7xl mx-auto space-y-6">
-      <section className="rounded-[32px] bg-slate-950 p-8 text-white shadow-2xl shadow-emerald-100"><p className="text-[11px] uppercase tracking-[0.28em] font-black text-emerald-200">MedicalOrder Workbench</p><h1 className="mt-3 text-3xl sm:text-4xl font-black tracking-tight">Chỉ định xét nghiệm</h1><p className="mt-3 max-w-3xl text-sm text-slate-300">Page riêng để tiếp nhận chỉ định, cập nhật tiến độ và upload kết quả về bác sĩ.</p></section>
-      {success && <Alert tone="success" message={success} />}{error && <Alert tone="error" message={error} />}
-      <section className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-        <aside className="xl:col-span-5 rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden"><div className="p-5 border-b border-slate-100"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm mã chỉ định, bệnh nhân, bác sĩ..." className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100" /><div className="mt-4 flex gap-2 overflow-x-auto pb-1">{STATUS_FILTERS.map((s) => <button key={s || 'ALL'} onClick={() => setFilter(s)} className={`px-3 py-2 rounded-xl text-xs font-black border whitespace-nowrap ${filter === s ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500 border-slate-200'}`}>{s || 'TẤT CẢ'}</button>)}</div></div><div className="p-4 space-y-3 max-h-[760px] overflow-y-auto">{loading && <LoadingIndicator size="lg" label="Đang tải order..." />}{!loading && filtered.map((o) => <OrderCard key={o.id} order={o} active={activeOrder?.id === o.id} onClick={() => setActiveOrder(o)} />)}{!loading && !filtered.length && <Empty title="Không có chỉ định" desc="Các MedicalOrder phù hợp sẽ hiển thị ở đây." />}</div></aside>
-        <main className="xl:col-span-7">{!activeOrder ? <Empty title="Chọn một chỉ định" desc="Thông tin và form trả kết quả sẽ hiển thị tại đây." /> : <OrderDetail order={activeOrder} form={form} setForm={setForm} onStatus={updateStatus} onSubmit={submitResult} busy={busy} />}</main>
-      </section>
-    </div>
-  </DashboardLayout>;
+  return (
+    <DashboardLayout user={user} navItems={LAB_MANAGER_NAV_ITEMS} activeItem="orders" onNavigate={(id) => navigate(labManagerRouteFor(id))} onLogout={logout}>
+      <div className="max-w-[1440px] mx-auto min-h-[calc(100vh-100px)] pb-10">
+
+        {/* Header Section */}
+        <div className="mb-6 bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm">
+          <p className="text-[11px] uppercase tracking-[0.28em] font-black text-emerald-600 mb-2">Workspace</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Workbench Xét Nghiệm</h1>
+          <p className="mt-2 text-sm text-slate-500 max-w-2xl">Quản lý các chỉ định xét nghiệm, chuyển trạng thái xử lý mẫu và tải lên kết quả lâm sàng (PDF/Hình ảnh) để trả về cho Bác sĩ.</p>
+        </div>
+
+        {/* Cảnh báo (Alerts) */}
+        {(success || error) && (
+          <div className="mb-6">
+            {success && <Alert tone="success" message={success} />}
+            {error && <Alert tone="error" message={error} />}
+          </div>
+        )}
+
+        {/* Controls: Search & Filter */}
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Tìm mã chỉ định, tên bệnh nhân..."
+            className="w-full md:max-w-md rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all shadow-sm"
+          />
+          <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar items-center">
+            {STATUS_FILTERS.map((s) => (
+              <button
+                key={s || 'ALL'}
+                onClick={() => setFilter(s)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors border shadow-sm ${filter === s
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+              >
+                {s ? getStatusUI(s).label : 'TẤT CẢ'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Grid Danh sách Orders */}
+        {loading ? (
+          <div className="py-20 text-center bg-white rounded-3xl border border-slate-200 shadow-sm"><LoadingIndicator size="lg" label="Đang tải danh sách..." /></div>
+        ) : filteredOrders.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            {filteredOrders.map((o) => (
+              <OrderCard
+                key={o.id}
+                order={o}
+                onClick={() => setActiveOrder(o)}
+              />
+            ))}
+          </div>
+        ) : (
+          <Empty title="Chưa có chỉ định nào" desc="Không tìm thấy chỉ định xét nghiệm phù hợp với điều kiện lọc." />
+        )}
+
+      </div>
+
+      {/* POPUP: Order Detail Modal */}
+      {activeOrder && (
+        <OrderModal
+          order={activeOrder}
+          form={form}
+          setForm={setForm}
+          onStatus={updateStatus}
+          onSubmit={submitResult}
+          busy={busy}
+          onClose={() => setActiveOrder(null)}
+        />
+      )}
+    </DashboardLayout>
+  );
 }
 
-function OrderCard({ order, active, onClick }) { return <button onClick={onClick} className={`w-full text-left rounded-2xl border p-4 transition-all ${active ? 'border-emerald-300 bg-emerald-50 shadow-lg shadow-emerald-100' : 'border-slate-100 bg-white hover:border-emerald-200 hover:shadow-md'}`}><div className="flex justify-between gap-3"><div><p className="text-[10px] uppercase tracking-wider font-black text-slate-400">{order.orderCode} · {order.priority}</p><h3 className="mt-1 font-black text-slate-950">{order.orderType}</h3><p className="mt-1 text-xs font-semibold text-slate-500">{order.patient?.fullName} · BS. {order.doctor?.staffProfile?.fullName || 'N/A'}</p></div><span className={`h-fit rounded-full border px-2.5 py-1 text-[10px] font-black ${statusCls(order.status)}`}>{order.status}</span></div></button>; }
-function OrderDetail({ order, form, setForm, onStatus, onSubmit, busy }) { return <section className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden"><div className="bg-gradient-to-br from-emerald-50 via-white to-blue-50 p-6"><div className="flex flex-col sm:flex-row justify-between gap-4"><div><p className="text-[11px] uppercase tracking-[0.22em] text-emerald-600 font-black">{order.orderCode}</p><h2 className="mt-2 text-2xl sm:text-3xl font-black text-slate-950">{order.orderType}</h2><p className="mt-1 text-sm font-semibold text-slate-500">{order.patient?.fullName} · {order.patient?.patientCode}</p></div><span className={`h-fit rounded-full border px-3 py-1.5 text-xs font-black ${statusCls(order.status)}`}>{order.status}</span></div></div><div className="p-6 space-y-5"><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Info label="Bác sĩ chỉ định" value={`BS. ${order.doctor?.staffProfile?.fullName || 'N/A'}`} /><Info label="Khoa nhận" value={order.targetDepartment?.name || 'Chưa gán'} /><div className="md:col-span-2"><Info label="Ghi chú lâm sàng" value={order.clinicalNote || 'Không có'} large /></div></div><div className="flex flex-wrap gap-3"><button disabled={busy || order.status !== 'ORDERED'} onClick={() => onStatus('IN_PROGRESS')} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white disabled:opacity-50">Nhận xử lý</button><span className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-500">Upload PDF/ảnh kết quả, bác sĩ sẽ xem trực tiếp trên hồ sơ.</span></div><form onSubmit={onSubmit} className="rounded-3xl border border-slate-100 bg-slate-50 p-5 space-y-4"><div><h3 className="text-xl font-black text-slate-950">Trả MedicalResult</h3><p className="mt-1 text-sm font-semibold text-slate-500">Upload file PDF/ảnh và thêm ghi chú nếu cần.</p></div><label className="block"><span className="text-xs font-black text-slate-600">Ghi chú kết quả</span><textarea value={form.note || ''} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={3} placeholder="Ví dụ: Đã chụp đủ phim, chất lượng hình ảnh đạt yêu cầu..." className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100" /></label><label className="block rounded-3xl border-2 border-dashed border-emerald-200 bg-white p-6 text-center hover:bg-emerald-50/40 transition-all"><span className="block text-sm font-black text-slate-800">Chọn file kết quả PDF/ảnh</span><span className="mt-1 block text-xs font-semibold text-slate-500">Hỗ trợ PDF, JPG, PNG, WEBP. Tối đa 10 file, mỗi file 10MB.</span><input type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp" onChange={(e) => setForm({ ...form, files: Array.from(e.target.files || []) })} className="mt-4 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold" /></label>{form.files?.length > 0 && <div className="grid grid-cols-1 md:grid-cols-2 gap-2">{form.files.map((file, index) => <div key={`${file.name}-${index}`} className="rounded-2xl border border-emerald-100 bg-white p-3"><strong className="block text-sm text-slate-900 truncate">{file.name}</strong><span className="text-xs font-bold text-slate-400">{file.type || 'file'} · {(file.size / 1024 / 1024).toFixed(2)} MB</span></div>)}</div>}<button disabled={busy || !form.files?.length || order.status === 'COMPLETED' || order.status === 'CANCELLED'} className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-100 disabled:opacity-60">Upload và trả kết quả về bác sĩ</button></form><div className="space-y-2">{order.results?.map((r) => <div key={r.id} className="rounded-2xl border border-slate-100 bg-white p-4"><strong>{r.resultCode}</strong>{r.note && <p className="text-sm text-slate-700 mt-1">{r.note}</p>}{r.files?.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{r.files.map((file) => <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-100">{file.originalName}</a>)}</div>}</div>)}</div></div></section>; }
-function Info({ label, value, large = false }) { return <div className={`rounded-2xl border border-slate-100 bg-slate-50 p-4 ${large ? 'min-h-[92px]' : ''}`}><p className="mb-1 text-[10px] uppercase tracking-wider text-slate-400 font-black">{label}</p><p className="text-sm font-bold leading-relaxed text-slate-800">{value}</p></div>; }
-function Alert({ tone, message }) { const cls = tone === 'error' ? 'bg-red-50 border-red-100 text-red-700' : 'bg-emerald-50 border-emerald-100 text-emerald-800'; return <div className={`rounded-2xl border p-4 text-sm font-bold ${cls}`}>{message}</div>; }
-function Empty({ title, desc }) { return <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-10 text-center"><strong className="text-slate-800">{title}</strong><p className="mt-1 text-sm text-slate-500">{desc}</p></div>; }
+// ----------------------------------------------------------------------
+// CÁC COMPONENT PHỤ TRỢ
+// ----------------------------------------------------------------------
+
+function OrderCard({ order, onClick }) {
+  const statusInfo = getStatusUI(order.status);
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left rounded-3xl p-6 transition-all border border-slate-200 bg-white hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-100/50 flex flex-col h-full group"
+    >
+      <div className="flex justify-between items-start mb-4 w-full">
+        <span className="text-xs uppercase tracking-wider font-black text-slate-400 group-hover:text-emerald-600 transition-colors">{order.orderCode}</span>
+        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border ${statusInfo.cls}`}>{statusInfo.label}</span>
+      </div>
+      <h3 className="font-black text-slate-900 text-lg mb-2 line-clamp-2">{order.orderType}</h3>
+
+      <div className="mt-auto pt-4 border-t border-slate-100">
+        <p className="text-sm text-slate-600">
+          <span className="text-xs font-bold text-slate-400 block mb-1">Bệnh nhân</span>
+          <span className="font-bold text-slate-800">{order.patient?.fullName}</span>
+          <span className="text-slate-400 ml-1">({order.patient?.patientCode})</span>
+        </p>
+      </div>
+    </button>
+  );
+}
+
+function OrderModal({ order, form, setForm, onStatus, onSubmit, busy, onClose }) {
+  const statusInfo = getStatusUI(order.status);
+  const isOrdered = order.status === 'ORDERED';
+  const isInProgress = order.status === 'IN_PROGRESS';
+
+  // Chặn scroll body khi mở modal
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = 'unset'; };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+      {/* Lớp nền mờ */}
+      <div
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+        onClick={onClose}
+      ></div>
+
+      {/* Nội dung Popup */}
+      <div className="relative w-full max-w-4xl bg-white rounded-[32px] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+
+        {/* Header Modal */}
+        <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <span className="text-xs font-black text-emerald-600 bg-emerald-100 px-2.5 py-1 rounded-lg">{order.orderCode}</span>
+              <span className={`text-xs font-black px-2.5 py-1 rounded-lg border ${statusInfo.cls}`}>{statusInfo.label}</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900">{order.orderType}</h2>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition-colors flex-shrink-0"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        {/* Body Modal (Vùng cuộn) */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+
+          <div className="flex items-center justify-between bg-slate-900 rounded-2xl p-5 text-white">
+            <div>
+              <p className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Thao tác nhanh</p>
+              <p className="text-sm font-medium">Bấm nhận xử lý mẫu trước khi tải lên kết quả.</p>
+            </div>
+            {isOrdered ? (
+              <button
+                disabled={busy}
+                onClick={() => onStatus('IN_PROGRESS')}
+                className="px-6 py-3 bg-blue-500 hover:bg-blue-400 text-white text-sm font-black rounded-xl shadow-lg shadow-blue-500/30 transition-all disabled:opacity-50"
+              >
+                NHẬN XỬ LÝ MẪU
+              </button>
+            ) : (
+              <span className="px-4 py-2 bg-slate-800 rounded-xl text-sm font-bold text-slate-300">Đã tiếp nhận</span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <InfoCard label="Bệnh nhân" value={`${order.patient?.fullName} - ${order.patient?.patientCode}`} />
+            <InfoCard label="Bác sĩ chỉ định" value={`BS. ${order.doctor?.staffProfile?.fullName || 'N/A'}`} />
+            <div className="md:col-span-2">
+              <InfoCard label="Ghi chú lâm sàng từ bác sĩ" value={order.clinicalNote || 'Không có ghi chú'} />
+            </div>
+          </div>
+
+          <hr className="border-slate-200" />
+
+          {isInProgress && (
+            <form onSubmit={onSubmit} className="bg-emerald-50/50 p-6 rounded-3xl border border-emerald-100 space-y-5">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Trả Kết Quả</h3>
+                <p className="text-sm text-slate-600 mt-1">Tải lên hình ảnh chụp hoặc file PDF kết quả xét nghiệm.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-700 mb-2 uppercase tracking-wider">Ghi chú cho Bác sĩ (Tùy chọn)</label>
+                <textarea
+                  value={form.note}
+                  onChange={(e) => setForm({ ...form, note: e.target.value })}
+                  rows={3}
+                  placeholder="VD: Mẫu máu khó lấy, hình ảnh hơi mờ do bệnh nhân cử động..."
+                  className="w-full rounded-2xl border border-slate-200 p-4 text-sm font-medium outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-700 mb-2 uppercase tracking-wider">Tệp đính kèm (PDF, JPG, PNG)</label>
+                <label className="flex flex-col items-center justify-center w-full h-32 rounded-2xl border-2 border-dashed border-emerald-300 bg-white hover:bg-emerald-50 transition-colors cursor-pointer group">
+                  <span className="text-sm font-black text-emerald-600 group-hover:text-emerald-700">Click hoặc Kéo thả file vào đây</span>
+                  <span className="text-xs text-slate-500 mt-2 font-medium">Tối đa 10MB/file. Chọn được nhiều file.</span>
+                  <input
+                    type="file" multiple accept=".pdf, image/*" className="hidden"
+                    onChange={(e) => {
+                      const picked = Array.from(e.target.files || []);
+                      setForm({ ...form, files: [...(form.files || []), ...picked].slice(0, 10) });
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              </div>
+
+              {form.files?.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {form.files.map((file, idx) => (
+                    <div key={idx} className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-xl shadow-sm">
+                      <span className="text-sm font-bold text-slate-700 truncate mr-3">{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, files: form.files.filter((_, i) => i !== idx) })}
+                        className="text-[10px] uppercase font-black px-2 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
+                      >
+                        XÓA
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={busy || !form.files?.length}
+                className="w-full py-4 mt-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm uppercase tracking-wider rounded-2xl shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50 disabled:shadow-none"
+              >
+                {busy ? 'Đang tải lên...' : 'Hoàn Tất & Gửi Bác Sĩ'}
+              </button>
+            </form>
+          )}
+
+          {!isOrdered && !isInProgress && (
+            <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200">
+              <h3 className="text-lg font-black text-slate-900 mb-4">Kết quả đã ghi nhận</h3>
+              {order.results?.length > 0 ? (
+                <div className="space-y-4">
+                  {order.results.map((r, i) => (
+                    <div key={r.id || i} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                      {r.note && <p className="text-sm text-slate-700 mb-4"><span className="font-bold text-slate-900">Ghi chú:</span> {r.note}</p>}
+                      <div className="flex flex-wrap gap-2">
+                        {r.files?.map((f, j) => (
+                          <a key={j} href={f.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-bold rounded-xl border border-slate-200 hover:bg-slate-200 transition-colors">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                            {f.originalName || 'Xem tệp đính kèm'}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 font-medium italic">Không có file hiển thị.</p>
+              )}
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InfoCard({ label, value }) {
+  return (
+    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+      <p className="text-[10px] uppercase font-black tracking-wider text-slate-400 mb-1.5">{label}</p>
+      <p className="text-sm font-bold text-slate-900 whitespace-pre-wrap">{value}</p>
+    </div>
+  );
+}
+
+function Alert({ tone, message }) {
+  const isError = tone === 'error';
+  return (
+    <div className={`p-4 rounded-2xl border text-sm font-bold shadow-sm ${isError ? 'bg-red-50 border-red-200 text-red-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>
+      {message}
+    </div>
+  );
+}
+
+function Empty({ title, desc }) {
+  return (
+    <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-3xl border border-slate-200 shadow-sm">
+      <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+        <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+      </div>
+      <span className="text-slate-900 font-black text-lg mb-1">{title}</span>
+      <p className="text-sm text-slate-500 max-w-sm">{desc}</p>
+    </div>
+  );
+}

@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { memoryStorage } from 'multer';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -9,13 +8,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { CreateMedicalOrderDto, CreateMedicalResultDto, MedicalOrderQueryDto, UpdateMedicalOrderStatusDto } from '../dto/medical-order.dto';
 import { MedicalOrderService } from '../services/medical-order.service';
 
-const resultFileStorage = diskStorage({
-  destination: './uploads/medical-results',
-  filename: (_req, file, callback) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    callback(null, `${unique}${extname(file.originalname)}`);
-  },
-});
+const resultFileStorage = memoryStorage();
 
 @ApiTags('Medical Orders')
 @ApiBearerAuth()
@@ -58,7 +51,7 @@ export class MedicalOrderController {
       callback(null, allowed.includes(file.mimetype));
     },
   }))
-  uploadResultFiles(@Param('id') id: string, @UploadedFiles() files: Array<{ filename: string; originalname: string; mimetype: string; size: number }>) {
+  uploadResultFiles(@Param('id') id: string, @UploadedFiles() files: Array<{ buffer: Buffer; originalname: string; mimetype: string; size: number }>) {
     return this.service.mapUploadedResultFiles(id, files || []);
   }
 }

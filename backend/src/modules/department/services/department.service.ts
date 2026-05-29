@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { OperationalStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { AssignManagerDto, CreateDepartmentDto, DepartmentQueryDto, UpdateDepartmentDto } from '../dto/department.dto';
 import { getPagination, paginated } from '../../shared/pagination.dto';
@@ -25,7 +25,7 @@ export class DepartmentService {
           departmentCode: dto.departmentCode.trim(),
           name: dto.name.trim(),
           floor: dto.floor?.trim(),
-          status: dto.status?.trim() || 'ACTIVE',
+          status: dto.status || OperationalStatus.ACTIVE,
           type: dto.type,
           canReceiveOrders: dto.canReceiveOrders ?? false,
           description: dto.description?.trim(),
@@ -76,7 +76,7 @@ export class DepartmentService {
         ...(dto.departmentCode !== undefined ? { departmentCode: dto.departmentCode.trim() } : {}),
         ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
         ...(dto.floor !== undefined ? { floor: dto.floor?.trim() } : {}),
-        ...(dto.status !== undefined ? { status: dto.status.trim() } : {}),
+        ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.type !== undefined ? { type: dto.type } : {}),
         ...(dto.canReceiveOrders !== undefined ? { canReceiveOrders: dto.canReceiveOrders } : {}),
         ...(dto.description !== undefined ? { description: dto.description?.trim() } : {}),
