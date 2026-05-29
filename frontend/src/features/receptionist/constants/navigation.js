@@ -5,14 +5,13 @@ export const RECEPTIONIST_NAV_ITEMS = [
   { id: 'patient-records', label: 'Hồ sơ bệnh nhân', icon: 'file' },
 ];
 
-export const RECEPTIONIST_SECTIONS = {
-  overview: 'receptionist-overview',
-  'patient-intake': 'patient-intake',
-  'visit-queue': 'visit-queue',
-  'patient-records': 'patient-records',
+export const RECEPTIONIST_ROUTES = {
+  overview: '/receptionist',
+  'patient-intake': '/receptionist/intake',
+  'visit-queue': '/receptionist/queue',
+  'patient-records': '/receptionist/records',
 };
 
-export function navigateReceptionistSection(id) {
-  const element = document.getElementById(RECEPTIONIST_SECTIONS[id] || RECEPTIONIST_SECTIONS.overview);
-  element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+export function receptionistRouteFor(id) {
+  return RECEPTIONIST_ROUTES[id] || RECEPTIONIST_ROUTES.overview;
 }

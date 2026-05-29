@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MedicalOrderStatus } from '@prisma/client';
-import { IsEnum, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateMedicalOrderDto {
   @ApiProperty()
@@ -51,24 +52,41 @@ export class UpdateMedicalOrderStatusDto {
   status!: MedicalOrderStatus;
 }
 
-export class CreateMedicalResultDto {
-  @ApiProperty({ example: 'Bạch cầu tăng nhẹ, CRP tăng' })
+export class MedicalResultFileDto {
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  resultSummary!: string;
+  fileName!: string;
 
-  @ApiPropertyOptional({ description: 'Dữ liệu xét nghiệm dạng JSON: chỉ số, đơn vị, khoảng tham chiếu...' })
-  @IsOptional()
-  @IsObject()
-  resultData?: Record<string, any>;
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  originalName!: string;
 
-  @ApiPropertyOptional()
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  mimeType!: string;
+
+  @ApiProperty()
+  @IsNumber()
+  size!: number;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  url!: string;
+}
+
+export class CreateMedicalResultDto {
+  @ApiPropertyOptional({ example: 'Ghi chú thêm từ kỹ thuật viên phòng Lab' })
   @IsOptional()
   @IsString()
-  attachmentUrl?: string;
+  note?: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  conclusion?: string;
+  @ApiProperty({ type: [MedicalResultFileDto], description: 'Danh sách ảnh/PDF kết quả đã upload' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MedicalResultFileDto)
+  files!: MedicalResultFileDto[];
 }

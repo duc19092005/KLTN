@@ -285,16 +285,31 @@ model MedicalResult {
   performedById   String?
   performedBy     User?        @relation(fields: [performedById], references: [id])
 
-  resultSummary   String
-  resultData      Json?
-  attachmentUrl   String?
-  conclusion      String?
+  note            String?
   returnedAt      DateTime     @default(now())
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
+  files           MedicalResultFile[]
+
   @@index([orderId])
   @@index([performedById])
+}
+
+model MedicalResultFile {
+  id             String        @id @default(uuid())
+  resultId       String
+  result         MedicalResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+
+  fileName       String
+  originalName   String
+  mimeType       String
+  size           Int
+  url            String
+
+  createdAt      DateTime      @default(now())
+
+  @@index([resultId])
 }
 
 enum MedicalOrderStatus {

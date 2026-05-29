@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { visitService } from '../apis/visitService';
 
@@ -14,6 +14,9 @@ const STATUS_MAP = {
 export default function VisitQueue({ refreshTrigger }) {
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [sortOrder, setSortOrder] = useState('asc');
 
   const loadVisits = async () => {
     setLoading(true);
@@ -32,24 +35,59 @@ export default function VisitQueue({ refreshTrigger }) {
     loadVisits();
   }, [refreshTrigger]);
 
+  const visibleVisits = useMemo(() => {
+    const text = query.trim().toLowerCase();
+    return visits
+      .filter((visit) => !statusFilter || visit.status === statusFilter)
+      .filter((visit) => {
+        if (!text) return true;
+        return [
+          visit.visitCode,
+          visit.patient?.fullName,
+          visit.patient?.patientCode,
+          visit.patient?.phone,
+          visit.clinicalRoom?.roomName,
+          visit.doctor?.staffProfile?.fullName,
+        ].filter(Boolean).some((value) => String(value).toLowerCase().includes(text));
+      })
+      .sort((a, b) => {
+        const left = new Date(a.createdAt || a.checkInAt || 0).getTime();
+        const right = new Date(b.createdAt || b.checkInAt || 0).getTime();
+        return sortOrder === 'asc' ? left - right : right - left;
+      });
+  }, [query, sortOrder, statusFilter, visits]);
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
-      <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-        <div>
-          <h3 className="text-sm font-black text-slate-900">Hàng Đợi Lượt Khám</h3>
-          <p className="text-[11px] text-slate-500 font-medium">Danh sách bệnh nhân đang xử lý</p>
+      <div className="p-4 border-b border-slate-100 bg-slate-50/50 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-black text-slate-900">Hàng Đợi Lượt Khám</h3>
+            <p className="text-[11px] text-slate-500 font-medium">Danh sách bệnh nhân đang xử lý · {visibleVisits.length}/{visits.length} lượt</p>
+          </div>
+          <button onClick={loadVisits} className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors" title="Làm mới">
+            {loading ? <LoadingIndicator size="sm" /> : '↻'}
+          </button>
         </div>
-        <button onClick={loadVisits} className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors" title="Làm mới">
-          {loading ? <LoadingIndicator size="sm" /> : '↻'}
-        </button>
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_190px] gap-2">
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Lọc theo mã lượt, tên BN, phòng, bác sĩ..." className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-50" />
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 outline-none focus:border-cyan-400">
+            <option value="">Tất cả trạng thái</option>
+            {Object.entries(STATUS_MAP).map(([key, item]) => <option key={key} value={key}>{item.label}</option>)}
+          </select>
+          <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 outline-none focus:border-cyan-400">
+            <option value="asc">Sắp xếp: thấp → cao</option>
+            <option value="desc">Sắp xếp: cao → thấp</option>
+          </select>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {visits.length === 0 && !loading && (
-          <div className="text-center py-10 text-slate-400 text-sm">Chưa có lượt khám nào trong hàng đợi.</div>
+        {visibleVisits.length === 0 && !loading && (
+          <div className="text-center py-10 text-slate-400 text-sm">Không có lượt khám phù hợp với bộ lọc.</div>
         )}
         
-        {visits.map(visit => {
+        {visibleVisits.map(visit => {
           const patient = visit.patient;
           const room = visit.clinicalRoom;
           const doctor = visit.doctor?.staffProfile;

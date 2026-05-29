@@ -4,6 +4,12 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { CreateMedicalOrderDto, CreateMedicalResultDto, MedicalOrderQueryDto } from '../dto/medical-order.dto';
 
 type AuthUser = { sub: string; role: UserRole | string };
+type UploadedMedicalResultFile = {
+  filename: string;
+  originalname: string;
+  mimetype: string;
+  size: number;
+};
 
 @Injectable()
 export class MedicalOrderService {
@@ -94,6 +100,7 @@ export class MedicalOrderService {
     if (order.status === MedicalOrderStatus.COMPLETED || order.status === MedicalOrderStatus.CANCELLED) {
       throw new BadRequestException('Cannot return result for completed/cancelled order');
     }
+    if (!dto.files?.length) throw new BadRequestException('At least one result PDF/image file is required');
 
     return this.prisma.$transaction(async (tx) => {
       const resultCode = await this.generateResultCode(tx);
@@ -102,11 +109,18 @@ export class MedicalOrderService {
           resultCode,
           orderId,
           performedById: user.sub,
-          resultSummary: dto.resultSummary.trim(),
-          resultData: dto.resultData === undefined ? undefined : dto.resultData,
-          attachmentUrl: dto.attachmentUrl?.trim() || null,
-          conclusion: dto.conclusion?.trim() || null,
+          note: dto.note?.trim() || null,
+          files: {
+            create: dto.files.map((file) => ({
+              fileName: file.fileName,
+              originalName: file.originalName,
+              mimeType: file.mimeType,
+              size: file.size,
+              url: file.url,
+            })),
+          },
         },
+        include: { files: true },
       });
 
       const updatedOrder = await tx.medicalOrder.update({
@@ -124,6 +138,17 @@ export class MedicalOrderService {
 
       return { result, order: updatedOrder };
     });
+  }
+
+  mapUploadedResultFiles(orderId: string, files: UploadedMedicalResultFile[]) {
+    if (!files.length) throw new BadRequestException('Please upload at least one PDF/image file');
+    return files.map((file) => ({
+      fileName: file.filename,
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+      url: `/uploads/medical-results/${file.filename}`,
+    }));
   }
 
   private async ensureDepartment(id: string) {
@@ -206,7 +231,7 @@ export class MedicalOrderService {
       patient: true,
       doctor: { include: { staffProfile: { include: { department: true } } } },
       targetDepartment: true,
-      results: { include: { performedBy: { select: { id: true, username: true, email: true, role: true } } }, orderBy: { returnedAt: 'desc' } },
+      results: { include: { files: true, performedBy: { select: { id: true, username: true, email: true, role: true } } }, orderBy: { returnedAt: 'desc' } },
     } as const;
   }
 

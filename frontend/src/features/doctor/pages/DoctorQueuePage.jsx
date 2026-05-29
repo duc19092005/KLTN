@@ -622,8 +622,11 @@ function ResultsPanel({ orders }) {
               <div className="mt-2 space-y-2.5">
                 {o.results.map((r) => (
                   <div key={r.id} className="rounded-lg bg-white border border-slate-100 p-2.5 text-xs">
-                    <p className="font-medium text-slate-700"><span className="text-slate-400">Kết luận sơ bộ:</span> {r.resultSummary}</p>
-                    {r.conclusion && <p className="mt-1 font-bold text-emerald-700">Chẩn đoán KTV: {r.conclusion}</p>}
+                    {r.note ? (
+                      <p className="font-medium text-slate-700"><span className="text-slate-400">Ghi chú:</span> {r.note}</p>
+                    ) : (
+                      <p className="font-medium text-slate-400 italic">Kết quả được đính kèm trong file ảnh/PDF.</p>
+                    )}
                     <div className="mt-2 flex justify-end">
                       <button type="button" onClick={() => setSelectedResult({ ...r, order: o })} className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-[11px] font-black text-blue-700 hover:bg-blue-100">
                         Xem chi tiết hồ sơ
@@ -659,18 +662,25 @@ function ResultDetailModal({ result, onClose }) {
         </div>
         <div className="max-h-[70vh] overflow-y-auto p-5 space-y-4">
           <Info label="Thời gian trả kết quả" value={result.returnedAt ? new Date(result.returnedAt).toLocaleString('vi-VN') : 'N/A'} />
-          <Info label="Tóm tắt kết quả" value={result.resultSummary || 'Chưa có tóm tắt'} large />
-          <Info label="Kết luận kỹ thuật viên" value={result.conclusion || 'Chưa có kết luận'} large />
-          {result.resultData && (
+          <Info label="Ghi chú kết quả" value={result.note || 'Không có ghi chú'} large />
+          {result.files?.length > 0 ? (
             <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-tight">Dữ liệu chi tiết</span>
-              <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap rounded-xl bg-white p-3 text-xs font-semibold text-slate-700 border border-slate-100">{JSON.stringify(result.resultData, null, 2)}</pre>
+              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-tight">File kết quả đính kèm</span>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {result.files.map((file) => {
+                  const fileUrl = file.url?.startsWith('http') ? file.url : `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3001'}${file.url}`;
+                  return (
+                    <a key={file.id} href={fileUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-blue-100 bg-white px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-50">
+                      {file.originalName || file.fileName || 'Mở file kết quả'}
+                    </a>
+                  );
+                })}
+              </div>
             </div>
-          )}
-          {result.attachmentUrl && (
-            <a href={result.attachmentUrl} target="_blank" rel="noreferrer" className="inline-flex rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-black text-white hover:bg-blue-700">
-              Mở file đính kèm
-            </a>
+          ) : (
+            <div className="rounded-xl border border-amber-100 bg-amber-50 p-3.5 text-xs font-bold text-amber-700">
+              Chưa nhận được danh sách file đính kèm từ backend. Vui lòng bấm làm mới hoặc mở lại quy trình điều trị.
+            </div>
           )}
         </div>
       </div>

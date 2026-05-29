@@ -165,7 +165,18 @@ export class ClinicalDecisionService {
       patient: true,
       doctor: { include: { staffProfile: { include: { department: true } } } },
       clinicalRoom: true,
-      medicalOrders: { include: { targetDepartment: true, results: { include: { performedBy: { select: { id: true, username: true, email: true, role: true } } } } }, orderBy: { orderedAt: 'desc' } },
+      medicalOrders: {
+        include: {
+          targetDepartment: true,
+          results: {
+            include: {
+              files: true,
+              performedBy: { select: { id: true, username: true, email: true, role: true } },
+            },
+          },
+        },
+        orderBy: { orderedAt: 'desc' },
+      },
       aiDiagnoses: { include: { aiModel: true, reviewedByDoctor: { include: { staffProfile: true } } }, orderBy: { createdAt: 'desc' } },
       finalConclusion: { include: { aiDiagnosis: { include: { aiModel: true } } } },
     } as const;
@@ -175,9 +186,8 @@ export class ClinicalDecisionService {
     const results = visit.medicalOrders.flatMap((order) => order.results.map((result) => ({
       orderType: order.orderType,
       targetDepartment: order.targetDepartment?.name || null,
-      resultSummary: result.resultSummary,
-      conclusion: result.conclusion || null,
-      resultData: result.resultData || null,
+      note: result.note || null,
+      files: result.files?.map((file) => ({ originalName: file.originalName, mimeType: file.mimeType, url: file.url })) || [],
     })));
 
     return [

@@ -3,6 +3,11 @@ import { useAuth } from '../providers/AuthProvider';
 import { LoginPage, AuthenticatePage, ChangePasswordPage } from '../features/auth';
 import { AdminPage, DepartmentsPage, StaffPage, DoctorsPage, ClinicalRoomsPage, AiModelsPage } from '../features/admin';
 import { ReceptionistDashboard, DoctorDashboard, LabManagerDashboard } from '../features/role-dashboard';
+import ReceptionistIntakePage from '../features/receptionist/pages/ReceptionistIntakePage';
+import ReceptionistQueuePage from '../features/receptionist/pages/ReceptionistQueuePage';
+import ReceptionistRecordsPage from '../features/receptionist/pages/ReceptionistRecordsPage';
+import LabOrdersPage from '../features/lab-manager/pages/LabOrdersPage';
+import LabResultsPage from '../features/lab-manager/pages/LabResultsPage';
 import DoctorQueuePage from '../features/doctor/pages/DoctorQueuePage';
 import LoadingIndicator from '../shared/components/LoadingIndicator';
 import { getDashboardRoute } from '../shared/constants/roleRoutes';
@@ -35,9 +40,14 @@ export default function App() {
         <Route path="/admin/clinical-rooms" element={<ProtectedRoute requireVerified roles={['ADMIN']}><ClinicalRoomsPage /></ProtectedRoute>} />
         <Route path="/admin/ai-models" element={<ProtectedRoute requireVerified roles={['ADMIN']}><AiModelsPage /></ProtectedRoute>} />
         <Route path="/receptionist" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST']}><ReceptionistDashboard /></ProtectedRoute>} />
+        <Route path="/receptionist/intake" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST']}><ReceptionistIntakePage /></ProtectedRoute>} />
+        <Route path="/receptionist/queue" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST']}><ReceptionistQueuePage /></ProtectedRoute>} />
+        <Route path="/receptionist/records" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST']}><ReceptionistRecordsPage /></ProtectedRoute>} />
         <Route path="/doctor" element={<ProtectedRoute requireVerified roles={['DOCTOR']}><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/doctor/queue" element={<ProtectedRoute requireVerified roles={['DOCTOR']}><DoctorQueuePage /></ProtectedRoute>} />
         <Route path="/lab-manager" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><LabManagerDashboard /></ProtectedRoute>} />
+        <Route path="/lab-manager/orders" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><LabOrdersPage /></ProtectedRoute>} />
+        <Route path="/lab-manager/results" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><LabResultsPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to={isAuthenticated ? (user?.firstLogin ? '/change-password' : dashboardRoute) : '/login'} replace />} />
       </Routes>
     </div>
