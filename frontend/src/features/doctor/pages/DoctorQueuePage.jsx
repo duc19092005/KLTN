@@ -418,10 +418,10 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
                   type="button"
                   onClick={() => handleStepClick(s.step)}
                   className={`text-left rounded-xl p-3 border transition-all ${isCurrent
-                      ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-400'
-                      : isPast
-                        ? 'border-emerald-200 bg-emerald-50/60 text-emerald-800'
-                        : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-50'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-400'
+                    : isPast
+                      ? 'border-emerald-200 bg-emerald-50/60 text-emerald-800'
+                      : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-50'
                     }`}
                 >
                   <p className="text-[11px] font-black tracking-tight">{s.title}</p>
@@ -534,65 +534,75 @@ function OrderPanel({ visit, forms, setForms, departments, existingOrders = [], 
                 {existingOrders.map((order) => (
                   <div key={order.id} className="rounded-xl border border-purple-100 bg-white px-3 py-2 text-xs">
                     <strong className="block text-slate-900">{order.orderType}</strong>
-                    <span className="mt-0.5 block text-[10px] font-bold text-slate-400">{order.orderCode} - {order.targetDepartment?.name || 'Chưa rõ khoa'} - {order.status}</span>
+                    <span className="mt-0.5 block text-[10px] font-bold text-slate-400">{order.orderCode} - {order.targetDepartment?.name || 'N/A'}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {!departments.length && (
-            <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-xs font-bold text-amber-800">
-              Chưa có khoa/phòng nào được cấu hình nhận phiếu chỉ định. Vui lòng vào Quản lý phòng ban và bật "Nhận phiếu chỉ định" cho Xét nghiệm, X-Ray, MRI...
-            </div>
-          )}
-
-          {hasDuplicateDepartments && (
-            <div className="rounded-xl border border-amber-100 bg-amber-50 p-3 text-xs font-bold text-amber-800">
-              Có phiếu đang chọn trùng khoa/phòng. Hệ thống sẽ chặn gửi cho đến khi chọn khoa/phòng khác.
-            </div>
-          )}
           {forms.map((form, index) => (
-            <div key={`order-form-${index}`} className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
-              <div className="md:col-span-2 flex items-center justify-between gap-3">
-                <h4 className="text-xs font-black text-slate-800">Phiếu chỉ định #{index + 1}</h4>
-                <button type="button" onClick={() => removeForm(index)} className="rounded-lg border border-red-100 bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-600 hover:bg-red-100">
-                  Xóa phiếu
-                </button>
-              </div>
-
-              <Field required label="Tên dịch vụ/Chỉ định cụ thể" value={form.orderType} onChange={(v) => updateForm(index, { orderType: v })} placeholder="Ví dụ: Chụp X-Quang ngực thẳng, Tổng phân tích tế bào máu..." />
-
-              <label className="block">
-                <span className="text-xs font-bold text-slate-700">Khoa phòng thực hiện</span>
-                <select required value={form.targetDepartmentId} onChange={(e) => handleDepartmentChange(index, e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500">
-                  <option value="">-- Chọn khoa tiếp nhận phiếu --</option>
-                  {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-                {form.targetDepartmentId && forms.some((other, otherIndex) => otherIndex !== index && other.targetDepartmentId === form.targetDepartmentId) && (
-                  <p className="mt-1.5 rounded-lg border border-amber-100 bg-amber-50 px-2.5 py-1.5 text-[11px] font-bold text-amber-700">
-                    Khoa/phòng này đã được chọn ở phiếu khác. Vui lòng chọn khoa/phòng khác để tránh trùng.
-                  </p>
+            <div key={index} className="rounded-2xl border border-blue-100 bg-blue-50/30 p-5 shadow-sm relative transition-all">
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-sm font-black text-blue-900 flex items-center gap-2">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-200 text-[10px] font-black text-blue-800">{index + 1}</span>
+                  Soạn phiếu mới
+                </h4>
+                {forms.length > 1 && (
+                  <button type="button" onClick={() => removeForm(index)} className="rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-red-500 hover:bg-red-50 hover:text-red-700 transition-all">
+                    Xóa phiếu
+                  </button>
                 )}
-              </label>
-
-              <label className="block">
-                <span className="text-xs font-bold text-slate-700">Mức độ ưu tiên xử lý</span>
-                <select value={form.priority} onChange={(e) => updateForm(index, { priority: e.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500">
-                  <option value="NORMAL">Bình thường (Theo hàng đợi)</option>
-                  <option value="URGENT">Khẩn cấp (Ưu tiên cao)</option>
-                  <option value="STAT">Cấp cứu (Thực hiện ngay lập tức)</option>
-                </select>
-              </label>
-
-              <Field label="Tóm tắt bệnh lý lâm sàng / Lý do chỉ định" value={form.clinicalNote} onChange={(v) => updateForm(index, { clinicalNote: v })} placeholder="Ghi chú triệu chứng đi kèm cho kỹ thuật viên..." />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Nơi thực hiện <span className="text-red-500">*</span></label>
+                  <select
+                    value={form.targetDepartmentId}
+                    onChange={(e) => handleDepartmentChange(index, e.target.value)}
+                    required
+                    className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                  >
+                    <option value="">-- Chọn khoa/phòng cận lâm sàng --</option>
+                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Tên/Loại chỉ định <span className="text-red-500">*</span></label>
+                  <input
+                    value={form.orderType}
+                    onChange={(e) => updateForm(index, { orderType: e.target.value })}
+                    required
+                    placeholder="VD: Siêu âm ổ bụng, Chụp X-Quang phổi..."
+                    className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Ghi chú lâm sàng cho KTV</label>
+                  <input
+                    value={form.clinicalNote}
+                    onChange={(e) => updateForm(index, { clinicalNote: e.target.value })}
+                    placeholder="VD: Nghi ngờ viêm ruột thừa, tập trung kiểm tra hố chậu phải..."
+                    className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                  />
+                </div>
+              </div>
             </div>
           ))}
 
-          <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <p className="text-xs font-semibold text-slate-500">Tổng số phiếu đang soạn: <strong className="text-slate-900">{forms.length}</strong></p>
-            <button disabled={busy} className="rounded-xl bg-purple-600 px-4 py-2.5 text-xs font-bold text-white shadow hover:bg-purple-700 transition-all disabled:opacity-50">
-              {busy ? 'Đang gửi chỉ định...' : `Gửi ${forms.length} phiếu chỉ định`}
+          {hasDuplicateDepartments && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-[11px] font-bold text-red-700">
+              Cảnh báo: Đang có sự trùng lặp khoa/phòng thực hiện giữa các phiếu. Vui lòng gộp chung chỉ định vào 1 phiếu hoặc chọn bộ phận khác để tránh lỗi.
+            </div>
+          )}
+
+          <div className="flex justify-end pt-3">
+            <button
+              type="submit"
+              disabled={busy || hasDuplicateDepartments}
+              className="rounded-xl bg-blue-600 px-6 py-3 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-blue-600/30 hover:bg-blue-700 disabled:opacity-50 disabled:shadow-none transition-all"
+            >
+              {busy ? 'Đang gửi...' : 'Xác nhận & Gửi tất cả phiếu'}
             </button>
           </div>
         </form>
@@ -602,250 +612,278 @@ function OrderPanel({ visit, forms, setForms, departments, existingOrders = [], 
 }
 
 function ResultsPanel({ orders }) {
-  const [selectedResult, setSelectedResult] = useState(null);
+  const completedOrders = orders.filter(o => o.status === 'RESULT_READY' || o.status === 'COMPLETED');
+  const pendingOrders = orders.filter(o => !['RESULT_READY', 'COMPLETED', 'CANCELLED'].includes(o.status));
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-3">
-      <h3 className="text-sm font-black text-slate-900">Danh sách kết quả CLS đã trả về</h3>
-      <div className="max-h-[350px] overflow-y-auto space-y-2.5 pr-1">
-        {orders.map((o) => (
-          <div key={o.id} className="rounded-xl border border-slate-100 bg-slate-50 p-3.5 space-y-2">
-            <div className="flex justify-between items-start gap-2 text-xs">
-              <div>
-                <strong className="text-slate-900 block">{o.orderType}</strong>
-                <span className="text-[10px] text-slate-400 font-mono">{o.orderCode} - {o.targetDepartment?.name || 'N/A'}</span>
-              </div>
-              <span className="rounded-md bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-blue-600">{o.status}</span>
-            </div>
-
-            {o.results?.length ? (
-              <div className="mt-2 space-y-2.5">
-                {o.results.map((r) => (
-                  <div key={r.id} className="rounded-lg bg-white border border-slate-100 p-2.5 text-xs">
-                    {r.note ? (
-                      <p className="font-medium text-slate-700"><span className="text-slate-400">Ghi chú:</span> {r.note}</p>
-                    ) : (
-                      <p className="font-medium text-slate-400 italic">Kết quả được đính kèm trong file ảnh/PDF.</p>
-                    )}
-                    <div className="mt-2 flex justify-end">
-                      <button type="button" onClick={() => setSelectedResult({ ...r, order: o })} className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-[11px] font-black text-blue-700 hover:bg-blue-100">
-                        Xem chi tiết hồ sơ
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-[11px] text-slate-400 italic">Chưa có file báo cáo hoặc dữ liệu kết quả từ phòng máy.</p>
-            )}
-          </div>
-        ))}
-        {!orders.length && <Empty title="Chưa có dịch vụ nào" desc="Bác sĩ chưa khởi tạo chỉ định xét nghiệm nào cho lượt khám này." />}
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+      <div className="flex justify-between items-start">
+        <div>
+          <h3 className="text-sm font-black text-slate-900">Chi tiết kết quả trả về</h3>
+          <p className="text-[11px] font-semibold text-slate-400 mt-1">Dữ liệu từ phòng Lab và Chẩn đoán hình ảnh.</p>
+        </div>
+        <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600 border border-slate-200">
+          Tổng: {orders.length} phiếu
+        </span>
       </div>
 
-      {selectedResult && <ResultDetailModal result={selectedResult} onClose={() => setSelectedResult(null)} />}
-    </div>
-  );
-}
-
-function ResultDetailModal({ result, onClose }) {
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-3xl border border-slate-100 bg-white shadow-2xl overflow-hidden">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50 p-5">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-wider text-blue-600">Hồ sơ kết quả cận lâm sàng</p>
-            <h3 className="mt-1 text-xl font-black text-slate-950">{result.order?.orderType || 'Kết quả CLS'}</h3>
-            <p className="mt-1 text-xs font-semibold text-slate-400">{result.resultCode} - {result.order?.targetDepartment?.name || 'Chưa rõ khoa/phòng'}</p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50">Đóng</button>
-        </div>
-        <div className="max-h-[70vh] overflow-y-auto p-5 space-y-4">
-          <Info label="Thời gian trả kết quả" value={result.returnedAt ? new Date(result.returnedAt).toLocaleString('vi-VN') : 'N/A'} />
-          <Info label="Ghi chú kết quả" value={result.note || 'Không có ghi chú'} large />
-          {result.files?.length > 0 ? (
-            <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-tight">File kết quả đính kèm</span>
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {result.files.map((file) => {
-                  const fileUrl = file.url?.startsWith('http') ? file.url : `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3001'}${file.url}`;
-                  return (
-                    <a key={file.id} href={fileUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-blue-100 bg-white px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-50">
-                      {file.originalName || file.fileName || 'Mở file kết quả'}
-                    </a>
-                  );
-                })}
-              </div>
+      {orders.length === 0 ? (
+        <Empty title="Chưa có phiếu chỉ định" desc="Bác sĩ chưa tạo bất kỳ phiếu yêu cầu cận lâm sàng nào cho bệnh án này." />
+      ) : (
+        <div className="space-y-4 mt-4">
+          {pendingOrders.length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-800">Đang thực hiện {pendingOrders.length} phiếu...</span>
+              <LoadingIndicator size="sm" />
             </div>
-          ) : (
-            <div className="rounded-xl border border-amber-100 bg-amber-50 p-3.5 text-xs font-bold text-amber-700">
-              Chưa nhận được danh sách file đính kèm từ backend. Vui lòng bấm làm mới hoặc mở lại quy trình điều trị.
+          )}
+
+          {completedOrders.length > 0 && (
+            <div className="space-y-3">
+              {completedOrders.map(order => (
+                <div key={order.id} className="rounded-xl border border-emerald-100 bg-emerald-50/30 p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <strong className="text-xs font-black text-emerald-900">{order.orderType}</strong>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-1 rounded-md">Đã trả KQ</span>
+                  </div>
+                  {order.results?.length > 0 ? order.results.map(res => (
+                    <div key={res.id} className="mt-2 bg-white rounded-lg border border-emerald-100 p-3 text-xs shadow-sm">
+                      {res.note && (
+                        <p className="mb-2 text-slate-700"><span className="font-bold text-slate-900">KTV Ghi chú:</span> {res.note}</p>
+                      )}
+                      {res.files?.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {res.files.map(f => (
+                            <a
+                              key={f.id}
+                              href={f.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 px-3 py-2 rounded-lg border border-blue-100 hover:bg-blue-100 transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                              Xem {f.originalName?.slice(-12) || 'Tệp đính kèm'}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )) : (
+                    <div className="text-xs text-slate-500 italic mt-2">Chưa cập nhật nội dung chi tiết.</div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
 function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId, selectedAiId, setSelectedAiId, onGenerate, busy }) {
+  const currentDiagnosis = diagnoses.find(d => d.id === selectedAiId) || diagnoses[0];
+  const parsedResult = parseAiResult(currentDiagnosis?.result);
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-black text-slate-900">Trợ lý chẩn đoán thông minh AI</h3>
-          <p className="mt-1 text-xs font-semibold text-slate-400">Chọn model AI đã cấu hình rồi mới chạy phân tích.</p>
+          <h3 className="text-sm font-black text-slate-900">Trợ lý Phân tích AI</h3>
+          <p className="text-[11px] font-semibold text-slate-400 mt-1">Đọc hiểu hồ sơ, tóm tắt và đưa ra phác đồ gợi ý.</p>
         </div>
-        <button disabled={busy || !selectedAiModelId} onClick={onGenerate} className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50">
-          {busy ? 'Đang tính toán...' : 'Triệu gọi AI'}
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <select
+          value={selectedAiModelId}
+          onChange={(e) => setSelectedAiModelId(e.target.value)}
+          disabled={busy}
+          className="flex-1 rounded-xl border border-slate-200 p-3 text-xs font-semibold outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 bg-slate-50 disabled:opacity-50 transition-all"
+        >
+          {aiModels.map(m => <option key={m.id} value={m.id}>{m.name} ({m.provider})</option>)}
+        </select>
+        <button
+          type="button"
+          onClick={onGenerate}
+          disabled={busy || !selectedAiModelId}
+          className="rounded-xl bg-indigo-600 px-5 py-3 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 disabled:opacity-50 disabled:shadow-none whitespace-nowrap transition-all flex items-center justify-center gap-2"
+        >
+          {busy ? (
+            <>
+              <LoadingIndicator size="sm" />
+              <span>Đang xử lý...</span>
+            </>
+          ) : (
+            'Yêu cầu AI phân tích'
+          )}
         </button>
       </div>
 
-      <label className="block rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
-        <span className="text-xs font-black text-slate-700">Model AI sử dụng</span>
-        <select value={selectedAiModelId} onChange={(e) => setSelectedAiModelId(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500">
-          <option value="">-- Chọn model AI --</option>
-          {aiModels.map((model) => (
-            <option key={model.id} value={model.id}>{model.modelName} {model.modelVersion ? `(${model.modelVersion})` : ''} - {model.provider || 'other'}</option>
-          ))}
-        </select>
-        {!aiModels.length && <p className="mt-2 text-[11px] font-bold text-amber-700">Chưa có model AI API đang hoạt động. Vui lòng cấu hình tại trang Quản lý AI Model.</p>}
-      </label>
+      {diagnoses.length > 0 && (
+        <div className="mt-5 space-y-3">
+          {diagnoses.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+              {diagnoses.map((d, idx) => (
+                <button
+                  key={d.id}
+                  onClick={() => setSelectedAiId(d.id)}
+                  className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border whitespace-nowrap transition-all ${d.id === selectedAiId ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                >
+                  Bản mẫu {diagnoses.length - idx} ({formatTime(d.createdAt)})
+                </button>
+              ))}
+            </div>
+          )}
 
-      <div className="max-h-[350px] overflow-y-auto space-y-2.5 pr-1">
-        {diagnoses.map((d) => (
-          <AiDiagnosisCard key={d.id} diagnosis={d} selected={selectedAiId === d.id} onSelect={() => setSelectedAiId(d.id)} />
-        ))}
-        {!diagnoses.length && <Empty title="Chưa có dữ liệu AI" desc="Chọn model AI và nhấn Triệu gọi AI sau khi có đầy đủ kết quả cận lâm sàng." />}
-      </div>
-    </div>
-  );
-}
+          <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-5 text-xs text-slate-800 space-y-4">
+            {parsedResult.summary && (
+              <div>
+                <strong className="text-[11px] uppercase tracking-wider font-black text-indigo-900 block mb-1.5">Tổng quan lâm sàng:</strong>
+                <p className="leading-relaxed font-medium text-slate-700">{parsedResult.summary}</p>
+              </div>
+            )}
 
-function AiDiagnosisCard({ diagnosis, selected, onSelect }) {
-  const parsed = parseAiResult(diagnosis.result);
-  const analysis = parsed.analysis;
-  return (
-    <label className={`block rounded-xl border p-4 cursor-pointer transition-all ${selected ? 'border-blue-400 bg-blue-50/30 ring-1 ring-blue-400' : 'border-slate-100 bg-slate-50/60 hover:bg-slate-50'}`}>
-      <div className="flex items-start text-xs font-semibold">
-        <input type="radio" className="mt-0.5 mr-2" checked={selected} onChange={onSelect} />
-        <div>
-          <strong className="text-slate-900 text-sm">{parsed.modelName || diagnosis.aiModel?.modelName || 'AI Core Professional'}</strong>
-          <p className="text-[10px] text-slate-400 mt-0.5 font-medium">Nhà cung cấp: {parsed.provider || 'Hệ thống'} - {parsed.generatedAt ? new Date(parsed.generatedAt).toLocaleString('vi-VN') : 'N/A'}</p>
+            {parsedResult.possibleConditions && (
+              <div>
+                <strong className="text-[11px] uppercase tracking-wider font-black text-indigo-900 block mb-1.5">Đánh giá nguy cơ (Chẩn đoán sơ bộ):</strong>
+                <ul className="list-disc pl-5 space-y-1 font-medium text-slate-700 marker:text-indigo-400">
+                  {Array.isArray(parsedResult.possibleConditions) ? parsedResult.possibleConditions.map((c, i) => <li key={i}>{c}</li>) : <li>{parsedResult.possibleConditions}</li>}
+                </ul>
+              </div>
+            )}
+
+            {parsedResult.recommendations && (
+              <div>
+                <strong className="text-[11px] uppercase tracking-wider font-black text-indigo-900 block mb-1.5">Đề xuất hướng điều trị:</strong>
+                <ul className="list-disc pl-5 space-y-1 font-medium text-slate-700 marker:text-indigo-400">
+                  {Array.isArray(parsedResult.recommendations) ? parsedResult.recommendations.map((c, i) => <li key={i}>{c}</li>) : <li>{parsedResult.recommendations}</li>}
+                </ul>
+              </div>
+            )}
+
+            {!parsedResult.summary && !parsedResult.possibleConditions && currentDiagnosis?.result && (
+              <div className="whitespace-pre-wrap leading-relaxed font-medium text-slate-700">{currentDiagnosis.result}</div>
+            )}
+          </div>
         </div>
-      </div>
-
-      <div className="mt-3 space-y-2.5 border-t border-slate-200/50 pt-2.5 text-xs">
-        <AnalysisBlock analysis={analysis} fallback={diagnosis.result} />
-        <div className="rounded-lg bg-white border border-blue-100 p-2 text-[10px] font-medium text-blue-700">
-          {parsed.disclaimer || 'Kết quả mang tính tham khảo y khoa, không thay thế cho quyết định pháp lý của bác sĩ chuyên khoa.'}
-        </div>
-      </div>
-    </label>
-  );
-}
-
-function AnalysisBlock({ analysis, fallback }) {
-  if (analysis && typeof analysis === 'object' && !Array.isArray(analysis)) {
-    return (
-      <div className="space-y-2">
-        <AiText label="Đánh giá tóm tắt" value={analysis.summary} />
-        <AiList label=" Cân nhắc lâm sàng gợi ý" value={analysis.clinicalConsiderations} />
-        <AiList label="Cảnh báo chỉ số rủi ro" value={analysis.riskFlags} />
-        <AiList label="Đề xuất điều hướng điều trị" value={analysis.recommendedNextSteps} />
-      </div>
-    );
-  }
-  return <p className="text-xs font-medium text-slate-700 leading-relaxed">{typeof analysis === 'string' ? analysis : String(fallback || 'Không có tóm tắt dữ liệu')}</p>;
-}
-
-function AiText({ label, value }) {
-  if (!value) return null;
-  return (
-    <div>
-      <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 block">{label}</span>
-      <p className="text-xs font-semibold text-slate-700 mt-0.5 leading-relaxed">{String(value)}</p>
-    </div>
-  );
-}
-
-function AiList({ label, value }) {
-  if (!value) return null;
-  const items = Array.isArray(value) ? value : [value];
-  return (
-    <div>
-      <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 block">{label}</span>
-      <ul className="mt-1 list-disc pl-4 text-xs font-semibold text-slate-700 space-y-0.5">
-        {items.map((item, index) => <li key={`${label}-${index}`}>{typeof item === 'object' ? JSON.stringify(item) : String(item)}</li>)}
-      </ul>
+      )}
     </div>
   );
 }
 
 function ConclusionPanel({ form, setForm, onSubmit, busy, completed }) {
-  return (
-    <form onSubmit={onSubmit} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-      <div>
-        <h3 className="text-sm font-black text-slate-900">Chẩn đoán xác định & Phác đồ xuất viện</h3>
-        {completed && <p className="mt-1 text-xs font-bold text-emerald-600">Ca bệnh này đã có hồ sơ kết luận lưu trữ trên hệ thống.</p>}
-      </div>
+  const updateForm = (patch) => setForm({ ...form, ...patch });
 
-      <div className="grid grid-cols-1 gap-3 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
-        <Field required label="Chẩn đoán xác định lâm sàng (Mã ICD-10 / Tên bệnh)" value={form.finalDiagnosis} onChange={(v) => setForm({ ...form, finalDiagnosis: v })} placeholder="Ví dụ: E11 - Đái tháo đường tuýp 2, I10 - Tăng huyết áp vô căn..." />
-        <TextArea label="Phác đồ & Hướng dẫn điều trị chi tiết" value={form.treatmentPlan} onChange={(v) => setForm({ ...form, treatmentPlan: v })} placeholder="Chế độ sinh hoạt, nghỉ ngơi, theo dõi chỉ số sinh tồn tại nhà..." />
-        <TextArea label="Đơn thuốc y khoa chỉ định" value={form.prescription} onChange={(v) => setForm({ ...form, prescription: v })} placeholder="Tên thuốc, hàm lượng, số lượng, cách dùng (sáng/trưa/chiều/tối)..." />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <TextArea label="Lịch hẹn tái khám cụ thể" value={form.followUpNote} onChange={(v) => setForm({ ...form, followUpNote: v })} placeholder="Tái khám sau 2 tuần hoặc khi có dấu hiệu bất thường..." />
-          <TextArea label="Ghi chú nội bộ dành cho bác sĩ" value={form.doctorNote} onChange={(v) => setForm({ ...form, doctorNote: v })} placeholder="Lưu ý diễn tiến bệnh án cho ca kíp trực tiếp theo..." />
+  return (
+    <div className="rounded-2xl border border-emerald-200 bg-white p-6 shadow-xs">
+      <form onSubmit={onSubmit} className="space-y-5">
+        <div>
+          <label className="block text-[11px] font-black text-emerald-800 mb-1.5 uppercase tracking-wider">Chẩn đoán xác định (Bắt buộc) <span className="text-red-500">*</span></label>
+          <textarea
+            required
+            rows={2}
+            value={form.finalDiagnosis}
+            onChange={(e) => updateForm({ finalDiagnosis: e.target.value })}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-xs font-semibold outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all"
+            placeholder="VD: Viêm loét dạ dày tá tràng K27..."
+            disabled={completed}
+          />
         </div>
-      </div>
 
-      <div className="pt-2">
-        <button disabled={busy} className="w-full sm:w-auto rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white shadow hover:bg-emerald-700 transition-all disabled:opacity-50">
-          Lưu kết luận & Khóa hồ sơ bệnh án
-        </button>
-      </div>
-    </form>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label className="block text-[11px] font-black text-emerald-800 mb-1.5 uppercase tracking-wider">Hướng điều trị</label>
+            <textarea
+              rows={3}
+              value={form.treatmentPlan}
+              onChange={(e) => updateForm({ treatmentPlan: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-xs font-semibold outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all"
+              placeholder="VD: Điều trị nội khoa ngoại trú, ăn uống kiêng cữ..."
+              disabled={completed}
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-black text-emerald-800 mb-1.5 uppercase tracking-wider">Toa thuốc (Kê đơn)</label>
+            <textarea
+              rows={3}
+              value={form.prescription}
+              onChange={(e) => updateForm({ prescription: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-xs font-semibold outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all"
+              placeholder="VD: 1. Omeprazol 20mg x 14 viên (Ngày 1 viên sáng)..."
+              disabled={completed}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label className="block text-[11px] font-black text-emerald-800 mb-1.5 uppercase tracking-wider">Lời dặn / Hẹn tái khám</label>
+            <input
+              value={form.followUpNote}
+              onChange={(e) => updateForm({ followUpNote: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-xs font-semibold outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all"
+              placeholder="VD: Tái khám sau 7 ngày hoặc khi đau bụng dữ dội."
+              disabled={completed}
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-black text-emerald-800 mb-1.5 uppercase tracking-wider">Ghi chú ẩn (Lưu hành nội bộ BS)</label>
+            <input
+              value={form.doctorNote}
+              onChange={(e) => updateForm({ doctorNote: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-xs font-semibold outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all"
+              placeholder="Ghi chú thêm về cơ địa, đặc điểm tâm lý bệnh nhân..."
+              disabled={completed}
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-5 mt-2 border-t border-slate-100">
+          <button
+            type="submit"
+            disabled={busy || completed}
+            className={`rounded-xl px-8 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-lg transition-all ${completed
+              ? 'bg-slate-300 shadow-none text-slate-500 cursor-not-allowed'
+              : 'bg-emerald-600 shadow-emerald-600/30 hover:bg-emerald-700 disabled:opacity-50 disabled:shadow-none'
+              }`}
+          >
+            {busy ? 'Đang lưu dữ liệu...' : completed ? 'Hồ sơ đã đóng' : 'Hoàn Tất & Đóng Bệnh Án'}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
-function Field({ label, value, onChange, required = false, placeholder = '' }) {
+function Info({ label, value, large }) {
   return (
-    <label className="block text-xs">
-      <span className="font-bold text-slate-700">{label} {required && <span className="text-red-500">*</span>}</span>
-      <input required={required} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-semibold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50/40 transition-all" />
-    </label>
-  );
-}
-
-function TextArea({ label, value, onChange, placeholder = '' }) {
-  return (
-    <label className="block text-xs">
-      <span className="font-bold text-slate-700">{label}</span>
-      <textarea rows={3} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-semibold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50/40 transition-all" />
-    </label>
-  );
-}
-
-function Info({ label, value, large = false }) {
-  return (
-    <div className={`rounded-xl border border-slate-100 bg-slate-50/60 p-3.5 ${large ? 'min-h-[80px]' : ''}`}>
-      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-tight">{label}</span>
-      <p className="text-xs font-bold text-slate-800 mt-1 leading-relaxed">{value}</p>
+    <div className={`rounded-2xl border border-slate-100 bg-slate-50/50 p-4 ${large ? 'col-span-full' : ''}`}>
+      <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</span>
+      <span className={`block mt-1 font-bold text-slate-900 ${large ? 'text-sm' : 'text-xs'}`}>{value}</span>
     </div>
   );
 }
 
 function Alert({ tone, message }) {
-  const cls = tone === 'error' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800';
-  return <div className={`rounded-xl border p-3 text-xs font-semibold ${cls} animate-fadeIn`}>{message}</div>;
+  const isSuccess = tone === 'success';
+  return (
+    <div className={`p-4 rounded-2xl border text-xs font-black shadow-sm ${isSuccess ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+      {message}
+    </div>
+  );
 }
 
 function Empty({ title, desc }) {
   return (
-    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center">
-      <strong className="text-xs text-slate-700 block">{title}</strong>
-      <p className="mt-1 text-[11px] text-slate-400 font-medium">{desc}</p>
+    <div className="flex flex-col items-center justify-center py-16 text-center bg-slate-50/30 rounded-2xl">
+      <div className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-sm flex items-center justify-center mb-4 text-slate-300">
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      </div>
+      <h3 className="text-sm font-black text-slate-900">{title}</h3>
+      <p className="mt-1 text-xs font-semibold text-slate-500 max-w-sm mx-auto">{desc}</p>
     </div>
   );
 }
