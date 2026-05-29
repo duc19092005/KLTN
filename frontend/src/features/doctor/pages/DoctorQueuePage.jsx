@@ -384,103 +384,154 @@ function VisitHeader({ visit, detailLoading, onStart, onContinue, busy }) {
    MODAL WIZARD STEP-BY-STEP CHUẨN HÓA KHÁM BỆNH
    ========================================== */
 function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, resultProps, aiProps, conclusionProps }) {
-  // Logic kiểm soát điều kiện chuyển bước UX an toàn
-  const handleStepClick = (stepIndex) => {
-    setActiveStep(stepIndex);
+  const orders = orderProps?.existingOrders || [];
+  const readyOrders = orders.filter((order) => order.status === 'RESULT_READY');
+  const pendingOrders = orders.filter((order) => ['ORDERED', 'IN_PROGRESS'].includes(order.status));
+  const hasConclusion = Boolean(conclusionProps?.completed || visit.finalConclusion);
+  const canCreateOrders = ['IN_PROGRESS', 'WAITING_TEST_RESULT'].includes(visit?.status);
+  const canReviewResults = orders.length > 0 || ['WAITING_TEST_RESULT', 'WAITING_CONCLUSION', 'COMPLETED'].includes(visit?.status);
+  const canConclude = readyOrders.length > 0 || visit?.status === 'WAITING_CONCLUSION' || hasConclusion;
+
+  const steps = [
+    {
+      step: 1,
+      eyebrow: 'Bước 01',
+      title: 'Khám lâm sàng & chỉ định CLS',
+      desc: 'Tạo phiếu xét nghiệm, X-Quang, siêu âm hoặc chẩn đoán hình ảnh.',
+      status: orders.length ? `${orders.length} phiếu đã gửi` : canCreateOrders ? 'Sẵn sàng tạo phiếu' : 'Chưa tiếp nhận khám',
+      tone: 'blue',
+      enabled: true,
+    },
+    {
+      step: 2,
+      eyebrow: 'Bước 02',
+      title: 'Đọc kết quả & tham vấn AI',
+      desc: 'Kiểm tra file Lab trả về, sau đó chạy AI nếu cần hỗ trợ phân tích.',
+      status: pendingOrders.length ? `Còn ${pendingOrders.length} phiếu đang xử lý` : readyOrders.length ? `${readyOrders.length} phiếu có kết quả` : 'Chưa có kết quả',
+      tone: 'violet',
+      enabled: canReviewResults,
+    },
+    {
+      step: 3,
+      eyebrow: 'Bước 03',
+      title: 'Kết luận, toa thuốc & đóng bệnh án',
+      desc: 'Nhập chẩn đoán cuối, hướng điều trị, toa thuốc và hẹn tái khám.',
+      status: hasConclusion ? 'Hồ sơ đã đóng' : canConclude ? 'Có thể kết luận' : 'Cần kết quả CLS trước',
+      tone: 'emerald',
+      enabled: canConclude,
+    },
+  ];
+
+  const goStep = (step) => {
+    const target = steps.find((item) => item.step === step);
+    if (target?.enabled) setActiveStep(step);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-fadeIn">
-      <div className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl flex flex-col">
+  const currentStep = steps.find((item) => item.step === activeStep) || steps[0];
 
-        {/* Header Modal cố định */}
-        <div className="border-b border-slate-200/80 bg-slate-50/50 p-5 shrink-0">
-          <div className="flex items-center justify-between gap-4">
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-fadeIn">
+      <div className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-[28px] border border-white/20 bg-white shadow-2xl flex flex-col">
+        <div className="shrink-0 border-b border-slate-100 bg-white">
+          <div className="flex items-start justify-between gap-4 p-6 pb-4">
             <div>
-              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Hồ sơ bệnh án điện tử</span>
-              <h2 className="text-lg font-black text-slate-900">Tiến trình điều trị: {visit.patient?.fullName} ({visit.visitCode})</h2>
+              <span className="text-[10px] uppercase font-black text-blue-600 tracking-[0.22em]">Hồ sơ bệnh án điện tử</span>
+              <h2 className="mt-1 text-xl font-black text-slate-950">Quy trình điều trị: {visit.patient?.fullName} ({visit.visitCode})</h2>
+              <p className="mt-1 text-xs font-semibold text-slate-500">Đi theo đúng luồng: chỉ định cận lâm sàng → đọc kết quả → kết luận và đóng bệnh án.</p>
             </div>
-            <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 shadow-xs transition-all">Đóng lại</button>
+            <button type="button" onClick={onClose} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600 shadow-sm hover:bg-slate-50">Đóng lại</button>
           </div>
 
-          {/* Stepper Navigation: Chuẩn hóa UI thành dạng Tab có thể nhấn được */}
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2">
-            {[
-              { step: 1, title: '1. Chỉ định xét nghiệm', desc: 'Tạo phiếu CLS' },
-              { step: 2, title: '2. Kết quả & Trợ lý AI', desc: 'Duyệt kết quả phòng Lab' },
-              { step: 3, title: '3. Kết luận & Toa thuốc', desc: 'Đóng bệnh án hoàn tất' }
-            ].map((s) => {
-              const isCurrent = activeStep === s.step;
-              const isPast = activeStep > s.step;
-              return (
-                <button
-                  key={s.step}
-                  type="button"
-                  onClick={() => handleStepClick(s.step)}
-                  className={`text-left rounded-xl p-3 border transition-all ${isCurrent
-                    ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-400'
-                    : isPast
-                      ? 'border-emerald-200 bg-emerald-50/60 text-emerald-800'
-                      : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-50'
-                    }`}
-                >
-                  <p className="text-[11px] font-black tracking-tight">{s.title}</p>
-                  <p className={`text-[10px] font-medium mt-0.5 truncate ${isCurrent ? 'text-blue-500' : isPast ? 'text-emerald-600' : 'text-slate-400'}`}>{s.desc}</p>
-                </button>
-              );
-            })}
+          <div className="px-6 pb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              {steps.map((step, index) => {
+                const isCurrent = activeStep === step.step;
+                const isDone = step.step < activeStep || (step.step === 3 && hasConclusion);
+                const tone = step.tone === 'emerald'
+                  ? { active: 'border-emerald-400 bg-emerald-50 text-emerald-900 ring-4 ring-emerald-50', dot: 'bg-emerald-600', badge: 'bg-emerald-100 text-emerald-700 border-emerald-200' }
+                  : step.tone === 'violet'
+                    ? { active: 'border-violet-400 bg-violet-50 text-violet-900 ring-4 ring-violet-50', dot: 'bg-violet-600', badge: 'bg-violet-100 text-violet-700 border-violet-200' }
+                    : { active: 'border-blue-400 bg-blue-50 text-blue-900 ring-4 ring-blue-50', dot: 'bg-blue-600', badge: 'bg-blue-100 text-blue-700 border-blue-200' };
+                return (
+                  <button
+                    key={step.step}
+                    type="button"
+                    onClick={() => goStep(step.step)}
+                    disabled={!step.enabled}
+                    className={`relative rounded-2xl border p-4 text-left transition-all ${isCurrent ? tone.active : isDone ? 'border-emerald-200 bg-emerald-50/50 text-slate-900' : step.enabled ? 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:shadow-md' : 'border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed opacity-70'}`}
+                  >
+                    {index < steps.length - 1 && <span className="hidden lg:block absolute left-[calc(100%+2px)] top-1/2 h-px w-[8px] bg-slate-200" />}
+                    <div className="flex items-start gap-3">
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-xs font-black text-white ${isDone ? 'bg-emerald-600' : step.enabled ? tone.dot : 'bg-slate-300'}`}>{isDone ? '✓' : step.step}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] uppercase tracking-[0.18em] font-black opacity-70">{step.eyebrow}</p>
+                        <h3 className="mt-1 text-sm font-black leading-snug">{step.title}</h3>
+                        <p className="mt-1 text-[11px] font-semibold leading-relaxed opacity-70">{step.desc}</p>
+                        <span className={`mt-3 inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black ${isCurrent ? tone.badge : isDone ? 'border-emerald-200 bg-white text-emerald-700' : 'border-slate-200 bg-white text-slate-500'}`}>{step.status}</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
-        {/* Nội dung Modal - Cuộn độc lập dựa trên Step đang Active */}
-        <div className="overflow-y-auto p-5 bg-slate-50/40 flex-1 space-y-4">
+        <div className="overflow-y-auto bg-slate-50/50 p-6 flex-1 space-y-5">
+          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+            <p className="text-[10px] uppercase tracking-[0.18em] font-black text-slate-400">Đang thực hiện</p>
+            <h3 className="mt-1 text-lg font-black text-slate-950">{currentStep.title}</h3>
+            <p className="mt-1 text-xs font-semibold text-slate-500">{currentStep.desc}</p>
+          </div>
 
           {activeStep === 1 && (
             <div className="space-y-4 animate-slideUp">
-              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800 font-medium">
-                <strong>Hướng dẫn:</strong> Bác sĩ thực hiện chọn phân khoa và gõ chỉ định cận lâm sàng (Xét nghiệm máu, X-Quang, Siêu âm...). Phiếu sẽ được chuyển trực tiếp đến phòng máy tương ứng.
-              </div>
               <OrderPanel visit={visit} {...orderProps} />
-              <div className="mt-4 pt-4 border-t border-slate-100 flex justify-end">
-                <button type="button" onClick={() => setActiveStep(2)} className="bg-slate-900 text-white font-bold text-xs px-4 py-2 rounded-xl shadow hover:bg-slate-800">Chuyển sang Bước 2 Đọc kết quả CLS </button>
-              </div>
+              <WorkflowActions
+                primaryLabel="Sang bước 2: Đọc kết quả CLS"
+                onPrimary={() => goStep(2)}
+                primaryDisabled={!canReviewResults}
+                primaryHint={!canReviewResults ? 'Cần tạo ít nhất một phiếu chỉ định trước.' : ''}
+              />
             </div>
           )}
 
           {activeStep === 2 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-slideUp">
+            <div className="space-y-4 animate-slideUp">
               <div className="space-y-4">
-                <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 text-xs text-purple-800 font-medium">
-                  <strong>Kết quả Phòng Lab:</strong> Danh sách kết quả trả về từ các khoa phòng liên quan.
-                </div>
                 <ResultsPanel {...resultProps} />
-              </div>
-              <div className="space-y-4">
-                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-800 font-medium">
-                  <strong>AI Copilot:</strong> Chạy mô hình phân tích để nhận báo cáo gợi ý chẩn đoán tự động.
-                </div>
                 <AiPanel {...aiProps} />
               </div>
-              <div className="col-span-full pt-4 border-t border-slate-200/60 flex justify-between">
-                <button type="button" onClick={() => setActiveStep(1)} className="border border-slate-200 bg-white text-slate-700 font-bold text-xs px-4 py-2 rounded-xl hover:bg-slate-50"> Quay lại Bước 1</button>
-                <button type="button" onClick={() => setActiveStep(3)} className="bg-slate-900 text-white font-bold text-xs px-4 py-2 rounded-xl shadow hover:bg-slate-800">Tiến hành chẩn đoán cuối & kê đơn (Bước 3) </button>
-              </div>
+              <WorkflowActions
+                secondaryLabel="Quay lại bước 1"
+                onSecondary={() => goStep(1)}
+                primaryLabel="Sang bước 3: Kết luận & kê đơn"
+                onPrimary={() => goStep(3)}
+                primaryDisabled={!canConclude}
+                primaryHint={!canConclude ? 'Chỉ nên kết luận khi đã có ít nhất một kết quả cận lâm sàng.' : ''}
+              />
             </div>
           )}
 
           {activeStep === 3 && (
             <div className="space-y-4 animate-slideUp">
-              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-xs text-emerald-800 font-medium">
-                <strong>Kết luận điều trị:</strong> Nhập chẩn đoán cuối ICD, thiết lập phác đồ, kê đơn thuốc và hẹn ngày tái khám để hoàn tất ca bệnh.
-              </div>
               <ConclusionPanel {...conclusionProps} />
-              <div className="pt-2 flex justify-start">
-                <button type="button" onClick={() => setActiveStep(2)} className="border border-slate-200 bg-white text-slate-700 font-bold text-xs px-4 py-2 rounded-xl hover:bg-slate-50"> Xem lại Kết quả & Gợi ý AI (Bước 2)</button>
-              </div>
+              <WorkflowActions secondaryLabel="Xem lại bước 2" onSecondary={() => goStep(2)} />
             </div>
           )}
-
         </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkflowActions({ secondaryLabel, onSecondary, primaryLabel, onPrimary, primaryDisabled = false, primaryHint = '' }) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-200/70 pt-4">
+      <div>{primaryHint && <p className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-700">{primaryHint}</p>}</div>
+      <div className="flex justify-end gap-2">
+        {secondaryLabel && <button type="button" onClick={onSecondary} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 hover:bg-slate-50">{secondaryLabel}</button>}
+        {primaryLabel && <button type="button" onClick={onPrimary} disabled={primaryDisabled} className="rounded-xl bg-slate-950 px-5 py-2.5 text-xs font-black text-white shadow-lg shadow-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none">{primaryLabel}</button>}
       </div>
     </div>
   );
@@ -682,94 +733,89 @@ function ResultsPanel({ orders }) {
 }
 
 function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId, selectedAiId, setSelectedAiId, onGenerate, busy }) {
-  const currentDiagnosis = diagnoses.find(d => d.id === selectedAiId) || diagnoses[0];
-  const parsedResult = parseAiResult(currentDiagnosis?.result);
+  const currentDiagnosis = diagnoses.find((diagnosis) => diagnosis.id === selectedAiId) || diagnoses[0];
+  const parsedResult = normalizeAiAnalysis(currentDiagnosis?.result);
+  const selectedModel = aiModels.find((model) => model.id === selectedAiModelId);
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-5">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-slate-100 pb-4">
         <div>
-          <h3 className="text-sm font-black text-slate-900">Trợ lý Phân tích AI</h3>
-          <p className="text-[11px] font-semibold text-slate-400 mt-1">Đọc hiểu hồ sơ, tóm tắt và đưa ra phác đồ gợi ý.</p>
+          <h3 className="text-sm font-black text-slate-900">So sánh kết quả phân tích AI</h3>
+          <p className="text-[11px] font-semibold text-slate-400 mt-1">Chạy nhiều model cho cùng một hồ sơ. Mỗi kết quả được lưu riêng, không ghi đè nhau.</p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 xl:min-w-[520px]">
+          <select value={selectedAiModelId} onChange={(e) => setSelectedAiModelId(e.target.value)} disabled={busy} className="flex-1 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:opacity-50 transition-all">
+            <option value="">-- Chọn AI model --</option>
+            {aiModels.map((model) => <option key={model.id} value={model.id}>{model.modelName || model.name || 'AI Model'} {model.modelVersion ? `(${model.modelVersion})` : ''} - {model.provider || 'other'}</option>)}
+          </select>
+          <button type="button" onClick={onGenerate} disabled={busy || !selectedAiModelId} className="rounded-xl bg-indigo-600 px-5 py-3 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-indigo-600/25 hover:bg-indigo-700 disabled:opacity-50 disabled:shadow-none whitespace-nowrap transition-all flex items-center justify-center gap-2">
+            {busy ? (<><LoadingIndicator size="sm" /><span>Đang phân tích...</span></>) : (`Chạy ${selectedModel?.provider || 'AI'}`)}
+          </button>
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <select
-          value={selectedAiModelId}
-          onChange={(e) => setSelectedAiModelId(e.target.value)}
-          disabled={busy}
-          className="flex-1 rounded-xl border border-slate-200 p-3 text-xs font-semibold outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 bg-slate-50 disabled:opacity-50 transition-all"
-        >
-          {aiModels.map(m => <option key={m.id} value={m.id}>{m.name} ({m.provider})</option>)}
-        </select>
-        <button
-          type="button"
-          onClick={onGenerate}
-          disabled={busy || !selectedAiModelId}
-          className="rounded-xl bg-indigo-600 px-5 py-3 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 disabled:opacity-50 disabled:shadow-none whitespace-nowrap transition-all flex items-center justify-center gap-2"
-        >
-          {busy ? (
-            <>
-              <LoadingIndicator size="sm" />
-              <span>Đang xử lý...</span>
-            </>
-          ) : (
-            'Yêu cầu AI phân tích'
-          )}
-        </button>
-      </div>
-
-      {diagnoses.length > 0 && (
-        <div className="mt-5 space-y-3">
-          {diagnoses.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-              {diagnoses.map((d, idx) => (
-                <button
-                  key={d.id}
-                  onClick={() => setSelectedAiId(d.id)}
-                  className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border whitespace-nowrap transition-all ${d.id === selectedAiId ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                >
-                  Bản mẫu {diagnoses.length - idx} ({formatTime(d.createdAt)})
-                </button>
-              ))}
+      {diagnoses.length > 0 ? (
+        <div className="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-5 items-start">
+          <aside className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Lịch sử phân tích</span>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-indigo-700 border border-indigo-100">{diagnoses.length} bản</span>
             </div>
-          )}
+            <div className="grid grid-cols-1 gap-2 max-h-[520px] overflow-y-auto pr-1">
+              {diagnoses.map((diagnosis) => {
+                const parsed = normalizeAiAnalysis(diagnosis.result);
+                const isSelected = diagnosis.id === currentDiagnosis?.id;
+                return (
+                  <button key={diagnosis.id} type="button" onClick={() => setSelectedAiId(diagnosis.id)} className={`w-full rounded-2xl border p-3 text-left transition-all ${isSelected ? 'border-indigo-400 bg-white shadow-sm ring-2 ring-indigo-100' : 'border-slate-100 bg-white/70 hover:bg-white hover:border-slate-200'}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="rounded-lg bg-indigo-50 px-2 py-1 text-[10px] font-black uppercase text-indigo-700 border border-indigo-100">{parsed.provider || diagnosis.aiModel?.provider || 'AI'}</span>
+                      <span className="text-[10px] font-bold text-slate-400">{formatTime(diagnosis.createdAt)}</span>
+                    </div>
+                    <strong className="mt-2 block text-xs font-black text-slate-900">{parsed.modelName || diagnosis.aiModel?.modelName || 'AI Model'}</strong>
+                    <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-relaxed text-slate-500">{parsed.summary || 'Bản phân tích AI đã được lưu.'}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
 
-          <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-5 text-xs text-slate-800 space-y-4">
-            {parsedResult.summary && (
+          <section className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/70 to-white p-5 text-xs text-slate-800 space-y-5">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-indigo-100 pb-4">
               <div>
-                <strong className="text-[11px] uppercase tracking-wider font-black text-indigo-900 block mb-1.5">Tổng quan lâm sàng:</strong>
-                <p className="leading-relaxed font-medium text-slate-700">{parsedResult.summary}</p>
+                <p className="text-[10px] font-black uppercase tracking-wider text-indigo-700">Đang xem kết quả</p>
+                <h4 className="mt-1 text-lg font-black text-slate-950">{parsedResult.modelName || currentDiagnosis?.aiModel?.modelName || 'AI Model'}</h4>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">Provider: {parsedResult.provider || currentDiagnosis?.aiModel?.provider || 'other'} · {currentDiagnosis?.createdAt ? new Date(currentDiagnosis.createdAt).toLocaleString('vi-VN') : 'N/A'}</p>
               </div>
-            )}
+              <span className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-[10px] font-black text-emerald-700">Đã lưu DB</span>
+            </div>
 
-            {parsedResult.possibleConditions && (
-              <div>
-                <strong className="text-[11px] uppercase tracking-wider font-black text-indigo-900 block mb-1.5">Đánh giá nguy cơ (Chẩn đoán sơ bộ):</strong>
-                <ul className="list-disc pl-5 space-y-1 font-medium text-slate-700 marker:text-indigo-400">
-                  {Array.isArray(parsedResult.possibleConditions) ? parsedResult.possibleConditions.map((c, i) => <li key={i}>{c}</li>) : <li>{parsedResult.possibleConditions}</li>}
-                </ul>
-              </div>
-            )}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="lg:col-span-2 rounded-2xl border border-white bg-white/80 p-4 shadow-sm"><AiSection title="Tổng quan lâm sàng" value={parsedResult.summary} /></div>
+              <div className="rounded-2xl border border-white bg-white/80 p-4 shadow-sm"><AiSection title="Cân nhắc lâm sàng" value={parsedResult.clinicalConsiderations || parsedResult.possibleConditions} list /></div>
+              <div className="rounded-2xl border border-white bg-white/80 p-4 shadow-sm"><AiSection title="Cảnh báo rủi ro" value={parsedResult.riskFlags} list /></div>
+              <div className="rounded-2xl border border-white bg-white/80 p-4 shadow-sm"><AiSection title="Đề xuất bước tiếp theo" value={parsedResult.recommendedNextSteps || parsedResult.recommendations} list /></div>
+              <div className="rounded-2xl border border-white bg-white/80 p-4 shadow-sm"><AiSection title="Giới hạn phân tích" value={parsedResult.limitations} list /></div>
+            </div>
 
-            {parsedResult.recommendations && (
-              <div>
-                <strong className="text-[11px] uppercase tracking-wider font-black text-indigo-900 block mb-1.5">Đề xuất hướng điều trị:</strong>
-                <ul className="list-disc pl-5 space-y-1 font-medium text-slate-700 marker:text-indigo-400">
-                  {Array.isArray(parsedResult.recommendations) ? parsedResult.recommendations.map((c, i) => <li key={i}>{c}</li>) : <li>{parsedResult.recommendations}</li>}
-                </ul>
-              </div>
-            )}
-
-            {!parsedResult.summary && !parsedResult.possibleConditions && currentDiagnosis?.result && (
-              <div className="whitespace-pre-wrap leading-relaxed font-medium text-slate-700">{currentDiagnosis.result}</div>
-            )}
-          </div>
+            {!parsedResult.summary && currentDiagnosis?.result && <div className="whitespace-pre-wrap rounded-xl border border-white bg-white/80 p-4 text-xs font-medium leading-relaxed text-slate-700">{currentDiagnosis.result}</div>}
+          </section>
         </div>
-      )}
+      ) : (<Empty title="Chưa có phân tích AI" desc="Chọn Gemini, ChatGPT/OpenAI hoặc model khác rồi bấm chạy để lưu bản phân tích đầu tiên." />)}
     </div>
   );
+}
+
+function normalizeAiAnalysis(value) {
+  const parsed = parseAiResult(value);
+  const analysis = parsed?.analysis && typeof parsed.analysis === 'object' && !Array.isArray(parsed.analysis) ? parsed.analysis : {};
+  return { ...parsed, ...analysis, summary: analysis.summary || parsed.summary, clinicalConsiderations: analysis.clinicalConsiderations || parsed.clinicalConsiderations, riskFlags: analysis.riskFlags || parsed.riskFlags, recommendedNextSteps: analysis.recommendedNextSteps || parsed.recommendedNextSteps, limitations: analysis.limitations || parsed.limitations };
+}
+
+function AiSection({ title, value, list = false }) {
+  if (!value) return null;
+  const items = Array.isArray(value) ? value : [value];
+  return <div><strong className="text-[11px] uppercase tracking-wider font-black text-indigo-900 block mb-1.5">{title}</strong>{list ? <ul className="list-disc pl-5 space-y-1 font-medium text-slate-700 marker:text-indigo-400">{items.map((item, index) => <li key={`${title}-${index}`}>{typeof item === 'object' ? JSON.stringify(item) : String(item)}</li>)}</ul> : <p className="leading-relaxed font-medium text-slate-700">{String(value)}</p>}</div>;
 }
 
 function ConclusionPanel({ form, setForm, onSubmit, busy, completed }) {
