@@ -72,7 +72,20 @@ export class VisitService {
         throw new ForbiddenException('Doctor can only update status for own visit');
       }
     }
-    return this.prisma.visit.update({ where: { id }, data: { status, completedAt: status === VisitStatus.COMPLETED ? new Date() : undefined }, include: this.includeRelations() });
+    if (status === VisitStatus.CANCELLED) {
+      this.ensureCanCancelVisit(visit, user);
+    }
+    if (visit.status === VisitStatus.COMPLETED || visit.status === VisitStatus.CANCELLED) {
+      throw new BadRequestException('Cannot update a completed/cancelled visit');
+    }
+    return this.prisma.visit.update({
+      where: { id },
+      data: {
+        status,
+        completedAt: status === VisitStatus.COMPLETED || status === VisitStatus.CANCELLED ? new Date() : undefined,
+      },
+      include: this.includeRelations(),
+    });
   }
 
   async suggestRooms(specialty: string) {
@@ -87,6 +100,16 @@ export class VisitService {
     const visit = await this.prisma.visit.findUnique({ where: { id } });
     if (!visit) throw new NotFoundException('Visit not found');
     return visit;
+  }
+
+  private ensureCanCancelVisit(visit: Awaited<ReturnType<VisitService['ensureVisit']>>, user?: AuthUser) {
+    if (!user || user.role === UserRole.ADMIN) return;
+    if (user.role === UserRole.RECEPTIONIST && visit.status !== VisitStatus.WAITING) {
+      throw new BadRequestException('Receptionist can only cancel visits before examination starts');
+    }
+    if (user.role === UserRole.DOCTOR && !([VisitStatus.WAITING, VisitStatus.IN_PROGRESS] as VisitStatus[]).includes(visit.status)) {
+      throw new BadRequestException('Doctor can only cancel visits before test orders/results are created');
+    }
   }
 
   private async getCurrentDoctorId(userId: string) {

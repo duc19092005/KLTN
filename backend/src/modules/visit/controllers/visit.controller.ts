@@ -31,7 +31,7 @@ export class VisitController {
     return this.visitService.suggestRooms(specialty);
   }
 
-  @Roles('ADMIN', 'DOCTOR')
+  @Roles('ADMIN', 'RECEPTIONIST', 'DOCTOR')
   @Patch(':id/status')
   updateStatus(@Param('id') id: string, @Body() dto: UpdateVisitStatusDto, @Req() req: any) {
     return this.visitService.updateStatus(id, dto.status, req.user);

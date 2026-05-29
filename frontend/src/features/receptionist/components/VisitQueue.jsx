@@ -11,6 +11,7 @@ export default function VisitQueue({ refreshTrigger }) {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sortOrder, setSortOrder] = useState('asc');
+  const [busyId, setBusyId] = useState('');
 
   const loadVisits = async () => {
     setLoading(true);
@@ -28,6 +29,19 @@ export default function VisitQueue({ refreshTrigger }) {
   useEffect(() => {
     loadVisits();
   }, [refreshTrigger]);
+
+  const cancelVisit = async (visit) => {
+    if (!window.confirm(`Hủy lượt khám ${visit.visitCode}?`)) return;
+    setBusyId(visit.id);
+    try {
+      await visitService.updateStatus(visit.id, 'CANCELLED');
+      await loadVisits();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Không thể hủy lượt khám');
+    } finally {
+      setBusyId('');
+    }
+  };
 
   const visibleVisits = useMemo(() => {
     const text = query.trim().toLowerCase();
@@ -86,6 +100,7 @@ export default function VisitQueue({ refreshTrigger }) {
           const room = visit.clinicalRoom;
           const doctor = visit.doctor?.staffProfile;
           const st = getVisitStatus(visit.status);
+          const canCancel = visit.status === 'WAITING';
 
           return (
             <div key={visit.id} className="p-4 rounded-xl border border-slate-100 bg-white hover:border-cyan-200 hover:shadow-md hover:shadow-cyan-50 transition-all flex flex-col gap-3 group">
@@ -107,14 +122,26 @@ export default function VisitQueue({ refreshTrigger }) {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                <div className="w-8 h-8 rounded-md bg-cyan-100 text-cyan-700 flex items-center justify-center font-black text-xs shrink-0">
-                  {room?.roomCode?.substring(0, 2) || 'RM'}
+              <div className="flex items-center justify-between gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="w-8 h-8 rounded-md bg-cyan-100 text-cyan-700 flex items-center justify-center font-black text-xs shrink-0">
+                    {room?.roomCode?.substring(0, 2) || 'RM'}
+                  </div>
+                  <div className="overflow-hidden">
+                    <p className="text-xs font-bold text-slate-700 truncate">{room?.roomName}</p>
+                    <p className="text-[10px] text-slate-500 truncate">BS. {doctor?.fullName || 'Chưa rõ'}</p>
+                  </div>
                 </div>
-                <div className="overflow-hidden">
-                  <p className="text-xs font-bold text-slate-700 truncate">{room?.roomName}</p>
-                  <p className="text-[10px] text-slate-500 truncate">BS. {doctor?.fullName || 'Chưa rõ'}</p>
-                </div>
+                {canCancel && (
+                  <button
+                    type="button"
+                    disabled={busyId === visit.id}
+                    onClick={() => cancelVisit(visit)}
+                    className="shrink-0 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-[10px] font-black text-red-600 hover:bg-red-100 disabled:opacity-50"
+                  >
+                    {busyId === visit.id ? 'Đang hủy...' : 'Hủy lượt'}
+                  </button>
+                )}
               </div>
             </div>
           );
