@@ -217,7 +217,7 @@ export class ClinicalDecisionService {
   }
 
   private async callGemini(aiModel: AiModelRegistry, token: string, prompt: string): Promise<AiProviderResponse> {
-    const endpoint = this.withGeminiApiKey(aiModel.apiEndpoint!, token);
+    const endpoint = this.withGeminiApiKey(this.withGeminiModel(aiModel.apiEndpoint!, aiModel.modelVersion), token);
     const response = await this.postJson(endpoint, {}, {
       contents: [
         {
@@ -305,6 +305,12 @@ export class ClinicalDecisionService {
     } catch {
       throw new BadRequestException('Selected Gemini API endpoint is invalid');
     }
+  }
+
+  private withGeminiModel(endpoint: string, modelVersion: string) {
+    return endpoint.includes(':generateContent')
+      ? endpoint.replace(/models\/[^/:]+:generateContent/, `models/${modelVersion}:generateContent`)
+      : endpoint;
   }
 
   private extractOpenAiCompatibleText(response: any) {

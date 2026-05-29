@@ -20,6 +20,15 @@ enum UserStatus {
   PENDING
 }
 
+enum DepartmentType {
+  ADMINISTRATIVE
+  CLINICAL
+  LABORATORY
+  IMAGING
+  PHARMACY
+  OTHER
+}
+
 model User {
   id                String     @id @default(uuid())
   username          String     @unique
@@ -49,10 +58,12 @@ model Department {
   id             String   @id @default(uuid())
   departmentCode String   @unique
   name           String   @unique
-  floor          String?
-  status         String   @default("ACTIVE")
-  description    String?
-  managerId      String?  @unique
+  floor            String?
+  status           String         @default("ACTIVE")
+  type             DepartmentType @default(CLINICAL)
+  canReceiveOrders Boolean        @default(false)
+  description      String?
+  managerId        String?        @unique
 
   manager        StaffProfile?  @relation("DepartmentManager", fields: [managerId], references: [id])
   staffs         StaffProfile[] @relation("DepartmentStaffs")
@@ -62,6 +73,8 @@ model Department {
   updatedAt      DateTime @updatedAt
 
   @@index([status])
+  @@index([type])
+  @@index([canReceiveOrders])
 }
 
 model StaffProfile {

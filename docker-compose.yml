@@ -33,7 +33,7 @@ services:
     ports:
       - "3001:3001"
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       PORT: 3001
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-change-me-local-only}@db:5432/${POSTGRES_DB:-zkp_identity}?schema=public
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
@@ -42,6 +42,10 @@ services:
       IDENTITY_REGISTRY_ADDRESS: ${IDENTITY_REGISTRY_ADDRESS:-0x5FbDB2315678afecb367f032d93F642f64180aa3}
       BLOCKCHAIN_RPC_URL: http://blockchain:8545
       FRONTEND_ORIGIN: http://localhost:5173
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: sh -c "until nc -z db 5432; do echo 'Waiting for PostgreSQL...'; sleep 2; done; until nc -z blockchain 8545; do echo 'Waiting for blockchain...'; sleep 2; done; sleep 6; npx prisma generate; npx prisma db push; npm run start:dev"
     depends_on:
       db:
         condition: service_healthy
@@ -65,6 +69,12 @@ services:
       VITE_IDENTITY_REGISTRY_ADDRESS: ${IDENTITY_REGISTRY_ADDRESS:-0x5FbDB2315678afecb367f032d93F642f64180aa3}
       VITE_NETWORK_RPC_URL: http://localhost:8545
       VITE_CHAIN_ID: 31337
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0 --port 5173
     depends_on:
       - backend
 

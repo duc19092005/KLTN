@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { DepartmentType } from '@prisma/client';
+import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { PaginationQueryDto } from '../../shared/pagination.dto';
 
 export class CreateDepartmentDto {
@@ -24,6 +26,17 @@ export class CreateDepartmentDto {
   @IsString()
   @MaxLength(40)
   status?: string;
+
+  @ApiPropertyOptional({ enum: DepartmentType, example: DepartmentType.CLINICAL })
+  @IsOptional()
+  @IsEnum(DepartmentType)
+  type?: DepartmentType;
+
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  canReceiveOrders?: boolean;
 
   @ApiPropertyOptional({ example: 'Heart and vascular disease department' })
   @IsOptional()
@@ -62,6 +75,17 @@ export class UpdateDepartmentDto {
   @MaxLength(40)
   status?: string;
 
+  @ApiPropertyOptional({ enum: DepartmentType, example: DepartmentType.CLINICAL })
+  @IsOptional()
+  @IsEnum(DepartmentType)
+  type?: DepartmentType;
+
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  canReceiveOrders?: boolean;
+
   @ApiPropertyOptional({ example: 'Updated department description' })
   @IsOptional()
   @IsString()
@@ -91,4 +115,15 @@ export class DepartmentQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @ApiPropertyOptional({ enum: DepartmentType, example: DepartmentType.LABORATORY })
+  @IsOptional()
+  @IsEnum(DepartmentType)
+  type?: DepartmentType;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  canReceiveOrders?: boolean;
 }

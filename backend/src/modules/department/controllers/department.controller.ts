@@ -20,6 +20,7 @@ export class DepartmentController {
     return this.service.create(dto, req.user?.sub);
   }
 
+  @Roles('ADMIN', 'RECEPTIONIST', 'DOCTOR', 'LAB_MANAGER')
   @Get()
   @ApiOperation({ summary: 'List departments with pagination and search' })
   findAll(@Query() query: DepartmentQueryDto) {

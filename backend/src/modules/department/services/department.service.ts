@@ -26,6 +26,8 @@ export class DepartmentService {
           name: dto.name.trim(),
           floor: dto.floor?.trim(),
           status: dto.status?.trim() || 'ACTIVE',
+          type: dto.type,
+          canReceiveOrders: dto.canReceiveOrders ?? false,
           description: dto.description?.trim(),
           managerId: dto.managerId || null,
         },
@@ -54,6 +56,8 @@ export class DepartmentService {
       ...(query.departmentCode ? { departmentCode: { contains: query.departmentCode, mode: 'insensitive' } } : {}),
       ...(query.name ? { name: { contains: query.name, mode: 'insensitive' } } : {}),
       ...(query.status ? { status: query.status } : {}),
+      ...(query.type ? { type: query.type } : {}),
+      ...(query.canReceiveOrders !== undefined ? { canReceiveOrders: query.canReceiveOrders } : {}),
     };
     const [items, total] = await this.prisma.$transaction([
       this.prisma.department.findMany({ where, include: this.includeRelations(), orderBy: { departmentCode: 'asc' }, skip, take: limit }),
@@ -73,6 +77,8 @@ export class DepartmentService {
         ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
         ...(dto.floor !== undefined ? { floor: dto.floor?.trim() } : {}),
         ...(dto.status !== undefined ? { status: dto.status.trim() } : {}),
+        ...(dto.type !== undefined ? { type: dto.type } : {}),
+        ...(dto.canReceiveOrders !== undefined ? { canReceiveOrders: dto.canReceiveOrders } : {}),
         ...(dto.description !== undefined ? { description: dto.description?.trim() } : {}),
       },
       include: this.includeRelations(),

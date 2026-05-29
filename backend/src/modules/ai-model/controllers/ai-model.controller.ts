@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
-import { AiModelQueryDto, CreateAiModelDto } from '../dto/ai-model.dto';
+import { AiModelQueryDto, CreateAiModelDto, TestAiModelApiDto } from '../dto/ai-model.dto';
 import { AiModelService } from '../services/ai-model.service';
 
 @ApiTags('AI Model Registry')
@@ -17,6 +17,12 @@ export class AiModelController {
   @Post()
   create(@Body() dto: CreateAiModelDto, @Req() req: any) {
     return this.service.create(dto, req.user.sub);
+  }
+
+  @Roles('ADMIN')
+  @Post('test-api')
+  testApi(@Body() dto: TestAiModelApiDto) {
+    return this.service.testApi(dto);
   }
 
   @Roles('ADMIN', 'DOCTOR')

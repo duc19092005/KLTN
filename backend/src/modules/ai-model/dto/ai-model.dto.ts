@@ -32,7 +32,7 @@ export class CreateAiModelDto {
   @IsIn(AI_API_PROVIDERS)
   provider?: string;
 
-  @ApiPropertyOptional({ example: 'https://api.openai.com/v1/chat/completions' })
+  @ApiPropertyOptional({ example: 'https://api.openai.com/v1/chat/completions', description: 'Optional; backend can infer from provider' })
   @IsOptional()
   @IsString()
   @MaxLength(500)
@@ -60,4 +60,26 @@ export class AiModelQueryDto {
   @IsOptional()
   @IsIn(AI_MODEL_TYPES)
   type?: 'API' | 'IP';
+}
+
+export class TestAiModelApiDto {
+  @ApiProperty({ enum: AI_API_PROVIDERS })
+  @IsIn(AI_API_PROVIDERS)
+  provider!: string;
+
+  @ApiProperty({ example: 'gemini-1.5-pro' })
+  @IsString()
+  @IsNotEmpty()
+  modelVersion!: string;
+
+  @ApiProperty({ description: 'API key/token dùng để test, không lưu DB.' })
+  @IsString()
+  @IsNotEmpty()
+  secretOrIpHash!: string;
+
+  @ApiPropertyOptional({ description: 'Optional override endpoint' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  apiEndpoint?: string;
 }
