@@ -13,7 +13,7 @@ import { aiModelService } from '../../admin/apis/aiModelService';
 const STATUS = {
   WAITING: { label: 'Chờ khám', color: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-400' },
   IN_PROGRESS: { label: 'Đang khám', color: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500' },
-  WAITING_TEST_RESULT: { label: 'Chờ kết quả CLS', color: 'bg-purple-50 text-purple-700 border-purple-200', dot: 'bg-purple-500' },
+  WAITING_TEST_RESULT: { label: 'Chờ kết quả cận lâm sàng', color: 'bg-purple-50 text-purple-700 border-purple-200', dot: 'bg-purple-500' },
   WAITING_CONCLUSION: { label: 'Chờ kết luận', color: 'bg-indigo-50 text-indigo-700 border-indigo-200', dot: 'bg-indigo-500' },
   COMPLETED: { label: 'Hoàn tất', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
   CANCELLED: { label: 'Đã hủy', color: 'bg-slate-100 text-slate-600 border-slate-200', dot: 'bg-slate-400' },
@@ -188,7 +188,7 @@ export default function DoctorQueuePage() {
             <div>
               <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md">Doctor Workspace</span>
               <h1 className="mt-2 text-2xl font-black text-slate-900 tracking-tight">Hàng đợi khám & Quản lý điều trị</h1>
-              <p className="mt-1 text-xs text-slate-500">Tiếp nhận bệnh nhân, ra chỉ định xét nghiệm, tham vấn AI chuyên khoa và kê đơn hoàn tất quy trình.</p>
+              <p className="mt-1 text-xs text-slate-500">Tiếp nhận, chỉ định, xem kết quả và hoàn tất điều trị.</p>
             </div>
             <button onClick={loadVisits} className="self-start md:self-auto h-10 px-4 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-sm flex items-center gap-2 transition-all">
               {loading ? <LoadingIndicator size="sm" /> : <span>Làm mới danh sách</span>}
@@ -231,7 +231,7 @@ function QueueList({ query, setQuery, filter, setFilter, loading, visits, active
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">Danh sách hàng đợi lâm sàng</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Tìm kiếm, lọc trạng thái và thao tác quy trình điều trị ngay trên từng dòng.</p>
+
           </div>
           <div className="px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-xs font-bold text-blue-700 w-fit">
             Tổng số: {totalItems} ca bệnh
@@ -388,17 +388,17 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
   const readyOrders = orders.filter((order) => order.status === 'RESULT_READY');
   const pendingOrders = orders.filter((order) => ['ORDERED', 'IN_PROGRESS'].includes(order.status));
   const hasConclusion = Boolean(conclusionProps?.completed || visit.finalConclusion);
-  const canCreateOrders = ['IN_PROGRESS', 'WAITING_TEST_RESULT'].includes(visit?.status);
+  const canCreateOrders = ['IN_PROGRESS', 'WAITING_TEST_RESULT', 'WAITING_CONCLUSION'].includes(visit?.status);
   const canReviewResults = orders.length > 0 || ['WAITING_TEST_RESULT', 'WAITING_CONCLUSION', 'COMPLETED'].includes(visit?.status);
-  const canConclude = readyOrders.length > 0 || visit?.status === 'WAITING_CONCLUSION' || hasConclusion;
+  const canConclude = pendingOrders.length === 0 && (readyOrders.length > 0 || visit?.status === 'WAITING_CONCLUSION' || hasConclusion);
 
   const steps = [
     {
       step: 1,
       eyebrow: 'Bước 01',
-      title: 'Khám lâm sàng & chỉ định CLS',
+      title: 'Khám lâm sàng & chỉ định cận lâm sàng',
       desc: 'Tạo phiếu xét nghiệm, X-Quang, siêu âm hoặc chẩn đoán hình ảnh.',
-      status: orders.length ? `${orders.length} phiếu đã gửi` : canCreateOrders ? 'Sẵn sàng tạo phiếu' : 'Chưa tiếp nhận khám',
+      status: pendingOrders.length ? `Có thể bổ sung (${pendingOrders.length} phiếu chờ)` : orders.length ? `${orders.length} phiếu đã gửi` : canCreateOrders ? 'Sẵn sàng tạo phiếu' : 'Chưa tiếp nhận khám',
       tone: 'blue',
       enabled: true,
     },
@@ -416,7 +416,7 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
       eyebrow: 'Bước 03',
       title: 'Kết luận, toa thuốc & đóng bệnh án',
       desc: 'Nhập chẩn đoán cuối, hướng điều trị, toa thuốc và hẹn tái khám.',
-      status: hasConclusion ? 'Hồ sơ đã đóng' : canConclude ? 'Có thể kết luận' : 'Cần kết quả CLS trước',
+      status: hasConclusion ? 'Hồ sơ đã đóng' : canConclude ? 'Có thể kết luận' : 'Cần kết quả cận lâm sàng trước',
       tone: 'emerald',
       enabled: canConclude,
     },
@@ -430,65 +430,58 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
   const currentStep = steps.find((item) => item.step === activeStep) || steps[0];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-fadeIn">
-      <div className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-[28px] border border-white/20 bg-white shadow-2xl flex flex-col">
-        <div className="shrink-0 border-b border-slate-100 bg-white">
-          <div className="flex items-start justify-between gap-4 p-6 pb-4">
-            <div>
-              <span className="text-[10px] uppercase font-black text-blue-600 tracking-[0.22em]">Hồ sơ bệnh án điện tử</span>
-              <h2 className="mt-1 text-xl font-black text-slate-950">Quy trình điều trị: {visit.patient?.fullName} ({visit.visitCode})</h2>
-              <p className="mt-1 text-xs font-semibold text-slate-500">Đi theo đúng luồng: chỉ định cận lâm sàng → đọc kết quả → kết luận và đóng bệnh án.</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm animate-fadeIn">
+      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <div className="shrink-0 border-b border-slate-100 px-6 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600">Bệnh án điện tử</p>
+              <h2 className="mt-1 truncate text-lg font-black text-slate-950">
+                {visit.patient?.fullName} <span className="text-slate-400">({visit.visitCode})</span>
+              </h2>
             </div>
-            <button type="button" onClick={onClose} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600 shadow-sm hover:bg-slate-50">Đóng lại</button>
+            <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-black text-slate-600 hover:bg-slate-50">
+              Đóng
+            </button>
           </div>
 
-          <div className="px-6 pb-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-              {steps.map((step, index) => {
-                const isCurrent = activeStep === step.step;
-                const isDone = step.step < activeStep || (step.step === 3 && hasConclusion);
-                const tone = step.tone === 'emerald'
-                  ? { active: 'border-emerald-400 bg-emerald-50 text-emerald-900 ring-4 ring-emerald-50', dot: 'bg-emerald-600', badge: 'bg-emerald-100 text-emerald-700 border-emerald-200' }
-                  : step.tone === 'violet'
-                    ? { active: 'border-violet-400 bg-violet-50 text-violet-900 ring-4 ring-violet-50', dot: 'bg-violet-600', badge: 'bg-violet-100 text-violet-700 border-violet-200' }
-                    : { active: 'border-blue-400 bg-blue-50 text-blue-900 ring-4 ring-blue-50', dot: 'bg-blue-600', badge: 'bg-blue-100 text-blue-700 border-blue-200' };
-                return (
+          <div className="mt-4 flex items-center justify-center gap-5">
+            {steps.map((step, index) => {
+              const isCurrent = activeStep === step.step;
+              const isDone = step.step < activeStep || (step.step === 3 && hasConclusion);
+              const circleClass = isCurrent
+                ? 'bg-slate-950 text-white border-slate-950 ring-4 ring-slate-100'
+                : isDone
+                  ? 'bg-emerald-600 text-white border-emerald-600'
+                  : step.enabled
+                    ? 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                    : 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed';
+              return (
+                <React.Fragment key={step.step}>
                   <button
-                    key={step.step}
                     type="button"
                     onClick={() => goStep(step.step)}
                     disabled={!step.enabled}
-                    className={`relative rounded-2xl border p-4 text-left transition-all ${isCurrent ? tone.active : isDone ? 'border-emerald-200 bg-emerald-50/50 text-slate-900' : step.enabled ? 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:shadow-md' : 'border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed opacity-70'}`}
+                    aria-label={`Bước ${step.step}`}
+                    className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm font-black transition-all ${circleClass}`}
                   >
-                    {index < steps.length - 1 && <span className="hidden lg:block absolute left-[calc(100%+2px)] top-1/2 h-px w-[8px] bg-slate-200" />}
-                    <div className="flex items-start gap-3">
-                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-xs font-black text-white ${isDone ? 'bg-emerald-600' : step.enabled ? tone.dot : 'bg-slate-300'}`}>{isDone ? '✓' : step.step}</span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[10px] uppercase tracking-[0.18em] font-black opacity-70">{step.eyebrow}</p>
-                        <h3 className="mt-1 text-sm font-black leading-snug">{step.title}</h3>
-                        <p className="mt-1 text-[11px] font-semibold leading-relaxed opacity-70">{step.desc}</p>
-                        <span className={`mt-3 inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black ${isCurrent ? tone.badge : isDone ? 'border-emerald-200 bg-white text-emerald-700' : 'border-slate-200 bg-white text-slate-500'}`}>{step.status}</span>
-                      </div>
-                    </div>
+                    {step.step}
                   </button>
-                );
-              })}
-            </div>
+                  {index < steps.length - 1 && <span className="h-px w-16 bg-slate-200" />}
+                </React.Fragment>
+              );
+            })}
           </div>
+
+          <h3 className="mt-4 text-center text-base font-black text-slate-900">{currentStep.title}</h3>
         </div>
 
-        <div className="overflow-y-auto bg-slate-50/50 p-6 flex-1 space-y-5">
-          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-            <p className="text-[10px] uppercase tracking-[0.18em] font-black text-slate-400">Đang thực hiện</p>
-            <h3 className="mt-1 text-lg font-black text-slate-950">{currentStep.title}</h3>
-            <p className="mt-1 text-xs font-semibold text-slate-500">{currentStep.desc}</p>
-          </div>
-
+        <div className="flex-1 overflow-y-auto bg-slate-50/70 p-5">
           {activeStep === 1 && (
             <div className="space-y-4 animate-slideUp">
               <OrderPanel visit={visit} {...orderProps} />
               <WorkflowActions
-                primaryLabel="Sang bước 2: Đọc kết quả CLS"
+                primaryLabel="Sang bước 2"
                 onPrimary={() => goStep(2)}
                 primaryDisabled={!canReviewResults}
                 primaryHint={!canReviewResults ? 'Cần tạo ít nhất một phiếu chỉ định trước.' : ''}
@@ -498,17 +491,17 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
 
           {activeStep === 2 && (
             <div className="space-y-4 animate-slideUp">
-              <div className="space-y-4">
-                <ResultsPanel {...resultProps} />
-                <AiPanel {...aiProps} />
-              </div>
+              <ResultsPanel {...resultProps} />
+              <AiPanel {...aiProps} />
               <WorkflowActions
                 secondaryLabel="Quay lại bước 1"
                 onSecondary={() => goStep(1)}
-                primaryLabel="Sang bước 3: Kết luận & kê đơn"
+                extraLabel="Yêu cầu bổ sung"
+                onExtra={() => goStep(1)}
+                primaryLabel="Sang bước 3"
                 onPrimary={() => goStep(3)}
                 primaryDisabled={!canConclude}
-                primaryHint={!canConclude ? 'Chỉ nên kết luận khi đã có ít nhất một kết quả cận lâm sàng.' : ''}
+                primaryHint={!canConclude ? (pendingOrders.length ? `Còn ${pendingOrders.length} phiếu đang chờ kết quả.` : 'Cần có kết quả cận lâm sàng trước.') : ''}
               />
             </div>
           )}
@@ -525,12 +518,13 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
   );
 }
 
-function WorkflowActions({ secondaryLabel, onSecondary, primaryLabel, onPrimary, primaryDisabled = false, primaryHint = '' }) {
+function WorkflowActions({ secondaryLabel, onSecondary, extraLabel, onExtra, primaryLabel, onPrimary, primaryDisabled = false, primaryHint = '' }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-200/70 pt-4">
       <div>{primaryHint && <p className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-700">{primaryHint}</p>}</div>
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         {secondaryLabel && <button type="button" onClick={onSecondary} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 hover:bg-slate-50">{secondaryLabel}</button>}
+        {extraLabel && <button type="button" onClick={onExtra} className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-2.5 text-xs font-black text-blue-700 hover:bg-blue-100">{extraLabel}</button>}
         {primaryLabel && <button type="button" onClick={onPrimary} disabled={primaryDisabled} className="rounded-xl bg-slate-950 px-5 py-2.5 text-xs font-black text-white shadow-lg shadow-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none">{primaryLabel}</button>}
       </div>
     </div>
@@ -538,7 +532,7 @@ function WorkflowActions({ secondaryLabel, onSecondary, primaryLabel, onPrimary,
 }
 
 function OrderPanel({ visit, forms, setForms, departments, existingOrders = [], onSubmit, busy }) {
-  const canOrder = ['IN_PROGRESS', 'WAITING_TEST_RESULT'].includes(visit?.status);
+  const canOrder = ['IN_PROGRESS', 'WAITING_TEST_RESULT', 'WAITING_CONCLUSION'].includes(visit?.status);
   const updateForm = (index, patch) => setForms(forms.map((item, i) => (i === index ? { ...item, ...patch } : item)));
   const addForm = () => setForms([...forms, { ...emptyOrder }]);
   const removeForm = (index) => setForms(forms.length > 1 ? forms.filter((_, i) => i !== index) : [{ ...emptyOrder }]);
@@ -556,7 +550,7 @@ function OrderPanel({ visit, forms, setForms, departments, existingOrders = [], 
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-black text-slate-900">Danh sách phiếu chỉ định</h3>
-          <p className="text-xs text-slate-400 mt-0.5">Một ca bệnh có thể có nhiều phiếu: xét nghiệm máu, X-Quang, MRI, siêu âm...</p>
+
           <p className="mt-2 text-[11px] font-bold text-slate-500">Đã gửi: <span className="text-purple-700">{existingOrders.length}</span> phiếu - Đang soạn: <span className="text-blue-700">{forms.length}</span> phiếu</p>
         </div>
         {canOrder && (
@@ -577,7 +571,7 @@ function OrderPanel({ visit, forms, setForms, departments, existingOrders = [], 
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h4 className="text-xs font-black text-purple-900">Phiếu chỉ định đã gửi</h4>
-                  <p className="text-[11px] font-semibold text-purple-600">Dùng để kiểm tra nhanh, tránh tạo trùng khoa/phòng.</p>
+
                 </div>
                 <span className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-purple-700 border border-purple-100">{existingOrders.length} phiếu</span>
               </div>
@@ -671,7 +665,7 @@ function ResultsPanel({ orders }) {
       <div className="flex justify-between items-start">
         <div>
           <h3 className="text-sm font-black text-slate-900">Chi tiết kết quả trả về</h3>
-          <p className="text-[11px] font-semibold text-slate-400 mt-1">Dữ liệu từ phòng Lab và Chẩn đoán hình ảnh.</p>
+
         </div>
         <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600 border border-slate-200">
           Tổng: {orders.length} phiếu
@@ -742,7 +736,7 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-slate-100 pb-4">
         <div>
           <h3 className="text-sm font-black text-slate-900">So sánh kết quả phân tích AI</h3>
-          <p className="text-[11px] font-semibold text-slate-400 mt-1">Chạy nhiều model cho cùng một hồ sơ. Mỗi kết quả được lưu riêng, không ghi đè nhau.</p>
+
         </div>
         <div className="flex flex-col sm:flex-row gap-2 xl:min-w-[520px]">
           <select value={selectedAiModelId} onChange={(e) => setSelectedAiModelId(e.target.value)} disabled={busy} className="flex-1 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:opacity-50 transition-all">
@@ -783,7 +777,7 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
           <section className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/70 to-white p-5 text-xs text-slate-800 space-y-5">
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-indigo-100 pb-4">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-wider text-indigo-700">Đang xem kết quả</p>
+
                 <h4 className="mt-1 text-lg font-black text-slate-950">{parsedResult.modelName || currentDiagnosis?.aiModel?.modelName || 'AI Model'}</h4>
                 <p className="mt-1 text-[11px] font-semibold text-slate-500">Provider: {parsedResult.provider || currentDiagnosis?.aiModel?.provider || 'other'} · {currentDiagnosis?.createdAt ? new Date(currentDiagnosis.createdAt).toLocaleString('vi-VN') : 'N/A'}</p>
               </div>

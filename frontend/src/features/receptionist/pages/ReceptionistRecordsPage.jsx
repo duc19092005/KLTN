@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
@@ -6,6 +6,7 @@ import { useAuth } from '../../../providers/AuthProvider';
 import { visitService } from '../apis/visitService';
 import { patientService } from '../apis/patientService';
 import { RECEPTIONIST_NAV_ITEMS, receptionistRouteFor } from '../constants/navigation';
+import { getVisitStatus } from '../constants/visitStatus';
 
 function getItems(data) { return Array.isArray(data) ? data : data?.items || []; }
 
@@ -14,6 +15,7 @@ export default function ReceptionistRecordsPage() {
   const navigate = useNavigate();
   const [patients, setPatients] = useState([]);
   const [visits, setVisits] = useState([]);
+  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -34,27 +36,49 @@ export default function ReceptionistRecordsPage() {
     return () => { mounted = false; };
   }, []);
 
+  const filteredPatients = useMemo(() => {
+    const text = query.trim().toLowerCase();
+    if (!text) return patients;
+    return patients.filter((patient) => [patient.fullName, patient.patientCode, patient.phone, patient.citizenId].filter(Boolean).some((value) => String(value).toLowerCase().includes(text)));
+  }, [patients, query]);
+
+  const filteredVisits = useMemo(() => {
+    const text = query.trim().toLowerCase();
+    if (!text) return visits;
+    return visits.filter((visit) => [visit.visitCode, visit.patient?.fullName, visit.patient?.patientCode, visit.clinicalRoom?.roomName, visit.doctor?.staffProfile?.fullName, getVisitStatus(visit.status).label].filter(Boolean).some((value) => String(value).toLowerCase().includes(text)));
+  }, [query, visits]);
+
   return (
     <DashboardLayout user={user} navItems={RECEPTIONIST_NAV_ITEMS} activeItem="patient-records" onNavigate={(id) => navigate(receptionistRouteFor(id))} onLogout={logout}>
       <div className="max-w-7xl mx-auto space-y-6">
-        <section className="rounded-[28px] border border-violet-100 bg-gradient-to-br from-white via-violet-50 to-cyan-50 p-8 shadow-sm">
-          <p className="text-[11px] font-black text-violet-600 uppercase tracking-[0.24em] mb-3">Patient Records</p>
-          <h1 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">Hồ sơ bệnh nhân</h1>
-          <p className="mt-3 max-w-3xl text-sm sm:text-base text-slate-600 leading-relaxed">Trang riêng để tra cứu hồ sơ bệnh nhân gần đây và các lượt khám mới nhất.</p>
+        <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-600">Hồ sơ bệnh nhân</p>
+              <h1 className="mt-1 text-2xl font-black text-slate-950">Tra cứu hồ sơ</h1>
+            </div>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Tìm bệnh nhân, mã lượt, trạng thái..."
+              className="w-full lg:w-[360px] rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold outline-none focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-50"
+            />
+          </div>
         </section>
+
         {error && <div className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div>}
         {loading ? <LoadingIndicator size="lg" label="Đang tải hồ sơ..." /> : (
           <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <Card title="Bệnh nhân gần đây" subtitle={`${patients.length} hồ sơ trong hệ thống`}>
+            <Card title="Bệnh nhân" count={filteredPatients.length}>
               <div className="space-y-3 max-h-[680px] overflow-y-auto pr-1">
-                {patients.map((p) => <PatientMini key={p.id} patient={p} />)}
-                {!patients.length && <Empty title="Chưa có hồ sơ bệnh nhân" desc="Hãy tiếp nhận bệnh nhân đầu tiên để tạo dữ liệu." />}
+                {filteredPatients.map((p) => <PatientMini key={p.id} patient={p} />)}
+                {!filteredPatients.length && <Empty title="Không có bệnh nhân phù hợp" />}
               </div>
             </Card>
-            <Card title="Lượt khám mới nhất" subtitle={`${visits.length} lượt khám gần đây`}>
+            <Card title="Lượt khám" count={filteredVisits.length}>
               <div className="space-y-3 max-h-[680px] overflow-y-auto pr-1">
-                {visits.map((v) => <VisitMini key={v.id} visit={v} />)}
-                {!visits.length && <Empty title="Chưa có lượt khám" desc="Sau khi tạo Visit, dữ liệu sẽ xuất hiện tại đây." />}
+                {filteredVisits.map((v) => <VisitMini key={v.id} visit={v} />)}
+                {!filteredVisits.length && <Empty title="Không có lượt khám phù hợp" />}
               </div>
             </Card>
           </section>
@@ -64,7 +88,12 @@ export default function ReceptionistRecordsPage() {
   );
 }
 
-function Card({ title, subtitle, children }) { return <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm"><div className="mb-5"><h2 className="text-xl font-black text-slate-950">{title}</h2><p className="mt-1 text-sm text-slate-500">{subtitle}</p></div>{children}</section>; }
-function Empty({ title, desc }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><strong className="text-slate-800">{title}</strong><p className="mt-1 text-sm text-slate-500">{desc}</p></div>; }
-function PatientMini({ patient }) { return <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><strong className="block text-slate-950">{patient.fullName}</strong><span className="text-xs text-slate-500">{patient.patientCode} · {patient.phone || 'Chưa có SĐT'} · {patient.citizenId || 'Chưa có CCCD'}</span></div>; }
-function VisitMini({ visit }) { return <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><strong className="text-slate-950">{visit.visitCode}</strong><span className="text-[10px] font-black text-cyan-700 bg-cyan-50 border border-cyan-100 rounded-full px-2 py-1">{visit.status}</span></div><p className="mt-1 text-sm text-slate-600">{visit.patient?.fullName || 'N/A'}</p><p className="text-xs text-slate-500">{visit.clinicalRoom?.roomName || 'Chưa có phòng'} · BS. {visit.doctor?.staffProfile?.fullName || 'N/A'}</p></div>; }
+function Card({ title, count, children }) {
+  return <section className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm"><div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-black text-slate-950">{title}</h2><span className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-xs font-black text-cyan-700">{count}</span></div>{children}</section>;
+}
+function Empty({ title }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm font-bold text-slate-500">{title}</div>; }
+function PatientMini({ patient }) { return <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4"><strong className="block text-slate-950">{patient.fullName}</strong><span className="text-xs text-slate-500">{patient.patientCode} · {patient.phone || 'Chưa có SĐT'} · {patient.citizenId || 'Chưa có CCCD'}</span></div>; }
+function VisitMini({ visit }) {
+  const st = getVisitStatus(visit.status);
+  return <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4"><div className="flex items-start justify-between gap-3"><div><strong className="text-slate-950">{visit.visitCode}</strong><p className="mt-1 text-sm font-bold text-slate-700">{visit.patient?.fullName || 'N/A'}</p></div><span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black ${st.color}`}><span className={`mr-1.5 h-1.5 w-1.5 rounded-full ${st.dot}`} />{st.label}</span></div><p className="mt-2 text-xs font-semibold text-slate-500">{visit.clinicalRoom?.roomName || 'Chưa có phòng'} · BS. {visit.doctor?.staffProfile?.fullName || 'N/A'}</p></div>;
+}

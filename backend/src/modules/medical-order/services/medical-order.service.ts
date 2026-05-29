@@ -33,6 +33,9 @@ export class MedicalOrderService {
     });
     if (!currentDoctor) throw new BadRequestException('Current user does not have doctor profile');
     if (visit.doctorId !== currentDoctor.id) throw new BadRequestException('Doctor can only order tests for own visit');
+    if (([VisitStatus.COMPLETED, VisitStatus.CANCELLED] as VisitStatus[]).includes(visit.status)) {
+      throw new BadRequestException('Cannot create additional medical orders for a completed/cancelled visit');
+    }
 
     if (dto.targetDepartmentId) await this.ensureDepartment(dto.targetDepartmentId);
 

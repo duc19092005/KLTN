@@ -1,15 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { visitService } from '../apis/visitService';
+import { VISIT_STATUS, getVisitStatus } from '../constants/visitStatus';
 
-const STATUS_MAP = {
-  WAITING: { label: 'Chờ khám', color: 'bg-amber-100 text-amber-800 border-amber-200' },
-  IN_PROGRESS: { label: 'Đang khám', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-  WAITING_TEST_RESULT: { label: 'Chờ KQ XN', color: 'bg-purple-100 text-purple-800 border-purple-200' },
-  WAITING_CONCLUSION: { label: 'Chờ kết luận', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
-  COMPLETED: { label: 'Hoàn tất', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
-  CANCELLED: { label: 'Đã hủy', color: 'bg-slate-100 text-slate-800 border-slate-200' },
-};
+
 
 export default function VisitQueue({ refreshTrigger }) {
   const [visits, setVisits] = useState([]);
@@ -73,7 +67,7 @@ export default function VisitQueue({ refreshTrigger }) {
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Lọc theo mã lượt, tên BN, phòng, bác sĩ..." className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-50" />
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 outline-none focus:border-cyan-400">
             <option value="">Tất cả trạng thái</option>
-            {Object.entries(STATUS_MAP).map(([key, item]) => <option key={key} value={key}>{item.label}</option>)}
+            {Object.entries(VISIT_STATUS).map(([key, item]) => <option key={key} value={key}>{item.label}</option>)}
           </select>
           <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 outline-none focus:border-cyan-400">
             <option value="asc">Sắp xếp: thấp → cao</option>
@@ -91,7 +85,7 @@ export default function VisitQueue({ refreshTrigger }) {
           const patient = visit.patient;
           const room = visit.clinicalRoom;
           const doctor = visit.doctor?.staffProfile;
-          const st = STATUS_MAP[visit.status] || STATUS_MAP.WAITING;
+          const st = getVisitStatus(visit.status);
 
           return (
             <div key={visit.id} className="p-4 rounded-xl border border-slate-100 bg-white hover:border-cyan-200 hover:shadow-md hover:shadow-cyan-50 transition-all flex flex-col gap-3 group">
