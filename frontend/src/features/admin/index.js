@@ -3,6 +3,7 @@ export { default as DepartmentsPage } from './pages/DepartmentsPage';
 export { default as StaffPage } from './pages/StaffPage';
 export { default as DoctorsPage } from './pages/DoctorsPage';
 export { default as ClinicalRoomsPage } from './pages/ClinicalRoomsPage';
+export { default as AiModelsPage } from './pages/AiModelsPage';
 export { departmentService } from './apis/departmentService';
 export { staffService } from './apis/staffService';
 export { doctorService } from './apis/doctorService';

@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../providers/AuthProvider';
 import { LoginPage, AuthenticatePage, ChangePasswordPage } from '../features/auth';
-import { AdminPage, DepartmentsPage, StaffPage, DoctorsPage, ClinicalRoomsPage } from '../features/admin';
+import { AdminPage, DepartmentsPage, StaffPage, DoctorsPage, ClinicalRoomsPage, AiModelsPage } from '../features/admin';
 import { ReceptionistDashboard, DoctorDashboard, LabManagerDashboard } from '../features/role-dashboard';
 import DoctorQueuePage from '../features/doctor/pages/DoctorQueuePage';
 import LoadingIndicator from '../shared/components/LoadingIndicator';
@@ -33,6 +33,7 @@ export default function App() {
         <Route path="/admin/staff" element={<ProtectedRoute requireVerified roles={['ADMIN']}><StaffPage /></ProtectedRoute>} />
         <Route path="/admin/doctors" element={<ProtectedRoute requireVerified roles={['ADMIN']}><DoctorsPage /></ProtectedRoute>} />
         <Route path="/admin/clinical-rooms" element={<ProtectedRoute requireVerified roles={['ADMIN']}><ClinicalRoomsPage /></ProtectedRoute>} />
+        <Route path="/admin/ai-models" element={<ProtectedRoute requireVerified roles={['ADMIN']}><AiModelsPage /></ProtectedRoute>} />
         <Route path="/receptionist" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST']}><ReceptionistDashboard /></ProtectedRoute>} />
         <Route path="/doctor" element={<ProtectedRoute requireVerified roles={['DOCTOR']}><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/doctor/queue" element={<ProtectedRoute requireVerified roles={['DOCTOR']}><DoctorQueuePage /></ProtectedRoute>} />

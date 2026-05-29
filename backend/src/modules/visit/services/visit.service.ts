@@ -1,8 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, VisitStatus } from '@prisma/client';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma, UserRole, VisitStatus } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { getPagination, paginated } from '../../shared/pagination.dto';
 import { CreateVisitDto, VisitQueryDto } from '../dto/visit.dto';
+
+type AuthUser = { sub: string; role: UserRole | string };
 
 @Injectable()
 export class VisitService {
@@ -46,11 +48,12 @@ export class VisitService {
     });
   }
 
-  async findAll(query: VisitQueryDto) {
+  async findAll(query: VisitQueryDto, user?: AuthUser) {
     const { page, limit, skip } = getPagination(query);
+    const doctorId = user?.role === UserRole.DOCTOR ? await this.getCurrentDoctorId(user.sub) : query.doctorId;
     const where: Prisma.VisitWhereInput = {
       ...(query.status ? { status: query.status } : {}),
-      ...(query.doctorId ? { doctorId: query.doctorId } : {}),
+      ...(doctorId ? { doctorId } : {}),
       ...(query.clinicalRoomId ? { clinicalRoomId: query.clinicalRoomId } : {}),
       ...(query.patientId ? { patientId: query.patientId } : {}),
     };
@@ -61,8 +64,14 @@ export class VisitService {
     return paginated(items, total, page, limit);
   }
 
-  async updateStatus(id: string, status: VisitStatus) {
-    await this.ensureVisit(id);
+  async updateStatus(id: string, status: VisitStatus, user?: AuthUser) {
+    const visit = await this.ensureVisit(id);
+    if (user?.role === UserRole.DOCTOR) {
+      const doctorId = await this.getCurrentDoctorId(user.sub);
+      if (visit.doctorId !== doctorId) {
+        throw new ForbiddenException('Doctor can only update status for own visit');
+      }
+    }
     return this.prisma.visit.update({ where: { id }, data: { status, completedAt: status === VisitStatus.COMPLETED ? new Date() : undefined }, include: this.includeRelations() });
   }
 
@@ -78,6 +87,12 @@ export class VisitService {
     const visit = await this.prisma.visit.findUnique({ where: { id } });
     if (!visit) throw new NotFoundException('Visit not found');
     return visit;
+  }
+
+  private async getCurrentDoctorId(userId: string) {
+    const doctor = await this.prisma.doctorProfile.findFirst({ where: { staffProfile: { userId } }, select: { id: true } });
+    if (!doctor) throw new ForbiddenException('Current user does not have doctor profile');
+    return doctor.id;
   }
 
   private includeRelations() {

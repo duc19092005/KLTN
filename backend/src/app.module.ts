@@ -13,6 +13,9 @@ import { DoctorModule } from './modules/doctor/doctor.module';
 import { ClinicalRoomModule } from './modules/clinical-room/clinical-room.module';
 import { PatientModule } from './modules/patient/patient.module';
 import { VisitModule } from './modules/visit/visit.module';
+import { AiModelModule } from './modules/ai-model/ai-model.module';
+import { MedicalOrderModule } from './modules/medical-order/medical-order.module';
+import { ClinicalDecisionModule } from './modules/clinical-decision/clinical-decision.module';
 import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
@@ -28,6 +31,9 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
     ClinicalRoomModule,
     PatientModule,
     VisitModule,
+    AiModelModule,
+    MedicalOrderModule,
+    ClinicalDecisionModule,
   ],
   controllers: [AppController],
   providers: [

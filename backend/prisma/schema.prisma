@@ -39,6 +39,7 @@ model User {
 
   staffProfile      StaffProfile?
   adminProfile      AdminProfile?
+  performedResults  MedicalResult[]
 
   @@index([role])
   @@index([status])
@@ -55,6 +56,7 @@ model Department {
 
   manager        StaffProfile?  @relation("DepartmentManager", fields: [managerId], references: [id])
   staffs         StaffProfile[] @relation("DepartmentStaffs")
+  medicalOrders  MedicalOrder[]
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -103,6 +105,10 @@ model DoctorProfile {
 
   clinicalRoom    ClinicalRoom? @relation("RoomDoctor")
   visits          Visit[]
+  aiQualities     AiQuality[]
+  medicalOrders   MedicalOrder[]
+  reviewedAiDiagnoses AiDiagnosis[]
+  medicalConclusions  MedicalConclusion[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -134,6 +140,8 @@ model Patient {
   updatedAt        DateTime @updatedAt
 
   visits           Visit[]
+  aiDiagnoses      AiDiagnosis[]
+  medicalOrders    MedicalOrder[]
 
   @@index([fullName])
   @@index([citizenId])
@@ -210,8 +218,175 @@ model Visit {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
+  medicalOrders  MedicalOrder[]
+  aiDiagnoses    AiDiagnosis[]
+  finalConclusion MedicalConclusion?
+
   @@index([patientId])
   @@index([doctorId])
   @@index([clinicalRoomId])
   @@index([status])
+}
+
+model MedicalOrder {
+  id                String             @id @default(uuid())
+  orderCode         String             @unique
+
+  visitId           String
+  visit             Visit              @relation(fields: [visitId], references: [id])
+
+  patientId         String
+  patient           Patient            @relation(fields: [patientId], references: [id])
+
+  doctorId          String
+  doctor            DoctorProfile      @relation(fields: [doctorId], references: [id])
+
+  targetDepartmentId String?
+  targetDepartment   Department?       @relation(fields: [targetDepartmentId], references: [id])
+
+  orderType         String
+  priority          String             @default("NORMAL")
+  clinicalNote      String?
+  status            MedicalOrderStatus @default(ORDERED)
+  orderedAt         DateTime           @default(now())
+  completedAt       DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  results           MedicalResult[]
+
+  @@index([visitId])
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([targetDepartmentId])
+  @@index([status])
+}
+
+model MedicalResult {
+  id              String       @id @default(uuid())
+  resultCode      String       @unique
+
+  orderId         String
+  order           MedicalOrder @relation(fields: [orderId], references: [id])
+
+  performedById   String?
+  performedBy     User?        @relation(fields: [performedById], references: [id])
+
+  resultSummary   String
+  resultData      Json?
+  attachmentUrl   String?
+  conclusion      String?
+  returnedAt      DateTime     @default(now())
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([orderId])
+  @@index([performedById])
+}
+
+enum MedicalOrderStatus {
+  ORDERED
+  IN_PROGRESS
+  RESULT_READY
+  COMPLETED
+  CANCELLED
+}
+
+model AiModelRegistry {
+  id                   String   @id @default(uuid())
+  modelId              String   @unique @default(uuid())
+  modelName            String
+  modelVersion         String
+  recommendedSpecialty String?
+
+  ipHashEncrypted      String
+  ipHashPlain          String?
+  apiEndpoint          String?
+  provider             String?
+  isActiveOnChain      Boolean  @default(false)
+
+  description          String?
+  createdBy            String
+  type                 String?
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  diagnoses            AiDiagnosis[]
+  aiQualities          AiQuality[]
+
+  @@index([modelId])
+  @@index([isActiveOnChain])
+  @@index([type])
+  @@index([provider])
+}
+
+model AiDiagnosis {
+  id           String          @id @default(uuid())
+  aiModelId    String
+  aiModel      AiModelRegistry @relation(fields: [aiModelId], references: [id])
+
+  patientId    String?
+  patient      Patient?        @relation(fields: [patientId], references: [id])
+  visitId      String?
+  visit        Visit?          @relation(fields: [visitId], references: [id])
+
+  prompt       String?
+  result       String?
+  confidence   Float?
+  status       String          @default("AI_SUGGESTED")
+  reviewedByDoctorId String?
+  reviewedByDoctor   DoctorProfile? @relation(fields: [reviewedByDoctorId], references: [id])
+  doctorFeedback String?
+  conclusions    MedicalConclusion[]
+
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([aiModelId])
+  @@index([patientId])
+  @@index([visitId])
+  @@index([reviewedByDoctorId])
+}
+
+model MedicalConclusion {
+  id              String        @id @default(uuid())
+  visitId         String        @unique
+  visit           Visit         @relation(fields: [visitId], references: [id])
+
+  doctorId        String
+  doctor          DoctorProfile @relation(fields: [doctorId], references: [id])
+
+  aiDiagnosisId   String?
+  aiDiagnosis     AiDiagnosis?  @relation(fields: [aiDiagnosisId], references: [id])
+
+  finalDiagnosis  String
+  treatmentPlan   String?
+  prescription    String?
+  followUpNote    String?
+  doctorNote      String?
+  concludedAt     DateTime      @default(now())
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([doctorId])
+  @@index([aiDiagnosisId])
+}
+
+model AiQuality {
+  id                         String          @id @default(uuid())
+  doctorId                   String
+  doctor                     DoctorProfile   @relation(fields: [doctorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  aiModelId                  String
+  aiModel                    AiModelRegistry @relation(fields: [aiModelId], references: [id])
+
+  doctorConclusionAboutModel String
+  trustablePercent           Float
+
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @updatedAt
+
+  @@index([doctorId])
+  @@index([aiModelId])
 }
