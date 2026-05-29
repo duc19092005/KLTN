@@ -9,9 +9,9 @@ const defaultNavItems = [
   { id: 'settings', label: 'Cài đặt', icon: 'settings' },
 ];
 
-function SidebarIcon({ name, isActive }) {
+function SidebarIcon({ name, isActive, compact = false }) {
   const common = {
-    className: `w-5 h-5 mr-3 shrink-0 transition-all duration-300 ${isActive ? 'scale-105 text-blue-600' : 'text-slate-400 group-hover:scale-105 group-hover:text-blue-500'}`,
+    className: `w-5 h-5 shrink-0 transition-all duration-300 ${compact ? '' : 'mr-3'} ${isActive ? 'scale-105 text-blue-600' : 'text-slate-400 group-hover:scale-105 group-hover:text-blue-500'}`,
     viewBox: '0 0 24 24',
     fill: 'none',
     stroke: 'currentColor',
@@ -41,6 +41,7 @@ export default function DashboardLayout({
   children,
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const handleNavigate = (id) => {
     onNavigate?.(id);
@@ -69,24 +70,38 @@ export default function DashboardLayout({
 
       {/* SIDEBAR */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-[260px] bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 
-        transition-transform duration-300 ease-in-out lg:static lg:translate-x-0
+        fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 
+        transition-all duration-300 ease-in-out lg:static lg:translate-x-0
+        ${isSidebarCollapsed ? 'lg:w-[92px]' : 'lg:w-[260px]'} w-[260px]
         ${isSidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full'}
       `}>
         <div className="flex flex-col h-full">
           {/* Brand / Logo Bệnh Viện */}
-          <div className="h-20 flex items-center justify-between px-6 border-b border-slate-100">
-            <div className="flex items-center">
+          <div className={`h-20 flex items-center border-b border-slate-100 transition-all duration-300 ${isSidebarCollapsed ? 'lg:justify-center lg:px-0' : 'justify-between px-6'}`}>
+            <div className={`flex items-center min-w-0 ${isSidebarCollapsed ? 'lg:hidden' : ''}`}>
               <div className="w-9 h-9 bg-blue-600 text-white font-bold rounded-lg flex items-center justify-center mr-3 shrink-0 shadow-sm shadow-blue-200">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
               </div>
-              <div className="flex flex-col">
+              <div className={`flex flex-col min-w-0 transition-all duration-200 ${isSidebarCollapsed ? 'lg:hidden' : ''}`}>
                 <strong className="text-slate-900 text-[15px] font-bold tracking-tight leading-tight">Med Identity</strong>
                 <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider mt-0.5">Hospital OS</span>
               </div>
             </div>
+
+            <button
+              id="dashboard-sidebar-collapse-button"
+              type="button"
+              className={`hidden lg:flex rounded-xl border border-blue-100 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all duration-200 ${isSidebarCollapsed ? 'h-9 w-9 items-center justify-center' : 'p-1.5'}`}
+              onClick={() => setIsSidebarCollapsed((value) => !value)}
+              title={isSidebarCollapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'}
+              aria-label={isSidebarCollapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'}
+            >
+              <svg className={`w-5 h-5 transition-transform duration-300 ${isSidebarCollapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
 
             {/* Close Button on Mobile */}
             <button
@@ -101,14 +116,15 @@ export default function DashboardLayout({
           </div>
 
           {/* Navigation Items */}
-          <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1" aria-label="Dashboard navigation">
+          <nav className={`flex-1 overflow-y-auto py-6 space-y-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:px-4' : 'px-3'}`} aria-label="Dashboard navigation">
             {navItems.map((item) => {
               const isActive = activeItem === item.id;
               return (
                 <button
                   key={item.id}
                   type="button"
-                  className={`group relative w-full flex items-center px-4 py-2.5 rounded-xl text-[14px] font-medium transition-all duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-blue-400
+                  className={`group relative w-full flex items-center rounded-xl text-[14px] font-medium transition-all duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-blue-400
+                    ${isSidebarCollapsed ? 'lg:justify-center lg:px-0 lg:py-3' : 'px-4 py-2.5'}
                     ${isActive
                       ? 'bg-blue-50/80 text-blue-700 font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]'
                       : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
@@ -119,15 +135,15 @@ export default function DashboardLayout({
                   {isActive && (
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-blue-600 rounded-r-full" />
                   )}
-                  <SidebarIcon name={item.icon} isActive={isActive} />
-                  <span>{item.label}</span>
+                  <SidebarIcon name={item.icon} isActive={isActive} compact={isSidebarCollapsed} />
+                  <span className={`truncate transition-all duration-200 ${isSidebarCollapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
                 </button>
               );
             })}
           </nav>
 
           {/* Security Status Card (Y tế bảo mật) */}
-          <div className="p-4 border-t border-slate-100">
+          <div className={`p-4 border-t border-slate-100 transition-all duration-200 ${isSidebarCollapsed ? 'lg:hidden' : ''}`}>
             <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-3 flex items-center gap-2.5">
               <span className="relative flex h-2 w-2 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -143,7 +159,7 @@ export default function DashboardLayout({
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <div className="flex-1 flex flex-col min-w-0 relative overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 relative overflow-hidden transition-all duration-300">
 
         {/* TOPBAR */}
         <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-30 shrink-0">
