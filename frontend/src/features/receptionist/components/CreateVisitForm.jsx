@@ -34,6 +34,7 @@ export default function CreateVisitForm({ patient, onVisitCreated, onCancel }) {
   };
 
   const handleCreateVisit = async () => {
+    if (!symptoms.trim()) return setError('Vui lòng nhập lý do khám hoặc triệu chứng ban đầu');
     if (!selectedRoom) return setError('Vui lòng chọn phòng khám');
     setCreating(true); setError('');
     try {
@@ -53,22 +54,16 @@ export default function CreateVisitForm({ patient, onVisitCreated, onCancel }) {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-        <div>
-          <h2 className="text-lg font-black text-slate-900">Tạo Lượt Khám Mới</h2>
-          <p className="text-sm text-slate-500 mt-1">Bệnh nhân: <strong className="text-cyan-700">{patient.fullName}</strong> ({patient.patientCode})</p>
-        </div>
-        <button onClick={onCancel} className="text-sm font-bold text-slate-400 hover:text-slate-700 underline">Đổi bệnh nhân</button>
-      </div>
+    <div className="space-y-5">
+
 
       <div className="space-y-4">
         <div>
-          <label className="block text-[12px] font-bold text-slate-600 mb-1">Triệu chứng lâm sàng / Lý do khám</label>
+          <label className="block text-[12px] font-bold text-slate-600 mb-1">Lý do khám / triệu chứng ban đầu <span className="text-red-500">*</span></label>
           <textarea
             value={symptoms}
             onChange={(e) => setSymptoms(e.target.value)}
-            placeholder="Mô tả triệu chứng của bệnh nhân..."
+            placeholder="VD: Sốt 2 ngày, ho, đau họng..."
             rows={2}
             className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none resize-none"
           />
@@ -80,7 +75,7 @@ export default function CreateVisitForm({ patient, onVisitCreated, onCancel }) {
             <input
               value={specialty}
               onChange={(e) => setSpecialty(e.target.value)}
-              placeholder="Nhập chuyên khoa (VD: Tim mạch, Nội tổng quát...)"
+              placeholder="Chuyên khoa, triệu chứng hoặc phòng khám..."
               className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none"
             />
             <button type="submit" disabled={loadingRooms} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-xl disabled:opacity-50">
@@ -123,7 +118,7 @@ export default function CreateVisitForm({ patient, onVisitCreated, onCancel }) {
         {error && <p className="text-red-600 text-sm font-bold text-center">{error}</p>}
 
         <div className="pt-4 flex gap-3">
-          <button type="button" onClick={onCancel} className="px-5 py-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100">Hủy bỏ</button>
+          <button type="button" onClick={onCancel} className="px-5 py-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100">Quay lại</button>
           <button onClick={handleCreateVisit} disabled={creating || !selectedRoom} className="flex-1 px-5 py-3 bg-cyan-600 text-white rounded-xl text-sm font-black hover:bg-cyan-700 disabled:opacity-60 shadow-md shadow-cyan-200 transition-all">
             {creating ? <LoadingIndicator size="sm" tone="white" /> : 'Xác nhận tạo lượt khám'}
           </button>

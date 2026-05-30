@@ -45,10 +45,10 @@ export default function PatientFinder({ onPatientSelected }) {
 
   return (
     <div className="space-y-4">
-      <form onSubmit={searchPatient} className="flex gap-2">
+      <form onSubmit={searchPatient} className="flex flex-col gap-2 sm:flex-row">
         <input
           value={query} onChange={(e) => setQuery(e.target.value)}
-          placeholder="Tìm theo CCCD, SĐT, tên bệnh nhân..."
+          placeholder="CCCD, SĐT, tên bệnh nhân..."
           className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none"
         />
         <button disabled={searching || !query.trim()} className="px-4 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-black hover:bg-cyan-700 disabled:opacity-60">
@@ -77,12 +77,12 @@ export default function PatientFinder({ onPatientSelected }) {
               </button>
             ))
           )}
-          {results.length > 0 && <button onClick={() => setShowForm(true)} className="text-xs text-slate-400 hover:text-cyan-600 underline">+ Tạo bệnh nhân mới thay thế</button>}
+          {results.length > 0 && <button type="button" onClick={() => setShowForm(true)} className="text-xs font-bold text-cyan-600 hover:text-cyan-700 underline">+ Tạo hồ sơ mới</button>}
         </div>
       )}
       {showForm && (
         <div className="rounded-2xl border border-cyan-100 bg-cyan-50/40 p-5 space-y-4">
-          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-cyan-700">Hồ sơ bệnh nhân mới</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-cyan-700">Tạo hồ sơ mới</p>
           <form onSubmit={createPatient} className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Input id="pf-fullname" label="Họ và tên" required {...f('fullName')} />
             <Select id="pf-gender" label="Giới tính" options={GENDERS} {...f('gender')} />
