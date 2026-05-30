@@ -28,20 +28,20 @@ A full-stack hospital management platform featuring:
 
 ## Tech Stack & Skill Mapping
 
-### Backend — NestJS + TypeORM + PostgreSQL
+### Backend — NestJS + Prisma + PostgreSQL
 **Directory:** `backend/`
 **Skills to use:**
 - `@nestjs-expert` — Module architecture, DI patterns, guards, interceptors, pipes
 - `@typescript-pro` — TypeScript type safety, generics, decorators
 - `@postgresql` — Database queries, indexing, optimization
-- `@database-design` — Entity relationships, migrations, schema design
+- `@database-design` — Prisma model relationships, migrations, schema design
 - `@auth-implementation-patterns` — JWT, Passport, RBAC guards
 - `@api-design-principles` — RESTful API design, DTOs, validation
 
 **Key patterns in this project:**
-- TypeORM entities with PostgreSQL
-- JWT + Passport authentication with role-based guards (`ADMIN`, `RECEPTIONIST`, `DOCTOR`)
-- State machine pattern for visit lifecycle (`WAITING` → `IN_PROGRESS` → `COMPLETED`)
+- Prisma ORM with PostgreSQL (canonical schema: `backend/prisma/schema.prisma`)
+- JWT + Passport authentication with role-based guards (`ADMIN`, `RECEPTIONIST`, `DOCTOR`, `LAB_MANAGER`)
+- State machine for visit lifecycle: `WAITING → IN_PROGRESS → WAITING_TEST_RESULT → WAITING_CONCLUSION → COMPLETED` (+ `CANCELLED`)
 - Modular architecture: each domain has its own module (patient, visit, department, staff, etc.)
 - ConfigModule with `.env` for environment management
 
@@ -129,12 +129,12 @@ A full-stack hospital management platform featuring:
 ## Project Conventions
 
 ### Naming Conventions
-- **Backend entities:** PascalCase (e.g., `Patient`, `Visit`, `Department`)
+- **Prisma models:** PascalCase (e.g., `Patient`, `Visit`, `Department`)
 - **Backend services:** PascalCase + `Service` suffix (e.g., `VisitService`)
 - **Frontend components:** PascalCase (e.g., `DepartmentsPage`, `PatientCard`)
 - **Frontend features:** kebab-case directories under `features/`
 - **API routes:** kebab-case, plural nouns (e.g., `/api/patients`, `/api/visits`)
-- **Database tables:** snake_case (TypeORM auto-converts)
+- **Database tables:** mapped from Prisma models (use `@@map`/`@map` if a different table name is needed)
 
 ### Code Style
 - Backend: ESLint + Prettier (NestJS defaults)
