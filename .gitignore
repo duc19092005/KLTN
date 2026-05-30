@@ -36,3 +36,6 @@ blockchain/artifacts/
 blockchain/typechain/
 blockchain/typechain-types/
 blockchain/ignition/deployments/chain-31337/
+
+# Antigravity skills (library copies - not project code)
+.agents/skills/*/
