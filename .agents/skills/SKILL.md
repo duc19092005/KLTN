@@ -17,6 +17,19 @@ This is the skill configuration for the **KLTN Hospital Management System** (Kh�
 >
 > AGENTS.md describes *what the system is*; the skill describes *the rules you must enforce*. They are complementary — do not duplicate domain facts here.
 
+## Locked Decisions (do not re-litigate)
+
+These architectural choices are **final** for this project. Do NOT ask the user to reconsider them, and do NOT propose alternatives unless the user explicitly requests a change:
+
+- **Database:** PostgreSQL (no SQLite / MySQL / Mongo).
+- **ORM:** Prisma (no TypeORM / Drizzle / Kysely).
+- **File storage:** Cloudinary (no MinIO / S3).
+- **Biometrics:** InsightFace + Euclidean-distance matching (no YOLO / SAM / other CV stacks).
+- **Frontend:** React + Vite + Tailwind (cyan-600 "Hospital OS" design system).
+- **Blockchain:** Solidity + Hardhat + Ethers.js v6 — used for audit / integrity ONLY.
+
+> Some generic community skills (e.g. `@database-design`) may suggest "ask which DB/ORM" or "consider SQLite". Ignore that guidance here — the stack above is locked. Use those skills only for their schema-modeling / indexing / optimization value.
+
 ## Project Overview
 
 A full-stack hospital management platform featuring:
@@ -84,7 +97,7 @@ A full-stack hospital management platform featuring:
 **Directory:** `backend/src/` (Python scripts/services)
 **Skills to use:**
 - `@python-pro` — Python best practices, async patterns
-- `@computer-vision-expert` — Face recognition, image processing
+- `@hospital-management-system` — Biometric domain rules (enrollment, on-chain face-hash anchoring, anti-replay, matching threshold)
 
 **Key patterns in this project:**
 - InsightFace for facial recognition (biometric authentication)
@@ -125,6 +138,8 @@ A full-stack hospital management platform featuring:
 | Testing | `@testing-qa` | `@nestjs-expert` (unit), `@e2e-testing` |
 | Performance issue | `@performance-optimizer` | `@postgresql-optimization`, `@react-component-performance` |
 | Documentation | `@documentation` | `@api-documentation` |
+
+> **Skill resolution:** Every skill referenced above is localized under `.agents/skills/` (project scope), so this router is self-contained when the repo is cloned. If a skill is ever missing locally, it falls back to the global library (`~/.agents/skills/`). Note: `@computer-vision-expert` was intentionally removed — biometric work is covered by `@hospital-management-system` + `@python-pro` (the project uses InsightFace, not YOLO/SAM).
 
 ## Project Conventions
 
