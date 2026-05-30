@@ -8,6 +8,12 @@ date_added: "2026-02-27"
 
 # Vercel React Best Practices
 
+> [!IMPORTANT]
+> **KLTN project overlay (read first):**
+> - The frontend is a **Vite SPA** (React 18 + React Router v6) — there is **no Next.js / RSC**. Skip all server-side rules: `next/dynamic`, `React.cache()`, `after()`, and the entire `server-*` category.
+> - Apply only client-side guidance (re-render, bundle size, rendering, JS performance).
+> - The "Full Compiled Document → `AGENTS.md`" reference below points to the upstream Vercel doc, NOT this project's AGENTS.md.
+
 Comprehensive performance optimization guide for React and Next.js applications, maintained by Vercel. Contains 45 rules across 8 categories, prioritized by impact to guide automated refactoring and code generation.
 
 ## When to Use

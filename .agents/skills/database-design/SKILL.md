@@ -8,6 +8,11 @@ date_added: "2026-02-27"
 
 # Database Design
 
+> [!IMPORTANT]
+> **KLTN project overlay (read first):**
+> - The stack is **locked to PostgreSQL + Prisma**. Do NOT ask the user "which database/ORM", and do NOT suggest SQLite / Drizzle / Kysely / MySQL / Mongo.
+> - Use this skill only for schema modeling, indexing, and query-optimization guidance — not for database/ORM selection.
+
 > **Learn to THINK, not copy SQL patterns.**
 
 ## 🎯 Selective Reading Rule

@@ -30,6 +30,20 @@ These architectural choices are **final** for this project. Do NOT ask the user 
 
 > Some generic community skills (e.g. `@database-design`) may suggest "ask which DB/ORM" or "consider SQLite". Ignore that guidance here — the stack above is locked. Use those skills only for their schema-modeling / indexing / optimization value.
 
+## Skill Overrides & Known Issues
+
+The localized community skills are kept close to upstream, so some contain generic guidance that conflicts with this project. These overrides take precedence over the skill bodies:
+
+| Area | In the skill | Override for THIS project |
+|------|--------------|---------------------------|
+| Ghost skills | `nestjs-expert` & `docker-expert` say "switch and stop" → `typescript-type-expert`, `database-expert`, `nodejs-expert`, `react-expert`, `kubernetes-expert`, `github-actions-expert`, `devops-expert` | **None of these exist.** Do not hand off to them. Stay in the current skill or use a real one from the routing table. |
+| ORM | `nestjs-expert` DB section / checklist / decision-tree is TypeORM/Mongoose | Use **Prisma** only (`prisma.$transaction`, Prisma Client). Ignore `getRepositoryToken` / repository-pattern advice. |
+| Frontend | `react-best-practices` mixes Next.js/RSC (`next/dynamic`, `React.cache()`, `after()`, `server-*`) | Frontend is a **Vite SPA** — apply client-side rules only; skip all Next.js/RSC rules. |
+| Docker runs | `docker-expert` "validation" runs `docker build/run/scout` directly | **Do not auto-run** these (resource cost / side effects). Static-analyze first; run Docker only with explicit user consent. |
+| Dead links | 9 skills point to `resources/implementation-playbook.md` | **That file does not exist anywhere** — ignore the pointer. |
+| Blockchain scope | `blockchain-developer` covers DeFi / NFT / DAO / tokenomics | KLTN blockchain is **audit / integrity ONLY** — no DeFi/NFT/DAO, and never PII/medical data on-chain. |
+| DB choice | `database-design` says "ask which DB/ORM", "SQLite may suffice" | Stack is locked (see above) — don't ask, don't suggest alternatives. |
+
 ## Project Overview
 
 A full-stack hospital management platform featuring:

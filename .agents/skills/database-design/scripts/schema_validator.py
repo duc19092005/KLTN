@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """
-Schema Validator - Database schema validation
-Validates Prisma schemas and checks for common issues.
+Schema Validator - Database schema heuristic checks (regex-based).
+
+NOTE: This performs lightweight, regex-based heuristics ONLY. It does NOT run
+`prisma validate` and is not a substitute for it. For authoritative Prisma
+schema validation, run `npx prisma validate`.
 
 Usage:
     python schema_validator.py <project_path>
 
-Checks:
-    - Prisma schema syntax
-    - Missing relations
-    - Index recommendations
-    - Naming conventions
+Heuristic checks:
+    - Model/enum naming conventions (PascalCase)
+    - Missing @id / createdAt fields
+    - @@index suggestions for foreign-key-like fields
+      (skips fields already covered by @id / @unique / @@unique / @@index)
 """
 
 import sys
@@ -26,18 +29,29 @@ except:
     pass
 
 
+EXCLUDED_DIRS = {'node_modules', '.git', 'dist', 'build', '.next', 'coverage', '.turbo'}
+
+
+def _is_excluded(path: Path) -> bool:
+    """True if any component of the path is a vendored/build directory."""
+    return any(part in EXCLUDED_DIRS for part in path.parts)
+
+
 def find_schema_files(project_path: Path) -> list:
-    """Find database schema files."""
+    """Find database schema files, skipping vendored/build directories."""
     schemas = []
     
     # Prisma schema
-    prisma_files = list(project_path.glob('**/prisma/schema.prisma'))
+    prisma_files = [f for f in project_path.glob('**/prisma/schema.prisma')
+                    if not _is_excluded(f)]
     schemas.extend([('prisma', f) for f in prisma_files])
     
     # Drizzle schema files
     drizzle_files = list(project_path.glob('**/drizzle/*.ts'))
     drizzle_files.extend(project_path.glob('**/schema/*.ts'))
     for f in drizzle_files:
+        if _is_excluded(f):
+            continue
         if 'schema' in f.name.lower() or 'table' in f.name.lower():
             schemas.append(('drizzle', f))
     
@@ -73,10 +87,25 @@ def validate_prisma_schema(file_path: Path) -> list:
                 if 'fields:' not in rel and 'references:' not in rel:
                     pass  # Implicit relation, ok
             
-            # Check for @@index suggestions
+            # Check for @@index suggestions on foreign-key-like fields.
+            # Skip fields that are already indexed via @id, @unique, @@unique,
+            # or @@index (avoids false positives for fields like managerId /
+            # userId that already carry a unique constraint).
             foreign_keys = re.findall(r'(\w+Id)\s+\w+', model_body)
-            for fk in foreign_keys:
-                if f'@@index([{fk}])' not in content and f'@@index(["{fk}"])' not in content:
+            for fk in set(foreign_keys):
+                field_line_match = re.search(
+                    rf'^\s*{re.escape(fk)}\s+\w+.*$', model_body, re.MULTILINE)
+                field_line = field_line_match.group(0) if field_line_match else ''
+
+                already_indexed = (
+                    '@unique' in field_line
+                    or '@id' in field_line
+                    or f'@@index([{fk}])' in content
+                    or f'@@index(["{fk}"])' in content
+                    or re.search(rf'@@unique\(\[[^\]]*\b{re.escape(fk)}\b[^\]]*\]\)', content) is not None
+                    or re.search(rf'@@index\(\[[^\]]*\b{re.escape(fk)}\b[^\]]*\]\)', content) is not None
+                )
+                if not already_indexed:
                     issues.append(f"Consider adding @@index([{fk}]) for better query performance in {model_name}")
         
         # Check for enum definitions
@@ -95,7 +124,7 @@ def main():
     project_path = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
     
     print(f"\n{'='*60}")
-    print(f"[SCHEMA VALIDATOR] Database Schema Validation")
+    print(f"[SCHEMA VALIDATOR] Database Schema Heuristic Checks (regex-based, NOT 'prisma validate')")
     print(f"{'='*60}")
     print(f"Project: {project_path}")
     print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

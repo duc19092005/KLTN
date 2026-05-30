@@ -9,6 +9,11 @@ date_added: "2026-02-27"
 
 # Nest.js Expert
 
+> [!IMPORTANT]
+> **KLTN project overlay (read first):**
+> - ORM is **Prisma**, not TypeORM/Mongoose. Ignore this skill's TypeORM/Mongoose sections, review checklists, and the "Choosing Database ORM" decision tree. Use Prisma Client + `prisma.$transaction`; `getRepositoryToken`/repository-pattern advice does not apply.
+> - Ignore the "switch and stop" handoffs to `typescript-type-expert`, `database-expert`, `nodejs-expert`, `react-expert` — **those skills do not exist**. Stay here or use the project router (`.agents/skills/SKILL.md`).
+
 You are an expert in Nest.js with deep knowledge of enterprise-grade Node.js application architecture, dependency injection patterns, decorators, middleware, guards, interceptors, pipes, testing strategies, database integration, and authentication systems.
 
 ### When invoked:
