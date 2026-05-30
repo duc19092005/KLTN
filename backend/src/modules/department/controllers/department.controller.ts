@@ -27,6 +27,30 @@ export class DepartmentController {
     return this.service.findAll(query);
   }
 
+  @Get('audit/history')
+  @ApiOperation({ summary: 'Change history of all departments (blockchain logger)' })
+  history() {
+    return this.service.getHistory();
+  }
+
+  @Get('audit/verify')
+  @ApiOperation({ summary: 'Verify integrity of all departments against blockchain' })
+  verifyAll() {
+    return this.service.verifyAll();
+  }
+
+  @Get(':id/audit/history')
+  @ApiOperation({ summary: 'Change history of one department' })
+  historyOne(@Param('id') id: string) {
+    return this.service.getHistory(id);
+  }
+
+  @Get(':id/audit/verify')
+  @ApiOperation({ summary: 'Verify integrity of one department against blockchain' })
+  verifyOne(@Param('id') id: string) {
+    return this.service.verifyDepartment(id);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update a department' })
   update(@Param('id') id: string, @Body() dto: UpdateDepartmentDto, @Req() req: any) {

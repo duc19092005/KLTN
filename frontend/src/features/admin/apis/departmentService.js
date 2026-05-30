@@ -6,4 +6,10 @@ export const departmentService = {
   update: (id, payload) => api.patch(`/departments/${id}`, payload),
   remove: (id) => api.delete(`/departments/${id}`),
   assignManager: (id, managerId) => api.patch(`/departments/${id}/manager`, { managerId }),
+
+  // Blockchain audit: tamper-evidence verification + change history
+  verifyAll: () => api.get('/departments/audit/verify'),
+  verifyOne: (id) => api.get(`/departments/${id}/audit/verify`),
+  history: () => api.get('/departments/audit/history'),
+  historyOne: (id) => api.get(`/departments/${id}/audit/history`),
 };

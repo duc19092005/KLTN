@@ -11,6 +11,7 @@ import { ethers } from 'ethers';
 import { BlockchainService } from '../../../infrastructure/blockchain/blockchain.service';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { ZkpService } from '../../zkp/services/zkp.service';
+import { hashToBytes32 } from '../../../infrastructure/audit/audit-hash.util';
 
 type UserWithProfile = User & { adminProfile: AdminProfile | null };
 type LoginableRole = Exclude<UserRole, 'ADMIN'>;
@@ -159,7 +160,7 @@ export class AuthService {
     }
 
     const faceEmbeddingJson = JSON.stringify(descriptors);
-    const faceHash = crypto.createHash('sha256').update(faceEmbeddingJson).digest('hex');
+    const faceHash = this.computeFaceHash(descriptors);
     const encryptedFaceEmbedding = this.zkpService.encryptSecret(faceEmbeddingJson);
 
     await this.prisma.user.update({
@@ -176,9 +177,16 @@ export class AuthService {
       },
     });
 
+    // Anchor the face-template integrity hash on-chain (FaceRegistry). Non-fatal: if the
+    // chain is unavailable the template is simply not yet protected by the integrity gate;
+    // it can be re-anchored later. The login gate treats a missing anchor as "skip".
+    const chainResult = await this.blockchainService.setFaceHash(userId, hashToBytes32(faceHash));
+
     await this.writeAudit(userId, 'FACE_ENROLL', 'User', userId, {
       sampleCount: descriptors.length,
       modelVersion: FACE_MODEL_VERSION,
+      onChain: chainResult.success ? 'ANCHORED' : 'UNANCHORED',
+      txHash: (chainResult as any).txHash || null,
     });
 
     return {
@@ -390,6 +398,25 @@ export class AuthService {
     await this.consumeFaceChallenge(userId, challenge);
 
     const storedDescriptors = this.decodeStoredDescriptors(user.faceEmbedding);
+
+    // Integrity gate: recompute the hash of the stored template and compare it to the
+    // immutable on-chain value BEFORE biometric matching. If the database template was
+    // swapped/altered (e.g. an attacker injected their own face), the recomputed hash will
+    // not match the on-chain anchor -> block the scan. A missing anchor (legacy enrollment
+    // or chain offline at enroll time) is treated as "not protected yet" and skipped.
+    const onChainFaceHash = await this.blockchainService.getFaceHash(userId);
+    if (onChainFaceHash) {
+      const recomputedFaceHash = hashToBytes32(this.computeFaceHash(storedDescriptors)).toLowerCase();
+      if (recomputedFaceHash !== onChainFaceHash.toLowerCase()) {
+        await this.writeAudit(userId, 'FACE_INTEGRITY_FAIL', 'User', userId, {
+          recomputedFaceHash,
+          onChainFaceHash: onChainFaceHash.toLowerCase(),
+          ip,
+        });
+        throw new UnauthorizedException('Dữ liệu khuôn mặt đã bị thay đổi. Vui lòng liên hệ quản trị viên.');
+      }
+    }
+
     const distances = storedDescriptors.map((stored) => this.euclideanDistance(descriptor, stored));
     const distance = Math.min(...distances);
     const meanDistance = distances.reduce((sum, value) => sum + value, 0) / distances.length;
@@ -730,6 +757,15 @@ export class AuthService {
     }
 
     return candidates.map((candidate) => this.validateFaceDescriptor(candidate));
+  }
+
+  /**
+   * Canonical integrity hash of a face template: SHA256 over the JSON of the validated
+   * descriptor set. Used both at enrollment (anchored on-chain) and on login (recomputed
+   * and compared to the on-chain anchor). Must stay in sync with how descriptors are stored.
+   */
+  private computeFaceHash(descriptors: number[][]): string {
+    return crypto.createHash('sha256').update(JSON.stringify(descriptors)).digest('hex');
   }
 
   private decodeStoredDescriptors(faceEmbedding: string): number[][] {

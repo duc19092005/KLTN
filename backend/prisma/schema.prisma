@@ -87,6 +87,13 @@ model Department {
   manager        StaffProfile?  @relation("DepartmentManager", fields: [managerId], references: [id])
   staffs         StaffProfile[] @relation("DepartmentStaffs")
   medicalOrders  MedicalOrder[]
+  blockchainLogs BlockchainLogger[]
+
+  // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain
+  // in DepartmentRegistry. dataSalt is a per-record random salt. A mismatch between the
+  // recomputed hash and the on-chain value proves the row was tampered with.
+  hash256        String?
+  dataSalt       String?
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -119,6 +126,11 @@ model StaffProfile {
 
   managedDepartment Department? @relation("DepartmentManager")
   doctorProfile     DoctorProfile?
+  blockchainLogs    BlockchainLogger[]
+
+  // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
+  hash256        String?
+  dataSalt       String?
 
   @@index([departmentId])
   @@index([fullName])
@@ -141,6 +153,11 @@ model DoctorProfile {
   medicalOrders   MedicalOrder[]
   reviewedAiDiagnoses AiDiagnosis[]
   medicalConclusions  MedicalConclusion[]
+  blockchainLogs      BlockchainLogger[]
+
+  // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
+  hash256        String?
+  dataSalt       String?
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -174,6 +191,11 @@ model Patient {
   visits           Visit[]
   aiDiagnoses      AiDiagnosis[]
   medicalOrders    MedicalOrder[]
+  blockchainLogs   BlockchainLogger[]
+
+  // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
+  hash256          String?
+  dataSalt         String?
 
   @@index([fullName])
   @@index([citizenId])
@@ -359,6 +381,11 @@ model AiModelRegistry {
 
   diagnoses            AiDiagnosis[]
   aiQualities          AiQuality[]
+  blockchainLogs       BlockchainLogger[]
+
+  // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
+  hash256              String?
+  dataSalt             String?
 
   @@index([modelId])
   @@index([isActiveOnChain])
@@ -414,6 +441,12 @@ model MedicalConclusion {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
+  blockchainLogs  BlockchainLogger[]
+
+  // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
+  hash256         String?
+  dataSalt        String?
+
   @@index([doctorId])
   @@index([aiDiagnosisId])
 }
@@ -432,6 +465,73 @@ model AiQuality {
   createdAt                  DateTime        @default(now())
   updatedAt                  DateTime        @updatedAt
 
+  blockchainLogs             BlockchainLogger[]
+
+  // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
+  hash256                    String?
+  dataSalt                   String?
+
   @@index([doctorId])
   @@index([aiModelId])
+}
+
+/// Centralized, blockchain-backed audit logger shared across services.
+/// Each row records one change (CREATE/UPDATE/DELETE) to one audited entity. The integrity
+/// hash is mirrored on-chain; foreign keys point to the specific entity the log refers to
+/// (exactly one FK is set per row, the rest are null).
+model BlockchainLogger {
+  id        String   @id @default(uuid())
+
+  // Who performed the change, what action, and on which logical entity
+  actorId   String?
+  action    String   // CREATE | UPDATE | DELETE
+  entity    String   // denormalized label: "Department", "Patient", ...
+  entityId  String?  // affected record id (string form) for display + verification
+  metadata  Json?
+
+  // Tamper-evidence integrity fields
+  dataHash      String?  // SHA256(pepper + salt + canonical snapshot) at change time
+  dataSalt      String?  // per-entry salt used for dataHash
+  beforeJson    Json?    // snapshot before the change (null on CREATE)
+  afterJson     Json?    // snapshot after the change (null on DELETE)
+
+  // On-chain anchoring
+  onChainStatus String?  @default("PENDING") // PENDING | ANCHORED | UNANCHORED
+  txHash        String?
+  blockNumber   Int?
+
+  // Foreign keys to the audited entities (nullable; exactly one set per row)
+  departmentId        String?
+  department          Department?        @relation(fields: [departmentId], references: [id])
+
+  staffProfileId      String?
+  staffProfile        StaffProfile?      @relation(fields: [staffProfileId], references: [id])
+
+  doctorProfileId     String?
+  doctorProfile       DoctorProfile?     @relation(fields: [doctorProfileId], references: [id])
+
+  patientId           String?
+  patient             Patient?           @relation(fields: [patientId], references: [id])
+
+  aiModelRegistryId   String?
+  aiModelRegistry     AiModelRegistry?   @relation(fields: [aiModelRegistryId], references: [id])
+
+  medicalConclusionId String?
+  medicalConclusion   MedicalConclusion? @relation(fields: [medicalConclusionId], references: [id])
+
+  aiQualityId         String?
+  aiQuality           AiQuality?         @relation(fields: [aiQualityId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([entity, entityId])
+  @@index([action])
+  @@index([departmentId])
+  @@index([staffProfileId])
+  @@index([doctorProfileId])
+  @@index([patientId])
+  @@index([aiModelRegistryId])
+  @@index([medicalConclusionId])
+  @@index([aiQualityId])
 }

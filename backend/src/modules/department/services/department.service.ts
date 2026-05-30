@@ -1,12 +1,19 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { OperationalStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { BlockchainService } from '../../../infrastructure/blockchain/blockchain.service';
+import { AuditLoggerService, AuditAction } from '../../../infrastructure/audit/audit-logger.service';
+import { hashToBytes32 } from '../../../infrastructure/audit/audit-hash.util';
 import { AssignManagerDto, CreateDepartmentDto, DepartmentQueryDto, UpdateDepartmentDto } from '../dto/department.dto';
 import { getPagination, paginated } from '../../shared/pagination.dto';
 
 @Injectable()
 export class DepartmentService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly blockchain: BlockchainService,
+    private readonly audit: AuditLoggerService,
+  ) {}
 
   async create(dto: CreateDepartmentDto, actorId?: string) {
     await this.assertNameUnique(dto.name);
@@ -19,8 +26,8 @@ export class DepartmentService {
       }
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const department = await tx.department.create({
+    const department = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.department.create({
         data: {
           departmentCode: dto.departmentCode.trim(),
           name: dto.name.trim(),
@@ -35,11 +42,14 @@ export class DepartmentService {
       });
 
       if (dto.managerId) {
-        await tx.staffProfile.update({ where: { id: dto.managerId }, data: { departmentId: department.id } });
+        await tx.staffProfile.update({ where: { id: dto.managerId }, data: { departmentId: created.id } });
       }
 
-      return tx.department.findUniqueOrThrow({ where: { id: department.id }, include: this.includeRelations() });
+      return tx.department.findUniqueOrThrow({ where: { id: created.id }, include: this.includeRelations() });
     });
+
+    await this.anchorDepartmentChange(department, 'CREATE', actorId, null);
+    return department;
   }
 
   async findAll(query: DepartmentQueryDto) {
@@ -67,10 +77,11 @@ export class DepartmentService {
   }
 
   async update(id: string, dto: UpdateDepartmentDto, actorId?: string) {
-    await this.ensureDepartment(id);
+    const existing = await this.ensureDepartment(id);
     if (dto.name) await this.assertNameUnique(dto.name, id);
     if (dto.departmentCode) await this.assertDepartmentCodeUnique(dto.departmentCode, id);
-    return this.prisma.department.update({
+    const before = this.buildSnapshot(existing);
+    const department = await this.prisma.department.update({
       where: { id },
       data: {
         ...(dto.departmentCode !== undefined ? { departmentCode: dto.departmentCode.trim() } : {}),
@@ -83,6 +94,8 @@ export class DepartmentService {
       },
       include: this.includeRelations(),
     });
+    await this.anchorDepartmentChange(department, 'UPDATE', actorId, before);
+    return department;
   }
 
   async assignManager(id: string, dto: AssignManagerDto, actorId?: string) {
@@ -103,11 +116,139 @@ export class DepartmentService {
   }
 
   async remove(id: string, actorId?: string) {
-    await this.ensureDepartment(id);
+    const existing = await this.ensureDepartment(id);
     const staffCount = await this.prisma.staffProfile.count({ where: { departmentId: id } });
     if (staffCount > 0) throw new BadRequestException(`Không thể xóa khoa vì còn ${staffCount} nhân sự.`);
+    const before = this.buildSnapshot(existing);
+    // BlockchainLogger rows reference the department via FK; detach them so the delete
+    // succeeds while preserving the historical log entries.
+    await this.prisma.blockchainLogger.updateMany({ where: { departmentId: id }, data: { departmentId: null } });
     await this.prisma.department.delete({ where: { id } });
+    await this.anchorDepartmentChange(existing, 'DELETE', actorId, before);
     return { deleted: true };
+  }
+
+  // ---- Tamper-evidence helpers ------------------------------------------------
+
+  /** Business fields included in the integrity hash (excludes timestamps + hash/salt). */
+  private buildSnapshot(d: any) {
+    return {
+      departmentCode: d.departmentCode,
+      name: d.name,
+      floor: d.floor ?? null,
+      status: d.status,
+      type: d.type,
+      canReceiveOrders: d.canReceiveOrders,
+      description: d.description ?? null,
+      managerId: d.managerId ?? null,
+    };
+  }
+
+  /**
+   * Compute the integrity hash of a department, mirror it on-chain (DepartmentRegistry),
+   * persist hash256/dataSalt on the row, and write a BlockchainLogger entry. On-chain
+   * failures are non-fatal: the log is still written but flagged UNANCHORED so the
+   * mismatch surfaces in verification rather than silently passing.
+   */
+  private async anchorDepartmentChange(department: any, action: AuditAction, actorId?: string, before?: unknown) {
+    const snapshot = this.buildSnapshot(department);
+    let dataHash: string | null = null;
+    let dataSalt: string | null = null;
+    let onChainStatus = 'PENDING';
+    let txHash: string | null = null;
+    let blockNumber: number | null = null;
+
+    try {
+      if (action === 'DELETE') {
+        const res = await this.blockchain.removeDepartmentHash(department.id);
+        onChainStatus = res.success ? 'ANCHORED' : 'UNANCHORED';
+        txHash = (res as any).txHash ?? null;
+        blockNumber = (res as any).blockNumber ?? null;
+      } else {
+        const { salt, hash } = this.audit.hashSnapshot(snapshot);
+        dataHash = hash;
+        dataSalt = salt;
+        await this.prisma.department.update({ where: { id: department.id }, data: { hash256: hash, dataSalt: salt } });
+        const res = await this.blockchain.setDepartmentHash(department.id, hashToBytes32(hash));
+        onChainStatus = res.success ? 'ANCHORED' : 'UNANCHORED';
+        txHash = (res as any).txHash ?? null;
+        blockNumber = (res as any).blockNumber ?? null;
+      }
+    } catch {
+      onChainStatus = 'UNANCHORED';
+    }
+
+    await this.audit.record({
+      entity: 'Department',
+      entityId: department.id,
+      action,
+      actorId,
+      dataHash,
+      dataSalt,
+      before: before ?? null,
+      after: action === 'DELETE' ? null : snapshot,
+      onChainStatus,
+      txHash,
+      blockNumber,
+    });
+  }
+
+  /** Change history for a department (or all departments if no id). */
+  getHistory(id?: string) {
+    return this.audit.history('Department', id);
+  }
+
+  /**
+   * Verify a department's integrity by recomputing its hash from the live DB row and
+   * comparing against both the stored hash256 and the immutable on-chain value.
+   */
+  async verifyDepartment(id: string) {
+    const dept = await this.prisma.department.findUnique({ where: { id } });
+    if (!dept) throw new NotFoundException('Department not found');
+    return this.evaluateIntegrity(dept);
+  }
+
+  /** Verify every department, summarizing which rows are verified vs tampered. */
+  async verifyAll() {
+    const departments = await this.prisma.department.findMany({ orderBy: { departmentCode: 'asc' } });
+    const items = await Promise.all(departments.map((d) => this.evaluateIntegrity(d)));
+    const summary = items.reduce(
+      (acc, item) => {
+        acc[item.status] = (acc[item.status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+    return { total: items.length, summary, items };
+  }
+
+  private async evaluateIntegrity(dept: any) {
+    const snapshot = this.buildSnapshot(dept);
+    const recomputed = dept.dataSalt ? this.audit.recompute(snapshot, dept.dataSalt) : null;
+    const dbHash = dept.hash256 || null;
+    const onChain = await this.blockchain.getDepartmentHash(dept.id);
+    const onChainNormalized = onChain ? onChain.toLowerCase() : null;
+    const recomputedBytes32 = recomputed ? hashToBytes32(recomputed).toLowerCase() : null;
+
+    const dbMatches = recomputed !== null && recomputed === dbHash;
+    const chainMatches = recomputedBytes32 !== null && recomputedBytes32 === onChainNormalized;
+
+    let status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED';
+    if (!onChainNormalized) status = 'UNANCHORED';
+    else if (chainMatches) status = 'VERIFIED';
+    else status = 'TAMPERED';
+
+    return {
+      id: dept.id,
+      departmentCode: dept.departmentCode,
+      name: dept.name,
+      status,
+      dbMatches,
+      chainMatches,
+      recomputedHash: recomputed,
+      storedHash: dbHash,
+      onChainHash: onChain,
+    };
   }
 
   private includeRelations() {

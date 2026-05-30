@@ -8,6 +8,14 @@ export class BlockchainService implements OnModuleInit {
   private contractAddress = '';
   private superAdminSigner: ethers.Wallet | null = null;
 
+  // DepartmentRegistry: on-chain key-value store of department integrity hashes.
+  private departmentRegistry: ethers.Contract | null = null;
+  private departmentRegistryAddress = '';
+
+  // FaceRegistry: on-chain key-value store of face-template integrity hashes.
+  private faceRegistry: ethers.Contract | null = null;
+  private faceRegistryAddress = '';
+
   private readonly abi = [
     'function authorizeAdmin(address wallet) external',
     'function revokeAdmin(address wallet) external',
@@ -17,6 +25,22 @@ export class BlockchainService implements OnModuleInit {
     'function transferOwnership(address newOwner) external',
     'function acceptOwnership() external',
     'function recordAction(bytes32 actionHash) external',
+  ];
+
+  private readonly departmentRegistryAbi = [
+    'function setHash(bytes32 key, bytes32 value) external',
+    'function removeHash(bytes32 key) external',
+    'function getHash(bytes32 key) external view returns (bytes32)',
+    'function hasHash(bytes32 key) external view returns (bool)',
+    'function owner() external view returns (address)',
+  ];
+
+  private readonly faceRegistryAbi = [
+    'function setFaceHash(bytes32 key, bytes32 value) external',
+    'function removeFaceHash(bytes32 key) external',
+    'function getFaceHash(bytes32 key) external view returns (bytes32)',
+    'function hasFaceHash(bytes32 key) external view returns (bool)',
+    'function owner() external view returns (address)',
   ];
 
   async onModuleInit() {
@@ -38,6 +62,158 @@ export class BlockchainService implements OnModuleInit {
       console.log(`✅ Connected to IdentityRegistry at ${this.contractAddress}`);
     } else {
       console.warn('⚠️ IDENTITY_REGISTRY_ADDRESS not set. Blockchain checks disabled.');
+    }
+
+    this.departmentRegistryAddress = process.env.DEPARTMENT_REGISTRY_ADDRESS || '';
+    if (this.departmentRegistryAddress) {
+      const runner = this.superAdminSigner || this.provider;
+      this.departmentRegistry = new ethers.Contract(this.departmentRegistryAddress, this.departmentRegistryAbi, runner);
+      console.log(`✅ Connected to DepartmentRegistry at ${this.departmentRegistryAddress}`);
+    } else {
+      console.warn('⚠️ DEPARTMENT_REGISTRY_ADDRESS not set. Department on-chain anchoring disabled.');
+    }
+
+    this.faceRegistryAddress = process.env.FACE_REGISTRY_ADDRESS || '';
+    if (this.faceRegistryAddress) {
+      const runner = this.superAdminSigner || this.provider;
+      this.faceRegistry = new ethers.Contract(this.faceRegistryAddress, this.faceRegistryAbi, runner);
+      console.log(`✅ Connected to FaceRegistry at ${this.faceRegistryAddress}`);
+    } else {
+      console.warn('⚠️ FACE_REGISTRY_ADDRESS not set. Face integrity anchoring disabled.');
+    }
+  }
+
+  // ---- FaceRegistry: face-template integrity anchoring ------------------------
+
+  /** Derive the on-chain key for a user's face record from their UUID. */
+  faceKey(userId: string): string {
+    return ethers.keccak256(ethers.toUtf8Bytes(userId));
+  }
+
+  /** Whether the FaceRegistry contract is available for writes. */
+  isFaceRegistryReady(): boolean {
+    return Boolean(this.faceRegistry && this.superAdminSigner);
+  }
+
+  /**
+   * Mirror a user's face-template integrity hash on-chain (on enrollment).
+   * @param userId off-chain user UUID
+   * @param valueBytes32 0x-prefixed 32-byte SHA256 hash of the canonical face embedding JSON
+   */
+  async setFaceHash(userId: string, valueBytes32: string) {
+    if (!this.faceRegistry || !this.superAdminSigner) {
+      return { success: false, error: 'FaceRegistry or Super Admin signer not configured' };
+    }
+    try {
+      const key = this.faceKey(userId);
+      const writable = this.faceRegistry.connect(this.superAdminSigner) as ethers.Contract;
+      const tx = await writable.setFaceHash(key, valueBytes32);
+      const receipt = await tx.wait();
+      return { success: true, key, txHash: tx.hash, blockNumber: receipt.blockNumber };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to set face hash' };
+    }
+  }
+
+  /** Remove a user's face hash on-chain (used on biometric reset). */
+  async removeFaceHash(userId: string) {
+    if (!this.faceRegistry || !this.superAdminSigner) {
+      return { success: false, error: 'FaceRegistry or Super Admin signer not configured' };
+    }
+    try {
+      const key = this.faceKey(userId);
+      const exists = await this.faceRegistry.hasFaceHash(key);
+      if (!exists) return { success: true, alreadyAbsent: true, key };
+      const writable = this.faceRegistry.connect(this.superAdminSigner) as ethers.Contract;
+      const tx = await writable.removeFaceHash(key);
+      const receipt = await tx.wait();
+      return { success: true, key, txHash: tx.hash, blockNumber: receipt.blockNumber };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to remove face hash' };
+    }
+  }
+
+  /**
+   * Read the on-chain face hash for a user. Returns null if the registry is unavailable
+   * or no hash is set (so the integrity gate can distinguish "not anchored").
+   */
+  async getFaceHash(userId: string): Promise<string | null> {
+    if (!this.faceRegistry) return null;
+    try {
+      const key = this.faceKey(userId);
+      const value: string = await this.faceRegistry.getFaceHash(key);
+      if (!value || value === ethers.ZeroHash) return null;
+      return value;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Derive the on-chain key for a department from its off-chain UUID.
+   * keccak256(departmentId) maps an arbitrary-length id to a fixed bytes32 slot.
+   */
+  departmentKey(departmentId: string): string {
+    return ethers.keccak256(ethers.toUtf8Bytes(departmentId));
+  }
+
+  /** Whether the DepartmentRegistry contract is available for writes. */
+  isDepartmentRegistryReady(): boolean {
+    return Boolean(this.departmentRegistry && this.superAdminSigner);
+  }
+
+  /**
+   * Mirror a department's integrity hash on-chain.
+   * @param departmentId off-chain UUID
+   * @param valueBytes32 0x-prefixed 32-byte SHA256 hash of the salted canonical data
+   */
+  async setDepartmentHash(departmentId: string, valueBytes32: string) {
+    if (!this.departmentRegistry || !this.superAdminSigner) {
+      return { success: false, error: 'DepartmentRegistry or Super Admin signer not configured' };
+    }
+    try {
+      const key = this.departmentKey(departmentId);
+      const writable = this.departmentRegistry.connect(this.superAdminSigner) as ethers.Contract;
+      const tx = await writable.setHash(key, valueBytes32);
+      const receipt = await tx.wait();
+      return { success: true, key, txHash: tx.hash, blockNumber: receipt.blockNumber };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to set department hash' };
+    }
+  }
+
+  /** Remove a department's hash on-chain (used on delete). */
+  async removeDepartmentHash(departmentId: string) {
+    if (!this.departmentRegistry || !this.superAdminSigner) {
+      return { success: false, error: 'DepartmentRegistry or Super Admin signer not configured' };
+    }
+    try {
+      const key = this.departmentKey(departmentId);
+      // Tolerate removing a key that was never anchored (e.g. created before the feature).
+      const exists = await this.departmentRegistry.hasHash(key);
+      if (!exists) return { success: true, alreadyAbsent: true, key };
+      const writable = this.departmentRegistry.connect(this.superAdminSigner) as ethers.Contract;
+      const tx = await writable.removeHash(key);
+      const receipt = await tx.wait();
+      return { success: true, key, txHash: tx.hash, blockNumber: receipt.blockNumber };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to remove department hash' };
+    }
+  }
+
+  /**
+   * Read the on-chain hash for a department. Returns null if the registry is unavailable
+   * or no hash is set (so verification can flag a missing anchor).
+   */
+  async getDepartmentHash(departmentId: string): Promise<string | null> {
+    if (!this.departmentRegistry) return null;
+    try {
+      const key = this.departmentKey(departmentId);
+      const value: string = await this.departmentRegistry.getHash(key);
+      if (!value || value === ethers.ZeroHash) return null;
+      return value;
+    } catch {
+      return null;
     }
   }
 
