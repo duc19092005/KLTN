@@ -105,6 +105,9 @@ A full-stack hospital management platform featuring:
 
 | Task Type | Primary Skill | Secondary Skills |
 |-----------|--------------|-----------------|
+| Clinical/hospital domain logic | `@hospital-management-system` | `@nestjs-expert`, `@blockchain-developer` |
+| Patient/visit/queue workflow | `@hospital-management-system` | `@nestjs-expert`, `@database-design` |
+| Biometric auth / face recognition | `@hospital-management-system` | `@python-pro`, `@auth-implementation-patterns` |
 | New API endpoint | `@nestjs-expert` | `@api-design-principles`, `@typescript-pro` |
 | Database schema change | `@database-design` | `@postgresql`, `@nestjs-expert` |
 | Frontend page/component | `@react-best-practices` | `@frontend-design`, `@ui-ux-designer` |
