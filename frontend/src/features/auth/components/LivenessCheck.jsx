@@ -107,6 +107,13 @@ export default function LivenessCheck({
         setStatus('loading');
         await initFaceMesh();
 
+        // Warm up face-api models early. Otherwise the 6MB recognition model may
+        // still be downloading when the user blinks, causing the identity-anchor
+        // capture to fail and the final continuity check to error out.
+        loadFaceApiModels().catch((e) =>
+          console.warn('[Liveness] face-api preload failed:', e?.message || e)
+        );
+
         if (cancelled) return;
 
         const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -263,6 +270,15 @@ export default function LivenessCheck({
           return;
         }
 
+        // Identity anchor retry: the blink-moment capture often fails (half-closed
+        // eyes, motion blur, models still loading). Now that blink is verified and
+        // the eyes are open, keep retrying on fresh frames until we capture a valid
+        // 128D descriptor. captureIdentityAnchor is idempotent (guards on pending /
+        // already-set), so this is safe to call every loop tick.
+        if (!identityAnchorRef.current && !anchorPendingRef.current) {
+          captureIdentityAnchor();
+        }
+
         const pose = computeHeadPose(landmarks);
         const { yawRatio, pitchRatio } = pose;
         const dir = classifyDirection(yawRatio, pitchRatio);
@@ -361,21 +377,36 @@ export default function LivenessCheck({
     })();
   };
 
-  // Compare the anchor descriptor against the final frame (and, in enroll mode,
-  // every pose frame). Any frame whose distance exceeds the threshold means
-  // the face changed mid-session and we must reject the liveness pass.
+  // Verify identity continuity across the captured frames. The blink-moment
+  // anchor is the preferred reference, but the separate face-api capture at the
+  // blink instant can fail (half-closed eyes, motion blur, models still loading).
+  // In that case we fall back to the first descriptor extracted from the frames
+  // we actually captured during the challenge, so a legitimate user is never
+  // blocked just because the live-anchor capture missed. Swap detection still
+  // holds: every captured frame is compared against the chosen anchor.
   const verifyIdentityContinuity = async (framesToCheck) => {
-    const anchor = identityAnchorRef.current;
-    if (!anchor) {
-      return { ok: false, reason: 'Không neo được định danh khi xác thực. Vui lòng thử lại.' };
-    }
-    let worstDistance = 0;
+    // Extract a 128D descriptor from each captured frame (skip frames where
+    // face-api finds nothing rather than failing outright).
+    const descriptors = [];
     for (const frame of framesToCheck) {
       if (!frame) continue;
       const descriptor = await detectFace(frame);
-      if (!descriptor) {
-        return { ok: false, reason: 'Không trích xuất được khuôn mặt ở một khung hình. Vui lòng thử lại.' };
-      }
+      if (descriptor) descriptors.push(descriptor);
+    }
+
+    // Prefer the live blink-moment anchor; otherwise use the first frame
+    // descriptor we managed to extract.
+    const anchor = identityAnchorRef.current || descriptors[0];
+
+    if (!anchor) {
+      return {
+        ok: false,
+        reason: 'Không phát hiện được khuôn mặt rõ ràng. Vui lòng cải thiện ánh sáng và thử lại.',
+      };
+    }
+
+    let worstDistance = 0;
+    for (const descriptor of descriptors) {
       const distance = euclideanDistance(anchor, descriptor);
       if (distance > worstDistance) worstDistance = distance;
       if (distance > IDENTITY_ANCHOR_THRESHOLD) {

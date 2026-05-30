@@ -15,6 +15,7 @@ type CloudinaryUploadResult = {
   public_id: string;
   secure_url: string;
   resource_type: string;
+  format?: string;
 };
 
 @Injectable()
@@ -164,6 +165,69 @@ export class MedicalOrderService {
     }));
   }
 
+  // Generates a short-lived signed download URL for a result file.
+  // Files are uploaded as `authenticated` (private) on Cloudinary, so they can only
+  // be retrieved with a valid signature. This method gates that signature behind
+  // an authorization check so only the responsible doctor, the owning lab
+  // department, or an admin can obtain a working link.
+  async getResultFileDownloadUrl(fileId: string, user: AuthUser) {
+    const file = await this.prisma.medicalResultFile.findUnique({
+      where: { id: fileId },
+      include: { result: { include: { order: true } } },
+    });
+    if (!file || !file.result?.order) throw new NotFoundException('Result file not found');
+    const order = file.result.order;
+
+    if (user.role === UserRole.ADMIN) {
+      // allowed
+    } else if (user.role === UserRole.DOCTOR) {
+      const doctor = await this.getDoctorByUserId(user.sub);
+      if (order.doctorId !== doctor.id) {
+        throw new ForbiddenException('Doctor can only access result files of their own visits');
+      }
+    } else if (user.role === UserRole.LAB_MANAGER) {
+      await this.assertCanManageOrder(order, user);
+    } else {
+      throw new ForbiddenException('User role is not allowed to access result files');
+    }
+
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+    if (!cloudName || !apiKey || !apiSecret) throw new BadRequestException('Cloudinary is not configured');
+
+    const resourceType = file.mimeType === 'application/pdf' ? 'raw' : 'image';
+    const format = this.extractFileFormat(file.originalName, file.mimeType);
+    const timestamp = Math.floor(Date.now() / 1000);
+    const expiresAt = timestamp + 300; // 5-minute TTL
+
+    const params: Record<string, string> = {
+      expires_at: String(expiresAt),
+      public_id: file.fileName,
+      timestamp: String(timestamp),
+      type: 'authenticated',
+    };
+    if (format) params.format = format;
+
+    const signature = this.signCloudinaryParams(params, apiSecret);
+    const query = new URLSearchParams({ ...params, signature, api_key: apiKey }).toString();
+    const url = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/download?${query}`;
+
+    return { url, originalName: file.originalName, expiresAt: new Date(expiresAt * 1000).toISOString() };
+  }
+
+  private extractFileFormat(originalName: string, mimeType: string) {
+    const ext = originalName.includes('.') ? originalName.split('.').pop()!.toLowerCase() : '';
+    if (ext) return ext;
+    const map: Record<string, string> = {
+      'application/pdf': 'pdf',
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+    };
+    return map[mimeType] || '';
+  }
+
   private uploadFileToCloudinary(file: UploadedMedicalResultFile, orderId: string): Promise<{ file: UploadedMedicalResultFile; cloudinary: CloudinaryUploadResult }> {
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
     const apiKey = process.env.CLOUDINARY_API_KEY;
@@ -177,7 +241,9 @@ export class MedicalOrderService {
     const folder = 'medical-results';
     const publicId = `${orderId}-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
     const resourceType = file.mimetype === 'application/pdf' ? 'raw' : 'image';
-    const paramsToSign: Record<string, string> = { folder, public_id: publicId, timestamp };
+    // `type: authenticated` makes the asset private: it cannot be fetched from
+    // Cloudinary without a valid signature, preventing public exposure of PHI.
+    const paramsToSign: Record<string, string> = { folder, public_id: publicId, timestamp, type: 'authenticated' };
     if (uploadPreset) paramsToSign.upload_preset = uploadPreset;
     const signature = this.signCloudinaryParams(paramsToSign, apiSecret);
     const form = new FormData();
@@ -187,6 +253,7 @@ export class MedicalOrderService {
     form.append('timestamp', timestamp);
     form.append('folder', folder);
     form.append('public_id', publicId);
+    form.append('type', 'authenticated');
     form.append('signature', signature);
     if (uploadPreset) form.append('upload_preset', uploadPreset);
 

@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { VisitStatus } from '@prisma/client';
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { PaginationQueryDto } from '../../shared/pagination.dto';
 import { CreatePatientDto } from '../../patient/dto/patient.dto';
 
@@ -21,11 +21,6 @@ export class CreateVisitDto {
   @ApiProperty({ example: 'doctor-profile-id' })
   @IsUUID()
   doctorId!: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  symptoms?: string;
 }
 
 export class UpdateVisitStatusDto {

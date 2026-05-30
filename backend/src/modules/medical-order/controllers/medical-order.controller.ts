@@ -29,6 +29,12 @@ export class MedicalOrderController {
     return this.service.findAll(query, req.user);
   }
 
+  @Roles('ADMIN', 'DOCTOR', 'LAB_MANAGER')
+  @Get('results/files/:fileId/download')
+  getResultFileDownloadUrl(@Param('fileId') fileId: string, @Req() req: any) {
+    return this.service.getResultFileDownloadUrl(fileId, req.user);
+  }
+
   @Roles('ADMIN', 'LAB_MANAGER')
   @Patch(':id/status')
   updateStatus(@Param('id') id: string, @Body() dto: UpdateMedicalOrderStatusDto, @Req() req: any) {

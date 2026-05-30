@@ -6,6 +6,18 @@ import { CreateVisitDto, VisitQueryDto } from '../dto/visit.dto';
 
 type AuthUser = { sub: string; role: UserRole | string };
 
+// Allowed VisitStatus transitions for the direct PATCH /visits/:id/status endpoint.
+// Note: automated transitions made by medical-order/clinical-decision services use
+// tx.visit.update directly and are intentionally not constrained here.
+const ALLOWED_VISIT_TRANSITIONS: Record<VisitStatus, VisitStatus[]> = {
+  [VisitStatus.WAITING]: [VisitStatus.IN_PROGRESS, VisitStatus.CANCELLED],
+  [VisitStatus.IN_PROGRESS]: [VisitStatus.WAITING_TEST_RESULT, VisitStatus.WAITING_CONCLUSION, VisitStatus.CANCELLED],
+  [VisitStatus.WAITING_TEST_RESULT]: [VisitStatus.IN_PROGRESS, VisitStatus.WAITING_CONCLUSION],
+  [VisitStatus.WAITING_CONCLUSION]: [VisitStatus.IN_PROGRESS, VisitStatus.COMPLETED],
+  [VisitStatus.COMPLETED]: [],
+  [VisitStatus.CANCELLED]: [],
+};
+
 @Injectable()
 export class VisitService {
   constructor(private readonly prisma: PrismaService) {}
@@ -18,34 +30,45 @@ export class VisitService {
     if (!doctor) throw new NotFoundException('Doctor profile not found');
     if (room.doctorId && room.doctorId !== dto.doctorId) throw new BadRequestException('Selected doctor is not assigned to this clinical room');
 
-    return this.prisma.$transaction(async (tx) => {
-      let patientId = dto.patientId;
-      if (!patientId && dto.patient) {
-        const patientCode = await this.generatePatientCode(tx);
-        const patient = await tx.patient.create({ data: {
-          patientCode,
-          fullName: dto.patient.fullName.trim(),
-          gender: dto.patient.gender.trim(),
-          birthDate: new Date(dto.patient.birthDate),
-          citizenId: dto.patient.citizenId?.trim() || null,
-          phone: dto.patient.phone?.trim() || null,
-          address: dto.patient.address?.trim() || null,
-          insuranceNumber: dto.patient.insuranceNumber?.trim() || null,
-          emergencyContact: dto.patient.emergencyContact?.trim() || null,
-        } });
-        patientId = patient.id;
+    // Retry on unique-code collisions: patientCode/visitCode are generated from the
+    // latest row, so concurrent intakes can collide. The whole transaction rolls back
+    // and regenerates fresh codes on the next attempt.
+    const maxAttempts = 5;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          let patientId = dto.patientId;
+          if (!patientId && dto.patient) {
+            const patientCode = await this.generatePatientCode(tx);
+            const patient = await tx.patient.create({ data: {
+              patientCode,
+              fullName: dto.patient.fullName.trim(),
+              gender: dto.patient.gender.trim(),
+              birthDate: new Date(dto.patient.birthDate),
+              citizenId: dto.patient.citizenId?.trim() || null,
+              phone: dto.patient.phone?.trim() || null,
+              address: dto.patient.address?.trim() || null,
+              insuranceNumber: dto.patient.insuranceNumber?.trim() || null,
+              emergencyContact: dto.patient.emergencyContact?.trim() || null,
+            } });
+            patientId = patient.id;
+          }
+          if (!patientId) throw new BadRequestException('Patient is required');
+          const visitCode = await this.generateVisitCode(tx);
+          return tx.visit.create({ data: {
+            visitCode,
+            patientId,
+            clinicalRoomId: dto.clinicalRoomId,
+            doctorId: dto.doctorId,
+            status: VisitStatus.WAITING,
+          }, include: this.includeRelations() });
+        });
+      } catch (error) {
+        if (!this.isUniqueCodeConflict(error) || attempt === maxAttempts) throw error;
       }
-      if (!patientId) throw new BadRequestException('Patient is required');
-      const visitCode = await this.generateVisitCode(tx);
-      return tx.visit.create({ data: {
-        visitCode,
-        patientId,
-        clinicalRoomId: dto.clinicalRoomId,
-        doctorId: dto.doctorId,
-        symptoms: dto.symptoms?.trim(),
-        status: VisitStatus.WAITING,
-      }, include: this.includeRelations() });
-    });
+    }
+
+    throw new BadRequestException('Cannot generate unique patient/visit code');
   }
 
   async findAll(query: VisitQueryDto, user?: AuthUser) {
@@ -78,6 +101,11 @@ export class VisitService {
     if (visit.status === VisitStatus.COMPLETED || visit.status === VisitStatus.CANCELLED) {
       throw new BadRequestException('Cannot update a completed/cancelled visit');
     }
+    // Enforce the clinical workflow ordering. Same-status calls are treated as
+    // idempotent no-ops; any other unlisted jump (e.g. WAITING -> COMPLETED) is rejected.
+    if (status !== visit.status && !ALLOWED_VISIT_TRANSITIONS[visit.status].includes(status)) {
+      throw new BadRequestException(`Không thể chuyển trạng thái lượt khám từ ${visit.status} sang ${status}`);
+    }
     return this.prisma.visit.update({
       where: { id },
       data: {
@@ -100,6 +128,13 @@ export class VisitService {
     const visit = await this.prisma.visit.findUnique({ where: { id } });
     if (!visit) throw new NotFoundException('Visit not found');
     return visit;
+  }
+
+  private isUniqueCodeConflict(error: unknown) {
+    return error instanceof Prisma.PrismaClientKnownRequestError
+      && error.code === 'P2002'
+      && Array.isArray(error.meta?.target)
+      && (error.meta.target.includes('patientCode') || error.meta.target.includes('visitCode'));
   }
 
   private ensureCanCancelVisit(visit: Awaited<ReturnType<VisitService['ensureVisit']>>, user?: AuthUser) {

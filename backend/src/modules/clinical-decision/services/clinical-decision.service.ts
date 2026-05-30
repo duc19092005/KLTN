@@ -196,7 +196,6 @@ export class ClinicalDecisionService {
     return [
       `Lượt khám: ${visit.visitCode}`,
       `Bệnh nhân: ${visit.patient.fullName}, giới tính ${visit.patient.gender}, ngày sinh ${visit.patient.birthDate}`,
-      `Triệu chứng ban đầu: ${visit.symptoms || 'N/A'}`,
       `Kết quả xét nghiệm/cận lâm sàng dạng JSON: ${JSON.stringify(results)}`,
       'Hãy phân tích hỗ trợ bác sĩ: tóm tắt dữ liệu, ước lượng khả năng chẩn đoán, điểm cần lưu ý, cảnh báo rủi ro, hướng xử trí cần bác sĩ cân nhắc.',
       'Trường diagnosticProbabilities phải là danh sách bệnh/nghi ngờ bệnh kèm phần trăm và lý do ngắn gọn.',
@@ -301,14 +300,17 @@ export class ClinicalDecisionService {
     const rawKey = process.env.ENCRYPTION_KEY;
     if (!rawKey) throw new BadRequestException('ENCRYPTION_KEY is not configured');
 
-    const [ivHex, encryptedHex] = encryptedValue.split(':');
-    if (!ivHex || !encryptedHex) throw new BadRequestException('AI model secret is invalid');
-
     const key = Buffer.from(rawKey, 'hex');
     if (key.length !== 32) throw new BadRequestException('ENCRYPTION_KEY must be 32 bytes hex for AES-256');
 
-    const decipher = createDecipheriv('aes-256-cbc', key, Buffer.from(ivHex, 'hex'));
-    return Buffer.concat([decipher.update(Buffer.from(encryptedHex, 'hex')), decipher.final()]).toString('utf8');
+    // Expected format: v1:ivHex:tagHex:cipherHex (AES-256-GCM, authenticated).
+    if (!encryptedValue.startsWith('v1:')) throw new BadRequestException('AI model secret is invalid or uses a legacy format; please re-enter the API key');
+    const [, ivHex, tagHex, cipherHex] = encryptedValue.split(':');
+    if (!ivHex || !tagHex || !cipherHex) throw new BadRequestException('AI model secret is invalid');
+
+    const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
+    decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+    return Buffer.concat([decipher.update(Buffer.from(cipherHex, 'hex')), decipher.final()]).toString('utf8');
   }
 
   private withGeminiApiKey(endpoint: string, token: string) {

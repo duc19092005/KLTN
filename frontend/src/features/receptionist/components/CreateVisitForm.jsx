@@ -7,7 +7,6 @@ export default function CreateVisitForm({ patient, onVisitCreated, onCancel }) {
   const [rooms, setRooms] = useState([]);
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState(null);
-  const [symptoms, setSymptoms] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
@@ -34,7 +33,6 @@ export default function CreateVisitForm({ patient, onVisitCreated, onCancel }) {
   };
 
   const handleCreateVisit = async () => {
-    if (!symptoms.trim()) return setError('Vui lòng nhập lý do khám hoặc triệu chứng ban đầu');
     if (!selectedRoom) return setError('Vui lòng chọn phòng khám');
     setCreating(true); setError('');
     try {
@@ -42,7 +40,6 @@ export default function CreateVisitForm({ patient, onVisitCreated, onCancel }) {
         patientId: patient.id,
         clinicalRoomId: selectedRoom.id,
         doctorId: selectedRoom.doctorId,
-        symptoms: symptoms.trim(),
       };
       const res = await visitService.create(payload);
       onVisitCreated(res.data);
@@ -58,17 +55,6 @@ export default function CreateVisitForm({ patient, onVisitCreated, onCancel }) {
 
 
       <div className="space-y-4">
-        <div>
-          <label className="block text-[12px] font-bold text-slate-600 mb-1">Lý do khám / triệu chứng ban đầu <span className="text-red-500">*</span></label>
-          <textarea
-            value={symptoms}
-            onChange={(e) => setSymptoms(e.target.value)}
-            placeholder="VD: Sốt 2 ngày, ho, đau họng..."
-            rows={2}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none resize-none"
-          />
-        </div>
-
         <div>
           <label className="block text-[12px] font-bold text-slate-600 mb-1">Đề xuất chuyên khoa / Phòng khám</label>
           <form onSubmit={handleSearchSpecialty} className="flex gap-2 mb-3">

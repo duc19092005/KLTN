@@ -243,7 +243,6 @@ model Visit {
   doctorId       String
   doctor         DoctorProfile @relation(fields: [doctorId], references: [id])
 
-  symptoms       String?
   status         VisitStatus  @default(WAITING)
   checkInAt      DateTime     @default(now())
   completedAt    DateTime?

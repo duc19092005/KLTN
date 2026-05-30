@@ -372,9 +372,6 @@ function VisitHeader({ visit, detailLoading, onStart, onContinue, busy }) {
         <Info label="Ngày sinh / Tuổi" value={formatDate(visit.patient?.birthDate)} />
         <Info label="Phòng chức năng" value={visit.clinicalRoom?.roomName || 'N/A'} />
         <Info label="Thời gian tiếp nhận" value={formatTime(visit.checkInAt)} />
-        <div className="md:col-span-3">
-          <Info label="Lý do đến khám & Triệu chứng ban đầu" value={visit.symptoms || 'Chưa có ghi nhận bệnh lý sơ bộ.'} large />
-        </div>
       </div>
     </section>
   );
@@ -696,19 +693,25 @@ function ResultsPanel({ orders }) {
                       {res.note && (
                         <p className="mb-2 text-slate-700"><span className="font-bold text-slate-900">KTV Ghi chú:</span> {res.note}</p>
                       )}
-                      {res.files?.length > 0 && (
+                       {res.files?.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-2">
                           {res.files.map(f => (
-                            <a
+                            <button
                               key={f.id}
-                              href={f.url}
-                              target="_blank"
-                              rel="noreferrer"
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  const dl = await medicalOrderService.getResultFileDownloadUrl(f.id);
+                                  if (dl.data?.url) window.open(dl.data.url, '_blank', 'noopener,noreferrer');
+                                } catch {
+                                  alert('Không tải được file kết quả hoặc bạn không có quyền truy cập.');
+                                }
+                              }}
                               className="flex items-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 px-3 py-2 rounded-lg border border-blue-100 hover:bg-blue-100 transition-colors"
                             >
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                               Xem {f.originalName?.slice(-12) || 'Tệp đính kèm'}
-                            </a>
+                            </button>
                           ))}
                         </div>
                       )}
