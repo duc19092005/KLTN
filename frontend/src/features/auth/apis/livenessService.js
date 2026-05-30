@@ -3,6 +3,11 @@ import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 let faceLandmarker = null;
 let initPromise = null;
 
+// ── Self-hosted asset paths (served from frontend/public) ──────────
+// Avoids depending on jsdelivr/googleapis at runtime; better privacy + offline.
+const MEDIAPIPE_WASM_URL = '/mediapipe/wasm';
+const MEDIAPIPE_MODEL_URL = '/mediapipe/models/face_landmarker.task';
+
 // ── Thresholds ──────────────────────────────────────────────────
 export const THRESHOLDS = {
   // Head direction thresholds (ratio-based)
@@ -30,6 +35,13 @@ export const THRESHOLDS = {
 
   // Face inside oval tolerance
   FACE_BOUNDS_TOLERANCE: 0.25,
+
+  // Blendshape blink (eyeBlink* score is 0-1; >0.55 ≈ closed)
+  BLENDSHAPE_BLINK_CLOSED: 0.55,
+  BLENDSHAPE_BLINK_OPEN: 0.30,
+
+  // Temporal anti-spoof: if frames stop arriving for too long the session is suspect.
+  MAX_FRAME_GAP_MS: 800,
 };
 
 // ── Key landmark indices (MediaPipe Face Mesh 468 points) ───────
@@ -50,52 +62,36 @@ const LM = {
 };
 
 /**
- * Initialize MediaPipe FaceLandmarker from CDN
- * Returns a promise that resolves when ready
+ * Initialize MediaPipe FaceLandmarker from self-hosted assets.
+ * Returns a promise that resolves when ready.
  */
 export async function initFaceMesh() {
   if (faceLandmarker) return faceLandmarker;
   if (initPromise) return initPromise;
 
+  const buildOptions = (delegate) => ({
+    baseOptions: {
+      modelAssetPath: MEDIAPIPE_MODEL_URL,
+      delegate,
+    },
+    outputFaceBlendshapes: true, // Enables eyeBlinkLeft/Right + mouth/expression scores for stronger anti-spoof signals.
+    outputFacialTransformationMatrixes: false,
+    runningMode: 'VIDEO',
+    numFaces: 1,
+  });
+
   initPromise = (async () => {
     try {
-      const vision = await FilesetResolver.forVisionTasks(
-        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
-      );
-
-      faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath:
-            'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
-          delegate: 'GPU',
-        },
-        outputFaceBlendshapes: false,
-        outputFacialTransformationMatrixes: false,
-        runningMode: 'VIDEO',
-        numFaces: 1,
-      });
-
-      console.log('✅ MediaPipe FaceLandmarker loaded');
+      const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_URL);
+      faceLandmarker = await FaceLandmarker.createFromOptions(vision, buildOptions('GPU'));
+      console.log('✅ MediaPipe FaceLandmarker loaded (self-hosted, GPU)');
       return faceLandmarker;
     } catch (err) {
-      console.error('❌ MediaPipe FaceLandmarker load failed:', err);
-      // Fallback to CPU if GPU fails
+      console.warn('⚠️ MediaPipe GPU load failed, falling back to CPU:', err);
       try {
-        const vision = await FilesetResolver.forVisionTasks(
-          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
-        );
-        faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath:
-              'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
-            delegate: 'CPU',
-          },
-          outputFaceBlendshapes: false,
-          outputFacialTransformationMatrixes: false,
-          runningMode: 'VIDEO',
-          numFaces: 1,
-        });
-        console.log('✅ MediaPipe FaceLandmarker loaded (CPU fallback)');
+        const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_URL);
+        faceLandmarker = await FaceLandmarker.createFromOptions(vision, buildOptions('CPU'));
+        console.log('✅ MediaPipe FaceLandmarker loaded (self-hosted, CPU fallback)');
         return faceLandmarker;
       } catch (fallbackErr) {
         initPromise = null;
@@ -108,19 +104,51 @@ export async function initFaceMesh() {
 }
 
 /**
- * Detect face landmarks from a video frame
- * @param {HTMLVideoElement} videoEl 
- * @param {number} timestampMs 
- * @returns {Array|null} landmarks array (468 points) or null
+ * Detect face landmarks from a video frame.
+ * Returns landmarks + blendshape scores when available.
  */
 export function detectLandmarks(videoEl, timestampMs) {
   if (!faceLandmarker) return null;
-  
+
   const result = faceLandmarker.detectForVideo(videoEl, timestampMs);
   if (!result || !result.faceLandmarks || result.faceLandmarks.length === 0) {
     return null;
   }
-  return result.faceLandmarks[0]; // First face only
+  return {
+    landmarks: result.faceLandmarks[0],
+    blendshapes: result.faceBlendshapes?.[0]?.categories || null,
+  };
+}
+
+/**
+ * Read a blendshape score by category name (e.g. 'eyeBlinkLeft').
+ */
+export function getBlendshape(blendshapes, name) {
+  if (!Array.isArray(blendshapes)) return undefined;
+  const entry = blendshapes.find((item) => item?.categoryName === name);
+  return entry ? entry.score : undefined;
+}
+
+/**
+ * Average eye blink score from blendshapes. Higher = more closed.
+ * Returns undefined if blendshapes are not available.
+ */
+export function computeBlendshapeBlink(blendshapes) {
+  const left = getBlendshape(blendshapes, 'eyeBlinkLeft');
+  const right = getBlendshape(blendshapes, 'eyeBlinkRight');
+  if (left === undefined && right === undefined) return undefined;
+  if (left === undefined) return right;
+  if (right === undefined) return left;
+  return (left + right) / 2;
+}
+
+/**
+ * Detect a frame-time discontinuity (e.g. paused/recorded video) and return
+ * true if the gap since last frame is suspiciously large.
+ */
+export function isTemporalGapSuspicious(prevTs, currentTs) {
+  if (typeof prevTs !== 'number') return false;
+  return currentTs - prevTs > THRESHOLDS.MAX_FRAME_GAP_MS;
 }
 
 /**

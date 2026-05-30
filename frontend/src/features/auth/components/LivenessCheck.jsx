@@ -10,8 +10,26 @@ import {
   destroyFaceMesh,
   THRESHOLDS,
   computeEyeOpenness,
+  computeBlendshapeBlink,
+  isTemporalGapSuspicious,
 } from '../apis/livenessService';
+import { detectFace, loadModels as loadFaceApiModels } from '../apis/faceService';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
+
+// Identity continuity: distance between the blink-time anchor descriptor and any
+// later frame must stay below this. Loose enough to absorb pose/yaw/pitch variance,
+// strict enough to catch a swap to a different face (e.g. a phone screen).
+const IDENTITY_ANCHOR_THRESHOLD = 0.55;
+
+const euclideanDistance = (a, b) => {
+  if (!a || !b || a.length !== b.length) return Number.POSITIVE_INFINITY;
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) {
+    const diff = a[i] - b[i];
+    sum += diff * diff;
+  }
+  return Math.sqrt(sum);
+};
 
 /**
  * LivenessCheck - Phiên bản Premium Clinical Tech (Xanh Y Tế Cao Cấp)
@@ -32,6 +50,9 @@ export default function LivenessCheck({
   const poseFramesRef = useRef([]);
   const passSentRef = useRef(false);
   const blinkStateRef = useRef({ baseline: null, closed: false, verified: false });
+  const lastFrameWallTimeRef = useRef(null);
+  const identityAnchorRef = useRef(null); // 128D descriptor captured at blink-verified moment
+  const anchorPendingRef = useRef(false);
 
   const captureVideoFrame = () => {
     if (!videoRef.current) return null;
@@ -151,9 +172,9 @@ export default function LivenessCheck({
         if (!videoRef.current || videoRef.current.readyState < 2) return;
 
         tsCounterRef.current += 80;
-        const landmarks = detectLandmarks(videoRef.current, tsCounterRef.current);
+        const detection = detectLandmarks(videoRef.current, tsCounterRef.current);
 
-        if (!landmarks) {
+        if (!detection) {
           setFaceDetected(false);
           setDisplayDir('center');
           setDistanceWarn(null);
@@ -162,6 +183,21 @@ export default function LivenessCheck({
           setMessage('Không tìm thấy dữ liệu khuôn mặt phù hợp');
           return;
         }
+
+        const { landmarks, blendshapes } = detection;
+
+        // Anti-spoof: detect a stalled / recorded-video stream by checking real-time frame gaps.
+        const wallNow = performance.now();
+        if (isTemporalGapSuspicious(lastFrameWallTimeRef.current, wallNow)) {
+          blinkStateRef.current = { baseline: null, closed: false, verified: false };
+          setBlinkVerified(false);
+          holdStartRef.current = null;
+          setDisplayProgress(0);
+          setMessage('Khung hình bị gián đoạn. Vui lòng giữ camera ổn định.');
+          lastFrameWallTimeRef.current = wallNow;
+          return;
+        }
+        lastFrameWallTimeRef.current = wallNow;
 
         setFaceDetected(true);
 
@@ -182,26 +218,47 @@ export default function LivenessCheck({
         }
         setDistanceWarn(null);
 
-        const eyeOpenness = computeEyeOpenness(landmarks);
+        // Prefer the model's blendshape blink score (more reliable than eyelid distance)
+        // and fall back to the geometric heuristic when blendshapes are not provided.
+        const blendshapeBlink = computeBlendshapeBlink(blendshapes);
         const blinkState = blinkStateRef.current;
-        if (!blinkState.baseline && eyeOpenness > 0.12) {
-          blinkState.baseline = eyeOpenness;
-        }
-        const closedThreshold = Math.max(0.055, (blinkState.baseline || 0.16) * 0.58);
-        const reopenedThreshold = Math.max(0.09, (blinkState.baseline || 0.16) * 0.78);
 
         if (!blinkState.verified) {
-          if (eyeOpenness < closedThreshold) {
-            blinkState.closed = true;
-            setMessage('Vui lòng chớp mắt một lần để xác nhận người thật');
-          } else if (blinkState.closed && eyeOpenness > reopenedThreshold) {
-            blinkState.verified = true;
-            setBlinkVerified(true);
-            setMessage('Đã xác nhận chớp mắt. Tiếp tục làm theo hướng dẫn');
-            holdStartRef.current = null;
-            setDisplayProgress(0);
+          if (blendshapeBlink !== undefined) {
+            if (blendshapeBlink > THRESHOLDS.BLENDSHAPE_BLINK_CLOSED) {
+              blinkState.closed = true;
+              setMessage('Vui lòng chớp mắt một lần để xác nhận người thật');
+            } else if (blinkState.closed && blendshapeBlink < THRESHOLDS.BLENDSHAPE_BLINK_OPEN) {
+              blinkState.verified = true;
+              setBlinkVerified(true);
+              setMessage('Đã xác nhận chớp mắt. Tiếp tục làm theo hướng dẫn');
+              holdStartRef.current = null;
+              setDisplayProgress(0);
+              captureIdentityAnchor();
+            } else {
+              setMessage('Vui lòng chớp mắt một lần để xác nhận người thật');
+            }
           } else {
-            setMessage('Vui lòng chớp mắt một lần để xác nhận người thật');
+            const eyeOpenness = computeEyeOpenness(landmarks);
+            if (!blinkState.baseline && eyeOpenness > 0.12) {
+              blinkState.baseline = eyeOpenness;
+            }
+            const closedThreshold = Math.max(0.055, (blinkState.baseline || 0.16) * 0.58);
+            const reopenedThreshold = Math.max(0.09, (blinkState.baseline || 0.16) * 0.78);
+
+            if (eyeOpenness < closedThreshold) {
+              blinkState.closed = true;
+              setMessage('Vui lòng chớp mắt một lần để xác nhận người thật');
+            } else if (blinkState.closed && eyeOpenness > reopenedThreshold) {
+              blinkState.verified = true;
+              setBlinkVerified(true);
+              setMessage('Đã xác nhận chớp mắt. Tiếp tục làm theo hướng dẫn');
+              holdStartRef.current = null;
+              setDisplayProgress(0);
+              captureIdentityAnchor();
+            } else {
+              setMessage('Vui lòng chớp mắt một lần để xác nhận người thật');
+            }
           }
           return;
         }
@@ -280,23 +337,93 @@ export default function LivenessCheck({
     }
   };
 
-  useEffect(() => {
-    if (allPassedUI && videoRef.current && !passSentRef.current) {
-      const timer = setTimeout(() => {
-        if (disabled || passSentRef.current) return;
-        passSentRef.current = true;
-        stopLoop();
-        const frame = capturedCanvasRef.current || captureVideoFrame();
-        const poseFrames = poseFramesRef.current.map((sample) => sample.frame);
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(t => t.stop());
-          streamRef.current = null;
+  // Capture a face descriptor at the moment blink is verified.
+  // This anchors the user's identity for the rest of the session: any later
+  // frame must match this descriptor, otherwise we assume an identity swap
+  // (e.g. a phone screen with someone else's face was placed in front of the camera).
+  const captureIdentityAnchor = () => {
+    if (identityAnchorRef.current || anchorPendingRef.current) return;
+    anchorPendingRef.current = true;
+    (async () => {
+      try {
+        const canvas = captureVideoFrame();
+        if (!canvas) return;
+        await loadFaceApiModels();
+        const descriptor = await detectFace(canvas);
+        if (descriptor && descriptor.length === 128) {
+          identityAnchorRef.current = descriptor;
         }
-        onLivenessPass?.(isEnrollMode && poseFrames.length > 0 ? poseFrames : (frame || videoRef.current));
-      }, 1500);
-      return () => clearTimeout(timer);
+      } catch (err) {
+        console.warn('[Liveness] identity anchor capture failed:', err?.message || err);
+      } finally {
+        anchorPendingRef.current = false;
+      }
+    })();
+  };
+
+  // Compare the anchor descriptor against the final frame (and, in enroll mode,
+  // every pose frame). Any frame whose distance exceeds the threshold means
+  // the face changed mid-session and we must reject the liveness pass.
+  const verifyIdentityContinuity = async (framesToCheck) => {
+    const anchor = identityAnchorRef.current;
+    if (!anchor) {
+      return { ok: false, reason: 'Không neo được định danh khi xác thực. Vui lòng thử lại.' };
     }
-  }, [allPassedUI, onLivenessPass, disabled, isEnrollMode]);
+    let worstDistance = 0;
+    for (const frame of framesToCheck) {
+      if (!frame) continue;
+      const descriptor = await detectFace(frame);
+      if (!descriptor) {
+        return { ok: false, reason: 'Không trích xuất được khuôn mặt ở một khung hình. Vui lòng thử lại.' };
+      }
+      const distance = euclideanDistance(anchor, descriptor);
+      if (distance > worstDistance) worstDistance = distance;
+      if (distance > IDENTITY_ANCHOR_THRESHOLD) {
+        return {
+          ok: false,
+          reason: `Phát hiện thay đổi danh tính giữa phiên (khoảng cách ${distance.toFixed(2)}). Vui lòng đừng đổi người/ảnh trước camera.`,
+        };
+      }
+    }
+    return { ok: true, worstDistance };
+  };
+
+  useEffect(() => {
+    if (!allPassedUI || !videoRef.current || passSentRef.current) return;
+    const timer = setTimeout(async () => {
+      if (disabled || passSentRef.current) return;
+      passSentRef.current = true;
+      stopLoop();
+
+      const frame = capturedCanvasRef.current || captureVideoFrame();
+      const poseFrames = poseFramesRef.current.map((sample) => sample.frame).filter(Boolean);
+      // Always include the final frame; in enroll mode also re-verify every pose frame
+      // so a swap during any direction is caught.
+      const framesToCheck = isEnrollMode
+        ? Array.from(new Set([...poseFrames, frame].filter(Boolean)))
+        : [frame].filter(Boolean);
+
+      setMessage('Đang kiểm tra tính liên tục của danh tính...');
+      const continuity = await verifyIdentityContinuity(framesToCheck);
+
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+
+      if (!continuity.ok) {
+        setStatus('error');
+        setAllPassedUI(false);
+        setMessage(continuity.reason);
+        onError?.(continuity.reason);
+        return;
+      }
+
+      console.log(`[Liveness] identity continuity OK, worst distance ${continuity.worstDistance.toFixed(3)}`);
+      onLivenessPass?.(isEnrollMode && poseFrames.length > 0 ? poseFrames : (frame || videoRef.current));
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [allPassedUI, onLivenessPass, onError, disabled, isEnrollMode]);
 
   const renderArrow = (direction) => {
     const rotationMap = { right: 0, down: 90, left: 180, up: 270 };
