@@ -24,7 +24,9 @@ export const authService = {
 
   registerFace: (embedding) => api.post('/auth/register-face', { embedding }),
 
-  verifyFace: (embedding) => api.post('/auth/verify-face', { embedding }),
+  faceChallenge: () => api.post('/auth/face-challenge'),
+
+  verifyFace: (embedding, challenge) => api.post('/auth/verify-face', { embedding, challenge }),
 
   getMe: () => api.get('/auth/me'),
 

@@ -38,6 +38,15 @@ export class FaceDescriptorDto {
   embedding: number[] | number[][];
 }
 
+export class VerifyFaceDto {
+  @IsArray()
+  embedding: number[];
+
+  @IsString()
+  @Length(32, 128)
+  challenge: string;
+}
+
 export class WalletChallengeDto {
   @IsEthereumAddress()
   address: string;

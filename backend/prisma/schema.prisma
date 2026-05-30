@@ -48,6 +48,20 @@ model User {
   inviteTokenExpiry DateTime?
   faceEmbedding     String?
   faceHash          String?
+
+  // Biometric metadata
+  faceModelVersion  String?
+  faceEnrolledAt    DateTime?
+  faceSampleCount   Int?
+
+  // Biometric anti-replay challenge (single-use nonce)
+  faceChallenge          String?
+  faceChallengeExpiresAt DateTime?
+
+  // Brute-force lockout
+  failedFaceAttempts Int       @default(0)
+  faceLockedUntil    DateTime?
+
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 

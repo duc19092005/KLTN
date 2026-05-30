@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import {
   BootstrapAdminDto,
   FaceDescriptorDto,
+  VerifyFaceDto,
   InviteLoginDto,
   WalletChallengeDto,
   WalletLoginDto,
@@ -137,10 +138,16 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post('face-challenge')
+  async faceChallenge(@Request() req) {
+    return this.authService.createFaceChallenge(req.user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post('verify-face')
   async verifyFace(
     @Request() req,
-    @Body() body: FaceDescriptorDto,
+    @Body() body: VerifyFaceDto,
     @Req() request,
     @Res({ passthrough: true }) res: Response,
   ) {
@@ -148,7 +155,13 @@ export class AuthController {
     this.rateLimiter.assertAllowed(key, 5, 10 * 60 * 1000);
 
     try {
-      const result = await this.authService.verifyFace(req.user.sub, body.embedding as number[], req.user.walletAddress);
+      const result = await this.authService.verifyFace(
+        req.user.sub,
+        body.embedding as number[],
+        body.challenge,
+        req.user.walletAddress,
+        this.clientIp(request),
+      );
       this.rateLimiter.reset(key);
       this.setAuthCookie(res, result.access_token);
       return this.stripToken(result);
@@ -191,8 +204,12 @@ export class AuthController {
   }
 
   private rateLimitKey(req: any, action: string, subject: string) {
-    const forwarded = String(req.headers?.['x-forwarded-for'] || '').split(',')[0].trim();
-    const ip = forwarded || req.ip || req.socket?.remoteAddress || 'unknown';
+    const ip = this.clientIp(req);
     return `${action}:${ip}:${subject}`;
+  }
+
+  private clientIp(req: any): string {
+    const forwarded = String(req.headers?.['x-forwarded-for'] || '').split(',')[0].trim();
+    return forwarded || req.ip || req.socket?.remoteAddress || 'unknown';
   }
 }

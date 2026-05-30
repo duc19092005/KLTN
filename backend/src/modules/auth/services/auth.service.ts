@@ -20,6 +20,12 @@ const WALLET_NONCE_TTL_MS = 5 * 60 * 1000;
 const WALLET_PURPOSE_BIND = 'BIND_ADMIN_WALLET';
 const WALLET_PURPOSE_LOGIN = 'WALLET_LOGIN';
 
+// Biometric face verification
+const FACE_CHALLENGE_TTL_MS = 2 * 60 * 1000;
+const FACE_MODEL_VERSION = 'face-api/tiny-face-detector+landmark68tiny+recognition-128d';
+const FACE_MAX_FAILED_ATTEMPTS = 5;
+const FACE_LOCKOUT_MS = 15 * 60 * 1000;
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -156,20 +162,52 @@ export class AuthService {
     const faceHash = crypto.createHash('sha256').update(faceEmbeddingJson).digest('hex');
     const encryptedFaceEmbedding = this.zkpService.encryptSecret(faceEmbeddingJson);
 
-    await this.prisma.$transaction([
-      this.prisma.user.update({
-        where: { id: userId },
-        data: { faceEmbedding: encryptedFaceEmbedding, faceHash, registrationStep: Math.max(user.registrationStep ?? 1, 2) },
-      }),
-    ]);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        faceEmbedding: encryptedFaceEmbedding,
+        faceHash,
+        faceModelVersion: FACE_MODEL_VERSION,
+        faceEnrolledAt: new Date(),
+        faceSampleCount: descriptors.length,
+        failedFaceAttempts: 0,
+        faceLockedUntil: null,
+        registrationStep: Math.max(user.registrationStep ?? 1, 2),
+      },
+    });
+
+    await this.writeAudit(userId, 'FACE_ENROLL', 'User', userId, {
+      sampleCount: descriptors.length,
+      modelVersion: FACE_MODEL_VERSION,
+    });
 
     return {
       registered: true,
-      algorithm: 'face-api/tiny-face-detector+landmark68tiny+recognition-128d/multi-sample',
+      algorithm: `${FACE_MODEL_VERSION}/multi-sample`,
       descriptorLength: descriptors[0].length,
       descriptorCount: descriptors.length,
       registrationStep: 2,
     };
+  }
+
+  async createFaceChallenge(userId: string) {
+    const user = await this.getAuthUser(userId);
+
+    if (!user.faceEmbedding) {
+      throw new UnauthorizedException('Face data is not registered');
+    }
+
+    this.assertNotFaceLocked(user);
+
+    const challenge = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + FACE_CHALLENGE_TTL_MS);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { faceChallenge: challenge, faceChallengeExpiresAt: expiresAt },
+    });
+
+    return { challenge, expiresAt: expiresAt.toISOString(), ttlMs: FACE_CHALLENGE_TTL_MS };
   }
 
   async walletBindChallenge(userId: string, address: string) {
@@ -319,7 +357,13 @@ export class AuthService {
     };
   }
 
-  async verifyFace(userId: string, embedding: number[], tokenWalletAddress?: string) {
+  async verifyFace(
+    userId: string,
+    embedding: number[],
+    challenge: string,
+    tokenWalletAddress?: string,
+    ip?: string,
+  ) {
     const descriptor = this.validateFaceDescriptor(embedding);
     const user = await this.getAuthUser(userId);
 
@@ -340,16 +384,45 @@ export class AuthService {
       throw new UnauthorizedException('Wallet session mismatch');
     }
 
+    this.assertNotFaceLocked(user);
+
+    // Consume the single-use challenge atomically before matching (anti-replay).
+    await this.consumeFaceChallenge(userId, challenge);
+
     const storedDescriptors = this.decodeStoredDescriptors(user.faceEmbedding);
     const distances = storedDescriptors.map((stored) => this.euclideanDistance(descriptor, stored));
     const distance = Math.min(...distances);
+    const meanDistance = distances.reduce((sum, value) => sum + value, 0) / distances.length;
     const threshold = this.getFaceMatchThreshold();
+    const passed = distance <= threshold;
 
-    console.log(`[FaceVerify] userId=${userId} distance=${distance.toFixed(4)} threshold=${threshold} result=${distance <= threshold ? 'PASS' : 'FAIL'}`);
+    console.log(
+      `[FaceVerify] userId=${userId} min=${distance.toFixed(4)} mean=${meanDistance.toFixed(4)} threshold=${threshold} result=${passed ? 'PASS' : 'FAIL'}`,
+    );
 
-    if (distance > threshold) {
+    if (!passed) {
+      const lockInfo = await this.recordFaceFailure(user);
+      await this.writeAudit(userId, 'FACE_VERIFY_FAIL', 'User', userId, {
+        minDistance: Number(distance.toFixed(4)),
+        meanDistance: Number(meanDistance.toFixed(4)),
+        threshold,
+        failedAttempts: lockInfo.failedAttempts,
+        locked: lockInfo.locked,
+        ip,
+      });
+      if (lockInfo.locked) {
+        throw new UnauthorizedException('Too many failed face attempts. Account temporarily locked.');
+      }
       throw new UnauthorizedException('Face verification failed');
     }
+
+    await this.resetFaceFailures(userId);
+    await this.writeAudit(userId, 'FACE_VERIFY_PASS', 'User', userId, {
+      minDistance: Number(distance.toFixed(4)),
+      meanDistance: Number(meanDistance.toFixed(4)),
+      threshold,
+      ip,
+    });
 
     return {
       access_token: this.signAccessToken(user, {
@@ -672,13 +745,16 @@ export class AuthService {
   }
 
   private getFaceMatchThreshold(): number {
-    // face-api euclidean distance: <0.42 = same person, 0.42-0.5 = borderline, >0.5 = different person
-    // Default 0.45 balances security vs usability; override via FACE_MATCH_THRESHOLD env var
-    const threshold = Number(process.env.FACE_MATCH_THRESHOLD ?? 0.45);
+    // face-api euclidean distance: <0.42 = same person, 0.42-0.5 = borderline, >0.5 = different person.
+    // Default 0.45 balances security vs usability. Hard-capped at 0.5 so a loose env value
+    // (e.g. 0.6) cannot weaken matching below acceptable security for a clinical system.
+    const DEFAULT = 0.45;
+    const MAX_SAFE = 0.5;
+    const threshold = Number(process.env.FACE_MATCH_THRESHOLD ?? DEFAULT);
     if (!Number.isFinite(threshold) || threshold <= 0 || threshold > 1) {
-      return 0.45;
+      return DEFAULT;
     }
-    return threshold;
+    return Math.min(threshold, MAX_SAFE);
   }
 
   private euclideanDistance(a: number[], b: number[]): number {
@@ -689,5 +765,74 @@ export class AuthService {
       sum += diff * diff;
     }
     return Math.sqrt(sum);
+  }
+
+  private assertNotFaceLocked(user: { faceLockedUntil?: Date | null }) {
+    if (user.faceLockedUntil && user.faceLockedUntil > new Date()) {
+      const remainingMin = Math.ceil((user.faceLockedUntil.getTime() - Date.now()) / 60000);
+      throw new UnauthorizedException(
+        `Face verification is temporarily locked. Try again in ${remainingMin} minute(s).`,
+      );
+    }
+  }
+
+  private async consumeFaceChallenge(userId: string, challenge: string) {
+    const now = new Date();
+    const result = await this.prisma.user.updateMany({
+      where: {
+        id: userId,
+        faceChallenge: challenge,
+        faceChallengeExpiresAt: { gte: now },
+      },
+      data: {
+        faceChallenge: null,
+        faceChallengeExpiresAt: null,
+      },
+    });
+
+    if (result.count !== 1) {
+      throw new UnauthorizedException('Invalid or expired face challenge');
+    }
+  }
+
+  private async recordFaceFailure(
+    user: User,
+  ): Promise<{ failedAttempts: number; locked: boolean }> {
+    const failedAttempts = (user.failedFaceAttempts ?? 0) + 1;
+    const locked = failedAttempts >= FACE_MAX_FAILED_ATTEMPTS;
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        // Reset the counter once locked; the lock window itself blocks further attempts.
+        failedFaceAttempts: locked ? 0 : failedAttempts,
+        faceLockedUntil: locked ? new Date(Date.now() + FACE_LOCKOUT_MS) : user.faceLockedUntil,
+      },
+    });
+
+    return { failedAttempts, locked };
+  }
+
+  private async resetFaceFailures(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { failedFaceAttempts: 0, faceLockedUntil: null },
+    });
+  }
+
+  private async writeAudit(
+    actorId: string | null,
+    action: string,
+    entity: string,
+    entityId: string | null,
+    metadata?: Record<string, unknown>,
+  ) {
+    try {
+      await this.prisma.auditLog.create({
+        data: { actorId, action, entity, entityId, metadata: metadata as any },
+      });
+    } catch (err) {
+      console.error('[AuditLog] failed to write', action, err);
+    }
   }
 }

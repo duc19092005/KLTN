@@ -70,7 +70,9 @@ export default function AuthenticatePage() {
   const verifyFaceLogin = async (embedding) => {
     setBusy(true); showStatus('Đang thực hiện kiểm tra thực thể sống (Liveness check)...');
     try {
-      const result = await authService.verifyFace(embedding);
+      const challengeRes = await authService.faceChallenge();
+      const challenge = challengeRes.data.challenge;
+      const result = await authService.verifyFace(embedding, challenge);
       const verifiedUser = result.data.user || { ...user, verified: true };
       updateSession(verifiedUser);
       goDashboard(verifiedUser);
