@@ -29,11 +29,25 @@ async function main() {
   await auditAnchor.waitForDeployment();
   const auditAnchorAddress = await auditAnchor.getAddress();
 
+  // 5. StaffRegistry (staff + doctor integrity hashes) -----------------------
+  const StaffRegistry = await hre.ethers.getContractFactory('StaffRegistry');
+  const staffRegistry = await StaffRegistry.deploy(identityRegistryAddress);
+  await staffRegistry.waitForDeployment();
+  const staffRegistryAddress = await staffRegistry.getAddress();
+
+  // 6. AIModelRegistry (AI model integrity hashes) ---------------------------
+  const AIModelRegistryContract = await hre.ethers.getContractFactory('AIModelRegistry');
+  const aiModelRegistry = await AIModelRegistryContract.deploy(identityRegistryAddress);
+  await aiModelRegistry.waitForDeployment();
+  const aiModelRegistryAddress = await aiModelRegistry.getAddress();
+
   console.log('\n========== Deployment Summary ==========');
   console.log(`IdentityRegistry:   ${identityRegistryAddress}`);
   console.log(`DepartmentRegistry: ${departmentRegistryAddress}`);
   console.log(`FaceRegistry:       ${faceRegistryAddress}`);
   console.log(`AuditAnchor:        ${auditAnchorAddress}`);
+  console.log(`StaffRegistry:      ${staffRegistryAddress}`);
+  console.log(`AIModelRegistry:    ${aiModelRegistryAddress}`);
   console.log(`Admin:              ${deployer.address}`);
   console.log('=========================================');
   console.log('\nAdd these to backend .env:');
@@ -41,6 +55,8 @@ async function main() {
   console.log(`DEPARTMENT_REGISTRY_ADDRESS=${departmentRegistryAddress}`);
   console.log(`FACE_REGISTRY_ADDRESS=${faceRegistryAddress}`);
   console.log(`AUDIT_ANCHOR_ADDRESS=${auditAnchorAddress}`);
+  console.log(`STAFF_REGISTRY_ADDRESS=${staffRegistryAddress}`);
+  console.log(`AI_MODEL_REGISTRY_ADDRESS=${aiModelRegistryAddress}`);
 }
 
 main()

@@ -82,6 +82,36 @@ export class UpdateDoctorDto {
 
   @ApiPropertyOptional({ example: 12, minimum: 0 })
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) yearsExperience?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional() @IsString() fullName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional() @IsString() phone?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional() @IsString() citizenId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional() @IsString() gender?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional() @IsString() address?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional() @IsString() avatarUrl?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional() @IsString() @IsUUID() departmentId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional() @IsString() position?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional() @IsDateString() birthDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional() @IsString() @IsUUID() clinicalRoomId?: string;
 }
 
 export class AssignClinicalRoomDto {

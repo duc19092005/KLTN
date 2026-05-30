@@ -2,8 +2,13 @@ import api from '../../../shared/apis/api';
 
 export const doctorService = {
   search: (params = {}) => api.get('/doctors', { params }),
+  get: (id) => api.get(`/doctors/${id}`),
   create: (payload) => api.post('/doctors', payload),
   createFull: (payload) => api.post('/doctors/full', payload),
   update: (id, payload) => api.patch(`/doctors/${id}`, payload),
   assignRoom: (id, clinicalRoomId) => api.patch(`/doctors/${id}/clinical-room`, { clinicalRoomId }),
+  verifyAll: () => api.get('/doctors/audit/verify'),
+  verifyOne: (id) => api.get(`/doctors/${id}/audit/verify`),
+  history: (id = null) => api.get(id ? `/doctors/${id}/audit/history` : '/doctors/audit/history'),
+
 };

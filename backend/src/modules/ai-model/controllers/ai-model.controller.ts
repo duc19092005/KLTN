@@ -25,10 +25,16 @@ export class AiModelController {
     return this.service.testApi(dto);
   }
 
-  @Roles('ADMIN', 'DOCTOR')
-  @Get()
-  findAll(@Query() query: AiModelQueryDto) {
-    return this.service.findAll(query);
+  @Roles('ADMIN')
+  @Get('audit/history')
+  history() {
+    return this.service.getHistory();
+  }
+
+  @Roles('ADMIN')
+  @Get('audit/verify')
+  verifyAll() {
+    return this.service.verifyAll();
   }
 
   @Roles('ADMIN', 'DOCTOR')
@@ -36,4 +42,23 @@ export class AiModelController {
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
   }
+
+  @Roles('ADMIN')
+  @Get(':id/audit/history')
+  historyOne(@Param('id') id: string) {
+    return this.service.getHistory(id);
+  }
+
+  @Roles('ADMIN')
+  @Get(':id/audit/verify')
+  verifyOne(@Param('id') id: string) {
+    return this.service.verifyAiModel(id);
+  }
+
+  @Roles('ADMIN', 'DOCTOR')
+  @Get()
+  findAll(@Query() query: AiModelQueryDto) {
+    return this.service.findAll(query);
+  }
 }
+

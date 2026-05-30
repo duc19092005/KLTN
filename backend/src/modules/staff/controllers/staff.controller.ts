@@ -27,6 +27,37 @@ export class StaffController {
     return this.service.findAll(query);
   }
 
+  @Get('audit/history')
+  @ApiOperation({ summary: 'Change history of all staff (blockchain logger)' })
+  history() {
+    return this.service.getHistory();
+  }
+
+  @Get('audit/verify')
+  @ApiOperation({ summary: 'Verify integrity of all staff against blockchain' })
+  verifyAll() {
+    return this.service.verifyAll();
+  }
+
+  @Roles('ADMIN', 'RECEPTIONIST', 'DOCTOR', 'LAB_MANAGER')
+  @Get(':id')
+  @ApiOperation({ summary: 'Get staff profile details with audit integrity verification' })
+  findOne(@Param('id') id: string) {
+    return this.service.findOne(id);
+  }
+
+  @Get(':id/audit/history')
+  @ApiOperation({ summary: 'Change history of one staff' })
+  historyOne(@Param('id') id: string) {
+    return this.service.getHistory(id);
+  }
+
+  @Get(':id/audit/verify')
+  @ApiOperation({ summary: 'Verify integrity of one staff against blockchain' })
+  verifyOne(@Param('id') id: string) {
+    return this.service.verifyStaff(id);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update staff profile and linked user account' })
   update(@Param('id') id: string, @Body() dto: UpdateStaffDto, @Req() req: any) {
@@ -51,3 +82,4 @@ export class StaffController {
     return this.service.remove(id, req.user?.sub);
   }
 }
+

@@ -1,12 +1,19 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { createCipheriv, createHash, randomBytes } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { BlockchainService } from '../../../infrastructure/blockchain/blockchain.service';
+import { AuditLoggerService, AuditAction } from '../../../infrastructure/audit/audit-logger.service';
+import { hashToBytes32 } from '../../../infrastructure/audit/audit-hash.util';
 import { CreateAiModelDto, AiModelQueryDto, TestAiModelApiDto } from '../dto/ai-model.dto';
 
 @Injectable()
 export class AiModelService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly blockchain: BlockchainService,
+    private readonly audit: AuditLoggerService,
+  ) {}
 
   async create(dto: CreateAiModelDto, adminUserId: string) {
     if (dto.type === 'API' && !dto.provider) {
@@ -17,7 +24,7 @@ export class AiModelService {
     const encrypted = this.encryptAes256(dto.secretOrIpHash);
     const plainFingerprint = this.createFingerprint(dto.secretOrIpHash);
 
-    return this.prisma.aiModelRegistry.create({
+    const model = await this.prisma.aiModelRegistry.create({
       data: {
         modelName: dto.modelName.trim(),
         modelVersion: dto.modelVersion.trim(),
@@ -32,6 +39,9 @@ export class AiModelService {
       },
       include: this.includeRelations(),
     });
+
+    await this.anchorAiModelChange(model, 'CREATE', adminUserId, null);
+    return model;
   }
 
   async findAll(query: AiModelQueryDto) {
@@ -55,11 +65,24 @@ export class AiModelService {
   }
 
   async findOne(id: string) {
-    return this.prisma.aiModelRegistry.findUniqueOrThrow({
+    const model = await this.prisma.aiModelRegistry.findUniqueOrThrow({
       where: { id },
       include: this.includeRelations(),
     });
+    const integrity = await this.evaluateIntegrity(model);
+    return {
+      ...model,
+      audit: {
+        status: integrity.status,
+        dbMatches: integrity.dbMatches,
+        chainMatches: integrity.chainMatches,
+        onChainHash: integrity.onChainHash,
+        storedHash: integrity.storedHash,
+        recomputedHash: integrity.recomputedHash,
+      },
+    };
   }
+
 
   async testApi(dto: TestAiModelApiDto) {
     const endpoint = this.resolveApiEndpoint(dto.provider, dto.apiEndpoint, dto.modelVersion);
@@ -74,6 +97,125 @@ export class AiModelService {
       const message = error instanceof Error ? error.message : 'Unknown API test error';
       throw new BadRequestException(`API test failed: ${message}`);
     }
+  }
+
+  // ---- Tamper-evidence helpers ------------------------------------------------
+
+  /** Business fields included in the integrity hash. */
+  private buildSnapshot(m: any) {
+    return {
+      modelName: m.modelName,
+      modelVersion: m.modelVersion,
+      recommendedSpecialty: m.recommendedSpecialty ?? null,
+      type: m.type ?? null,
+      provider: m.provider ?? null,
+      apiEndpoint: m.apiEndpoint ?? null,
+      ipHashPlain: m.ipHashPlain ?? null,
+      description: m.description ?? null,
+      createdBy: m.createdBy,
+    };
+  }
+
+  /**
+   * Compute the integrity hash, mirror on-chain (AIModelRegistry),
+   * persist hash256/dataSalt on the row, and write a BlockchainLogger entry.
+   */
+  private async anchorAiModelChange(model: any, action: AuditAction, actorId?: string, before?: unknown) {
+    const snapshot = this.buildSnapshot(model);
+    let dataHash: string | null = null;
+    let dataSalt: string | null = null;
+    let onChainStatus = 'PENDING';
+    let txHash: string | null = null;
+    let blockNumber: number | null = null;
+
+    try {
+      if (action === 'DELETE') {
+        const res = await this.blockchain.removeAiModelHash(model.id);
+        onChainStatus = res.success ? 'ANCHORED' : 'UNANCHORED';
+        txHash = (res as any).txHash ?? null;
+        blockNumber = (res as any).blockNumber ?? null;
+      } else {
+        const { salt, hash } = this.audit.hashSnapshot(snapshot);
+        dataHash = hash;
+        dataSalt = salt;
+        await this.prisma.aiModelRegistry.update({ where: { id: model.id }, data: { hash256: hash, dataSalt: salt } });
+        const res = await this.blockchain.setAiModelHash(model.id, hashToBytes32(hash));
+        onChainStatus = res.success ? 'ANCHORED' : 'UNANCHORED';
+        txHash = (res as any).txHash ?? null;
+        blockNumber = (res as any).blockNumber ?? null;
+      }
+    } catch {
+      onChainStatus = 'UNANCHORED';
+    }
+
+    await this.audit.record({
+      entity: 'AiModelRegistry',
+      entityId: model.id,
+      action,
+      actorId,
+      dataHash,
+      dataSalt,
+      before: before ?? null,
+      after: action === 'DELETE' ? null : snapshot,
+      onChainStatus,
+      txHash,
+      blockNumber,
+    });
+  }
+
+  /** Change history for an AI model. */
+  getHistory(id?: string) {
+    return this.audit.history('AiModelRegistry', id);
+  }
+
+  /** Verify an AI model's integrity against on-chain hash. */
+  async verifyAiModel(id: string) {
+    const model = await this.prisma.aiModelRegistry.findUnique({ where: { id } });
+    if (!model) throw new NotFoundException('AI model not found');
+    return this.evaluateIntegrity(model);
+  }
+
+  /** Verify all AI models. */
+  async verifyAll() {
+    const models = await this.prisma.aiModelRegistry.findMany({ orderBy: { createdAt: 'desc' } });
+    const items = await Promise.all(models.map((m) => this.evaluateIntegrity(m)));
+    const summary = items.reduce(
+      (acc, item) => {
+        acc[item.status] = (acc[item.status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+    return { total: items.length, summary, items };
+  }
+
+  private async evaluateIntegrity(model: any) {
+    const snapshot = this.buildSnapshot(model);
+    const recomputed = model.dataSalt ? this.audit.recompute(snapshot, model.dataSalt) : null;
+    const dbHash = model.hash256 || null;
+    const onChain = await this.blockchain.getAiModelHash(model.id);
+    const onChainNormalized = onChain ? onChain.toLowerCase() : null;
+    const recomputedBytes32 = recomputed ? hashToBytes32(recomputed).toLowerCase() : null;
+
+    const dbMatches = recomputed !== null && recomputed === dbHash;
+    const chainMatches = recomputedBytes32 !== null && recomputedBytes32 === onChainNormalized;
+
+    let status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED';
+    if (!onChainNormalized) status = 'UNANCHORED';
+    else if (chainMatches) status = 'VERIFIED';
+    else status = 'TAMPERED';
+
+    return {
+      id: model.id,
+      modelName: model.modelName,
+      modelVersion: model.modelVersion,
+      status,
+      dbMatches,
+      chainMatches,
+      recomputedHash: recomputed,
+      storedHash: dbHash,
+      onChainHash: onChain,
+    };
   }
 
   private resolveApiEndpoint(provider: string, customEndpoint?: string, modelVersion?: string) {

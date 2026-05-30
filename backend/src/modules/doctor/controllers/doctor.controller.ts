@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
@@ -12,7 +12,7 @@ import { DoctorService } from '../services/doctor.service';
 @ApiBearerAuth()
 @Controller('doctors')
 export class DoctorController {
-  constructor(private readonly service: DoctorService) {}
+  constructor(private readonly service: DoctorService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a doctor profile for a staff profile with DOCTOR role' })
@@ -32,10 +32,41 @@ export class DoctorController {
     return this.service.findAll(query);
   }
 
+  @Get('audit/history')
+  @ApiOperation({ summary: 'Change history of all doctors (blockchain logger)' })
+  history() {
+    return this.service.getHistory();
+  }
+
+  @Get('audit/verify')
+  @ApiOperation({ summary: 'Verify integrity of all doctors against blockchain' })
+  verifyAll() {
+    return this.service.verifyAll();
+  }
+
+  @Roles('ADMIN', 'RECEPTIONIST', 'DOCTOR', 'LAB_MANAGER')
+  @Get(':id')
+  @ApiOperation({ summary: 'Get doctor profile details with audit integrity verification' })
+  findOne(@Param('id') id: string) {
+    return this.service.findOne(id);
+  }
+
+  @Get(':id/audit/history')
+  @ApiOperation({ summary: 'Change history of one doctor' })
+  historyOne(@Param('id') id: string) {
+    return this.service.getHistory(id);
+  }
+
+  @Get(':id/audit/verify')
+  @ApiOperation({ summary: 'Verify integrity of one doctor against blockchain' })
+  verifyOne(@Param('id') id: string) {
+    return this.service.verifyDoctor(id);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update doctor specialty, license, qualification, or experience' })
-  update(@Param('id') id: string, @Body() dto: UpdateDoctorDto) {
-    return this.service.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateDoctorDto, @Req() req: any) {
+    return this.service.update(id, dto, req.user?.sub);
   }
 
   @Patch(':id/clinical-room')
@@ -44,3 +75,4 @@ export class DoctorController {
     return this.service.assignRoom(id, dto);
   }
 }
+
