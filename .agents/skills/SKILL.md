@@ -10,6 +10,13 @@ source: local
 
 This is the skill configuration for the **KLTN Hospital Management System** (Khóa Luận Tốt Nghiệp). Use this document to understand the project architecture and route tasks to the correct specialized skills.
 
+> **Documentation layout (read in this order):**
+> 1. [AGENTS.md](file:///home/congthang/Desktop/KhoaLuanV2/KLTN/AGENTS.md) — canonical source for project overview, architecture decisions, coding conventions, and the **Core Domain Model** (from `schema.prisma`).
+> 2. `hospital-management-system` skill — strict **business rules, domain invariants, blockchain/AI rules, anti-patterns, and the code review checklist**.
+> 3. This router (`SKILL.md`) — maps task types to the right specialized skills.
+>
+> AGENTS.md describes *what the system is*; the skill describes *the rules you must enforce*. They are complementary — do not duplicate domain facts here.
+
 ## Project Overview
 
 A full-stack hospital management platform featuring:

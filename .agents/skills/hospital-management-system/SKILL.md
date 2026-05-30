@@ -1,69 +1,111 @@
 ---
 name: hospital-management-system
-description: Domain expert for the KLTN Hospital Management System project. Understands the complete clinical workflow, biometric authentication, blockchain audit trails, and system architecture.
+description: Domain expert for the KLTN Hospital Management System project. Focuses strictly on business rules, workflows, invariants, and code review checklists.
 category: project
 risk: safe
 source: local
 ---
 
-# Hospital Management System Expert (KLTN)
+# Hospital Management System Rules (KLTN)
 
-You are the domain expert for the KLTN Hospital Management System, a full-stack healthcare platform integrating AI diagnostics, biometric authentication, and blockchain-based audit trails.
+You are the domain expert for the KLTN Hospital Management System. This skill defines the strict business rules, workflows, domain invariants, and anti-patterns you must enforce. 
 
-## When to Use
+For the canonical Domain Model and Architectural constraints, always refer to the project root's `AGENTS.md`.
 
-- When working on features specific to hospital operations, patient management, or clinical workflows.
-- When implementing or modifying business logic related to patient intake, doctor examination, or administrative tasks.
-- When dealing with biometric authentication flows or blockchain auditing within the hospital context.
-- When ensuring data integrity and strict state transitions across the patient lifecycle.
+## 1. Domain Invariants
 
-## Project Architecture Overview
+These are strict, unbreakable rules. If your code violates these, it is incorrect.
 
-The system relies on a modern, distributed architecture:
-- **Backend**: NestJS (TypeScript) with TypeORM and PostgreSQL.
-- **Frontend**: React (Vite) with Tailwind CSS, utilizing a custom cyan-600 Design System ("Hospital OS").
-- **Blockchain**: Solidity smart contracts (Hardhat, Ethers.js) deployed locally to maintain immutable audit trails.
-- **AI/ML**: Python (TensorFlow, InsightFace) integrated as child processes for facial recognition and diagnostic assistance.
+- **A Visit must belong to exactly one Patient.**
+- **A Visit cannot be COMPLETED without an assigned Doctor and a final MedicalConclusion.**
+- **Only a DOCTOR can finalize a Diagnosis (MedicalConclusion).**
+- **AI Diagnosis CANNOT finalize a diagnosis; it only suggests.**
+- **A MedicalResult must belong to a valid MedicalOrder, which in turn belongs to a Visit.**
+- **BlockchainAudit (`BlockchainLogger`) records are completely immutable once created.**
 
-## Key Roles (RBAC)
+## 2. Core Workflows
 
-1. **ADMIN**: Manages system configurations, departments, staff accounts, and oversees blockchain audit integrity.
-2. **RECEPTIONIST**: Handles high-speed patient intake, registration (including facial biometrics), and manages the examination queue.
-3. **DOCTOR**: Reviews patient records, utilizes AI diagnostic assistance, and finalizes clinical examination records.
+### Patient Intake & Queue (Receptionist)
+1. **Registration**: Capture patient data. If biometric authentication is used, capture face via InsightFace, generate `faceEmbedding`, and anchor the `faceHash` on-chain for tamper evidence.
+2. **Assignment**: Assign the Patient to a `ClinicalRoom` (which maps to a `DoctorProfile`).
+3. **State Management**: Initialize the `Visit` state to `WAITING`.
 
-## Core Workflows
+### Clinical Diagnostic Workflow (Doctor)
+1. **Review**: The Doctor reviews the Patient's history, current `Visit` details, and any `MedicalResult`s from `MedicalOrder`s.
+2. **AI Assistance**: The Doctor reviews `AiDiagnosis` suggestions based on the clinical data.
+3. **Conclusion**: The Doctor writes the `MedicalConclusion` (final diagnosis, treatment plan, prescription).
+4. **Finalization**: The Visit state transitions to `COMPLETED`. The `MedicalConclusion` is hashed, and the hash is anchored on-chain via `BlockchainLogger`.
 
-### 1. Patient Intake & Queue Management (Receptionist)
-- **Registration**: New patients are registered. If biometric, face templates are captured via InsightFace and their hashes are anchored on-chain (`FaceRegistry`) for tamper evidence.
-- **Queueing**: Patients are assigned to specific clinical rooms based on specialist assignments.
-- **State Machine Enforcement**: Visits follow strict state transitions (`WAITING` -> `IN_PROGRESS` -> `COMPLETED`).
+## 3. State Machine: Visit Status
 
-### 2. Clinical Diagnostic Workflow (Doctor)
-- **Review**: Doctors review pending AI-generated diagnostic suggestions based on clinical data.
-- **Finalization**: Doctors finalize the diagnosis and generate medical orders/prescriptions.
-- **Integrity**: Finalized clinical records are hashed, and hashes are anchored to the blockchain (`AuditAnchor`) to ensure immutability and ZKP verification readiness.
+You must rigorously enforce these state transitions. Do not invent new states. Do not jump states illegitimately.
 
-### 3. Biometric Authentication Pipeline
-- Uses **InsightFace** for generating highly accurate facial embeddings.
-- Face matching relies on a strict **Euclidean distance threshold** (e.g., <= 0.6) for reliable verification without unauthorized bypasses.
-- Face template hashes are stored on-chain. Before matching, the backend performs automated tamper-detection checks against the blockchain.
+```text
+WAITING (Patient checked in, waiting in room)
+  ↓
+IN_PROGRESS (Doctor is examining the patient)
+  ↓
+WAITING_TEST_RESULT (Doctor ordered tests, waiting for lab/imaging)
+  ↓
+WAITING_CONCLUSION (Tests returned, waiting for doctor to finalize)
+  ↓
+COMPLETED (Doctor issued MedicalConclusion)
+```
+*Note: `CANCELLED` is an alternate terminal state that can occur before completion.*
 
-### 4. Blockchain Audit Trail Integrity
-- **Unified Ownership**: Contracts (`DepartmentRegistry`, `FaceRegistry`, `AuditAnchor`) inherit from a core `IdentityRegistry` for administrative control.
-- **Verification Service**: A backend service can recompute database record hashes and compare them against immutable on-chain values, flagging any tampering for admin review.
+## 4. Blockchain Rules
 
-## Best Practices & Business Rules
+The blockchain layer exists strictly for audit and tamper detection. 
 
-1. **Strict State Transitions**: Never bypass the visit state machine. A visit must be `WAITING` before it can be `IN_PROGRESS`.
-2. **Atomic Operations**: Use database transactions for multi-step clinical record updates to prevent race conditions (especially with unique code generation).
-3. **Security First**: Clinical data is highly sensitive. Ensure RBAC guards are strictly enforced on all API endpoints. Cloud storage access must be authenticated.
-4. **Audit Integrity**: Any critical change to a patient record, department, or biometric data MUST trigger a blockchain audit anchor.
-5. **UI/UX Consistency**: Maintain the minimalist, high-speed "Hospital OS" design system. Prioritize concise, action-oriented data representations and master-detail workspaces to reduce cognitive load for front-line staff.
+**Store On-Chain:**
+- Hashes (`hash256` of canonical JSON snapshots)
+- Timestamps
+- Audit Metadata (Action type, Actor ID, Entity Type)
 
-## Important Files & References
+**NEVER Store On-Chain:**
+- Patient PII (Names, Citizen IDs, Contact Info)
+- Diagnosis Content (Free text notes, treatment plans)
+- Files (PDFs, X-Ray images, MRI images - these go to Cloudinary)
 
-- Backend Entities & Services: `/backend/src/modules/*/` and `/backend/src/infrastructure/audit/`
-- Smart Contracts: `/blockchain/contracts/`
-- Frontend Features: `/frontend/src/features/` (admin, receptionist, doctor)
+**Blockchain Purpose:**
+- Integrity verification.
+- Tamper detection.
+- Unbreakable audit trails.
 
-Follow these domain rules meticulously to ensure a secure, robust, and highly efficient clinical management system.
+## 5. AI Diagnosis Rules
+
+AI is an assistant, not a replacement.
+
+**AI Can:**
+- Suggest potential diagnoses.
+- Analyze uploaded results (e.g., imagery, text).
+- Generate confidence scores.
+
+**AI Cannot:**
+- Finalize a diagnosis (create a `MedicalConclusion` without doctor action).
+- Prescribe medication.
+- Override a Doctor's decision.
+- **Doctor approval is explicitly required for all AI outputs.**
+
+## 6. Anti-Patterns
+
+If you are doing any of the following, you are violating the project guidelines:
+
+- **Never** use `any` in TypeScript.
+- **Never** bypass RBAC (`@Roles()` guards must be used).
+- **Never** skip the blockchain audit trigger when a critical entity (Patient, Visit, Department, Conclusion) is modified.
+- **Never** attempt to store medical files, PII, or large strings directly on the blockchain.
+- **Never** directly modify a Visit state in the database without going through the designated state-transition methods (which enforce business logic).
+- **Never** hardcode role checks inside controllers; rely on the NestJS Auth Guards.
+
+## 7. Review Checklist
+
+When asked to review code, you MUST mentally check off these items before approving or suggesting changes:
+
+- [ ] **RBAC Checked**: Are the correct `@Roles()` applied to the controller/endpoint?
+- [ ] **State Transitions**: Does the code respect the 6-state Visit state machine?
+- [ ] **Transaction Boundaries**: Are multi-table mutations wrapped in a Prisma transaction?
+- [ ] **Prisma Relations**: Are foreign keys and relation objects correctly managed (e.g., creating a MedicalConclusion updates the Visit)?
+- [ ] **Audit Triggers**: Are modifications generating the appropriate `BlockchainLogger` entry?
+- [ ] **AI Approval**: Is there a hard boundary preventing AI from automatically fulfilling a Doctor's role?
+- [ ] **Integrity**: Are files securely uploaded to Cloudinary with their URLs/metadata properly referenced in the DB?
