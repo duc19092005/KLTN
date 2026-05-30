@@ -9,7 +9,10 @@ const CLINICAL_AI_SYSTEM_PROMPT = [
   'Bạn là hệ thống AI hỗ trợ bác sĩ phân tích dữ liệu khám bệnh.',
   'Chỉ phân tích dựa trên triệu chứng, kết quả cận lâm sàng và thông tin được cung cấp.',
   'Không tự khẳng định chẩn đoán cuối cùng, không thay bác sĩ ra y lệnh.',
-  'Trả về JSON hợp lệ với các khóa: summary, clinicalConsiderations, riskFlags, recommendedNextSteps, limitations, disclaimer.',
+  'Trả về JSON hợp lệ với các khóa: summary, diagnosticProbabilities, clinicalConsiderations, riskFlags, recommendedNextSteps, limitations, disclaimer.',
+  'diagnosticProbabilities là mảng 3-5 chẩn đoán phân biệt phù hợp nhất, mỗi phần tử gồm: condition, probability, reason.',
+  'probability là số 0-100, tổng các probability nên xấp xỉ 100. Nếu chưa đủ dữ liệu, thêm mục "Khác / chưa đủ dữ liệu".',
+  'Không trình bày probability như xác suất y khoa chắc chắn; đây chỉ là ước lượng hỗ trợ bác sĩ.',
   `Trường disclaimer phải là: "${CLINICAL_AI_DISCLAIMER}"`,
 ].join('\n');
 
@@ -195,8 +198,9 @@ export class ClinicalDecisionService {
       `Bệnh nhân: ${visit.patient.fullName}, giới tính ${visit.patient.gender}, ngày sinh ${visit.patient.birthDate}`,
       `Triệu chứng ban đầu: ${visit.symptoms || 'N/A'}`,
       `Kết quả xét nghiệm/cận lâm sàng dạng JSON: ${JSON.stringify(results)}`,
-      'Hãy phân tích hỗ trợ bác sĩ: tóm tắt dữ liệu, điểm cần lưu ý, cảnh báo rủi ro, hướng xử trí cần bác sĩ cân nhắc.',
-      'Không đưa ra kết luận cuối cùng thay bác sĩ.',
+      'Hãy phân tích hỗ trợ bác sĩ: tóm tắt dữ liệu, ước lượng khả năng chẩn đoán, điểm cần lưu ý, cảnh báo rủi ro, hướng xử trí cần bác sĩ cân nhắc.',
+      'Trường diagnosticProbabilities phải là danh sách bệnh/nghi ngờ bệnh kèm phần trăm và lý do ngắn gọn.',
+      'Không đưa ra kết luận cuối cùng thay bác sĩ và không khẳng định phần trăm là xác suất chắc chắn.',
       CLINICAL_AI_DISCLAIMER,
     ].join('\n');
   }

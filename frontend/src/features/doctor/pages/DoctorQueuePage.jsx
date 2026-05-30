@@ -786,6 +786,7 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="lg:col-span-2 rounded-2xl border border-white bg-white/80 p-4 shadow-sm"><AiSection title="Tổng quan lâm sàng" value={parsedResult.summary} /></div>
+              <div className="lg:col-span-2 rounded-2xl border border-white bg-white/80 p-4 shadow-sm"><DiagnosticProbabilitySection value={parsedResult.diagnosticProbabilities} /></div>
               <div className="rounded-2xl border border-white bg-white/80 p-4 shadow-sm"><AiSection title="Cân nhắc lâm sàng" value={parsedResult.clinicalConsiderations || parsedResult.possibleConditions} list /></div>
               <div className="rounded-2xl border border-white bg-white/80 p-4 shadow-sm"><AiSection title="Cảnh báo rủi ro" value={parsedResult.riskFlags} list /></div>
               <div className="rounded-2xl border border-white bg-white/80 p-4 shadow-sm"><AiSection title="Đề xuất bước tiếp theo" value={parsedResult.recommendedNextSteps || parsedResult.recommendations} list /></div>
@@ -803,7 +804,44 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
 function normalizeAiAnalysis(value) {
   const parsed = parseAiResult(value);
   const analysis = parsed?.analysis && typeof parsed.analysis === 'object' && !Array.isArray(parsed.analysis) ? parsed.analysis : {};
-  return { ...parsed, ...analysis, summary: analysis.summary || parsed.summary, clinicalConsiderations: analysis.clinicalConsiderations || parsed.clinicalConsiderations, riskFlags: analysis.riskFlags || parsed.riskFlags, recommendedNextSteps: analysis.recommendedNextSteps || parsed.recommendedNextSteps, limitations: analysis.limitations || parsed.limitations };
+  return { ...parsed, ...analysis, summary: analysis.summary || parsed.summary, diagnosticProbabilities: analysis.diagnosticProbabilities || analysis.differentialDiagnoses || analysis.possibleDiagnoses || parsed.diagnosticProbabilities, clinicalConsiderations: analysis.clinicalConsiderations || parsed.clinicalConsiderations, riskFlags: analysis.riskFlags || parsed.riskFlags, recommendedNextSteps: analysis.recommendedNextSteps || parsed.recommendedNextSteps, limitations: analysis.limitations || parsed.limitations };
+}
+
+function DiagnosticProbabilitySection({ value }) {
+  if (!value) return null;
+  const items = Array.isArray(value) ? value : [];
+  if (!items.length) return null;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <strong className="text-[11px] uppercase tracking-wider font-black text-indigo-900">Khả năng chẩn đoán</strong>
+        <span className="text-[10px] font-bold text-slate-400">Tham khảo</span>
+      </div>
+      <div className="space-y-3">
+        {items.map((item, index) => {
+          const condition = item.condition || item.name || item.diagnosis || `Khả năng ${index + 1}`;
+          const probability = Math.max(0, Math.min(100, Number(item.probability ?? item.percent ?? item.score ?? 0)));
+          const reason = item.reason || item.rationale || item.explanation;
+          return (
+            <div key={`${condition}-${index}`}>
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <span className="font-black text-slate-800">{condition}</span>
+                <span className="font-black text-indigo-700">{probability}%</span>
+              </div>
+              <div className="mt-1.5 h-2 rounded-full bg-slate-100 overflow-hidden">
+                <div className="h-full rounded-full bg-indigo-500" style={{ width: `${probability}%` }} />
+              </div>
+              {reason && <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-500">{reason}</p>}
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-700 border border-amber-100">
+        Tỷ lệ chỉ là ước lượng hỗ trợ, không thay thế chẩn đoán của bác sĩ.
+      </p>
+    </div>
+  );
 }
 
 function AiSection({ title, value, list = false }) {
