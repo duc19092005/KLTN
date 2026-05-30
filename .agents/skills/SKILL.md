@@ -103,7 +103,7 @@ A full-stack hospital management platform featuring:
 **Key services:**
 - PostgreSQL database container
 - Redis for caching/sessions
-- MinIO for object storage (medical images)
+- Cloudinary for medical file & image storage (external SaaS, configured via `CLOUDINARY_*` env vars)
 - Backend + Frontend containers
 
 ---
