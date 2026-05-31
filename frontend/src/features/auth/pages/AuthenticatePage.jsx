@@ -32,9 +32,16 @@ export default function AuthenticatePage() {
     setBusy(true); showStatus('Đang mã hóa và lưu trữ tệp tin khuôn mặt...');
     try {
       await authService.registerFace(embedding);
-      updateSession({ registrationStep: 2, hasFace: true, firstLogin: false });
-      if (!isAdmin) { setStep(4); showStatus('Đăng ký khuôn mặt thành công. Vui lòng quét lại để xác thực đăng nhập.'); }
-      else { setStep(2); showStatus('Đăng ký khuôn mặt thành công. Vui lòng tiếp tục liên kết ví.'); }
+      if (!isAdmin) {
+        // Nhân sự hoàn tất onboarding ngay sau khi đăng ký mặt -> chuyển sang luồng xác thực đăng nhập.
+        updateSession({ registrationStep: 2, hasFace: true, firstLogin: false });
+        setStep(4); showStatus('Đăng ký khuôn mặt thành công. Vui lòng quét lại để xác thực đăng nhập.');
+      } else {
+        // Onboarding admin còn nhiều bước (liên kết ví -> ZKP). Phải giữ firstLogin=true cho tới khi
+        // backend hoàn tất generateMfaSecret, nếu không trang sẽ rơi vào bước xác thực đăng nhập sớm.
+        updateSession({ registrationStep: 2, hasFace: true });
+        setStep(2); showStatus('Đăng ký khuôn mặt thành công. Vui lòng tiếp tục liên kết ví.');
+      }
     } catch (err) { showStatus(err.response?.data?.message || err.message, true); }
     finally { setBusy(false); }
   };
@@ -102,7 +109,7 @@ export default function AuthenticatePage() {
           {isAdmin && isFirstLogin && step === 2 && <ActionPanel title="Xác thực quyền hạn On-chain" desc="Liên kết địa chỉ ví mật mã làm định danh bất biến." button="Kết nối MetaMask & Xác nhận" onClick={bindWallet} busy={busy} id="bind-wallet-button" />}
           {isAdmin && isFirstLogin && step === 3 && !secret && <ActionPanel title="Tạo lập Zero-Knowledge Proofs" desc="Mã hóa thông tin nội bộ thành biểu thức toán học bảo mật." button="Khởi tạo Định danh ZKP" onClick={generateZkpIdentity} busy={busy} id="generate-zkp-button" />}
           {secret && <SecretPanel secret={secret} copied={copied} onCopy={handleCopySecret} onDone={() => goDashboard({ ...user, role: 'ADMIN' })} />}
-          {!isFirstLogin && <div className="w-full max-w-sm animate-in fade-in duration-300"><FaceCapture onCapture={verifyFaceLogin} disabled={busy} label="Xác Thực Trắc Sinh Học" /></div>}
+          {!isFirstLogin && !secret && <div className="w-full max-w-sm animate-in fade-in duration-300"><FaceCapture onCapture={verifyFaceLogin} disabled={busy} label="Xác Thực Trắc Sinh Học" /></div>}
         </div>
       </section>
     </main>
