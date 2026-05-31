@@ -3,10 +3,12 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../auth/guards/roles.guard';
+import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
+import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
 import { DepartmentService } from '../services/department.service';
 import { AssignManagerDto, CreateDepartmentDto, DepartmentQueryDto, UpdateDepartmentDto } from '../dto/department.dto';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
 @Roles('ADMIN')
 @ApiTags('Departments')
 @ApiBearerAuth()
@@ -64,7 +66,8 @@ export class DepartmentController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete an empty department' })
+  @RequireFaceStepUp('DELETE_DEPARTMENT')
+  @ApiOperation({ summary: 'Delete an empty department (requires face step-up)' })
   remove(@Param('id') id: string, @Req() req: any) {
     return this.service.remove(id, req.user?.sub);
   }

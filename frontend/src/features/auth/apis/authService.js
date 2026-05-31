@@ -28,6 +28,10 @@ export const authService = {
 
   verifyFace: (embedding, challenge) => api.post('/auth/verify-face', { embedding, challenge }),
 
+  // Step-up: mint a single-use face ticket scoped to a sensitive action (+ optional resourceId).
+  faceStepUp: (embedding, challenge, action, resourceId) =>
+    api.post('/auth/face-stepup', { embedding, challenge, action, resourceId }),
+
   getMe: () => api.get('/auth/me'),
 
   logout: () => api.post('/auth/logout'),

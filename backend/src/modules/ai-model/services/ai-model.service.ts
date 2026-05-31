@@ -21,8 +21,12 @@ export class AiModelService {
     }
     const apiEndpoint = dto.type === 'API' ? this.resolveApiEndpoint(dto.provider || 'other', dto.apiEndpoint, dto.modelVersion) : null;
 
-    const encrypted = this.encryptAes256(dto.secretOrIpHash);
-    const plainFingerprint = this.createFingerprint(dto.secretOrIpHash);
+    // Local/self-hosted models (Llama, Ollama, vLLM) often need no API key. When the key is
+    // omitted, use the endpoint (or model id) as the identity material so each model still gets
+    // a unique AES blob + fingerprint. ipHashEncrypted is NOT NULL, so we always store something.
+    const secretMaterial = dto.secretOrIpHash?.trim() || apiEndpoint || dto.modelVersion.trim();
+    const encrypted = this.encryptAes256(secretMaterial);
+    const plainFingerprint = this.createFingerprint(secretMaterial);
 
     const model = await this.prisma.aiModelRegistry.create({
       data: {
@@ -90,8 +94,8 @@ export class AiModelService {
     const startedAt = Date.now();
 
     try {
-      if (provider === 'gemini') await this.testGemini(endpoint, dto.secretOrIpHash, dto.modelVersion);
-      else await this.testOpenAiCompatible(endpoint, dto.secretOrIpHash, dto.modelVersion);
+      if (provider === 'gemini') await this.testGemini(endpoint, dto.secretOrIpHash || '', dto.modelVersion);
+      else await this.testOpenAiCompatible(endpoint, dto.secretOrIpHash || '', dto.modelVersion);
       return { ok: true, provider: dto.provider, endpoint, latencyMs: Date.now() - startedAt, message: 'API provider hoạt động.' };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown API test error';
@@ -229,14 +233,23 @@ export class AiModelService {
       gemini: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     };
     const endpoint = map[provider.toLowerCase()];
-    if (!endpoint) throw new BadRequestException('Custom API endpoint is required for provider other');
+    // local (self-hosted Llama/Ollama/vLLM) and other (custom) have no preset URL: the admin
+    // must supply the endpoint explicitly.
+    if (!endpoint) {
+      throw new BadRequestException(
+        'Vui lòng nhập API Endpoint cho model tự host / tùy chỉnh (ví dụ http://localhost:11434/v1/chat/completions).',
+      );
+    }
     return endpoint;
   }
 
   private async testOpenAiCompatible(endpoint: string, token: string, modelVersion: string) {
+    // Token is optional: local OpenAI-compatible servers (Ollama, vLLM) usually accept no auth.
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers,
       body: JSON.stringify({ model: modelVersion, messages: [{ role: 'user', content: 'ping' }], max_tokens: 8, temperature: 0 }),
     });
     if (!response.ok) throw new Error(await this.readProviderError(response));

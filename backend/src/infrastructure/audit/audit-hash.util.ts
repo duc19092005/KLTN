@@ -63,3 +63,43 @@ export function hashToBytes32(hexDigest: string): string {
   if (clean.length !== 64) throw new Error('Expected a 32-byte (64 hex char) SHA256 digest');
   return `0x${clean}`;
 }
+
+/** prevHash value for the very first chain entry (seq = 1). 32 zero bytes in hex. */
+export const GENESIS_PREV_HASH = '0'.repeat(64);
+
+/**
+ * Core fields that uniquely and immutably identify one audit entry. These are the only inputs to
+ * the chain leaf; mutable anchoring metadata (txHash, batchId, ...) is deliberately excluded so
+ * the chain stays stable as logs get anchored.
+ */
+export interface AuditEntryCore {
+  seq: number;
+  actorId?: string | null;
+  action: string;
+  entity: string;
+  entityId?: string | null;
+  dataHash?: string | null;
+  createdAtIso: string;
+}
+
+/**
+ * Compute the hash-chain leaf for one audit entry:
+ *   entryHash = SHA256(pepper | seq | prevHash | canonical(core)).
+ *
+ * Because prevHash is the previous entry's entryHash, every leaf transitively commits to the
+ * entire history before it. Deleting or editing any past row makes its successor's recomputed
+ * entryHash diverge, so the tamper is provable. The pepper (env-only) stops an attacker with mere
+ * DB access from forging a valid chain.
+ */
+export function computeEntryHash(core: AuditEntryCore, prevHash: string, pepper = getPepper()): string {
+  const canonical = canonicalize({
+    seq: core.seq,
+    actorId: core.actorId ?? null,
+    action: core.action,
+    entity: core.entity,
+    entityId: core.entityId ?? null,
+    dataHash: core.dataHash ?? null,
+    createdAtIso: core.createdAtIso,
+  });
+  return createHash('sha256').update(`${pepper}|${core.seq}|${prevHash}|${canonical}`).digest('hex');
+}

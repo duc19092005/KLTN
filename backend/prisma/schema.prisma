@@ -68,6 +68,7 @@ model User {
   staffProfile      StaffProfile?
   adminProfile      AdminProfile?
   performedResults  MedicalResult[]
+  stepUpTickets     StepUpTicket[]
 
   @@index([role])
   @@index([status])
@@ -500,6 +501,17 @@ model BlockchainLogger {
   txHash        String?
   blockNumber   Int?
 
+  // Tamper-evident hash-chain + Merkle batch membership.
+  // seq is a strictly monotonic sequence assigned by the serialized writer. entryHash links
+  // this row to the previous one (prevHash), so altering/deleting any row breaks the chain and
+  // is provable. batchId records which Merkle checkpoint anchored this row on-chain (null =
+  // not yet anchored). These columns are the only ones the anchoring job may mutate; all
+  // content columns are immutable via a DB trigger (see migration).
+  seq        Int?    @unique // monotonic sequence number (1, 2, 3, ...)
+  prevHash   String?         // entryHash of seq-1; genesis (seq 1) uses 64 zeros
+  entryHash  String?         // SHA256(pepper | seq | prevHash | core fields) -- the chain leaf
+  batchId    Int?            // Merkle batch that anchored this row; null until anchored
+
   // Foreign keys to the audited entities (nullable; exactly one set per row)
   departmentId        String?
   department          Department?        @relation(fields: [departmentId], references: [id])
@@ -534,4 +546,58 @@ model BlockchainLogger {
   @@index([aiModelRegistryId])
   @@index([medicalConclusionId])
   @@index([aiQualityId])
+  @@index([batchId])
+  @@index([onChainStatus])
+}
+
+/// One committed Merkle checkpoint over a batch of BlockchainLogger entries.
+/// The backend gathers all not-yet-anchored logs (ordered by seq), builds a Merkle tree over
+/// their entryHashes, and commits ONLY the root on-chain (AuditAnchor.commitRoot). Storing one
+/// root per batch keeps gas flat regardless of how many logs the batch contains. A batch row is
+/// created PENDING, flipped to ANCHORED once the on-chain tx confirms, or deleted/marked FAILED
+/// if the commit fails (the logs then stay unanchored and are retried next cycle).
+model AuditBatch {
+  id          String    @id @default(uuid())
+  batchId     Int       @unique // monotonic, mirrors the on-chain batchId
+  merkleRoot  String            // hex SHA256 Merkle root over the batch's entryHashes
+  leafCount   Int               // number of logs in the batch
+  fromSeq     Int?              // smallest BlockchainLogger.seq in the batch
+  toSeq       Int?              // largest BlockchainLogger.seq in the batch
+  status      String    @default("PENDING") // PENDING | ANCHORED | FAILED
+  txHash      String?
+  blockNumber Int?
+  error       String?
+  createdAt   DateTime  @default(now())
+  anchoredAt  DateTime?
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// Short-lived, single-use proof that a user re-authenticated with their face immediately
+/// before performing a highly sensitive action (e.g. deleting a doctor, committing a blockchain
+/// anchor). This is step-up / re-authentication: even though the user already holds a valid
+/// session, irreversible or money-touching operations demand a fresh biometric scan at the moment
+/// of the action so a hijacked or unattended session cannot trigger them.
+///
+/// Flow: POST /auth/face-stepup runs the same face match + on-chain integrity gate as login, then
+/// mints a ticket scoped to (userId, action, optional resourceId) that expires in minutes. The
+/// client replays the ticket via the x-stepup-ticket header on the protected request; FaceStepUpGuard
+/// consumes it atomically (usedAt) so it can never be replayed. We store only the SHA256 of the raw
+/// token, never the token itself.
+model StepUpTicket {
+  id         String   @id @default(uuid())
+  tokenHash  String   @unique // SHA256(raw ticket token); raw token is returned to client once
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String            // scope, e.g. "DELETE_DOCTOR" | "ANCHOR_BLOCKCHAIN"
+  resourceId String?           // optional: binds the ticket to one specific target record
+  ip         String?
+  expiresAt  DateTime          // typically now + a few minutes
+  usedAt     DateTime?         // set on first (and only) consumption
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([expiresAt])
 }

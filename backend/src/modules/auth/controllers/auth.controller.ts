@@ -13,6 +13,7 @@ import {
   WalletVerifyDto,
   StaffLoginDto,
   ChangePasswordDto,
+  StepUpFaceDto,
 } from '../dto/auth.dto';
 import { getAuthCookieOptions, getClearAuthCookieOptions } from '../constants/auth-security';
 
@@ -165,6 +166,30 @@ export class AuthController {
       this.rateLimiter.reset(key);
       this.setAuthCookie(res, result.access_token);
       return this.stripToken(result);
+    } catch (error) {
+      this.rateLimiter.recordFailure(key, 10 * 60 * 1000);
+      throw error;
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('face-stepup')
+  async faceStepUp(@Request() req, @Body() body: StepUpFaceDto, @Req() request) {
+    // Reuse the biometric rate limiter, keyed per user + action, to throttle scan abuse.
+    const key = this.rateLimitKey(request, 'face-stepup', `${req.user.sub}:${body.action}`);
+    this.rateLimiter.assertAllowed(key, 5, 10 * 60 * 1000);
+
+    try {
+      const ticket = await this.authService.verifyFaceForStepUp(
+        req.user.sub,
+        body.embedding as number[],
+        body.challenge,
+        body.action,
+        body.resourceId ?? null,
+        this.clientIp(request),
+      );
+      this.rateLimiter.reset(key);
+      return ticket;
     } catch (error) {
       this.rateLimiter.recordFailure(key, 10 * 60 * 1000);
       throw error;

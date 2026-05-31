@@ -4,10 +4,12 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../auth/guards/roles.guard';
+import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
+import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
 import { CreateStaffDto, StaffQueryDto, UpdateStaffDto } from '../dto/staff.dto';
 import { StaffService } from '../services/staff.service';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
 @Roles('ADMIN')
 @ApiTags('Staff')
 @ApiBearerAuth()
@@ -77,7 +79,8 @@ export class StaffController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Soft-delete staff by marking account inactive' })
+  @RequireFaceStepUp('DELETE_STAFF')
+  @ApiOperation({ summary: 'Soft-delete staff by marking account inactive (requires face step-up)' })
   remove(@Param('id') id: string, @Req() req: any) {
     return this.service.remove(id, req.user?.sub);
   }

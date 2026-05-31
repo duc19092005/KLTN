@@ -12,6 +12,8 @@ import { BlockchainService } from '../../../infrastructure/blockchain/blockchain
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { ZkpService } from '../../zkp/services/zkp.service';
 import { hashToBytes32 } from '../../../infrastructure/audit/audit-hash.util';
+import { AuditLoggerService } from '../../../infrastructure/audit/audit-logger.service';
+import { StepUpService } from '../../../common/stepup/stepup.service';
 
 type UserWithProfile = User & { adminProfile: AdminProfile | null };
 type LoginableRole = Exclude<UserRole, 'ADMIN'>;
@@ -34,6 +36,8 @@ export class AuthService {
     private jwtService: JwtService,
     private zkpService: ZkpService,
     private blockchainService: BlockchainService,
+    private audit: AuditLoggerService,
+    private stepUp: StepUpService,
   ) {}
 
   async bootstrapFirstAdmin(username: string, email: string, superAdminSecret: string) {
@@ -88,6 +92,7 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Invalid invite token');
     if (user.role !== 'ADMIN') throw new UnauthorizedException('Invite token is not for Admin');
     if (!user.firstLogin) throw new UnauthorizedException('Invite token already used');
+    // Trace: admin first-login via invite token (success path continues below).
     if (user.inviteTokenExpiry && user.inviteTokenExpiry < new Date()) {
       throw new UnauthorizedException('Invite token has expired');
     }
@@ -98,6 +103,8 @@ export class AuthService {
         data: { inviteToken: tokenHash },
       });
     }
+
+    await this.writeAudit(user.id, 'LOGIN_INVITE', 'User', user.id, { method: 'INVITE_TOKEN', role: user.role });
 
     return {
       access_token: this.signAccessToken(user, {
@@ -122,11 +129,25 @@ export class AuthService {
       include: { adminProfile: true },
     });
 
-    if (!user || user.role === 'ADMIN') throw new UnauthorizedException('Invalid credentials');
-    if (user.status !== 'ACTIVE') throw new UnauthorizedException('Account is not active');
-    if (!user.passwordHash || !this.verifyPassword(password, user.passwordHash)) {
+    if (!user || user.role === 'ADMIN') {
+      // No valid user: log the failed attempt against the attempted identity for tracing.
+      await this.writeAudit(null, 'LOGIN_FAIL', 'User', user?.id ?? 'unknown', {
+        method: 'PASSWORD',
+        reason: 'invalid_credentials',
+        attemptedIdentity: identity,
+      });
       throw new UnauthorizedException('Invalid credentials');
     }
+    if (user.status !== 'ACTIVE') {
+      await this.writeAudit(user.id, 'LOGIN_FAIL', 'User', user.id, { method: 'PASSWORD', reason: 'inactive_account' });
+      throw new UnauthorizedException('Account is not active');
+    }
+    if (!user.passwordHash || !this.verifyPassword(password, user.passwordHash)) {
+      await this.writeAudit(user.id, 'LOGIN_FAIL', 'User', user.id, { method: 'PASSWORD', reason: 'wrong_password' });
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    await this.writeAudit(user.id, 'LOGIN_PASSWORD', 'User', user.id, { method: 'PASSWORD', role: user.role });
 
     return {
       access_token: this.signAccessToken(user, { verified: false }),
@@ -461,6 +482,95 @@ export class AuthService {
       matchedDescriptorCount: storedDescriptors.length,
       user: this.toPublicUser(user, true),
     };
+  }
+
+  /**
+   * Step-up (re-authentication) face check for a highly sensitive action. Runs the SAME biometric
+   * match + on-chain integrity gate as verifyFace, but does NOT issue a session token. Instead, on
+   * success it mints a single-use, action-scoped step-up ticket (see StepUpService) that the client
+   * replays on the protected request. Applies to ALL roles: the user is already logged in; this
+   * proves a live human is present at the moment of the irreversible action.
+   *
+   * @param action     scope the ticket is bound to, e.g. 'DELETE_DOCTOR' | 'ANCHOR_BLOCKCHAIN'
+   * @param resourceId optional target record id, binding the ticket to one specific resource
+   */
+  async verifyFaceForStepUp(
+    userId: string,
+    embedding: number[],
+    challenge: string,
+    action: string,
+    resourceId?: string | null,
+    ip?: string,
+  ) {
+    const descriptor = this.validateFaceDescriptor(embedding);
+    const user = await this.getAuthUser(userId);
+
+    if (user.status !== 'ACTIVE' || user.firstLogin) {
+      throw new UnauthorizedException('Tài khoản chưa hoàn tất thiết lập');
+    }
+    if (!user.faceEmbedding) {
+      throw new UnauthorizedException('Chưa đăng ký dữ liệu khuôn mặt');
+    }
+
+    this.assertNotFaceLocked(user);
+
+    // Single-use challenge (anti-replay) consumed before matching.
+    await this.consumeFaceChallenge(userId, challenge);
+
+    const storedDescriptors = this.decodeStoredDescriptors(user.faceEmbedding);
+
+    // Integrity gate: stored template hash must still match the on-chain anchor (if anchored).
+    const onChainFaceHash = await this.blockchainService.getFaceHash(userId);
+    if (onChainFaceHash) {
+      const recomputedFaceHash = hashToBytes32(this.computeFaceHash(storedDescriptors)).toLowerCase();
+      if (recomputedFaceHash !== onChainFaceHash.toLowerCase()) {
+        await this.writeAudit(userId, 'FACE_INTEGRITY_FAIL', 'User', userId, {
+          context: 'STEPUP',
+          action,
+          resourceId: resourceId ?? null,
+          ip,
+        });
+        throw new UnauthorizedException('Dữ liệu khuôn mặt đã bị thay đổi. Vui lòng liên hệ quản trị viên.');
+      }
+    }
+
+    const distances = storedDescriptors.map((stored) => this.euclideanDistance(descriptor, stored));
+    const distance = Math.min(...distances);
+    const threshold = this.getFaceMatchThreshold();
+    const passed = distance <= threshold;
+
+    if (!passed) {
+      const lockInfo = await this.recordFaceFailure(user);
+      await this.writeAudit(userId, 'FACE_VERIFY_FAIL', 'User', userId, {
+        context: 'STEPUP',
+        action,
+        resourceId: resourceId ?? null,
+        minDistance: Number(distance.toFixed(4)),
+        threshold,
+        failedAttempts: lockInfo.failedAttempts,
+        locked: lockInfo.locked,
+        ip,
+      });
+      if (lockInfo.locked) {
+        throw new UnauthorizedException('Quá nhiều lần thử khuôn mặt thất bại. Tài khoản tạm khóa.');
+      }
+      throw new UnauthorizedException('Xác thực khuôn mặt thất bại');
+    }
+
+    await this.resetFaceFailures(userId);
+
+    // Mint the single-use ticket; this is what authorizes the sensitive action.
+    const ticket = await this.stepUp.issue(userId, action, resourceId ?? null, ip);
+
+    await this.writeAudit(userId, 'FACE_STEPUP_PASS', 'User', userId, {
+      action,
+      resourceId: resourceId ?? null,
+      minDistance: Number(distance.toFixed(4)),
+      threshold,
+      ip,
+    });
+
+    return ticket;
   }
 
   async generateMfaSecret(userId: string) {
@@ -856,6 +966,13 @@ export class AuthService {
     });
   }
 
+  /**
+   * Write an auth/security event to BOTH audit stores:
+   *  - AuditLog: fast, queryable operational log (indexed by actor/action/entity).
+   *  - BlockchainLogger (via AuditLoggerService): tamper-evident hash-chain leaf that later gets
+   *    batched into an on-chain Merkle root. This is what makes login history non-repudiable.
+   * Both writes are non-fatal: a logging failure must never block authentication.
+   */
   private async writeAudit(
     actorId: string | null,
     action: string,
@@ -869,6 +986,18 @@ export class AuthService {
       });
     } catch (err) {
       console.error('[AuditLog] failed to write', action, err);
+    }
+
+    try {
+      await this.audit.record({
+        entity,
+        entityId: entityId ?? 'unknown',
+        action,
+        actorId,
+        metadata,
+      });
+    } catch (err) {
+      console.error('[BlockchainLogger] failed to write', action, err);
     }
   }
 }

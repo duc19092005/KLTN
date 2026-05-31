@@ -47,6 +47,24 @@ export class VerifyFaceDto {
   challenge: string;
 }
 
+export class StepUpFaceDto {
+  @IsArray()
+  embedding: number[];
+
+  @IsString()
+  @Length(32, 128)
+  challenge: string;
+
+  @IsString()
+  @Length(2, 64)
+  action: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  resourceId?: string;
+}
+
 export class WalletChallengeDto {
   @IsEthereumAddress()
   address: string;

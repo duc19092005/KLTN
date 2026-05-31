@@ -6,6 +6,7 @@ import { useAuth } from '../../../providers/AuthProvider';
 import { departmentService } from '../apis/departmentService';
 import { staffService } from '../apis/staffService';
 import DepartmentAuditModal from '../components/DepartmentAuditModal';
+import { FaceStepUpModal } from '../../auth';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 
 const DEPARTMENT_TYPES = [
@@ -37,6 +38,7 @@ export default function DepartmentsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [auditOpen, setAuditOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null); // department awaiting face step-up
 
   const load = async () => {
     setLoading(true); setError('');
@@ -83,9 +85,19 @@ export default function DepartmentsPage() {
     } catch (err) { setError(getError(err, 'Không gán được phụ trách')); }
     finally { setBusy(false); }
   };
-  const removeDepartment = async (id) => {
-    if (!confirm('Xóa phòng ban này?')) return; setBusy(true);
-    try { await departmentService.remove(id); if (selectedDepartment?.id === id) setSelectedDepartment(null); await load(); }
+  // Deleting a department is irreversible -> require a fresh face scan. Open the step-up modal
+  // for the chosen department; the actual delete runs in handleDeleteStepUp once a ticket exists.
+  const removeDepartment = (id) => {
+    const dep = departments.find((d) => d.id === id) || { id };
+    setError('');
+    setPendingDelete(dep);
+  };
+  const handleDeleteStepUp = async (ticket) => {
+    const id = pendingDelete?.id;
+    setPendingDelete(null);
+    if (!id) return;
+    setBusy(true);
+    try { await departmentService.remove(id, ticket); if (selectedDepartment?.id === id) setSelectedDepartment(null); await load(); }
     catch (err) { setError(getError(err, 'Không xóa được phòng ban')); }
     finally { setBusy(false); }
   };
@@ -105,6 +117,16 @@ export default function DepartmentsPage() {
         )}
         {isModalOpen && <DepartmentModal form={form} setForm={setForm} onSubmit={submitDepartment} onClose={closeModal} busy={busy} editing={Boolean(editingDepartment)} />}
         {auditOpen && <DepartmentAuditModal onClose={() => setAuditOpen(false)} />}
+        {pendingDelete && (
+          <FaceStepUpModal
+            action="DELETE_DEPARTMENT"
+            resourceId={pendingDelete.id}
+            title="Xác nhận xóa phòng ban"
+            description={`Xóa phòng ban "${pendingDelete.name || pendingDelete.id}" là thao tác không thể hoàn tác. Vui lòng quét khuôn mặt để xác nhận chính bạn thực hiện.`}
+            onSuccess={handleDeleteStepUp}
+            onClose={() => setPendingDelete(null)}
+          />
+        )}
       </div>
     </DashboardLayout>
   );

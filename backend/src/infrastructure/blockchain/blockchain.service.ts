@@ -38,6 +38,11 @@ export class BlockchainService implements OnModuleInit {
   private aiModelRegistry: ethers.Contract | null = null;
   private aiModelRegistryAddress = '';
 
+  // AuditAnchor: append-only Merkle-root logger. The backend commits one Merkle root per batch
+  // of audit logs (gas flat regardless of batch size); individual logs are never stored on-chain.
+  private auditAnchor: ethers.Contract | null = null;
+  private auditAnchorAddress = '';
+
   private readonly abi = [
     'function authorizeAdmin(address wallet) external',
     'function revokeAdmin(address wallet) external',
@@ -79,6 +84,15 @@ export class BlockchainService implements OnModuleInit {
     'function removeHash(bytes32 key) external',
     'function getHash(bytes32 key) external view returns (bytes32)',
     'function hasHash(bytes32 key) external view returns (bool)',
+    'function owner() external view returns (address)',
+  ];
+
+  private readonly auditAnchorAbi = [
+    'function commitRoot(uint256 batchId, bytes32 root, uint256 leafCount) external',
+    'function getRoot(uint256 batchId) external view returns (bytes32)',
+    'function getCheckpoint(uint256 batchId) external view returns (bytes32 root, uint256 leafCount, uint256 timestamp, bool committed)',
+    'function latestBatchId() external view returns (uint256)',
+    'function totalBatches() external view returns (uint256)',
     'function owner() external view returns (address)',
   ];
 
@@ -137,6 +151,15 @@ export class BlockchainService implements OnModuleInit {
       console.log(`✅ Connected to AIModelRegistry at ${this.aiModelRegistryAddress}`);
     } else {
       console.warn('⚠️ AI_MODEL_REGISTRY_ADDRESS not set. AI Model on-chain anchoring disabled.');
+    }
+
+    this.auditAnchorAddress = process.env.AUDIT_ANCHOR_ADDRESS || '';
+    if (this.auditAnchorAddress) {
+      const runner = this.superAdminSigner || this.provider;
+      this.auditAnchor = new ethers.Contract(this.auditAnchorAddress, this.auditAnchorAbi, runner);
+      console.log(`✅ Connected to AuditAnchor at ${this.auditAnchorAddress}`);
+    } else {
+      console.warn('⚠️ AUDIT_ANCHOR_ADDRESS not set. Audit Merkle-root anchoring disabled.');
     }
   }
 
@@ -495,6 +518,76 @@ export class BlockchainService implements OnModuleInit {
         return { success: false, error: error instanceof Error ? error.message : 'Failed to record backend-signed action' };
       }
     });
+  }
+
+  // ---- AuditAnchor: Merkle-root batch anchoring -------------------------------
+
+  /** Whether the AuditAnchor contract is available for writes. */
+  isAuditAnchorReady(): boolean {
+    return Boolean(this.auditAnchor && this.superAdminSigner);
+  }
+
+  /**
+   * Commit the Merkle root of a sealed batch of audit logs on-chain. Exactly one transaction
+   * per batch, regardless of how many logs it covers, so gas is flat. batchId must be unique
+   * and monotonic; the contract rejects re-committing an existing batchId.
+   * @param rootBytes32 0x-prefixed 32-byte Merkle root over the batch's entryHashes
+   */
+  async commitAuditRoot(batchId: number, rootBytes32: string, leafCount: number) {
+    return this.enqueueWrite(async () => {
+      if (!this.auditAnchor || !this.superAdminSigner) {
+        return { success: false, error: 'AuditAnchor or Super Admin signer not configured' };
+      }
+      try {
+        const writable = this.auditAnchor.connect(this.superAdminSigner) as ethers.Contract;
+        const tx = await writable.commitRoot(batchId, rootBytes32, leafCount);
+        const receipt = await tx.wait();
+        return { success: true, batchId, txHash: tx.hash, blockNumber: receipt.blockNumber };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to commit audit root' };
+      }
+    });
+  }
+
+  /** Read the committed Merkle root for a batch. Returns null if unavailable or not committed. */
+  async getAuditRoot(batchId: number): Promise<string | null> {
+    if (!this.auditAnchor) return null;
+    try {
+      const value: string = await this.auditAnchor.getRoot(batchId);
+      if (!value || value === ethers.ZeroHash) return null;
+      return value;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Read the full on-chain checkpoint (root, leafCount, timestamp, committed) for a batch. */
+  async getAuditCheckpoint(
+    batchId: number,
+  ): Promise<{ root: string; leafCount: number; timestamp: number; committed: boolean } | null> {
+    if (!this.auditAnchor) return null;
+    try {
+      const [root, leafCount, timestamp, committed] = await this.auditAnchor.getCheckpoint(batchId);
+      return {
+        root,
+        leafCount: Number(leafCount),
+        timestamp: Number(timestamp),
+        committed: Boolean(committed),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /** Highest batchId committed on-chain, or null if the registry is unavailable. */
+  async getLatestAuditBatchId(): Promise<number | null> {
+    if (!this.auditAnchor) return null;
+    try {
+      const value = await this.auditAnchor.latestBatchId();
+      return Number(value);
+    } catch {
+      return null;
+    }
   }
 
   getContractAddress(): string {

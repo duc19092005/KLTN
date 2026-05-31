@@ -17,14 +17,17 @@ import { VisitModule } from './modules/visit/visit.module';
 import { AiModelModule } from './modules/ai-model/ai-model.module';
 import { MedicalOrderModule } from './modules/medical-order/medical-order.module';
 import { ClinicalDecisionModule } from './modules/clinical-decision/clinical-decision.module';
+import { AuditApiModule } from './modules/audit/audit-api.module';
 import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { StepUpModule } from './common/stepup/stepup.module';
 
 @Module({
   imports: [
     PrismaModule,
     BlockchainModule,
     AuditModule,
+    StepUpModule,
     ZkpModule,
     AuthModule,
     DepartmentModule,
@@ -36,6 +39,7 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
     AiModelModule,
     MedicalOrderModule,
     ClinicalDecisionModule,
+    AuditApiModule,
   ],
   controllers: [AppController],
   providers: [

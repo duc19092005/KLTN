@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export const AI_MODEL_TYPES = ['API', 'IP'] as const;
-export const AI_API_PROVIDERS = ['chatgpt', 'gemini', 'deepseek', 'qwen', 'anthropic', 'other'] as const;
+export const AI_API_PROVIDERS = ['chatgpt', 'gemini', 'deepseek', 'qwen', 'anthropic', 'local', 'other'] as const;
 
 export class CreateAiModelDto {
   @ApiProperty({ example: 'GPT-4o Medical Assistant' })
@@ -38,10 +38,14 @@ export class CreateAiModelDto {
   @MaxLength(500)
   apiEndpoint?: string;
 
-  @ApiProperty({ description: 'API key/token hoặc IP/hash gốc. Backend sẽ mã hóa AES-256 trước khi lưu.' })
+  @ApiPropertyOptional({
+    description:
+      'API key/token. Tùy chọn cho model local/self-hosted (Llama, Ollama, vLLM) vốn không cần key. ' +
+      'Khi có giá trị, backend mã hóa AES-256 trước khi lưu; khi trống, hệ thống dùng endpoint làm định danh.',
+  })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  secretOrIpHash!: string;
+  secretOrIpHash?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -72,10 +76,10 @@ export class TestAiModelApiDto {
   @IsNotEmpty()
   modelVersion!: string;
 
-  @ApiProperty({ description: 'API key/token dùng để test, không lưu DB.' })
+  @ApiPropertyOptional({ description: 'API key/token dùng để test, không lưu DB. Tùy chọn cho model local.' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  secretOrIpHash!: string;
+  secretOrIpHash?: string;
 
   @ApiPropertyOptional({ description: 'Optional override endpoint' })
   @IsOptional()
