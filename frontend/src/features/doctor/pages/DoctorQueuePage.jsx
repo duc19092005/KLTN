@@ -789,6 +789,7 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="lg:col-span-2 rounded-2xl border border-white bg-white/80 p-4 shadow-sm"><AiSection title="Tổng quan lâm sàng" value={parsedResult.summary} /></div>
+              <div className="lg:col-span-2 rounded-2xl border border-white bg-white/80 p-4 shadow-sm"><ImageFindingsSection value={parsedResult.imageFindings} /></div>
               <div className="lg:col-span-2 rounded-2xl border border-white bg-white/80 p-4 shadow-sm"><DiagnosticProbabilitySection value={parsedResult.diagnosticProbabilities} /></div>
               <div className="rounded-2xl border border-white bg-white/80 p-4 shadow-sm"><AiSection title="Cân nhắc lâm sàng" value={parsedResult.clinicalConsiderations || parsedResult.possibleConditions} list /></div>
               <div className="rounded-2xl border border-white bg-white/80 p-4 shadow-sm"><AiSection title="Cảnh báo rủi ro" value={parsedResult.riskFlags} list /></div>
@@ -807,7 +808,44 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
 function normalizeAiAnalysis(value) {
   const parsed = parseAiResult(value);
   const analysis = parsed?.analysis && typeof parsed.analysis === 'object' && !Array.isArray(parsed.analysis) ? parsed.analysis : {};
-  return { ...parsed, ...analysis, summary: analysis.summary || parsed.summary, diagnosticProbabilities: analysis.diagnosticProbabilities || analysis.differentialDiagnoses || analysis.possibleDiagnoses || parsed.diagnosticProbabilities, clinicalConsiderations: analysis.clinicalConsiderations || parsed.clinicalConsiderations, riskFlags: analysis.riskFlags || parsed.riskFlags, recommendedNextSteps: analysis.recommendedNextSteps || parsed.recommendedNextSteps, limitations: analysis.limitations || parsed.limitations };
+  return { ...parsed, ...analysis, summary: analysis.summary || parsed.summary, imageFindings: analysis.imageFindings || parsed.imageFindings, diagnosticProbabilities: analysis.diagnosticProbabilities || analysis.differentialDiagnoses || analysis.possibleDiagnoses || parsed.diagnosticProbabilities, clinicalConsiderations: analysis.clinicalConsiderations || parsed.clinicalConsiderations, riskFlags: analysis.riskFlags || parsed.riskFlags, recommendedNextSteps: analysis.recommendedNextSteps || parsed.recommendedNextSteps, limitations: analysis.limitations || parsed.limitations };
+}
+
+const SEVERITY_TONE = {
+  'nặng': 'bg-red-50 text-red-700 border-red-100',
+  'trung bình': 'bg-amber-50 text-amber-700 border-amber-100',
+  'nhẹ': 'bg-emerald-50 text-emerald-700 border-emerald-100',
+  'không rõ': 'bg-slate-50 text-slate-600 border-slate-200',
+};
+
+function ImageFindingsSection({ value }) {
+  const items = Array.isArray(value) ? value : [];
+  if (!items.length) return null;
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <strong className="text-[11px] uppercase tracking-wider font-black text-indigo-900">Phát hiện trên ảnh y khoa</strong>
+        <span className="rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-black text-indigo-700 border border-indigo-100">{items.length} ảnh</span>
+      </div>
+      <div className="space-y-2">
+        {items.map((item, index) => {
+          const modality = item.modality || item.type || `Ảnh ${index + 1}`;
+          const finding = item.finding || item.observation || item.description || (typeof item === 'string' ? item : JSON.stringify(item));
+          const severity = String(item.severity || '').toLowerCase();
+          const tone = SEVERITY_TONE[severity] || 'bg-slate-50 text-slate-600 border-slate-200';
+          return (
+            <div key={`img-${index}`} className="rounded-xl border border-slate-100 bg-white p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-black text-slate-900">{modality}</span>
+                {severity && <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black uppercase ${tone}`}>{item.severity}</span>}
+              </div>
+              <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-600">{finding}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function DiagnosticProbabilitySection({ value }) {
