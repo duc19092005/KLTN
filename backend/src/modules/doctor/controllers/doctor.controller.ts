@@ -1,7 +1,9 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { AuthUser } from '../../../common/types/auth-user.type';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { AssignClinicalRoomDto, CreateDoctorDto, CreateDoctorWithStaffDto, DoctorQueryDto, UpdateDoctorDto } from '../dto/doctor.dto';
 import { DoctorService } from '../services/doctor.service';
@@ -65,8 +67,8 @@ export class DoctorController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update doctor specialty, license, qualification, or experience' })
-  update(@Param('id') id: string, @Body() dto: UpdateDoctorDto, @Req() req: any) {
-    return this.service.update(id, dto, req.user?.sub);
+  update(@Param('id') id: string, @Body() dto: UpdateDoctorDto, @CurrentUser() user: AuthUser) {
+    return this.service.update(id, dto, user?.sub);
   }
 
   @Patch(':id/clinical-room')

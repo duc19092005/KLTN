@@ -1,8 +1,10 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { UserStatus } from '@prisma/client';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { AuthUser } from '../../../common/types/auth-user.type';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
 import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
@@ -19,8 +21,8 @@ export class StaffController {
 
   @Post()
   @ApiOperation({ summary: 'Create staff profile and login user account' })
-  create(@Body() dto: CreateStaffDto, @Req() req: any) {
-    return this.service.create(dto, req.user?.sub);
+  create(@Body() dto: CreateStaffDto, @CurrentUser() user: AuthUser) {
+    return this.service.create(dto, user?.sub);
   }
 
   @Get()
@@ -62,27 +64,27 @@ export class StaffController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update staff profile and linked user account' })
-  update(@Param('id') id: string, @Body() dto: UpdateStaffDto, @Req() req: any) {
-    return this.service.update(id, dto, req.user?.sub);
+  update(@Param('id') id: string, @Body() dto: UpdateStaffDto, @CurrentUser() user: AuthUser) {
+    return this.service.update(id, dto, user?.sub);
   }
 
   @Patch(':id/lock')
   @ApiOperation({ summary: 'Lock a staff account' })
-  lock(@Param('id') id: string, @Req() req: any) {
-    return this.service.setStatus(id, UserStatus.INACTIVE, req.user?.sub);
+  lock(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.service.setStatus(id, UserStatus.INACTIVE, user?.sub);
   }
 
   @Patch(':id/unlock')
   @ApiOperation({ summary: 'Unlock a staff account' })
-  unlock(@Param('id') id: string, @Req() req: any) {
-    return this.service.setStatus(id, UserStatus.ACTIVE, req.user?.sub);
+  unlock(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.service.setStatus(id, UserStatus.ACTIVE, user?.sub);
   }
 
   @Delete(':id')
   @RequireFaceStepUp('DELETE_STAFF')
   @ApiOperation({ summary: 'Soft-delete staff by marking account inactive (requires face step-up)' })
-  remove(@Param('id') id: string, @Req() req: any) {
-    return this.service.remove(id, req.user?.sub);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.service.remove(id, user?.sub);
   }
 }
 

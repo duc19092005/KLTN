@@ -1,7 +1,9 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { AuthUser } from '../../../common/types/auth-user.type';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
 import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
@@ -18,8 +20,8 @@ export class DepartmentController {
 
   @Post()
   @ApiOperation({ summary: 'Create a department' })
-  create(@Body() dto: CreateDepartmentDto, @Req() req: any) {
-    return this.service.create(dto, req.user?.sub);
+  create(@Body() dto: CreateDepartmentDto, @CurrentUser() user: AuthUser) {
+    return this.service.create(dto, user?.sub);
   }
 
   @Roles('ADMIN', 'RECEPTIONIST', 'DOCTOR', 'LAB_MANAGER')
@@ -55,20 +57,20 @@ export class DepartmentController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update a department' })
-  update(@Param('id') id: string, @Body() dto: UpdateDepartmentDto, @Req() req: any) {
-    return this.service.update(id, dto, req.user?.sub);
+  update(@Param('id') id: string, @Body() dto: UpdateDepartmentDto, @CurrentUser() user: AuthUser) {
+    return this.service.update(id, dto, user?.sub);
   }
 
   @Patch(':id/manager')
   @ApiOperation({ summary: 'Assign or clear department manager' })
-  assignManager(@Param('id') id: string, @Body() dto: AssignManagerDto, @Req() req: any) {
-    return this.service.assignManager(id, dto, req.user?.sub);
+  assignManager(@Param('id') id: string, @Body() dto: AssignManagerDto, @CurrentUser() user: AuthUser) {
+    return this.service.assignManager(id, dto, user?.sub);
   }
 
   @Delete(':id')
   @RequireFaceStepUp('DELETE_DEPARTMENT')
   @ApiOperation({ summary: 'Delete an empty department (requires face step-up)' })
-  remove(@Param('id') id: string, @Req() req: any) {
-    return this.service.remove(id, req.user?.sub);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.service.remove(id, user?.sub);
   }
 }
