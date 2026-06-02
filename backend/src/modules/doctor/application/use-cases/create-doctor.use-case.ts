@@ -21,6 +21,18 @@ export class CreateDoctorUseCase {
     if (staff.userRole !== UserRole.DOCTOR) throw new BadRequestException('Staff user role must be DOCTOR');
     if (staff.hasDoctorProfile) throw new ConflictException('Doctor profile already exists for this staff');
 
+    if (staff.departmentId) {
+      const dept = await this.repo.findDepartment(staff.departmentId);
+      if (dept) {
+        if (dept.type !== 'CLINICAL') {
+          throw new BadRequestException('Doctor can only be assigned to a CLINICAL department');
+        }
+        if (dept.specialty && dept.specialty !== dto.specialty) {
+          throw new BadRequestException(`Bác sĩ chuyên khoa "${dto.specialty}" không thể được xếp vào phòng ban chuyên khoa "${dept.specialty}"`);
+        }
+      }
+    }
+
     const license = await this.repo.findDoctorByLicense(dto.licenseNumber);
     if (license) throw new ConflictException('License number already exists');
 

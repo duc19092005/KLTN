@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { patientService } from '../apis/patientService';
+import { useToast } from '../../../providers/ToastProvider';
 
 const emptyPatient = { fullName: '', gender: 'MALE', birthDate: '', citizenId: '', phone: '', address: '', insuranceNumber: '', emergencyContact: '' };
 const GENDERS = [{ value: 'MALE', label: 'Nam' }, { value: 'FEMALE', label: 'Nữ' }, { value: 'OTHER', label: 'Khác' }];
@@ -14,27 +15,28 @@ export default function PatientFinder({ onPatientSelected }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyPatient);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const toast = useToast();
 
   const searchPatient = async (event) => {
-    event.preventDefault(); setError(''); setResults(null);
+    event.preventDefault(); setResults(null);
     if (!query.trim()) return;
     setSearching(true);
     try {
       const res = await patientService.search({ search: query.trim(), limit: 10 });
       const items = Array.isArray(res.data) ? res.data : res.data?.items || [];
       setResults(items);
-    } catch (err) { setError(err.response?.data?.message || 'Tìm kiếm thất bại'); }
+    } catch (err) { toast.error(err.response?.data?.message || 'Tìm kiếm thất bại'); }
     finally { setSearching(false); }
   };
 
   const createPatient = async (event) => {
-    event.preventDefault(); setError(''); setSaving(true);
+    event.preventDefault(); setSaving(true);
     try {
       const res = await patientService.create({ ...form, birthDate: form.birthDate });
       setShowForm(false); setResults([res.data]);
       onPatientSelected(res.data);
-    } catch (err) { setError(err.response?.data?.message || 'Không tạo được hồ sơ bệnh nhân'); }
+      toast.success('Tạo hồ sơ bệnh nhân thành công!');
+    } catch (err) { toast.error(err.response?.data?.message || 'Không tạo được hồ sơ bệnh nhân'); }
     finally { setSaving(false); }
   };
 
@@ -55,7 +57,6 @@ export default function PatientFinder({ onPatientSelected }) {
           {searching ? <LoadingIndicator size="sm" tone="white" /> : 'Tìm kiếm'}
         </button>
       </form>
-      {error && <p className="text-red-600 text-sm font-bold">{error}</p>}
       {results !== null && (
         <div className="space-y-2">
           {results.length === 0 ? (

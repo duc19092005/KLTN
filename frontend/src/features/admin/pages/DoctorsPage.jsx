@@ -10,6 +10,46 @@ import { departmentService } from '../apis/departmentService';
 import DoctorAuditModal from '../components/DoctorAuditModal';
 import DoctorDetailModal from '../components/DoctorDetailModal';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
+import { FaceStepUpModal } from '../../auth';
+import { useToast } from '../../../providers/ToastProvider';
+
+const SPECIALTIES = [
+  'Nội tổng quát',
+  'Ngoại tổng quát',
+  'Nhi khoa',
+  'Sản phụ khoa',
+  'Tim mạch',
+  'Tai Mũi Họng',
+  'Răng Hàm Mặt',
+  'Mắt',
+  'Da liễu',
+  'Thần kinh',
+  'Chấn thương chỉnh hình',
+  'Tiêu hóa',
+  'Nội tiết',
+  'Ung bướu',
+  'Hô hấp'
+];
+
+const DOCTOR_POSITIONS = [
+  'Bác sĩ',
+  'Thạc sĩ Bác sĩ',
+  'Bác sĩ Chuyên khoa I',
+  'Bác sĩ Chuyên khoa II',
+  'Tiến sĩ Bác sĩ',
+  'Phó Giáo sư',
+  'Giáo sư'
+];
+
+const QUALIFICATIONS = [
+  'Đại học',
+  'Thạc sĩ',
+  'Bác sĩ Chuyên khoa I',
+  'Bác sĩ Chuyên khoa II',
+  'Tiến sĩ'
+];
+
+
 
 
 const emptyForm = {
@@ -62,6 +102,7 @@ function buildFullDoctorPayload(form) {
 export default function DoctorsPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
   const [doctors, setDoctors] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -72,14 +113,13 @@ export default function DoctorsPage() {
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [auditOpen, setAuditOpen] = useState(false);
   const [detailDoctorId, setDetailDoctorId] = useState(null);
+  const [showStepUp, setShowStepUp] = useState(false);
   const totalLabel = useMemo(() => `${pagination.total} bác sĩ`, [pagination.total]);
 
   const load = async (page = pagination.page) => {
-    setLoading(true); setError('');
+    setLoading(true);
     try {
       const [doctorRes, roomRes, departmentRes] = await Promise.all([
         doctorService.search({ ...filters, page, limit: pagination.limit }),
@@ -91,7 +131,7 @@ export default function DoctorsPage() {
       if (!Array.isArray(data)) setPagination({ page: data.page, limit: data.limit, total: data.total, totalPages: data.totalPages });
       setRooms(getItems(roomRes.data));
       setDepartments(getItems(departmentRes.data));
-    } catch (err) { setError(getError(err)); }
+    } catch (err) { toast.error(getError(err)); }
     finally { setLoading(false); }
   };
   useEffect(() => { load(1); }, []);
@@ -99,15 +139,11 @@ export default function DoctorsPage() {
   const openCreate = () => {
     setEditing(null);
     setForm(emptyForm);
-    setError('');
-    setNotice('');
     setIsCreateOpen(true);
   };
   const openEdit = (doctor) => {
     setIsCreateOpen(false);
     setEditing(doctor);
-    setError('');
-    setNotice('');
     const staff = doctor.staffProfile || {};
     const formattedBirthDate = staff.birthDate ? new Date(staff.birthDate).toISOString().split('T')[0] : '';
     setForm({
@@ -129,42 +165,53 @@ export default function DoctorsPage() {
       clinicalRoomId: doctor.clinicalRoom?.id || '',
     });
   };
-  const close = () => { setEditing(null); setIsCreateOpen(false); setForm(emptyForm); setError(''); };
+  const close = () => { setEditing(null); setIsCreateOpen(false); setForm(emptyForm); };
   const submit = async (event) => {
-    event.preventDefault(); setBusy(true); setError(''); setNotice('');
-    const nextPage = editing ? pagination.page : 1;
+    event.preventDefault();
+    if (editing) {
+      setShowStepUp(true);
+      return;
+    }
+    setBusy(true);
     try {
-      if (editing) {
-        const payload = {
-          ...buildDoctorPayload(form),
-          fullName: form.fullName,
-          phone: form.phone,
-          citizenId: form.citizenId,
-          gender: form.gender,
-          address: form.address || undefined,
-          avatarUrl: form.avatarUrl,
-          departmentId: form.departmentId || undefined,
-          position: form.position || undefined,
-          birthDate: form.birthDate,
-          clinicalRoomId: form.clinicalRoomId || null,
-        };
-        await doctorService.update(editing.id, payload);
-      } else {
-        await doctorService.createFull(buildFullDoctorPayload(form));
-        setNotice('Tài khoản bác sĩ mới dùng mật khẩu mặc định: 123456');
-      }
-      close(); await load(nextPage);
-    } catch (err) { setError(getError(err)); }
+      await doctorService.createFull(buildFullDoctorPayload(form));
+      toast.success('Tạo bác sĩ mới thành công! Mật khẩu mặc định là: 123456');
+      close(); await load(1);
+    } catch (err) { toast.error(getError(err)); }
     finally { setBusy(false); }
   };
+
+  const handleUpdateStepUp = async (ticket) => {
+    setShowStepUp(false);
+    setBusy(true);
+    const nextPage = pagination.page;
+    try {
+      const payload = {
+        ...buildDoctorPayload(form),
+        fullName: form.fullName,
+        phone: form.phone,
+        citizenId: form.citizenId,
+        gender: form.gender,
+        address: form.address || undefined,
+        avatarUrl: form.avatarUrl,
+        departmentId: form.departmentId || undefined,
+        position: form.position || undefined,
+        birthDate: form.birthDate,
+        clinicalRoomId: form.clinicalRoomId || null,
+      };
+      await doctorService.update(editing.id, payload, ticket);
+      toast.success('Cập nhật thông tin bác sĩ thành công!');
+      close(); await load(nextPage);
+    } catch (err) { toast.error(getError(err)); }
+    finally { setBusy(false); }
+  };
+
   const search = async (event) => { event.preventDefault(); await load(1); };
 
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="doctors" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
       <div className="max-w-7xl mx-auto space-y-6">
         <Hero totalLabel={totalLabel} onCreate={openCreate} onOpenAudit={() => setAuditOpen(true)} />
-        {error && !isCreateOpen && !editing && <Alert>{error}</Alert>}
-        {notice && <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-bold text-emerald-700">{notice}</div>}
         {loading ? <LoadingIndicator size="lg" label="Đang tải bác sĩ..." /> : (
           <>
             <SearchBar filters={filters} setFilters={setFilters} onSearch={search} />
@@ -181,18 +228,28 @@ export default function DoctorsPage() {
             </section>
           </>
         )}
-        {(isCreateOpen || editing) && <DoctorModal mode={editing ? 'edit' : 'create'} form={form} setForm={setForm} departments={departments} rooms={rooms} onSubmit={submit} onClose={close} busy={busy} error={error} />}
+        {(isCreateOpen || editing) && <DoctorModal mode={editing ? 'edit' : 'create'} form={form} setForm={setForm} departments={departments} rooms={rooms} onSubmit={submit} onClose={close} busy={busy} />}
         {auditOpen && <DoctorAuditModal onClose={() => setAuditOpen(false)} />}
         {detailDoctorId && <DoctorDetailModal doctorId={detailDoctorId} onClose={() => setDetailDoctorId(null)} />}
+        {showStepUp && (
+          <FaceStepUpModal
+            action="UPDATE_DOCTOR"
+            resourceId={editing?.id}
+            title="Xác thực cập nhật bác sĩ"
+            description={`Cập nhật thông tin bác sĩ "${form.fullName || editing?.staffProfile?.fullName}" yêu cầu xác thực khuôn mặt để xác nhận chính bạn thực hiện.`}
+            onSuccess={handleUpdateStepUp}
+            onClose={() => setShowStepUp(false)}
+          />
+        )}
       </div>
     </DashboardLayout>
   );
 }
 
 function Hero({ totalLabel, onCreate, onOpenAudit }) { return <section className="rounded-[28px] border border-indigo-100 bg-gradient-to-br from-white via-indigo-50 to-cyan-50 p-8 shadow-sm flex flex-col lg:flex-row lg:items-end justify-between gap-5"><div><p className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.24em] mb-3">Doctor OS</p><h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">Quản lý bác sĩ</h2><p className="mt-3 text-sm sm:text-base text-slate-600">Tạo mới đầy đủ tài khoản, hồ sơ nhân sự, chuyên khoa, chứng chỉ và phòng khám trong một bước.</p><span className="mt-4 inline-flex rounded-xl bg-white/80 px-3 py-1 text-xs font-black text-indigo-700 border border-indigo-100">{totalLabel}</span></div><div className="flex flex-wrap gap-3"><button onClick={onOpenAudit} className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50">🔗 Xác thực Blockchain</button><button onClick={onCreate} className="rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-indigo-100 hover:bg-indigo-700">+ Thêm bác sĩ</button></div></section>; }
-function SearchBar({ filters, setFilters, onSearch }) { return <form onSubmit={onSearch} className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-3 items-end"><Input label="Chuyên khoa" value={filters.specialty} onChange={(v) => setFilters({ ...filters, specialty: v })} /><Input label="Tìm kiếm" value={filters.search} onChange={(v) => setFilters({ ...filters, search: v })} placeholder="Tên bác sĩ, chứng chỉ..." /><button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-black text-white hover:bg-slate-800">Tìm kiếm</button></form>; }
+function SearchBar({ filters, setFilters, onSearch }) { return <form onSubmit={onSearch} className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-3 items-end"><Select label="Chuyên khoa" value={filters.specialty} onChange={(v) => setFilters({ ...filters, specialty: v })} empty="Tất cả chuyên khoa" options={SPECIALTIES} /><Input label="Tìm kiếm" value={filters.search} onChange={(v) => setFilters({ ...filters, search: v })} placeholder="Tên bác sĩ, chứng chỉ..." /><button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-black text-white hover:bg-slate-800">Tìm kiếm</button></form>; }
 function DoctorRow({ doctor, onEdit, onViewDetails, busy }) { return <article className="p-5 hover:bg-slate-50/70"><div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr_1fr_240px] gap-4 lg:items-center"><div className="flex items-center gap-3"><img src={doctor.staffProfile?.avatarUrl} alt={doctor.staffProfile?.fullName || 'Bác sĩ'} className="w-11 h-11 rounded-2xl object-cover border border-indigo-100 bg-indigo-50" /><div><strong className="block text-slate-950">{doctor.staffProfile?.fullName}</strong><span className="text-xs text-slate-500">{doctor.staffProfile?.user?.email}</span></div></div><Info label="Chuyên khoa" value={doctor.specialty} /><Info label="Phòng khám" value={doctor.clinicalRoom?.roomName || 'Chưa gán'} /><div className="lg:text-right flex justify-end gap-2"><button type="button" disabled={busy} onClick={() => onViewDetails(doctor.id)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-indigo-600 hover:bg-indigo-50 disabled:opacity-50">Xem chi tiết</button><button type="button" disabled={busy} onClick={() => onEdit(doctor)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-50">Sửa / Gán phòng</button></div></div></article>; }
-function DoctorModal({ mode, form, setForm, departments, rooms, onSubmit, onClose, busy, error }) { const isCreate = mode === 'create'; return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm"><form onSubmit={onSubmit} className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl space-y-5"><div className="flex justify-between gap-4"><div><p className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.18em]">Doctor profile</p><h3 className="text-2xl font-black text-slate-950">{isCreate ? 'Thêm bác sĩ' : 'Cập nhật bác sĩ'}</h3><p className="text-sm text-slate-500">{isCreate ? 'Nhập đầy đủ thông tin tài khoản, nhân sự và chuyên môn bác sĩ. Mật khẩu mặc định là 123456 và được mã hóa trước khi lưu.' : 'Cập nhật thông tin nhân sự, chuyên môn và phòng khám phụ trách.'}</p></div><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500">Đóng</button></div>{error && <Alert>{error}</Alert>}<SectionTitle title="Thông tin tài khoản và nhân sự" /><div className="grid grid-cols-1 md:grid-cols-3 gap-4"><Input label="Họ tên" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: v })} required /><Input label="Avatar URL" value={form.avatarUrl} onChange={(v) => setForm({ ...form, avatarUrl: v })} placeholder="https://..." required /><Input label="Username" value={form.username} onChange={(v) => setForm({ ...form, username: v })} disabled={!isCreate} required /><Input label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} disabled={!isCreate} required /><Input label="Số điện thoại" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} required /><Input label="CCCD/CMND" value={form.citizenId} onChange={(v) => setForm({ ...form, citizenId: v })} required /><Input type="date" label="Ngày sinh" value={form.birthDate} onChange={(v) => setForm({ ...form, birthDate: v })} required /><Select label="Giới tính" value={form.gender} onChange={(v) => setForm({ ...form, gender: v })} empty="Chọn giới tính" required options={['Nam', 'Nữ', 'Khác']} /><Select label="Phòng ban" value={form.departmentId} onChange={(v) => setForm({ ...form, departmentId: v })} empty="Chưa gán phòng ban" options={departments.map((d) => ({ value: d.id, label: `${d.departmentCode || 'PB'} - ${d.name}` }))} /><Input label="Chức danh" value={form.position} onChange={(v) => setForm({ ...form, position: v })} placeholder="Bác sĩ" /><Input label="Địa chỉ" value={form.address} onChange={(v) => setForm({ ...form, address: v })} /></div><SectionTitle title="Thông tin chuyên môn" /><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Input label="Chuyên khoa" value={form.specialty} onChange={(v) => setForm({ ...form, specialty: v })} required /><Input label="Số chứng chỉ" value={form.licenseNumber} onChange={(v) => setForm({ ...form, licenseNumber: v })} required /><Input label="Trình độ" value={form.qualification} onChange={(v) => setForm({ ...form, qualification: v })} required /><Input type="number" label="Số năm kinh nghiệm" value={form.yearsExperience} onChange={(v) => setForm({ ...form, yearsExperience: v })} /><Select label="Phòng khám phụ trách" value={form.clinicalRoomId} onChange={(v) => setForm({ ...form, clinicalRoomId: v })} empty="Chưa gán phòng" options={rooms.map((r) => ({ value: r.id, label: `${r.roomCode} - ${r.roomName}` }))} /></div><button disabled={busy} className="w-full rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white hover:bg-indigo-700 disabled:opacity-70">{isCreate ? 'Tạo bác sĩ' : 'Lưu thay đổi'}</button></form></div>; }
+function DoctorModal({ mode, form, setForm, departments, rooms, onSubmit, onClose, busy }) { const isCreate = mode === 'create'; return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm"><form onSubmit={onSubmit} className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl space-y-5"><div className="flex justify-between gap-4"><div><p className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.18em]">Doctor profile</p><h3 className="text-2xl font-black text-slate-950">{isCreate ? 'Thêm bác sĩ' : 'Cập nhật bác sĩ'}</h3><p className="text-sm text-slate-500">{isCreate ? 'Nhập đầy đủ thông tin tài khoản, nhân sự và chuyên môn bác sĩ. Mật khẩu mặc định là 123456 và được mã hóa trước khi lưu.' : 'Cập nhật thông tin nhân sự, chuyên môn và phòng khám phụ trách.'}</p></div><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500">Đóng</button></div><SectionTitle title="Thông tin tài khoản và nhân sự" /><div className="grid grid-cols-1 md:grid-cols-3 gap-4"><Input label="Họ tên" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: v })} required /><Input label="Avatar URL" value={form.avatarUrl} onChange={(v) => setForm({ ...form, avatarUrl: v })} placeholder="https://..." required /><Input label="Username" value={form.username} onChange={(v) => setForm({ ...form, username: v })} disabled={!isCreate} required /><Input label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} disabled={!isCreate} required /><Input label="Số điện thoại" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} required /><Input label="CCCD/CMND" value={form.citizenId} onChange={(v) => setForm({ ...form, citizenId: v })} required /><Input type="date" label="Ngày sinh" value={form.birthDate} onChange={(v) => setForm({ ...form, birthDate: v })} required /><Select label="Giới tính" value={form.gender} onChange={(v) => setForm({ ...form, gender: v })} empty="Chọn giới tính" required options={['Nam', 'Nữ', 'Khác']} /><Select label="Phòng ban" value={form.departmentId} onChange={(v) => setForm({ ...form, departmentId: v })} empty="Chưa gán phòng ban" options={departments.filter((d) => d.type === 'CLINICAL').map((d) => ({ value: d.id, label: `${d.departmentCode || 'PB'} - ${d.name}` }))} /><Select label="Chức danh" value={form.position} onChange={(v) => setForm({ ...form, position: v })} empty="Chọn chức danh" required options={DOCTOR_POSITIONS} /><Input label="Địa chỉ" value={form.address} onChange={(v) => setForm({ ...form, address: v })} /></div><SectionTitle title="Thông tin chuyên môn" /><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Select label="Chuyên khoa" value={form.specialty} onChange={(v) => setForm({ ...form, specialty: v })} empty="Chọn chuyên khoa" required options={SPECIALTIES} /><Input label="Số chứng chỉ" value={form.licenseNumber} onChange={(v) => setForm({ ...form, licenseNumber: v })} required /><Select label="Trình độ" value={form.qualification} onChange={(v) => setForm({ ...form, qualification: v })} empty="Chọn trình độ" required options={QUALIFICATIONS} /><Input type="number" label="Số năm kinh nghiệm" value={form.yearsExperience} onChange={(v) => setForm({ ...form, yearsExperience: v })} /><Select label="Phòng khám phụ trách" value={form.clinicalRoomId} onChange={(v) => setForm({ ...form, clinicalRoomId: v })} empty="Chọn phòng khám" required options={rooms.map((r) => ({ value: r.id, label: `${r.roomCode} - ${r.roomName}` }))} /></div><button disabled={busy} className="w-full rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white hover:bg-indigo-700 disabled:opacity-70">{isCreate ? 'Tạo bác sĩ' : 'Lưu thay đổi'}</button></form></div>; }
 function SectionTitle({ title }) { return <h4 className="border-t border-slate-100 pt-4 text-sm font-black text-slate-800 first:border-t-0 first:pt-0">{title}</h4>; }
 function Pagination({ pagination, onPageChange }) { return <div className="flex items-center justify-between border-t border-slate-100 p-4"><p className="text-sm font-semibold text-slate-500">Trang {pagination.page}/{pagination.totalPages}</p><div className="flex gap-2"><SmallButton disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>Trước</SmallButton><SmallButton disabled={pagination.page >= pagination.totalPages} onClick={() => onPageChange(pagination.page + 1)}>Sau</SmallButton></div></div>; }
 function Info({ label, value }) { return <div><p className="text-[11px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className="text-sm font-bold text-slate-700">{value}</p></div>; }

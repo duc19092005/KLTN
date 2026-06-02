@@ -5,10 +5,12 @@ import { Roles } from '../../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
 import { RolesGuard } from '../../auth/guards/roles.guard';
+import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
+import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
 import { AssignClinicalRoomDto, CreateDoctorDto, CreateDoctorWithStaffDto, DoctorQueryDto, UpdateDoctorDto } from '../dto/doctor.dto';
 import { DoctorService } from '../services/doctor.service';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
 @Roles('ADMIN')
 @ApiTags('Doctors')
 @ApiBearerAuth()
@@ -66,6 +68,7 @@ export class DoctorController {
   }
 
   @Patch(':id')
+  @RequireFaceStepUp('UPDATE_DOCTOR')
   @ApiOperation({ summary: 'Update doctor specialty, license, qualification, or experience' })
   update(@Param('id') id: string, @Body() dto: UpdateDoctorDto, @CurrentUser() user: AuthUser) {
     return this.service.update(id, dto, user?.sub);

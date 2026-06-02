@@ -6,6 +6,7 @@ import { useAuth } from '../../../providers/AuthProvider';
 import { departmentService } from '../apis/departmentService';
 import { staffService } from '../apis/staffService';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
+import { useToast } from '../../../providers/ToastProvider';
 
 
 function getStaffItems(data) {
@@ -15,10 +16,10 @@ function getStaffItems(data) {
 export default function AdminPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
   const [departments, setDepartments] = useState([]);
   const [staffs, setStaffs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   const stats = useMemo(() => [
     { label: 'Phòng ban', value: departments.length, hint: 'Đơn vị chuyên môn', icon: '🏥' },
@@ -30,13 +31,12 @@ export default function AdminPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      setError('');
       try {
         const [departmentRes, staffRes] = await Promise.all([departmentService.list(), staffService.search()]);
         setDepartments(Array.isArray(departmentRes.data) ? departmentRes.data : departmentRes.data?.items || []);
         setStaffs(getStaffItems(staffRes.data));
       } catch (err) {
-        setError(err?.response?.data?.message || err.message || 'Không tải được thống kê');
+        toast.error(err?.response?.data?.message || err.message || 'Không tải được thống kê');
       } finally {
         setLoading(false);
       }
@@ -54,8 +54,6 @@ export default function AdminPage() {
             Trang thống kê nhanh tình trạng phòng ban, nhân sự, tài khoản hoạt động và các hồ sơ đang chờ kích hoạt trong Hospital OS.
           </p>
         </section>
-
-        {error && <div className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div>}
 
         {loading ? <LoadingIndicator size="lg" label="Đang tải thống kê..." /> : (
           <>

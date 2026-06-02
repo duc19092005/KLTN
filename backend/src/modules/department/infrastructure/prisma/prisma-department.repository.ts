@@ -58,6 +58,7 @@ export class PrismaDepartmentRepository implements DepartmentRepositoryPort {
           canReceiveOrders: data.canReceiveOrders,
           description: data.description?.trim(),
           managerId: data.managerId || null,
+          specialty: data.specialty || null,
         },
         include: this.includeRelations(),
       });
@@ -104,6 +105,7 @@ export class PrismaDepartmentRepository implements DepartmentRepositoryPort {
         ...(data.type !== undefined ? { type: data.type } : {}),
         ...(data.canReceiveOrders !== undefined ? { canReceiveOrders: data.canReceiveOrders } : {}),
         ...(data.description !== undefined ? { description: data.description?.trim() } : {}),
+        ...(data.specialty !== undefined ? { specialty: data.specialty || null } : {}),
       },
       include: this.includeRelations(),
     });

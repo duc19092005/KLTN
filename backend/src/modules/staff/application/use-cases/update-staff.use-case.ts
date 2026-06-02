@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, UserRole } from '@prisma/client';
 import { UpdateStaffDto } from '../../dto/staff.dto';
 import { STAFF_REPOSITORY, StaffRepositoryPort } from '../ports/staff.repository.port';
@@ -24,7 +24,18 @@ export class UpdateStaffUseCase {
 
   async execute(id: string, dto: UpdateStaffDto, actorId?: string) {
     const staff = await this.validator.ensureStaff(id);
-    if (dto.departmentId) await this.validator.ensureDepartment(dto.departmentId);
+    if (dto.departmentId) {
+      const dept = await this.repo.findDepartment(dto.departmentId);
+      if (!dept) throw new NotFoundException('Department not found');
+      if (staff.doctorProfile) {
+        if (dept.type !== 'CLINICAL') {
+          throw new BadRequestException('Doctor can only be assigned to a CLINICAL department');
+        }
+        if (dept.specialty && dept.specialty !== staff.doctorProfile.specialty) {
+          throw new BadRequestException(`Bác sĩ chuyên khoa "${staff.doctorProfile.specialty}" không thể được xếp vào phòng ban chuyên khoa "${dept.specialty}"`);
+        }
+      }
+    }
     if (dto.role === UserRole.ADMIN) {
       throw new BadRequestException('Staff module cannot promote users to ADMIN');
     }

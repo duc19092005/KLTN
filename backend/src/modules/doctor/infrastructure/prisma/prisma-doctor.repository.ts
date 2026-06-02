@@ -27,11 +27,17 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
       include: { user: { select: { role: true } }, doctorProfile: true },
     });
     if (!staff) return null;
-    return { id: staff.id, userRole: staff.user.role, hasDoctorProfile: Boolean(staff.doctorProfile) };
+    return { id: staff.id, userRole: staff.user.role, hasDoctorProfile: Boolean(staff.doctorProfile), departmentId: staff.departmentId };
   }
 
   async departmentExists(id: string): Promise<boolean> {
     return Boolean(await this.prisma.department.findUnique({ where: { id }, select: { id: true } }));
+  }
+
+  async findDepartment(id: string): Promise<{ id: string; type: string; specialty?: string | null } | null> {
+    const dept = await this.prisma.department.findUnique({ where: { id }, select: { id: true, type: true, specialty: true } });
+    if (!dept) return null;
+    return { id: dept.id, type: dept.type, specialty: dept.specialty };
   }
 
   async roomExists(id: string): Promise<boolean> {

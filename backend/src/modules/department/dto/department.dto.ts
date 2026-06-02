@@ -31,6 +31,12 @@ export class CreateDepartmentDto {
   @IsEnum(DepartmentType)
   type?: DepartmentType;
 
+  @ApiPropertyOptional({ example: 'Cardiology' })
+  @IsOptional()
+  @IsString()
+  specialty?: string;
+
+
   @ApiPropertyOptional({ example: false })
   @IsOptional()
   @Transform(({ value }) => value === true || value === 'true')
@@ -77,6 +83,12 @@ export class UpdateDepartmentDto {
   @IsOptional()
   @IsEnum(DepartmentType)
   type?: DepartmentType;
+
+  @ApiPropertyOptional({ example: 'Cardiology' })
+  @IsOptional()
+  @IsString()
+  specialty?: string;
+
 
   @ApiPropertyOptional({ example: false })
   @IsOptional()

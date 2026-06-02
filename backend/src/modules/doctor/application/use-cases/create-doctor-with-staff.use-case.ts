@@ -1,5 +1,5 @@
 import * as bcrypt from 'bcrypt';
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { CreateDoctorWithStaffDto } from '../../dto/doctor.dto';
 import { DOCTOR_REPOSITORY, DoctorRepositoryPort } from '../ports/doctor.repository.port';
@@ -20,11 +20,23 @@ export class CreateDoctorWithStaffUseCase {
   ) {}
 
   async execute(dto: CreateDoctorWithStaffDto) {
-    if (dto.departmentId && !(await this.repo.departmentExists(dto.departmentId))) {
-      throw new NotFoundException('Department not found');
+    if (!dto.clinicalRoomId) {
+      throw new BadRequestException('Clinical room is required');
     }
-    if (dto.clinicalRoomId && !(await this.repo.roomExists(dto.clinicalRoomId))) {
+    if (!(await this.repo.roomExists(dto.clinicalRoomId))) {
       throw new NotFoundException('Clinical room not found');
+    }
+    if (dto.departmentId) {
+      const dept = await this.repo.findDepartment(dto.departmentId);
+      if (!dept) {
+        throw new NotFoundException('Department not found');
+      }
+      if (dept.type !== 'CLINICAL') {
+        throw new BadRequestException('Doctor can only be assigned to a CLINICAL department');
+      }
+      if (dept.specialty && dept.specialty !== dto.specialty) {
+        throw new BadRequestException(`Bác sĩ chuyên khoa "${dto.specialty}" không thể được xếp vào phòng ban chuyên khoa "${dept.specialty}"`);
+      }
     }
     if (await this.repo.findUserByUsernameOrEmail(dto.username, dto.email)) {
       throw new ConflictException('Username or email already exists');

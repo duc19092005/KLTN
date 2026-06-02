@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { doctorService } from '../apis/doctorService';
+import { useToast } from '../../../providers/ToastProvider';
 
 const STATUS_TONE = {
   VERIFIED: { label: 'Khớp blockchain', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
@@ -27,13 +28,12 @@ function formatTime(value) {
 export default function DoctorAuditModal({ onClose }) {
   const [tab, setTab] = useState('verify');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const toast = useToast();
   const [verifyResult, setVerifyResult] = useState(null);
   const [history, setHistory] = useState([]);
 
   const load = async () => {
     setLoading(true);
-    setError('');
     try {
       const [verifyRes, historyRes] = await Promise.all([
         doctorService.verifyAll(),
@@ -42,7 +42,7 @@ export default function DoctorAuditModal({ onClose }) {
       setVerifyResult(verifyRes.data);
       setHistory(Array.isArray(historyRes.data) ? historyRes.data : historyRes.data?.items || []);
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || 'Không tải được dữ liệu xác thực');
+      toast.error(err?.response?.data?.message || err.message || 'Không tải được dữ liệu xác thực');
     } finally {
       setLoading(false);
     }
@@ -88,7 +88,6 @@ export default function DoctorAuditModal({ onClose }) {
 
 		{/* Body */}
         <div className="flex-1 overflow-y-auto bg-slate-50/60 p-5">
-          {error && <div className="mb-4 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div>}
           {loading ? (
             <LoadingIndicator size="lg" label="Đang đối chiếu dữ liệu bác sĩ với blockchain..." />
           ) : tab === 'verify' ? (

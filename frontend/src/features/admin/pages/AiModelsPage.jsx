@@ -5,6 +5,7 @@ import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { useAuth } from '../../../providers/AuthProvider';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { aiModelService } from '../apis/aiModelService';
+import { useToast } from '../../../providers/ToastProvider';
 
 // A provider is either a managed cloud API (endpoint auto-filled, key required) or a
 // self-hosted / custom endpoint (admin types the URL, key optional). "local" covers
@@ -87,6 +88,7 @@ function resolvedEndpoint(form) {
 export default function AiModelsPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
   const [models, setModels] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [filter, setFilter] = useState(''); // '' | cloud | local (client-side)
@@ -95,16 +97,14 @@ export default function AiModelsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [testResult, setTestResult] = useState(null);
 
   const load = async () => {
-    setLoading(true); setError('');
+    setLoading(true);
     try {
       const res = await aiModelService.list();
       setModels(getItems(res.data));
-    } catch (err) { setError(err.response?.data?.message || 'Không tải được AI Model Registry'); }
+    } catch (err) { toast.error(err.response?.data?.message || 'Không tải được AI Model Registry'); }
     finally { setLoading(false); }
   };
 
@@ -129,8 +129,6 @@ export default function AiModelsPage() {
   const openCreateModal = () => {
     setForm(emptyForm);
     setTestResult(null);
-    setError('');
-    setSuccess('');
     setShowCreateModal(true);
   };
 
@@ -152,7 +150,7 @@ export default function AiModelsPage() {
   };
 
   const testApi = async () => {
-    setTesting(true); setError(''); setSuccess(''); setTestResult(null);
+    setTesting(true); setTestResult(null);
     try {
       const res = await aiModelService.testApi({
         provider: form.provider,
@@ -161,14 +159,14 @@ export default function AiModelsPage() {
         apiEndpoint: form.apiEndpoint || undefined,
       });
       setTestResult(res.data);
-      setSuccess(`Kết nối thành công (${res.data.latencyMs}ms).`);
-    } catch (err) { setError(err.response?.data?.message || 'Kết nối model thất bại'); }
+      toast.success(`Kết nối thành công (${res.data.latencyMs}ms).`);
+    } catch (err) { toast.error(err.response?.data?.message || 'Kết nối model thất bại'); }
     finally { setTesting(false); }
   };
 
   const submit = async (event) => {
     event.preventDefault();
-    setSaving(true); setError(''); setSuccess('');
+    setSaving(true);
     try {
       // Unified flow: every model is registered as an API endpoint. Self-hosted (local) just
       // points at its own URL. type is kept for backend compatibility.
@@ -183,10 +181,10 @@ export default function AiModelsPage() {
         description: form.description || undefined,
       };
       const res = await aiModelService.create(payload);
-      setSuccess(`Đã thêm model ${res.data.modelName}.`);
+      toast.success(`Đã thêm model ${res.data.modelName}.`);
       setForm(emptyForm); setTestResult(null); setShowCreateModal(false);
       await load();
-    } catch (err) { setError(err.response?.data?.message || 'Không thêm được AI model'); }
+    } catch (err) { toast.error(err.response?.data?.message || 'Không thêm được AI model'); }
     finally { setSaving(false); }
   };
 
@@ -204,9 +202,6 @@ export default function AiModelsPage() {
             <button type="button" onClick={openCreateModal} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-cyan-100 hover:bg-cyan-700 transition-all">+ Thêm model AI</button>
           </div>
         </section>
-
-        {success && <Alert tone="success" message={success} />}
-        {error && !showCreateModal && <Alert tone="error" message={error} />}
 
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {stats.map((item) => <div key={item.label} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"><p className="text-[10px] uppercase tracking-wider text-slate-400 font-black">{item.label}</p><strong className="mt-1 block text-2xl font-black text-slate-950">{String(item.value).padStart(2, '0')}</strong></div>)}
@@ -236,12 +231,12 @@ export default function AiModelsPage() {
           </div>
         </section>
       </div>
-      {showCreateModal && <CreateModelModal form={form} updateForm={updateForm} onSubmit={submit} onClose={closeCreateModal} saving={saving} testing={testing} testApi={testApi} testResult={testResult} error={error} />}
+      {showCreateModal && <CreateModelModal form={form} updateForm={updateForm} onSubmit={submit} onClose={closeCreateModal} saving={saving} testing={testing} testApi={testApi} testResult={testResult} />}
     </DashboardLayout>
   );
 }
 
-function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing, testApi, testResult, error }) {
+function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing, testApi, testResult }) {
   const endpoint = resolvedEndpoint(form);
   const selectedProvider = providerInfo(form.provider);
   const manualEndpoint = needsManualEndpoint(form.provider);
@@ -263,7 +258,6 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4 p-6">
-          {error && <Alert tone="error" message={error} />}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Tên model hiển thị" value={form.modelName} onChange={(v) => updateForm('modelName', v)} required placeholder="VD: Trợ lý nội tổng quát" />

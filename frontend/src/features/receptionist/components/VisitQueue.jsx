@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { visitService } from '../apis/visitService';
 import { VISIT_STATUS, getVisitStatus } from '../constants/visitStatus';
+import { useToast } from '../../../providers/ToastProvider';
 
 const STATUS_TABS = ['', 'WAITING', 'IN_PROGRESS', 'WAITING_TEST_RESULT', 'WAITING_CONCLUSION', 'COMPLETED', 'CANCELLED'];
 const PAGE_SIZE = 8;
@@ -15,6 +16,7 @@ export default function VisitQueue({ refreshTrigger }) {
   const [sortOrder, setSortOrder] = useState('asc');
   const [page, setPage] = useState(1);
   const [busyId, setBusyId] = useState('');
+  const toast = useToast();
 
   const loadVisits = async () => {
     setLoading(true);
@@ -25,7 +27,7 @@ export default function VisitQueue({ refreshTrigger }) {
       setVisits(items);
       if (selectedVisit) setSelectedVisit(items.find((item) => item.id === selectedVisit.id) || null);
     } catch (err) {
-      console.error('Failed to load visits', err);
+      toast.error('Không tải được danh sách lượt khám');
     } finally {
       setLoading(false);
     }
@@ -39,9 +41,10 @@ export default function VisitQueue({ refreshTrigger }) {
     setBusyId(visit.id);
     try {
       await visitService.updateStatus(visit.id, 'CANCELLED');
+      toast.success(`Đã hủy lượt khám ${visit.visitCode} thành công!`);
       await loadVisits();
     } catch (err) {
-      alert(err.response?.data?.message || 'Không thể hủy');
+      toast.error(err.response?.data?.message || 'Không thể hủy');
     } finally {
       setBusyId('');
     }

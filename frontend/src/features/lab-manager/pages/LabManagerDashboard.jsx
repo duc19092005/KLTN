@@ -6,25 +6,26 @@ import { useAuth } from '../../../providers/AuthProvider';
 import { medicalOrderService } from '../../medical-order/apis/medicalOrderService';
 import { LAB_MANAGER_NAV_ITEMS, labManagerRouteFor } from '../constants/navigation';
 import { getMedicalOrderStatus } from '../constants/medicalOrderStatus';
+import { useToast } from '../../../providers/ToastProvider';
 
 function getItems(data) { return Array.isArray(data) ? data : data?.items || []; }
 
 export default function LabManagerDashboardPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     let mounted = true;
     async function load() {
-      setLoading(true); setError('');
+      setLoading(true);
       try {
         const res = await medicalOrderService.list({});
         if (mounted) setOrders(getItems(res.data));
       } catch (err) {
-        if (mounted) setError(err.response?.data?.message || 'Không tải được thống kê Lab');
+        if (mounted) toast.error(err.response?.data?.message || 'Không tải được thống kê Lab');
       } finally { if (mounted) setLoading(false); }
     }
     load();
@@ -55,7 +56,6 @@ export default function LabManagerDashboardPage() {
             <button onClick={() => navigate('/lab-manager/orders')} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-700">Xử lý phiếu</button>
           </div>
         </section>
-        {error && <Alert tone="error" message={error} />}
         {loading ? <LoadingIndicator size="lg" label="Đang tải thống kê..." /> : <>
           <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
             <Kpi label="Hôm nay" value={analytics.today} />

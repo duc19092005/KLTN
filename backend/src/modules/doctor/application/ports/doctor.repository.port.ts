@@ -12,6 +12,7 @@ export type StaffForDoctorCreate = {
   id: string;
   userRole: string;
   hasDoctorProfile: boolean;
+  departmentId: string | null;
 };
 
 /**
@@ -23,6 +24,7 @@ export interface DoctorRepositoryPort {
   findByIdWithRelations(id: string): Promise<any | null>;
   findStaffForDoctorCreate(staffProfileId: string): Promise<StaffForDoctorCreate | null>;
   departmentExists(id: string): Promise<boolean>;
+  findDepartment(id: string): Promise<{ id: string; type: string; specialty?: string | null } | null>;
   roomExists(id: string): Promise<boolean>;
 
   findDoctorByLicense(licenseNumber: string): Promise<{ id: string } | null>;

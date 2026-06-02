@@ -6,6 +6,7 @@ import { useAuth } from '../../../providers/AuthProvider';
 import { auditService } from '../apis/auditService';
 import { FaceStepUpModal } from '../../auth';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
+import { useToast } from '../../../providers/ToastProvider';
 
 // ---- Display helpers --------------------------------------------------------
 
@@ -51,22 +52,20 @@ function formatTime(value) {
 export default function AuditLogsPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [tab, setTab] = useState('logs');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [logs, setLogs] = useState([]);
   const [batches, setBatches] = useState([]);
   const [chain, setChain] = useState(null);
   const [entity, setEntity] = useState('');
   const [anchoring, setAnchoring] = useState(false);
-  const [notice, setNotice] = useState('');
   const [proof, setProof] = useState(null);
   const [stepUpOpen, setStepUpOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError('');
     try {
       const [logsRes, batchesRes, chainRes] = await Promise.all([
         auditService.logs({ take: 200, ...(entity ? { entity } : {}) }),
@@ -77,7 +76,7 @@ export default function AuditLogsPage() {
       setBatches(Array.isArray(batchesRes.data) ? batchesRes.data : batchesRes.data?.items || []);
       setChain(chainRes.data);
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || 'Không tải được nhật ký');
+      toast.error(err?.response?.data?.message || err.message || 'Không tải được nhật ký');
     } finally {
       setLoading(false);
     }
@@ -101,8 +100,6 @@ export default function AuditLogsPage() {
 
   // Step 1: open the face step-up modal. The anchor only commits after a valid ticket is minted.
   const handleAnchorNow = () => {
-    setNotice('');
-    setError('');
     setStepUpOpen(true);
   };
 
@@ -113,14 +110,14 @@ export default function AuditLogsPage() {
     try {
       const res = await auditService.anchorNow(ticket);
       const d = res.data || {};
-      setNotice(
-        d.committed
-          ? `Đã neo lô #${d.batchId} (${d.leafCount} log) lên blockchain.`
-          : `Không có gì để neo: ${d.reason || 'hàng đợi trống'}.`,
-      );
+      if (d.committed) {
+        toast.success(`Đã neo lô #${d.batchId} (${d.leafCount} log) lên blockchain.`);
+      } else {
+        toast.info(`Không có gì để neo: ${d.reason || 'hàng đợi trống'}.`);
+      }
       await load();
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || 'Neo thất bại');
+      toast.error(err?.response?.data?.message || err.message || 'Neo thất bại');
     } finally {
       setAnchoring(false);
     }
@@ -168,9 +165,6 @@ export default function AuditLogsPage() {
 
         {/* Integrity banner */}
         <ChainBanner chain={chain} loading={loading} />
-
-        {notice && <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm font-bold text-blue-700">{notice}</div>}
-        {error && <div className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div>}
 
         {/* Stats */}
         <section className="grid grid-cols-2 xl:grid-cols-4 gap-4">

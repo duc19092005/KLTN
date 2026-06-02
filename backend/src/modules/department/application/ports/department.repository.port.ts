@@ -21,6 +21,7 @@ export type CreateDepartmentData = {
   canReceiveOrders: boolean;
   description?: string;
   managerId?: string | null;
+  specialty?: string | null;
 };
 
 export type UpdateDepartmentData = {
@@ -31,6 +32,7 @@ export type UpdateDepartmentData = {
   type?: DepartmentType;
   canReceiveOrders?: boolean;
   description?: string;
+  specialty?: string | null;
 };
 
 export type StaffProfileInfo = { id: string; departmentId: string | null };

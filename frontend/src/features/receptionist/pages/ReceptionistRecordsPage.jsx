@@ -7,6 +7,7 @@ import { visitService } from '../apis/visitService';
 import { patientService } from '../apis/patientService';
 import { RECEPTIONIST_NAV_ITEMS, receptionistRouteFor } from '../constants/navigation';
 import { getVisitStatus } from '../constants/visitStatus';
+import { useToast } from '../../../providers/ToastProvider';
 
 function getItems(data) { return Array.isArray(data) ? data : data?.items || []; }
 const PAGE_SIZE = 10;
@@ -14,25 +15,25 @@ const PAGE_SIZE = 10;
 export default function ReceptionistRecordsPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
   const [patients, setPatients] = useState([]);
   const [visits, setVisits] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     let mounted = true;
     async function load() {
-      setLoading(true); setError('');
+      setLoading(true);
       try {
         const [patientRes, visitRes] = await Promise.all([patientService.search({ limit: 100 }), visitService.search({ limit: 100 })]);
         if (!mounted) return;
         setPatients(getItems(patientRes.data));
         setVisits(getItems(visitRes.data));
       } catch (err) {
-        if (mounted) setError(err.response?.data?.message || 'Không tải được hồ sơ');
+        if (mounted) toast.error(err.response?.data?.message || 'Không tải được hồ sơ');
       } finally { if (mounted) setLoading(false); }
     }
     load();
@@ -61,7 +62,6 @@ export default function ReceptionistRecordsPage() {
           </div>
         </section>
 
-        {error && <div className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div>}
         {loading ? <LoadingIndicator size="lg" label="Đang tải hồ sơ..." /> : <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm"><div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div><h2 className="text-lg font-black text-slate-950">Danh sách bệnh nhân</h2><p className="mt-1 text-xs font-semibold text-slate-500">{filteredPatients.length}/{patients.length}</p></div></div>{pagedPatients.length ? <><div className="hidden overflow-x-auto lg:block"><table className="min-w-full text-left"><thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500"><tr><th className="px-5 py-3">Bệnh nhân</th><th className="px-5 py-3">CCCD</th><th className="px-5 py-3">SĐT</th><th className="px-5 py-3">Lượt khám</th><th className="px-5 py-3">Gần nhất</th><th className="px-5 py-3 text-right">Thao tác</th></tr></thead><tbody className="divide-y divide-slate-100">{pagedPatients.map((patient) => <PatientRow key={patient.id} patient={patient} visits={visitsOf(patient)} onOpen={() => setSelectedPatient(patient)} />)}</tbody></table></div><div className="space-y-3 p-4 lg:hidden">{pagedPatients.map((patient) => <PatientCard key={patient.id} patient={patient} visits={visitsOf(patient)} onOpen={() => setSelectedPatient(patient)} />)}</div><Pagination page={page} totalPages={totalPages} total={filteredPatients.length} onPrev={() => setPage((v) => Math.max(1, v - 1))} onNext={() => setPage((v) => Math.min(totalPages, v + 1))} /></> : <Empty title="Không có dữ liệu" />}</section>}
       </div>
       {selectedPatient && <PatientDetailModal patient={selectedPatient} visits={visitsOf(selectedPatient)} onClose={() => setSelectedPatient(null)} onCreateVisit={() => navigate('/receptionist/intake')} />}
