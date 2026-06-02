@@ -7,28 +7,29 @@ import { visitService } from '../apis/visitService';
 import { patientService } from '../apis/patientService';
 import { RECEPTIONIST_NAV_ITEMS, receptionistRouteFor } from '../constants/navigation';
 import { getVisitStatus } from '../constants/visitStatus';
+import { useToast } from '../../../providers/ToastProvider';
 
 function getItems(data) { return Array.isArray(data) ? data : data?.items || []; }
 
 export default function ReceptionistDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
   const [visits, setVisits] = useState([]);
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     let mounted = true;
     async function loadOverview() {
-      setLoading(true); setError('');
+      setLoading(true);
       try {
         const [visitRes, patientRes] = await Promise.all([visitService.search({ limit: 100 }), patientService.search({ limit: 100 })]);
         if (!mounted) return;
         setVisits(getItems(visitRes.data));
         setPatients(getItems(patientRes.data));
       } catch (err) {
-        if (mounted) setError(err.response?.data?.message || err.message || 'Không tải được dữ liệu');
+        if (mounted) toast.error(err.response?.data?.message || err.message || 'Không tải được dữ liệu');
       } finally { if (mounted) setLoading(false); }
     }
     loadOverview();
@@ -54,7 +55,6 @@ export default function ReceptionistDashboard() {
             <div className="flex gap-2"><button onClick={() => navigate('/receptionist/intake')} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white hover:bg-cyan-700">+ Tiếp nhận</button><button onClick={() => navigate('/receptionist/queue')} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 hover:bg-slate-50">Hàng đợi</button></div>
           </div>
         </section>
-        {error && <Alert tone="error" message={error} />}
         {loading ? <LoadingIndicator size="lg" label="Đang tải..." /> : <>
           <section className="grid grid-cols-2 xl:grid-cols-5 gap-3">
             <StatCard label="Chờ khám" value={analytics.totals.waiting} />

@@ -6,6 +6,7 @@ import { useAuth } from '../../../providers/AuthProvider';
 import { medicalOrderService } from '../../medical-order/apis/medicalOrderService';
 import { LAB_MANAGER_NAV_ITEMS, labManagerRouteFor } from '../constants/navigation';
 import { getMedicalOrderStatus } from '../constants/medicalOrderStatus';
+import { useToast } from '../../../providers/ToastProvider';
 
 const STATUS_FILTERS = ['', 'ORDERED', 'IN_PROGRESS', 'RESULT_READY', 'CANCELLED'];
 const emptyResult = { files: [], note: '' };
@@ -15,6 +16,7 @@ function getActionLabel(status) { return status === 'ORDERED' ? 'Nhận xử lý
 export default function LabOrdersPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
   const [orders, setOrders] = useState([]);
   const [activeOrder, setActiveOrder] = useState(null);
   const [filter, setFilter] = useState('ORDERED');
@@ -22,23 +24,21 @@ export default function LabOrdersPage() {
   const [form, setForm] = useState(emptyResult);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
   const load = async () => {
-    setLoading(true); setError('');
+    setLoading(true);
     try {
       const res = await medicalOrderService.list(filter ? { status: filter } : {});
       const items = getItems(res.data);
       setOrders(items);
       if (activeOrder) setActiveOrder(items.find((o) => o.id === activeOrder.id) || null);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không tải được phiếu');
+      toast.error(err.response?.data?.message || 'Không tải được phiếu');
     } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, [filter]);
-  useEffect(() => { setForm(emptyResult); setError(''); setSuccess(''); }, [activeOrder?.id]);
+  useEffect(() => { setForm(emptyResult); }, [activeOrder?.id]);
 
   const filteredOrders = useMemo(() => {
     const text = query.trim().toLowerCase();
@@ -50,29 +50,29 @@ export default function LabOrdersPage() {
 
   const updateStatus = async (status) => {
     if (!activeOrder) return;
-    setBusy(true); setError(''); setSuccess('');
+    setBusy(true);
     try {
       await medicalOrderService.updateStatus(activeOrder.id, status);
-      setSuccess(`Đã cập nhật: ${getMedicalOrderStatus(status).label}.`);
+      toast.success(`Đã cập nhật: ${getMedicalOrderStatus(status).label}.`);
       await load();
     } catch (err) {
-      setError(err.response?.data?.message || 'Không cập nhật được trạng thái');
+      toast.error(err.response?.data?.message || 'Không cập nhật được trạng thái');
     } finally { setBusy(false); }
   };
 
   const submitResult = async (event) => {
     event.preventDefault();
     if (!activeOrder) return;
-    if (!form.files?.length) return setError('Vui lòng upload ít nhất một file kết quả.');
-    setBusy(true); setError(''); setSuccess('');
+    if (!form.files?.length) return toast.error('Vui lòng upload ít nhất một file kết quả.');
+    setBusy(true);
     try {
       const uploadRes = await medicalOrderService.uploadResultFiles(activeOrder.id, form.files);
       await medicalOrderService.createResult(activeOrder.id, { files: uploadRes.data, note: form.note });
-      setSuccess('Đã gửi kết quả.');
+      toast.success('Đã gửi kết quả.');
       setForm(emptyResult);
       await load();
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Lỗi gửi kết quả');
+      toast.error(err.response?.data?.message || err.message || 'Lỗi gửi kết quả');
     } finally { setBusy(false); }
   };
 
@@ -85,8 +85,6 @@ export default function LabOrdersPage() {
             <button onClick={load} className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 hover:bg-slate-50">↻ Làm mới</button>
           </div>
         </section>
-
-        {(success || error) && <div className="space-y-2">{success && <Alert tone="success" message={success} />}{error && <Alert tone="error" message={error} />}</div>}
 
         <section className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(260px,1fr)_auto] lg:items-center">

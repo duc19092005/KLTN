@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { AuthUser } from '../../../common/types/auth-user.type';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { CreateMedicalOrderDto, CreateMedicalResultDto, MedicalOrderQueryDto, UpdateMedicalOrderStatusDto } from '../dto/medical-order.dto';
@@ -19,32 +21,32 @@ export class MedicalOrderController {
 
   @Roles('DOCTOR')
   @Post()
-  create(@Body() dto: CreateMedicalOrderDto, @Req() req: any) {
-    return this.service.create(dto, req.user.sub);
+  create(@Body() dto: CreateMedicalOrderDto, @CurrentUser() user: AuthUser) {
+    return this.service.create(dto, user.sub);
   }
 
   @Roles('ADMIN', 'DOCTOR', 'LAB_MANAGER')
   @Get()
-  findAll(@Query() query: MedicalOrderQueryDto, @Req() req: any) {
-    return this.service.findAll(query, req.user);
+  findAll(@Query() query: MedicalOrderQueryDto, @CurrentUser() user: AuthUser) {
+    return this.service.findAll(query, user);
   }
 
   @Roles('ADMIN', 'DOCTOR', 'LAB_MANAGER')
   @Get('results/files/:fileId/download')
-  getResultFileDownloadUrl(@Param('fileId') fileId: string, @Req() req: any) {
-    return this.service.getResultFileDownloadUrl(fileId, req.user);
+  getResultFileDownloadUrl(@Param('fileId') fileId: string, @CurrentUser() user: AuthUser) {
+    return this.service.getResultFileDownloadUrl(fileId, user);
   }
 
   @Roles('ADMIN', 'LAB_MANAGER')
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateMedicalOrderStatusDto, @Req() req: any) {
-    return this.service.updateStatus(id, dto.status, req.user);
+  updateStatus(@Param('id') id: string, @Body() dto: UpdateMedicalOrderStatusDto, @CurrentUser() user: AuthUser) {
+    return this.service.updateStatus(id, dto.status, user);
   }
 
   @Roles('LAB_MANAGER')
   @Post(':id/results')
-  createResult(@Param('id') id: string, @Body() dto: CreateMedicalResultDto, @Req() req: any) {
-    return this.service.createResult(id, dto, req.user);
+  createResult(@Param('id') id: string, @Body() dto: CreateMedicalResultDto, @CurrentUser() user: AuthUser) {
+    return this.service.createResult(id, dto, user);
   }
 
   @Roles('LAB_MANAGER')

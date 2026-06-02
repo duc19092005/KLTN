@@ -1,0 +1,102 @@
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { AUTH_REPOSITORY, AuthRepositoryPort } from '../ports/auth.repository.port';
+import { ACCESS_TOKEN_SIGNER, AccessTokenSignerPort } from '../ports/access-token-signer.port';
+import { SECURITY_EVENT_LOGGER, SecurityEventLoggerPort } from '../ports/security-event-logger.port';
+import { AuthUserLookupService } from '../services/auth-user-lookup.service';
+import { FaceMatchService } from '../services/face-match.service';
+import { assertNotFaceLocked, validateFaceDescriptor } from '../../domain/face.util';
+import { toPublicUser } from '../../domain/public-user';
+
+/**
+ * Full face login. Behavior copied verbatim from the former AuthService.verifyFace():
+ * admin wallet-session checks, single-use challenge consume, on-chain integrity gate,
+ * euclidean matching with lockout, audit at every branch, and a verified token on success.
+ */
+@Injectable()
+export class VerifyFaceUseCase {
+  constructor(
+    @Inject(AUTH_REPOSITORY) private readonly repo: AuthRepositoryPort,
+    @Inject(ACCESS_TOKEN_SIGNER) private readonly tokenSigner: AccessTokenSignerPort,
+    @Inject(SECURITY_EVENT_LOGGER) private readonly audit: SecurityEventLoggerPort,
+    private readonly lookup: AuthUserLookupService,
+    private readonly faceMatch: FaceMatchService,
+  ) {}
+
+  async execute(userId: string, embedding: number[], challenge: string, tokenWalletAddress?: string, ip?: string) {
+    const descriptor = validateFaceDescriptor(embedding);
+    const user = await this.lookup.getAuthUser(userId);
+
+    if (user.role === 'ADMIN' && !tokenWalletAddress) {
+      throw new UnauthorizedException('Wallet authentication is required before face verification');
+    }
+    if (user.status !== 'ACTIVE' || user.firstLogin) {
+      throw new UnauthorizedException('Admin setup is not complete');
+    }
+    if (!user.faceEmbedding) {
+      throw new UnauthorizedException('Face data is not registered');
+    }
+    if (user.role === 'ADMIN' && !user.adminProfile?.walletAddress) {
+      throw new UnauthorizedException('Wallet data is not registered');
+    }
+    if (user.role === 'ADMIN' && user.adminProfile?.walletAddress.toLowerCase() !== tokenWalletAddress!.toLowerCase()) {
+      throw new UnauthorizedException('Wallet session mismatch');
+    }
+
+    assertNotFaceLocked(user);
+
+    // Consume the single-use challenge atomically before matching (anti-replay).
+    const consumed = await this.repo.consumeFaceChallenge(userId, challenge, new Date());
+    if (consumed !== 1) throw new UnauthorizedException('Invalid or expired face challenge');
+
+    const storedDescriptors = this.faceMatch.decodeStoredDescriptors(user.faceEmbedding);
+
+    // Integrity gate: stored template hash must still match the on-chain anchor (if anchored).
+    const integrity = await this.faceMatch.checkIntegrity(userId, storedDescriptors);
+    if (!integrity.ok) {
+      await this.audit.write(userId, 'FACE_INTEGRITY_FAIL', 'User', userId, {
+        recomputedFaceHash: integrity.recomputedFaceHash,
+        onChainFaceHash: integrity.onChainFaceHash,
+        ip,
+      });
+      throw new UnauthorizedException('Dữ liệu khuôn mặt đã bị thay đổi. Vui lòng liên hệ quản trị viên.');
+    }
+
+    const match = this.faceMatch.computeMatch(descriptor, storedDescriptors);
+
+    console.log(
+      `[FaceVerify] userId=${userId} min=${match.distance.toFixed(4)} mean=${match.meanDistance.toFixed(4)} threshold=${match.threshold} result=${match.passed ? 'PASS' : 'FAIL'}`,
+    );
+
+    if (!match.passed) {
+      const lockInfo = await this.faceMatch.recordFailure(user);
+      await this.audit.write(userId, 'FACE_VERIFY_FAIL', 'User', userId, {
+        minDistance: Number(match.distance.toFixed(4)),
+        meanDistance: Number(match.meanDistance.toFixed(4)),
+        threshold: match.threshold,
+        failedAttempts: lockInfo.failedAttempts,
+        locked: lockInfo.locked,
+        ip,
+      });
+      if (lockInfo.locked) {
+        throw new UnauthorizedException('Too many failed face attempts. Account temporarily locked.');
+      }
+      throw new UnauthorizedException('Face verification failed');
+    }
+
+    await this.faceMatch.resetFailures(userId);
+    await this.audit.write(userId, 'FACE_VERIFY_PASS', 'User', userId, {
+      minDistance: Number(match.distance.toFixed(4)),
+      meanDistance: Number(match.meanDistance.toFixed(4)),
+      threshold: match.threshold,
+      ip,
+    });
+
+    return {
+      access_token: this.tokenSigner.sign(user, { verified: true, walletAddress: user.adminProfile?.walletAddress }),
+      verified: true,
+      algorithm: 'face-api/euclidean-distance/min-of-multi-sample',
+      matchedDescriptorCount: storedDescriptors.length,
+      user: toPublicUser(user, true),
+    };
+  }
+}

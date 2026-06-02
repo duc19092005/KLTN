@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Param, Post, Req, Request, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthService } from '../services/auth.service';
 import { AuthRateLimiterService } from '../services/auth-rate-limiter.service';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { AuthUser } from '../../../common/types/auth-user.type';
 import {
   BootstrapAdminDto,
   FaceDescriptorDto,
@@ -76,31 +78,31 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('change-password')
-  async changePassword(@Request() req, @Body() body: ChangePasswordDto) {
-    return this.authService.changePassword(req.user.sub, body.currentPassword, body.newPassword);
+  async changePassword(@CurrentUser() user: AuthUser, @Body() body: ChangePasswordDto) {
+    return this.authService.changePassword(user.sub, body.currentPassword, body.newPassword);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('register-face')
-  async registerFace(@Request() req, @Body() body: FaceDescriptorDto) {
-    return this.authService.registerFace(req.user.sub, body.embedding);
+  async registerFace(@CurrentUser() user: AuthUser, @Body() body: FaceDescriptorDto) {
+    return this.authService.registerFace(user.sub, body.embedding);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('wallet-bind-challenge')
-  async walletBindChallenge(@Request() req, @Body() body: WalletChallengeDto) {
-    return this.authService.walletBindChallenge(req.user.sub, body.address);
+  async walletBindChallenge(@CurrentUser() user: AuthUser, @Body() body: WalletChallengeDto) {
+    return this.authService.walletBindChallenge(user.sub, body.address);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('verify-wallet')
   async verifyWallet(
-    @Request() req,
+    @CurrentUser() user: AuthUser,
     @Body() body: WalletVerifyDto,
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.verifyWallet(
-      req.user.sub,
+      user.sub,
       body.address,
       body.signature,
       body.message,
@@ -140,27 +142,27 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('face-challenge')
-  async faceChallenge(@Request() req) {
-    return this.authService.createFaceChallenge(req.user.sub);
+  async faceChallenge(@CurrentUser() user: AuthUser) {
+    return this.authService.createFaceChallenge(user.sub);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('verify-face')
   async verifyFace(
-    @Request() req,
+    @CurrentUser() user: AuthUser,
     @Body() body: VerifyFaceDto,
     @Req() request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const key = this.rateLimitKey(request, 'face', req.user.sub);
+    const key = this.rateLimitKey(request, 'face', user.sub);
     this.rateLimiter.assertAllowed(key, 5, 10 * 60 * 1000);
 
     try {
       const result = await this.authService.verifyFace(
-        req.user.sub,
+        user.sub,
         body.embedding as number[],
         body.challenge,
-        req.user.walletAddress,
+        user.walletAddress,
         this.clientIp(request),
       );
       this.rateLimiter.reset(key);
@@ -174,14 +176,14 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('face-stepup')
-  async faceStepUp(@Request() req, @Body() body: StepUpFaceDto, @Req() request) {
+  async faceStepUp(@CurrentUser() user: AuthUser, @Body() body: StepUpFaceDto, @Req() request) {
     // Reuse the biometric rate limiter, keyed per user + action, to throttle scan abuse.
-    const key = this.rateLimitKey(request, 'face-stepup', `${req.user.sub}:${body.action}`);
+    const key = this.rateLimitKey(request, 'face-stepup', `${user.sub}:${body.action}`);
     this.rateLimiter.assertAllowed(key, 5, 10 * 60 * 1000);
 
     try {
       const ticket = await this.authService.verifyFaceForStepUp(
-        req.user.sub,
+        user.sub,
         body.embedding as number[],
         body.challenge,
         body.action,
@@ -198,16 +200,16 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('generate-secret')
-  async generateMfaSecret(@Request() req, @Res({ passthrough: true }) res: Response) {
-    const result = await this.authService.generateMfaSecret(req.user.sub);
+  async generateMfaSecret(@CurrentUser() user: AuthUser, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.generateMfaSecret(user.sub);
     this.setAuthCookie(res, result.access_token);
     return this.stripToken(result);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  async getMe(@Request() req) {
-    return this.authService.getMe(req.user.sub, req.user.verified);
+  async getMe(@CurrentUser() user: AuthUser) {
+    return this.authService.getMe(user.sub, Boolean(user.verified));
   }
 
   @Post('logout')

@@ -9,6 +9,7 @@ import { departmentService } from '../../admin/apis/departmentService';
 import { medicalOrderService } from '../../medical-order/apis/medicalOrderService';
 import { clinicalDecisionService } from '../../medical-order/apis/clinicalDecisionService';
 import { aiModelService } from '../../admin/apis/aiModelService';
+import { useToast } from '../../../providers/ToastProvider';
 
 const STATUS = {
   WAITING: { label: 'Chờ khám', color: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-400' },
@@ -39,6 +40,7 @@ function parseAiResult(value) { try { return JSON.parse(value || '{}'); } catch 
 export default function DoctorQueuePage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
   const [visits, setVisits] = useState([]);
   const [activeVisit, setActiveVisit] = useState(null);
   const [decision, setDecision] = useState(null);
@@ -56,18 +58,16 @@ export default function DoctorQueuePage() {
   const [conclusionForm, setConclusionForm] = useState(emptyConclusion);
   const [selectedAiId, setSelectedAiId] = useState('');
   const [selectedAiModelId, setSelectedAiModelId] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
   const loadVisits = async () => {
-    setLoading(true); setError('');
+    setLoading(true);
     try {
       const res = await doctorVisitService.list(filter ? { status: filter, limit: 50 } : { limit: 50 });
       const items = getItems(res.data);
       setVisits(items);
       setActiveVisit((current) => current ? (items.find((v) => v.id === current.id) || items[0] || null) : (items[0] || null));
     } catch (err) {
-      setError(err.response?.data?.message || 'Không tải được hàng đợi khám');
+      toast.error(err.response?.data?.message || 'Không tải được hàng đợi khám');
     } finally { setLoading(false); }
   };
 
@@ -119,63 +119,63 @@ export default function DoctorQueuePage() {
   const submitOrder = async (event) => {
     event.preventDefault();
     if (!activeVisit) return;
-    setBusy(true); setError(''); setSuccess('');
+    setBusy(true);
     try {
       const validOrders = orderForms.filter((item) => item.orderType.trim() && item.targetDepartmentId);
       if (!validOrders.length) {
-        setError('Vui lòng nhập ít nhất 1 phiếu chỉ định hợp lệ.');
+        toast.error('Vui lòng nhập ít nhất 1 phiếu chỉ định hợp lệ.');
         return;
       }
       const duplicateDepartmentId = validOrders.find((item, index) => validOrders.findIndex((other) => other.targetDepartmentId === item.targetDepartmentId) !== index)?.targetDepartmentId;
       if (duplicateDepartmentId) {
         const duplicatedDepartment = departments.find((department) => department.id === duplicateDepartmentId);
-        setError(`Bạn đã chọn khoa/phòng "${duplicatedDepartment?.name || duplicateDepartmentId}" rồi. Vui lòng chọn khoa/phòng khác để tránh trùng phiếu chỉ định.`);
+        toast.error(`Bạn đã chọn khoa/phòng "${duplicatedDepartment?.name || duplicateDepartmentId}" rồi. Vui lòng chọn khoa/phòng khác để tránh trùng phiếu chỉ định.`);
         return;
       }
       await Promise.all(validOrders.map((item) => medicalOrderService.create({ ...item, visitId: activeVisit.id, targetDepartmentId: item.targetDepartmentId || undefined })));
-      setSuccess('Đã tạo và gửi chỉ định cận lâm sàng thành công.');
+      toast.success('Đã tạo và gửi chỉ định cận lâm sàng thành công.');
       setOrderForms([{ ...emptyOrder }]);
       await Promise.all([loadVisits(), loadDecision(activeVisit.id)]);
-    } catch (err) { setError(err.response?.data?.message || 'Không tạo được chỉ định'); }
+    } catch (err) { toast.error(err.response?.data?.message || 'Không tạo được chỉ định'); }
     finally { setBusy(false); }
   };
 
   const startVisit = async (targetVisit = activeVisit) => {
     if (!targetVisit) return;
     setActiveVisit(targetVisit);
-    setBusy(true); setError(''); setSuccess('');
+    setBusy(true);
     try {
       await doctorVisitService.updateStatus(targetVisit.id, 'IN_PROGRESS');
-      setSuccess('Đã tiếp nhận bệnh nhân. Hệ thống chuyển sang Bước 1: Chỉ định cận lâm sàng.');
+      toast.success('Đã tiếp nhận bệnh nhân. Hệ thống chuyển sang Bước 1: Chỉ định cận lâm sàng.');
       await Promise.all([loadVisits(), loadDecision(targetVisit.id)]);
       setActiveStep(1);
       setShowWorkflowModal(true);
-    } catch (err) { setError(err.response?.data?.message || 'Không thể bắt đầu khám'); }
+    } catch (err) { toast.error(err.response?.data?.message || 'Không thể bắt đầu khám'); }
     finally { setBusy(false); }
   };
 
   const generateAi = async () => {
     if (!activeVisit) return;
-    setBusy(true); setError(''); setSuccess('');
+    setBusy(true);
     try {
       const res = await clinicalDecisionService.generateAiAnalysis({ visitId: activeVisit.id, aiModelId: selectedAiModelId || undefined });
       setSelectedAiId(res.data.id);
-      setSuccess('AI đã phân tích dữ liệu lâm sàng thành công.');
+      toast.success('AI đã phân tích dữ liệu lâm sàng thành công.');
       await loadDecision(activeVisit.id);
-    } catch (err) { setError(err.response?.data?.message || 'Không tạo được phân tích AI'); }
+    } catch (err) { toast.error(err.response?.data?.message || 'Không tạo được phân tích AI'); }
     finally { setBusy(false); }
   };
 
   const submitConclusion = async (event) => {
     event.preventDefault();
     if (!activeVisit) return;
-    setBusy(true); setError(''); setSuccess('');
+    setBusy(true);
     try {
       await clinicalDecisionService.createConclusion({ ...conclusionForm, visitId: activeVisit.id, aiDiagnosisId: selectedAiId || undefined });
-      setSuccess('Đã đóng hồ sơ bệnh án và hoàn tất lượt khám của bệnh nhân.');
+      toast.success('Đã đóng hồ sơ bệnh án và hoàn tất lượt khám của bệnh nhân.');
       setShowWorkflowModal(false);
       await loadVisits();
-    } catch (err) { setError(err.response?.data?.message || 'Không lưu được kết luận cuối'); }
+    } catch (err) { toast.error(err.response?.data?.message || 'Không lưu được kết luận cuối'); }
     finally { setBusy(false); }
   };
 
@@ -196,8 +196,7 @@ export default function DoctorQueuePage() {
           </div>
         </section>
 
-        {success && <Alert tone="success" message={success} />}
-        {error && <Alert tone="error" message={error} />}
+
 
         {/* Danh sách hàng đợi */}
         <QueueList query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} loading={loading} visits={pagedVisits} activeVisit={activeVisit} setActiveVisit={setActiveVisit} page={page} setPage={setPage} totalPages={totalPages} totalItems={filteredVisits.length} busy={busy} onStart={startVisit} onOpenWorkflow={(visit) => { setActiveVisit(visit); setShowWorkflowModal(true); }} />
@@ -656,6 +655,7 @@ function OrderPanel({ visit, forms, setForms, departments, existingOrders = [], 
 function ResultsPanel({ orders }) {
   const completedOrders = orders.filter(o => o.status === 'RESULT_READY' || o.status === 'COMPLETED');
   const pendingOrders = orders.filter(o => !['RESULT_READY', 'COMPLETED', 'CANCELLED'].includes(o.status));
+  const toast = useToast();
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
@@ -704,7 +704,7 @@ function ResultsPanel({ orders }) {
                                   const dl = await medicalOrderService.getResultFileDownloadUrl(f.id);
                                   if (dl.data?.url) window.open(dl.data.url, '_blank', 'noopener,noreferrer');
                                 } catch {
-                                  alert('Không tải được file kết quả hoặc bạn không có quyền truy cập.');
+                                  toast.error('Không tải được file kết quả hoặc bạn không có quyền truy cập.');
                                 }
                               }}
                               className="flex items-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 px-3 py-2 rounded-lg border border-blue-100 hover:bg-blue-100 transition-colors"
@@ -984,14 +984,7 @@ function Info({ label, value, large }) {
   );
 }
 
-function Alert({ tone, message }) {
-  const isSuccess = tone === 'success';
-  return (
-    <div className={`p-4 rounded-2xl border text-xs font-black shadow-sm ${isSuccess ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-      {message}
-    </div>
-  );
-}
+
 
 function Empty({ title, desc }) {
   return (

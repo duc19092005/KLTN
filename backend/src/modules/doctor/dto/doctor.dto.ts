@@ -66,8 +66,8 @@ export class CreateDoctorWithStaffDto {
   @ApiPropertyOptional({ example: 10, minimum: 0 })
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) yearsExperience?: number;
 
-  @ApiPropertyOptional({ example: '0d82b56f-5d0a-4501-bd18-bb9af91e90d7' })
-  @IsOptional() @IsString() @IsUUID() clinicalRoomId?: string;
+  @ApiProperty({ example: '0d82b56f-5d0a-4501-bd18-bb9af91e90d7' })
+  @IsString() @IsUUID() clinicalRoomId!: string;
 }
 
 export class UpdateDoctorDto {
@@ -115,8 +115,8 @@ export class UpdateDoctorDto {
 }
 
 export class AssignClinicalRoomDto {
-  @ApiPropertyOptional({ example: '0d82b56f-5d0a-4501-bd18-bb9af91e90d7', nullable: true })
-  @IsOptional() @IsString() @IsUUID() clinicalRoomId?: string;
+  @ApiProperty({ example: '0d82b56f-5d0a-4501-bd18-bb9af91e90d7' })
+  @IsString() @IsUUID() clinicalRoomId!: string;
 }
 
 export class DoctorQueryDto extends PaginationQueryDto {

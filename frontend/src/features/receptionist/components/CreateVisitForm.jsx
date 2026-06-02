@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { visitService } from '../apis/visitService';
+import { useToast } from '../../../providers/ToastProvider';
 
 export default function CreateVisitForm({ patient, onVisitCreated, onCancel }) {
   const [specialty, setSpecialty] = useState('');
@@ -8,16 +9,16 @@ export default function CreateVisitForm({ patient, onVisitCreated, onCancel }) {
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState('');
+  const toast = useToast();
 
   const fetchRooms = async (searchSpecialty = '') => {
-    setLoadingRooms(true); setError('');
+    setLoadingRooms(true);
     try {
       const res = await visitService.suggestRooms(searchSpecialty);
       setRooms(res.data || []);
       setSelectedRoom(null);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể tải danh sách phòng khám');
+      toast.error(err.response?.data?.message || 'Không thể tải danh sách phòng khám');
     } finally {
       setLoadingRooms(false);
     }
@@ -33,8 +34,8 @@ export default function CreateVisitForm({ patient, onVisitCreated, onCancel }) {
   };
 
   const handleCreateVisit = async () => {
-    if (!selectedRoom) return setError('Vui lòng chọn phòng khám');
-    setCreating(true); setError('');
+    if (!selectedRoom) return toast.error('Vui lòng chọn phòng khám');
+    setCreating(true);
     try {
       const payload = {
         patientId: patient.id,
@@ -44,7 +45,7 @@ export default function CreateVisitForm({ patient, onVisitCreated, onCancel }) {
       const res = await visitService.create(payload);
       onVisitCreated(res.data);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể tạo lượt khám');
+      toast.error(err.response?.data?.message || 'Không thể tạo lượt khám');
     } finally {
       setCreating(false);
     }
@@ -100,8 +101,6 @@ export default function CreateVisitForm({ patient, onVisitCreated, onCancel }) {
             })}
           </div>
         </div>
-
-        {error && <p className="text-red-600 text-sm font-bold text-center">{error}</p>}
 
         <div className="pt-4 flex gap-3">
           <button type="button" onClick={onCancel} className="px-5 py-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100">Quay lại</button>

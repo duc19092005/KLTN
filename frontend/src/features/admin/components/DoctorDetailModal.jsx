@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { doctorService } from '../apis/doctorService';
+import { useToast } from '../../../providers/ToastProvider';
 
 const STATUS_TONE = {
   VERIFIED: { label: 'Xác thực khớp với Blockchain', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
@@ -20,14 +21,13 @@ function formatTime(value) {
 
 export default function DoctorDetailModal({ doctorId, onClose }) {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const toast = useToast();
   const [detail, setDetail] = useState(null);
   const [history, setHistory] = useState([]);
   const [activeTab, setActiveTab] = useState('info'); // 'info' | 'history'
 
   const load = async () => {
     setLoading(true);
-    setError('');
     try {
       const [res, historyRes] = await Promise.all([
         doctorService.get(doctorId),
@@ -36,7 +36,7 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
       setDetail(res.data);
       setHistory(Array.isArray(historyRes.data) ? historyRes.data : historyRes.data?.items || []);
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || 'Không tải được chi tiết bác sĩ');
+      toast.error(err?.response?.data?.message || err.message || 'Không tải được chi tiết bác sĩ');
     } finally {
       setLoading(false);
     }
@@ -89,8 +89,6 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
 
         {/* Content Body */}
         <div className="flex-1 overflow-y-auto bg-slate-50/60 p-6">
-          {error && <div className="mb-4 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div>}
-
           {loading ? (
             <LoadingIndicator size="lg" label="Đang tải dữ liệu bác sĩ..." />
           ) : activeTab === 'info' ? (

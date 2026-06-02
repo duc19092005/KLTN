@@ -7,6 +7,7 @@ import { departmentService } from '../apis/departmentService';
 import { staffService } from '../apis/staffService';
 import { FaceStepUpModal } from '../../auth';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
+import { useToast } from '../../../providers/ToastProvider';
 
 const emptyStaff = { username: '', email: '', fullName: '', avatarUrl: '', departmentId: '', phone: '', gender: '', citizenId: '', birthDate: '', address: '', position: '', role: 'LAB_MANAGER' };
 const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100', INACTIVE: 'bg-red-50 text-red-700 border-red-100', PENDING: 'bg-amber-50 text-amber-700 border-amber-100' };
@@ -31,6 +32,7 @@ function buildStaffPayload(form) {
 export default function StaffPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
   const [departments, setDepartments] = useState([]);
   const [staffs, setStaffs] = useState([]);
   const [form, setForm] = useState(emptyStaff);
@@ -40,14 +42,12 @@ export default function StaffPage() {
   const [editingStaff, setEditingStaff] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [pendingDelete, setPendingDelete] = useState(null); // staff awaiting face step-up
 
   const totalLabel = useMemo(() => `${pagination.total} hồ sơ`, [pagination.total]);
 
   const load = async (page = pagination.page) => {
-    setLoading(true); setError('');
+    setLoading(true);
     try {
       const [depRes, staffRes] = await Promise.all([
         departmentService.list(),
@@ -57,23 +57,21 @@ export default function StaffPage() {
       const data = staffRes.data || {};
       setStaffs(Array.isArray(data) ? data : data.items || []);
       if (!Array.isArray(data)) setPagination({ page: data.page, limit: data.limit, total: data.total, totalPages: data.totalPages });
-    } catch (err) { setError(getError(err)); }
+    } catch (err) { toast.error(getError(err)); }
     finally { setLoading(false); }
   };
   useEffect(() => { load(1); }, []);
 
-  const openCreate = () => { setEditingStaff(null); setForm(emptyStaff); setError(''); setNotice(''); setIsFormOpen(true); };
+  const openCreate = () => { setEditingStaff(null); setForm(emptyStaff); setIsFormOpen(true); };
   const openEdit = (staff) => {
     setEditingStaff(staff);
     setForm({ username: staff.user?.username || '', email: staff.user?.email || '', fullName: staff.fullName || '', avatarUrl: staff.avatarUrl || '', departmentId: staff.departmentId || '', phone: staff.phone || '', gender: staff.gender || '', citizenId: staff.citizenId || '', birthDate: staff.birthDate ? staff.birthDate.slice(0, 10) : '', address: staff.address || '', position: staff.position || '', role: staff.user?.role || 'LAB_MANAGER' });
-    setError('');
-    setNotice('');
     setIsFormOpen(true);
   };
   const closeForm = () => { setIsFormOpen(false); setEditingStaff(null); setForm(emptyStaff); };
 
   const submitStaff = async (event) => {
-    event.preventDefault(); setBusy(true); setError(''); setNotice('');
+    event.preventDefault(); setBusy(true);
     try {
       if (editingStaff?.doctorProfile && form.role !== 'DOCTOR') {
         throw new Error('Không thể đổi bác sĩ sang vai trò khác vì backend chưa có API xóa DoctorProfile.');
@@ -81,24 +79,33 @@ export default function StaffPage() {
       const staffPayload = buildStaffPayload(form);
       if (editingStaff) {
         await staffService.update(editingStaff.id, staffPayload);
+        toast.success('Cập nhật nhân sự thành công!');
       } else {
         await staffService.create(staffPayload);
-        setNotice('Tài khoản mới dùng mật khẩu mặc định: 123456');
+        toast.success('Tạo nhân sự thành công! Mật khẩu mặc định: 123456');
       }
       closeForm(); await load(editingStaff ? pagination.page : 1);
-    } catch (err) { setError(getError(err)); }
+    } catch (err) { toast.error(getError(err)); }
     finally { setBusy(false); }
   };
   const search = async (event) => { event.preventDefault(); await load(1); };
   const toggleStatus = async (staff) => {
     setBusy(true);
-    try { if (staff.user?.status === 'INACTIVE') await staffService.unlock(staff.id); else await staffService.lock(staff.id); await load(pagination.page); }
-    catch (err) { setError(getError(err)); }
+    try {
+      if (staff.user?.status === 'INACTIVE') {
+        await staffService.unlock(staff.id);
+        toast.success('Mở khóa tài khoản thành công!');
+      } else {
+        await staffService.lock(staff.id);
+        toast.success('Khóa tài khoản thành công!');
+      }
+      await load(pagination.page);
+    }
+    catch (err) { toast.error(getError(err)); }
     finally { setBusy(false); }
   };
   // Deleting/deactivating a staff (incl. doctors) is sensitive -> require a fresh face scan.
   const removeStaff = (staff) => {
-    setError('');
     setPendingDelete(staff);
   };
   const handleDeleteStepUp = async (ticket) => {
@@ -106,8 +113,12 @@ export default function StaffPage() {
     setPendingDelete(null);
     if (!staff?.id) return;
     setBusy(true);
-    try { await staffService.remove(staff.id, ticket); await load(pagination.page); }
-    catch (err) { setError(getError(err)); }
+    try {
+      await staffService.remove(staff.id, ticket);
+      toast.success('Xóa nhân sự thành công!');
+      await load(pagination.page);
+    }
+    catch (err) { toast.error(getError(err)); }
     finally { setBusy(false); }
   };
 
@@ -115,8 +126,6 @@ export default function StaffPage() {
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="staff" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
       <div className="max-w-7xl mx-auto space-y-6">
         <Hero onCreate={openCreate} />
-        {error && <div className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div>}
-        {notice && <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-bold text-emerald-700">{notice}</div>}
         {loading ? <LoadingIndicator size="lg" label="Đang tải nhân sự..." /> : (
           <>
             <StaffSearch filters={filters} setFilters={setFilters} onSearch={search} />

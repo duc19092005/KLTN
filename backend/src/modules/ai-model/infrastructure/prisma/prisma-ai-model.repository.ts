@@ -1,0 +1,61 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
+import {
+  AiModelListFilter,
+  AiModelRepositoryPort,
+  buildAiModelWhere,
+  CreateAiModelData,
+} from '../../application/ports/ai-model.repository.port';
+
+/**
+ * Prisma-backed AiModelRegistry repository. Preserves the include shapes and
+ * query filters from the former AiModelService.
+ */
+@Injectable()
+export class PrismaAiModelRepository implements AiModelRepositoryPort {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async create(data: CreateAiModelData): Promise<any> {
+    return this.prisma.aiModelRegistry.create({
+      data: {
+        modelName: data.modelName,
+        modelVersion: data.modelVersion,
+        recommendedSpecialty: data.recommendedSpecialty ?? null,
+        type: data.type,
+        provider: data.provider,
+        apiEndpoint: data.apiEndpoint,
+        ipHashEncrypted: data.ipHashEncrypted,
+        ipHashPlain: data.ipHashPlain,
+        description: data.description ?? null,
+        createdBy: data.createdBy,
+      },
+      include: this.includeRelations(),
+    });
+  }
+
+  async findAll(filter: AiModelListFilter): Promise<any[]> {
+    return this.prisma.aiModelRegistry.findMany({
+      where: buildAiModelWhere(filter),
+      include: this.includeRelations(),
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async findByIdOrThrow(id: string): Promise<any> {
+    return this.prisma.aiModelRegistry.findUniqueOrThrow({ where: { id }, include: this.includeRelations() });
+  }
+
+  async findById(id: string): Promise<any | null> {
+    return this.prisma.aiModelRegistry.findUnique({ where: { id } });
+  }
+
+  async findAllOrdered(): Promise<any[]> {
+    return this.prisma.aiModelRegistry.findMany({ orderBy: { createdAt: 'desc' } });
+  }
+
+  private includeRelations() {
+    return {
+      _count: { select: { diagnoses: true, aiQualities: true } },
+    } as const;
+  }
+}

@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import axios from 'axios';
 import App from './routes/AppRoutes';
 import { AuthProvider } from './providers/AuthProvider';
+import { ToastProvider } from './providers/ToastProvider';
 import './index.css';
 
 axios.defaults.withCredentials = true;
@@ -12,7 +13,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <ToastProvider>
+          <App />
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>,

@@ -83,6 +83,7 @@ model Department {
   type             DepartmentType @default(CLINICAL)
   canReceiveOrders Boolean        @default(false)
   description      String?
+  specialty        String?
   managerId        String?        @unique
 
   manager        StaffProfile?  @relation("DepartmentManager", fields: [managerId], references: [id])
