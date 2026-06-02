@@ -67,6 +67,7 @@ export default function DepartmentsPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null); // department awaiting face step-up
+  const [pendingSave, setPendingSave] = useState(null); // { payload, mode: 'create' | 'edit', id?: string }
 
   const load = async () => {
     setLoading(true);
@@ -99,26 +100,41 @@ export default function DepartmentsPage() {
   };
   const closeModal = () => { setForm(emptyForm); setEditingDepartment(null); setIsModalOpen(false); };
   const submitDepartment = async (event) => {
-    event.preventDefault(); if (!form.departmentCode.trim() || !form.name.trim()) return; setBusy(true);
+    event.preventDefault(); if (!form.departmentCode.trim() || !form.name.trim()) return;
+    const payload = {
+      ...form,
+      floor: form.floor || undefined,
+      description: form.description || undefined,
+      canReceiveOrders: Boolean(form.canReceiveOrders),
+      specialty: (form.type === 'CLINICAL' || form.type === 'LABORATORY') ? (form.specialty || undefined) : undefined,
+    };
+    setPendingSave({
+      payload,
+      mode: editingDepartment ? 'edit' : 'create',
+      id: editingDepartment?.id,
+    });
+  };
+
+  const handleSaveStepUp = async (ticket) => {
+    const { payload, mode, id } = pendingSave || {};
+    setPendingSave(null);
+    if (!payload) return;
+    setBusy(true);
     try {
-      const payload = {
-        ...form,
-        floor: form.floor || undefined,
-        description: form.description || undefined,
-        canReceiveOrders: Boolean(form.canReceiveOrders),
-        specialty: (form.type === 'CLINICAL' || form.type === 'LABORATORY') ? (form.specialty || undefined) : undefined,
-      };
-      if (editingDepartment) {
-        const res = await departmentService.update(editingDepartment.id, payload);
-        if (selectedDepartment?.id === editingDepartment.id) setSelectedDepartment(res.data);
+      if (mode === 'edit') {
+        const res = await departmentService.update(id, payload, ticket);
+        if (selectedDepartment?.id === id) setSelectedDepartment(res.data);
         toast.success('Cập nhật phòng ban thành công!');
       } else {
-        await departmentService.create(payload);
+        await departmentService.create(payload, ticket);
         toast.success('Tạo phòng ban thành công!');
       }
       closeModal(); await load();
-    } catch (err) { toast.error(getError(err, editingDepartment ? 'Không cập nhật được phòng ban' : 'Không tạo được phòng ban')); }
-    finally { setBusy(false); }
+    } catch (err) {
+      toast.error(getError(err, mode === 'edit' ? 'Không cập nhật được phòng ban' : 'Không tạo được phòng ban'));
+    } finally {
+      setBusy(false);
+    }
   };
   const assignManager = async (departmentId, managerId) => {
     setBusy(true);
@@ -172,6 +188,20 @@ export default function DepartmentsPage() {
             description={`Xóa phòng ban "${pendingDelete.name || pendingDelete.id}" là thao tác không thể hoàn tác. Vui lòng quét khuôn mặt để xác nhận chính bạn thực hiện.`}
             onSuccess={handleDeleteStepUp}
             onClose={() => setPendingDelete(null)}
+          />
+        )}
+        {pendingSave && (
+          <FaceStepUpModal
+            action={pendingSave.mode === 'edit' ? 'UPDATE_DEPARTMENT' : 'CREATE_DEPARTMENT'}
+            resourceId={pendingSave.id}
+            title={pendingSave.mode === 'edit' ? 'Xác thực cập nhật phòng ban' : 'Xác thực tạo phòng ban'}
+            description={
+              pendingSave.mode === 'edit'
+                ? `Cập nhật thông tin phòng ban "${pendingSave.payload.name}" yêu cầu xác thực khuôn mặt để xác nhận chính bạn thực hiện.`
+                : `Tạo phòng ban mới "${pendingSave.payload.name}" yêu cầu xác thực khuôn mặt để xác nhận chính bạn thực hiện.`
+            }
+            onSuccess={handleSaveStepUp}
+            onClose={() => setPendingSave(null)}
           />
         )}
       </div>

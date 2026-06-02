@@ -19,6 +19,7 @@ export class DepartmentController {
   constructor(private readonly service: DepartmentService) {}
 
   @Post()
+  @RequireFaceStepUp('CREATE_DEPARTMENT')
   @ApiOperation({ summary: 'Create a department' })
   create(@Body() dto: CreateDepartmentDto, @CurrentUser() user: AuthUser) {
     return this.service.create(dto, user?.sub);
@@ -56,6 +57,7 @@ export class DepartmentController {
   }
 
   @Patch(':id')
+  @RequireFaceStepUp('UPDATE_DEPARTMENT')
   @ApiOperation({ summary: 'Update a department' })
   update(@Param('id') id: string, @Body() dto: UpdateDepartmentDto, @CurrentUser() user: AuthUser) {
     return this.service.update(id, dto, user?.sub);
