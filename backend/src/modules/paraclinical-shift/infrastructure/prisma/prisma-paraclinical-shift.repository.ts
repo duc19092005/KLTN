@@ -257,4 +257,11 @@ export class PrismaParaclinicalShiftRepository implements ParaclinicalShiftRepos
     });
     return rooms;
   }
+
+  async findDepartmentBySharedUserId(userId: string) {
+    return this.prisma.department.findFirst({
+      where: { sharedUserId: userId },
+      select: { id: true, name: true },
+    });
+  }
 }

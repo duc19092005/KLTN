@@ -44,6 +44,8 @@ export default function ShiftManagementPage() {
   const [registerForm, setRegisterForm] = useState({ roomId: '', startTime: '', endTime: '' });
   const [rooms, setRooms] = useState([]);
   const [pendingShifts, setPendingShifts] = useState([]);
+  // Only ADMIN and LAB_MANAGER (department heads) can approve/reject shifts.
+  // DEPT_SHARED (shared accounts) should NOT see the approval queue.
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'LAB_MANAGER';
 
   const currentWeek = useMemo(() => {

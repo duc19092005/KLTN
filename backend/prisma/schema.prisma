@@ -12,6 +12,7 @@ enum UserRole {
   RECEPTIONIST
   DOCTOR
   LAB_MANAGER
+  DEPT_SHARED
 }
 
 enum UserStatus {
@@ -76,6 +77,7 @@ model User {
   performedResults  MedicalResult[]
   stepUpTickets     StepUpTicket[]
   approvedShifts    ParaclinicalShift[] @relation("ApprovedShifts")
+  sharedDepartment  Department?         @relation("DeptSharedUser")
 
   @@index([role])
   @@index([status])
@@ -92,8 +94,10 @@ model Department {
   description      String?
   specialty        String?
   managerId        String?        @unique
+  sharedUserId     String?        @unique
 
   manager        StaffProfile?  @relation("DepartmentManager", fields: [managerId], references: [id])
+  sharedUser     User?          @relation("DeptSharedUser", fields: [sharedUserId], references: [id])
   staffs         StaffProfile[] @relation("DepartmentStaffs")
   medicalOrders  MedicalOrder[]
   blockchainLogs BlockchainLogger[]

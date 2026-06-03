@@ -22,11 +22,11 @@ export class PasswordLoginUseCase {
     const identity = usernameOrEmail.trim();
     const user = await this.repo.findUserByIdentity(identity, identity.toLowerCase());
 
-    if (!user || user.role === 'ADMIN') {
-      // No valid user: log the failed attempt against the attempted identity for tracing.
+    if (!user || user.role === 'ADMIN' || user.role === 'DEPT_SHARED') {
+      // No valid user, admin, or shared dept accounts must not use this flow.
       await this.audit.write(null, 'LOGIN_FAIL', 'User', user?.id ?? 'unknown', {
         method: 'PASSWORD',
-        reason: 'invalid_credentials',
+        reason: user?.role === 'DEPT_SHARED' ? 'dept_shared_wrong_flow' : 'invalid_credentials',
         attemptedIdentity: identity,
       });
       throw new UnauthorizedException('Invalid credentials');

@@ -31,6 +31,12 @@ export class ParaclinicalLoginUseCase {
       throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa.');
     }
 
+    // Only DEPT_SHARED accounts can login via the shared-account flow.
+    // LAB_MANAGER (department heads) must use the standard /auth/login endpoint.
+    if (user.role !== 'DEPT_SHARED') {
+      throw new UnauthorizedException('Tài khoản này không phải tài khoản chung phòng ban. Vui lòng đăng nhập qua trang chính.');
+    }
+
     const passwordMatch = await bcrypt.compare(password, user.passwordHash);
     if (!passwordMatch) {
       await this.logger.write(null, 'PARACLINICAL_LOGIN_FAILED', 'User', user.id, {

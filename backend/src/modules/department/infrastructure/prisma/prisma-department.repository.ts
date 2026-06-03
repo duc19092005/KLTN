@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import {
   CreateDepartmentData,
   DepartmentListFilter,
   DepartmentRepositoryPort,
+  SharedUserData,
   StaffProfileInfo,
   UpdateDepartmentData,
 } from '../../application/ports/department.repository.port';
@@ -46,9 +47,26 @@ export class PrismaDepartmentRepository implements DepartmentRepositoryPort {
     return this.prisma.staffProfile.count({ where: { departmentId } });
   }
 
-  async createWithManager(data: CreateDepartmentData): Promise<any> {
+  async createWithManager(data: CreateDepartmentData, sharedUser?: SharedUserData): Promise<any> {
     return this.prisma.$transaction(async (tx) => {
-      const created = await tx.department.create({
+      // 1. Create shared user for the department (if provided)
+      let sharedUserId: string | null = null;
+      if (sharedUser) {
+        const created = await tx.user.create({
+          data: {
+            username: sharedUser.username,
+            email: sharedUser.email,
+            passwordHash: sharedUser.passwordHash,
+            role: sharedUser.role,
+            status: 'ACTIVE',
+            firstLogin: true,
+          },
+        });
+        sharedUserId = created.id;
+      }
+
+      // 2. Create the department
+      const dept = await tx.department.create({
         data: {
           departmentCode: data.departmentCode.trim(),
           name: data.name.trim(),
@@ -59,15 +77,17 @@ export class PrismaDepartmentRepository implements DepartmentRepositoryPort {
           description: data.description?.trim(),
           managerId: data.managerId || null,
           specialty: data.specialty || null,
+          sharedUserId,
         },
         include: this.includeRelations(),
       });
 
+      // 3. Assign manager to department if provided
       if (data.managerId) {
-        await tx.staffProfile.update({ where: { id: data.managerId }, data: { departmentId: created.id } });
+        await tx.staffProfile.update({ where: { id: data.managerId }, data: { departmentId: dept.id } });
       }
 
-      return tx.department.findUniqueOrThrow({ where: { id: created.id }, include: this.includeRelations() });
+      return tx.department.findUniqueOrThrow({ where: { id: dept.id }, include: this.includeRelations() });
     });
   }
 
@@ -134,9 +154,25 @@ export class PrismaDepartmentRepository implements DepartmentRepositoryPort {
     return this.prisma.department.findMany({ orderBy: { departmentCode: 'asc' } });
   }
 
+  async updateUserRole(userId: string, role: UserRole): Promise<void> {
+    await this.prisma.user.update({ where: { id: userId }, data: { role } });
+  }
+
+  async findStaffWithUser(staffId: string) {
+    return this.prisma.staffProfile.findUnique({
+      where: { id: staffId },
+      select: {
+        id: true,
+        userId: true,
+        user: { select: { id: true, role: true } },
+      },
+    });
+  }
+
   private includeRelations() {
     return {
       manager: { include: { user: { select: this.safeUserSelect() }, doctorProfile: true } },
+      sharedUser: { select: { id: true, username: true, email: true, role: true, status: true } },
       staffs: { include: { user: { select: this.safeUserSelect() }, doctorProfile: true } },
     } as const;
   }

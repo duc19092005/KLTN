@@ -39,14 +39,26 @@ export class VerifyShiftFaceUseCase {
     // 2. Validate the face descriptor format
     const validDescriptor = validateFaceDescriptor(faceDescriptor);
 
-    // 3. Find all active shifts covering the current time
-    //    Get all rooms the shared-account staff's department covers
-    const staff = await this.repo.findStaffByUserId(payload.sub);
-    if (!staff || !staff.departmentId) {
+    // 3. Determine the department for this shared account.
+    //    DEPT_SHARED users don't have a StaffProfile — find via Department.sharedUserId.
+    //    Fallback: try StaffProfile for backward compatibility.
+    let departmentId: string | null = null;
+
+    const dept = await this.repo.findDepartmentBySharedUserId(payload.sub);
+    if (dept) {
+      departmentId = dept.id;
+    } else {
+      const staff = await this.repo.findStaffByUserId(payload.sub);
+      if (staff?.departmentId) {
+        departmentId = staff.departmentId;
+      }
+    }
+
+    if (!departmentId) {
       throw new ForbiddenException('Tài khoản không được liên kết với khoa nào.');
     }
 
-    const rooms = await this.repo.findRoomsByDepartmentStaff(staff.departmentId);
+    const rooms = await this.repo.findRoomsByDepartmentStaff(departmentId);
     if (rooms.length === 0) {
       throw new ForbiddenException('Không tìm thấy phòng nào có ca trực hoạt động.');
     }

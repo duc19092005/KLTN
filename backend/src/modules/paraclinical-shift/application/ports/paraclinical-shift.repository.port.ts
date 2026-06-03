@@ -116,4 +116,7 @@ export interface ParaclinicalShiftRepositoryPort {
 
   /** Find rooms linked to a department (for shared-account room scoping). */
   findRoomsByDepartmentStaff(departmentId: string): Promise<{ id: string; roomCode: string; roomName: string }[]>;
+
+  /** Find the department linked to a DEPT_SHARED user. */
+  findDepartmentBySharedUserId(userId: string): Promise<{ id: string; name: string } | null>;
 }
