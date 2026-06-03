@@ -12,6 +12,7 @@ import { MedicalOrderService } from './modules/medical-order/services/medical-or
 import { ClinicalDecisionService } from './modules/clinical-decision/services/clinical-decision.service';
 import { ClinicalRoomService } from './modules/clinical-room/services/clinical-room.service';
 import { PatientService } from './modules/patient/services/patient.service';
+import { ParaclinicalShiftService } from './modules/paraclinical-shift/services/paraclinical-shift.service';
 
 // A representative port token from each refactored module: resolving these proves
 // the Clean Architecture DI wiring (provide: TOKEN, useClass: Adapter) is complete.
@@ -41,6 +42,7 @@ import { ENCRYPTION_PORT } from './modules/auth/application/ports/encryption.por
 import { STEPUP_TICKET_ISSUER } from './modules/auth/application/ports/stepup-ticket-issuer.port';
 import { CLINICAL_ROOM_REPOSITORY } from './modules/clinical-room/application/ports/clinical-room.repository.port';
 import { PATIENT_REPOSITORY } from './modules/patient/application/ports/patient.repository.port';
+import { PARACLINICAL_SHIFT_REPOSITORY } from './modules/paraclinical-shift/application/ports/paraclinical-shift.repository.port';
 
 /**
  * DI smoke test for the Clean Architecture refactor. Compiling AppModule forces
@@ -71,6 +73,7 @@ describe('AppModule dependency injection (Clean Architecture wiring)', () => {
     expect(moduleRef.get(ClinicalDecisionService)).toBeDefined();
     expect(moduleRef.get(ClinicalRoomService)).toBeDefined();
     expect(moduleRef.get(PatientService)).toBeDefined();
+    expect(moduleRef.get(ParaclinicalShiftService)).toBeDefined();
   });
 
   it('resolves every repository/gateway/policy port to a concrete adapter', () => {
@@ -101,6 +104,7 @@ describe('AppModule dependency injection (Clean Architecture wiring)', () => {
       STEPUP_TICKET_ISSUER,
       CLINICAL_ROOM_REPOSITORY,
       PATIENT_REPOSITORY,
+      PARACLINICAL_SHIFT_REPOSITORY,
     ];
     for (const token of tokens) {
       expect(moduleRef.get(token as any, { strict: false })).toBeDefined();

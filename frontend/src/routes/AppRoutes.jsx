@@ -9,6 +9,9 @@ import ReceptionistRecordsPage from '../features/receptionist/pages/Receptionist
 import LabOrdersPage from '../features/lab-manager/pages/LabOrdersPage';
 import LabResultsPage from '../features/lab-manager/pages/LabResultsPage';
 import DoctorQueuePage from '../features/doctor/pages/DoctorQueuePage';
+import ParaclinicalLoginPage from '../features/paraclinical/pages/ParaclinicalLoginPage';
+import ParaclinicalDashboardPage from '../features/paraclinical/pages/ParaclinicalDashboardPage';
+import ShiftManagementPage from '../features/paraclinical/pages/ShiftManagementPage';
 import LoadingIndicator from '../shared/components/LoadingIndicator';
 import { getDashboardRoute } from '../shared/constants/roleRoutes';
 
@@ -46,7 +49,9 @@ export default function App() {
         <Route path="/receptionist/records" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST']}><ReceptionistRecordsPage /></ProtectedRoute>} />
         <Route path="/doctor" element={<ProtectedRoute requireVerified roles={['DOCTOR']}><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/doctor/queue" element={<ProtectedRoute requireVerified roles={['DOCTOR']}><DoctorQueuePage /></ProtectedRoute>} />
-        <Route path="/lab-manager" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><LabManagerDashboard /></ProtectedRoute>} />
+        <Route path="/paraclinical-login" element={<ParaclinicalLoginPage />} />
+        <Route path="/lab-manager" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><ParaclinicalDashboardPage /></ProtectedRoute>} />
+        <Route path="/lab-manager/shifts" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><ShiftManagementPage /></ProtectedRoute>} />
         <Route path="/lab-manager/orders" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><LabOrdersPage /></ProtectedRoute>} />
         <Route path="/lab-manager/results" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><LabResultsPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to={isAuthenticated ? (user?.firstLogin ? '/change-password' : dashboardRoute) : '/login'} replace />} />

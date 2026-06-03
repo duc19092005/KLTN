@@ -34,6 +34,12 @@ enum OperationalStatus {
   INACTIVE
 }
 
+enum ShiftStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id                String     @id @default(uuid())
   username          String     @unique
@@ -69,6 +75,7 @@ model User {
   adminProfile      AdminProfile?
   performedResults  MedicalResult[]
   stepUpTickets     StepUpTicket[]
+  approvedShifts    ParaclinicalShift[] @relation("ApprovedShifts")
 
   @@index([role])
   @@index([status])
@@ -129,6 +136,9 @@ model StaffProfile {
   managedDepartment Department? @relation("DepartmentManager")
   doctorProfile     DoctorProfile?
   blockchainLogs    BlockchainLogger[]
+  paraclinicalShifts ParaclinicalShift[]
+  handoversFrom     HandoverLog[] @relation("HandoverFrom")
+  handoversTo       HandoverLog[] @relation("HandoverTo")
 
   // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
   hash256        String?
@@ -244,6 +254,8 @@ model ClinicalRoom {
   doctorId          String?         @unique
   doctor            DoctorProfile?  @relation("RoomDoctor", fields: [doctorId], references: [id])
   visits            Visit[]
+  paraclinicalShifts ParaclinicalShift[]
+  handoverLogs      HandoverLog[]
 
   floor             String?
   description       String?
@@ -535,6 +547,12 @@ model BlockchainLogger {
   aiQualityId         String?
   aiQuality           AiQuality?         @relation(fields: [aiQualityId], references: [id])
 
+  paraclinicalShiftId String?
+  paraclinicalShift   ParaclinicalShift? @relation(fields: [paraclinicalShiftId], references: [id])
+
+  handoverLogId       String?
+  handoverLog         HandoverLog?       @relation(fields: [handoverLogId], references: [id])
+
   createdAt DateTime @default(now())
 
   @@index([actorId])
@@ -547,6 +565,8 @@ model BlockchainLogger {
   @@index([aiModelRegistryId])
   @@index([medicalConclusionId])
   @@index([aiQualityId])
+  @@index([paraclinicalShiftId])
+  @@index([handoverLogId])
   @@index([batchId])
   @@index([onChainStatus])
 }
@@ -601,4 +621,61 @@ model StepUpTicket {
   @@index([userId])
   @@index([action])
   @@index([expiresAt])
+}
+
+/// A scheduled paraclinical shift. Staff register for open slots (PENDING); a department head
+/// or admin approves/rejects. Approved shifts are batch-anchored on-chain via Merkle roots.
+/// Direct assignment by admin creates an APPROVED shift immediately.
+model ParaclinicalShift {
+  id             String            @id @default(uuid())
+  staffId        String
+  staff          StaffProfile      @relation(fields: [staffId], references: [id])
+  clinicalRoomId String
+  clinicalRoom   ClinicalRoom      @relation(fields: [clinicalRoomId], references: [id])
+  startTime      DateTime
+  endTime        DateTime
+  status         ShiftStatus       @default(PENDING)
+  approvedById   String?
+  approvedBy     User?             @relation("ApprovedShifts", fields: [approvedById], references: [id])
+  isActive       Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
+  hash256        String?
+  dataSalt       String?
+
+  blockchainLogs BlockchainLogger[]
+
+  @@index([staffId])
+  @@index([clinicalRoomId])
+  @@index([status])
+  @@index([startTime, endTime])
+  @@index([isActive])
+}
+
+/// Records one completed handover ceremony between two staff members.
+/// Both parties must pass biometric face verification before the handover is finalized.
+/// The completed handover is IMMEDIATELY anchored on-chain (Tier-A event) because it
+/// demarcates a legal responsibility boundary in clinical operations.
+model HandoverLog {
+  id             String       @id @default(uuid())
+  clinicalRoomId String
+  clinicalRoom   ClinicalRoom @relation(fields: [clinicalRoomId], references: [id])
+  fromStaffId    String
+  fromStaff      StaffProfile @relation("HandoverFrom", fields: [fromStaffId], references: [id])
+  toStaffId      String
+  toStaff        StaffProfile @relation("HandoverTo", fields: [toStaffId], references: [id])
+  reason         String?
+  timestamp      DateTime     @default(now())
+  faceVerifiedA  Boolean      @default(false)
+  faceVerifiedB  Boolean      @default(false)
+  isCompleted    Boolean      @default(false)
+
+  blockchainLogs BlockchainLogger[]
+
+  @@index([clinicalRoomId])
+  @@index([fromStaffId])
+  @@index([toStaffId])
+  @@index([isCompleted])
 }

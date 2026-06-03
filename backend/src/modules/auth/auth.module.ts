@@ -93,6 +93,6 @@ import { StepUpTicketIssuerAdapter } from './infrastructure/adapters/stepup-tick
     { provide: ENCRYPTION_PORT, useClass: EncryptionAdapter },
     { provide: STEPUP_TICKET_ISSUER, useClass: StepUpTicketIssuerAdapter },
   ],
-  exports: [AuthService, JwtModule],
+  exports: [AuthService, JwtModule, FaceMatchService, AUTH_REPOSITORY, SECURITY_EVENT_LOGGER],
 })
 export class AuthModule {}
