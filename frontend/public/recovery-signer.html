@@ -272,6 +272,13 @@
         statusBox.style.display = 'none';
     }
 
+    // Helper to convert UTF-8 string to hex representation
+    function utf8ToHex(str) {
+        return '0x' + Array.from(new TextEncoder().encode(str))
+            .map(val => val.toString(16).padStart(2, '0'))
+            .join('');
+    }
+
     // Handle MetaMask connection and signing
     async function handleWalletAction() {
         clearStatus();
@@ -305,10 +312,11 @@
                 actionBtn.disabled = true;
                 actionBtn.innerText = '⏳ Đang chờ bạn xác nhận trên MetaMask...';
 
-                // Call MetaMask personal_sign method (UTF-8 plain text sign)
+                // Call MetaMask personal_sign method (Hex-encoded challenge required)
+                const hexChallenge = utf8ToHex(challenge);
                 const signature = await window.ethereum.request({
                     method: 'personal_sign',
-                    params: [challenge, connectedAddress]
+                    params: [hexChallenge, connectedAddress]
                 });
 
                 signatureOutput.value = signature;
