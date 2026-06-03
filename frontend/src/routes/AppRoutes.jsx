@@ -35,7 +35,7 @@ export default function App() {
     <div className="app">
       <Routes>
         <Route path="/" element={<PatientVerificationPage />} />
-        <Route path="/login" element={!isAuthenticated || loading ? <LoginPage /> : <Navigate to={user?.firstLogin ? '/change-password' : dashboardRoute} replace />} />
+        <Route path="/login" element={!isAuthenticated || loading ? <Navigate to="/?login=true" replace /> : <Navigate to={user?.firstLogin ? '/change-password' : dashboardRoute} replace />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/change-password" element={<ProtectedRoute allowFirstLogin><ChangePasswordPage /></ProtectedRoute>} />
         <Route path="/authenticate" element={<ProtectedRoute allowFirstLogin><AuthenticatePage /></ProtectedRoute>} />

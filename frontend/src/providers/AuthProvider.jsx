@@ -50,7 +50,7 @@ export function AuthProvider({ children }) {
     try {
       const response = await api.post('/auth/wallet-login', { walletAddress, signature, message });
       persistSession({ ...response.data.user, firstLogin: false });
-      return { success: true, user: response.data.user };
+      return { success: true, ...response.data };
     } catch (err) {
       clearSession();
       return { success: false, error: err.response?.data?.message || 'Wallet login failed' };
