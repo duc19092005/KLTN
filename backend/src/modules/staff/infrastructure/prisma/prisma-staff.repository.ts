@@ -146,7 +146,10 @@ export class PrismaStaffRepository implements StaffRepositoryPort {
   }
 
   async findAllOrdered(): Promise<any[]> {
-    return this.prisma.staffProfile.findMany({ orderBy: { employeeCode: 'asc' } });
+    return this.prisma.staffProfile.findMany({
+      orderBy: { employeeCode: 'asc' },
+      include: this.includeStaff(),
+    });
   }
 
   private includeStaff() {

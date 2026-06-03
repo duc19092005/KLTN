@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, OnApplicationBootstrap } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { computeMerkleRoot, buildMerkleProof, rootToBytes32, verifyMerkleProof } from './merkle.util';
@@ -21,7 +21,7 @@ import { computeMerkleRoot, buildMerkleProof, rootToBytes32, verifyMerkleProof }
  * cycle). Only anchoring metadata is mutated on log rows, which the append-only trigger permits.
  */
 @Injectable()
-export class AuditAnchorService implements OnModuleInit, OnModuleDestroy {
+export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnApplicationBootstrap {
   private readonly logger = new Logger(AuditAnchorService.name);
   private timer: NodeJS.Timeout | null = null;
   private running = false;
@@ -50,6 +50,36 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy {
       this.runCycle().catch((err) => this.logger.error('Audit batch cycle failed', err));
     }, this.intervalMs);
     this.logger.log(`Audit batch anchoring scheduled every ${this.intervalMs}ms (max ${this.maxLeaves} leaves/batch).`);
+  }
+
+  async onApplicationBootstrap() {
+    // Automatically trigger Genesis Anchor if the blockchain has zero batches.
+    try {
+      if (process.env.AUDIT_BATCH_DISABLED === 'true') return;
+
+      const onChainLatest = await this.blockchain.getLatestAuditBatchId();
+      if (onChainLatest === 0 || onChainLatest === null) {
+        this.logger.log('🚀 [Genesis Anchor] Detected empty blockchain state. Checking for seed/initial logs...');
+        
+        const pendingCount = await this.prisma.blockchainLogger.count({
+          where: { batchId: null, seq: { not: null }, entryHash: { not: null } },
+        });
+
+        if (pendingCount > 0) {
+          this.logger.log(`🚀 [Genesis Anchor] Found ${pendingCount} unanchored logs. Committing Batch 1 immediately...`);
+          const res = await this.anchorNow();
+          if (res.committed) {
+            this.logger.log(`✅ [Genesis Anchor] Genesis Batch 1 anchored successfully!`);
+          } else {
+            this.logger.warn(`⚠️ [Genesis Anchor] Genesis Batch 1 anchor failed: ${res.reason}`);
+          }
+        } else {
+          this.logger.log('🚀 [Genesis Anchor] No pending logs to anchor.');
+        }
+      }
+    } catch (err) {
+      this.logger.error('Failed to execute Genesis Anchor on bootstrap:', err);
+    }
   }
 
   onModuleDestroy() {

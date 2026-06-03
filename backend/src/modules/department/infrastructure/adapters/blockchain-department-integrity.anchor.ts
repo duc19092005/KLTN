@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
-import { BlockchainService } from '../../../../infrastructure/blockchain/blockchain.service';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
-import { hashToBytes32 } from '../../../../infrastructure/audit/audit-hash.util';
+import { AuditAnchorService } from '../../../../infrastructure/audit/audit-anchor.service';
 import {
   DepartmentAnchorAction,
   DepartmentIntegrityAnchorPort,
@@ -11,46 +10,33 @@ import {
 import { buildDepartmentSnapshot } from '../../domain/department-snapshot';
 
 /**
- * Tamper-evidence adapter for departments. Logic copied verbatim from the
- * former DepartmentService (anchorDepartmentChange, evaluateIntegrity,
- * getHistory): salted hash, on-chain mirror via DepartmentRegistry,
- * hash256/dataSalt persistence, and the BlockchainLogger audit entry. On-chain
- * failures are non-fatal (flagged UNANCHORED). Only the salted hash goes on-chain.
+ * Tamper-evidence adapter for departments. Uses the centralized AuditAnchor
+ * (Merkle batch) for on-chain integrity verification instead of a dedicated
+ * DepartmentRegistry contract. Each change is recorded in BlockchainLogger and
+ * periodically anchored on-chain via a Merkle root.
  */
 @Injectable()
 export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityAnchorPort {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly blockchain: BlockchainService,
     private readonly audit: AuditLoggerService,
+    private readonly auditAnchor: AuditAnchorService,
   ) {}
 
   async anchorChange(department: any, action: DepartmentAnchorAction, actorId?: string, before?: unknown): Promise<void> {
     const snapshot = buildDepartmentSnapshot(department);
     let dataHash: string | null = null;
     let dataSalt: string | null = null;
-    let onChainStatus = 'PENDING';
-    let txHash: string | null = null;
-    let blockNumber: number | null = null;
 
     try {
-      if (action === 'DELETE') {
-        const res = await this.blockchain.removeDepartmentHash(department.id);
-        onChainStatus = res.success ? 'ANCHORED' : 'UNANCHORED';
-        txHash = (res as any).txHash ?? null;
-        blockNumber = (res as any).blockNumber ?? null;
-      } else {
+      if (action !== 'DELETE') {
         const { salt, hash } = this.audit.hashSnapshot(snapshot);
         dataHash = hash;
         dataSalt = salt;
         await this.prisma.department.update({ where: { id: department.id }, data: { hash256: hash, dataSalt: salt } });
-        const res = await this.blockchain.setDepartmentHash(department.id, hashToBytes32(hash));
-        onChainStatus = res.success ? 'ANCHORED' : 'UNANCHORED';
-        txHash = (res as any).txHash ?? null;
-        blockNumber = (res as any).blockNumber ?? null;
       }
     } catch {
-      onChainStatus = 'UNANCHORED';
+      // Hash computation failed; log entry will still be created below with null hashes.
     }
 
     await this.audit.record({
@@ -62,9 +48,7 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
       dataSalt,
       before: before ?? null,
       after: action === 'DELETE' ? null : snapshot,
-      onChainStatus,
-      txHash,
-      blockNumber,
+      onChainStatus: 'PENDING',
     });
   }
 
@@ -72,16 +56,30 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
     const snapshot = buildDepartmentSnapshot(dept);
     const recomputed = dept.dataSalt ? this.audit.recompute(snapshot, dept.dataSalt) : null;
     const dbHash = dept.hash256 || null;
-    const onChain = await this.blockchain.getDepartmentHash(dept.id);
-    const onChainNormalized = onChain ? onChain.toLowerCase() : null;
-    const recomputedBytes32 = recomputed ? hashToBytes32(recomputed).toLowerCase() : null;
-
     const dbMatches = recomputed !== null && recomputed === dbHash;
-    const chainMatches = recomputedBytes32 !== null && recomputedBytes32 === onChainNormalized;
+
+    // Find the latest anchored log entry for this department
+    const latestLog = await this.prisma.blockchainLogger.findFirst({
+      where: { entity: 'Department', entityId: dept.id, batchId: { not: null } },
+      orderBy: { seq: 'desc' },
+      select: { seq: true, dataHash: true, batchId: true },
+    });
+
+    let chainMatches = false;
+    if (latestLog?.seq) {
+      try {
+        const proof = await this.auditAnchor.getInclusionProof(latestLog.seq);
+        if (proof && proof.verified) {
+          chainMatches = latestLog.dataHash === recomputed;
+        }
+      } catch {
+        // Proof verification failed; chainMatches stays false
+      }
+    }
 
     let status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED';
-    if (!onChainNormalized) status = 'UNANCHORED';
-    else if (chainMatches) status = 'VERIFIED';
+    if (!latestLog || !latestLog.batchId) status = 'UNANCHORED';
+    else if (dbMatches && chainMatches) status = 'VERIFIED';
     else status = 'TAMPERED';
 
     return {
@@ -93,7 +91,7 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
       chainMatches,
       recomputedHash: recomputed,
       storedHash: dbHash,
-      onChainHash: onChain,
+      onChainHash: latestLog?.dataHash ?? null,
     };
   }
 

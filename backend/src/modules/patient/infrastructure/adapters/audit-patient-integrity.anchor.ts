@@ -3,27 +3,27 @@ import { PrismaService } from '../../../../infrastructure/prisma/prisma.service'
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
 import { AuditAnchorService } from '../../../../infrastructure/audit/audit-anchor.service';
 import {
-  AiModelAnchorAction,
-  AiModelIntegrityAnchorPort,
-  IntegrityEvaluation,
-} from '../../application/ports/ai-model-integrity-anchor.port';
-import { buildAiModelSnapshot } from '../../domain/ai-model-snapshot';
+  PatientIntegrityAnchorPort,
+  PatientIntegrityEvaluation,
+} from '../../application/ports/patient-integrity-anchor.port';
+import { buildPatientSnapshot } from '../../domain/patient-snapshot';
 
 /**
- * Tamper-evidence adapter for AI models. Uses the centralized AuditAnchor
- * (Merkle batch) for on-chain integrity verification instead of a dedicated
- * AIModelRegistry contract.
+ * Tamper-evidence adapter for Patient records. Uses the centralized AuditAnchor
+ * (Merkle batch) for on-chain integrity verification. No dedicated smart contract
+ * is needed — the hash is stored locally (hash256/dataSalt) and recorded in
+ * BlockchainLogger, then batch-anchored via AuditAnchor.sol.
  */
 @Injectable()
-export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorPort {
+export class AuditPatientIntegrityAnchor implements PatientIntegrityAnchorPort {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditLoggerService,
     private readonly auditAnchor: AuditAnchorService,
   ) {}
 
-  async anchorChange(model: any, action: AiModelAnchorAction, actorId?: string, before?: unknown): Promise<void> {
-    const snapshot = buildAiModelSnapshot(model);
+  async anchorChange(patient: any, action: string, actorId?: string, before?: unknown): Promise<void> {
+    const snapshot = buildPatientSnapshot(patient);
     let dataHash: string | null = null;
     let dataSalt: string | null = null;
 
@@ -32,15 +32,18 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
         const { salt, hash } = this.audit.hashSnapshot(snapshot);
         dataHash = hash;
         dataSalt = salt;
-        await this.prisma.aiModelRegistry.update({ where: { id: model.id }, data: { hash256: hash, dataSalt: salt } });
+        await this.prisma.patient.update({
+          where: { id: patient.id },
+          data: { hash256: hash, dataSalt: salt },
+        });
       }
-    } catch {
-      // Hash computation failed; log entry will still be created below with null hashes.
+    } catch (err) {
+      console.error('Error computing patient hash:', err);
     }
 
     await this.audit.record({
-      entity: 'AiModelRegistry',
-      entityId: model.id,
+      entity: 'Patient',
+      entityId: patient.id,
       action,
       actorId,
       dataHash,
@@ -51,14 +54,14 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
     });
   }
 
-  async evaluate(model: any): Promise<IntegrityEvaluation> {
-    const snapshot = buildAiModelSnapshot(model);
-    const recomputed = model.dataSalt ? this.audit.recompute(snapshot, model.dataSalt) : null;
-    const dbHash = model.hash256 || null;
+  async evaluate(patient: any): Promise<PatientIntegrityEvaluation> {
+    const snapshot = buildPatientSnapshot(patient);
+    const recomputed = patient.dataSalt ? this.audit.recompute(snapshot, patient.dataSalt) : null;
+    const dbHash = patient.hash256 || null;
     const dbMatches = recomputed !== null && recomputed === dbHash;
 
     const latestLog = await this.prisma.blockchainLogger.findFirst({
-      where: { entity: 'AiModelRegistry', entityId: model.id, batchId: { not: null } },
+      where: { entity: 'Patient', entityId: patient.id, batchId: { not: null } },
       orderBy: { seq: 'desc' },
       select: { seq: true, dataHash: true, batchId: true },
     });
@@ -79,19 +82,18 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
     else status = 'TAMPERED';
 
     return {
-      id: model.id,
-      modelName: model.modelName,
-      modelVersion: model.modelVersion,
+      id: patient.id,
+      patientCode: patient.patientCode,
+      fullName: patient.fullName,
       status,
       dbMatches,
       chainMatches,
       recomputedHash: recomputed,
       storedHash: dbHash,
-      onChainHash: latestLog?.dataHash ?? null,
     };
   }
 
   history(id?: string) {
-    return this.audit.history('AiModelRegistry', id);
+    return this.audit.history('Patient', id);
   }
 }
