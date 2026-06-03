@@ -49,6 +49,8 @@ export interface ClinicalDecisionRepositoryPort {
 
   findAiDiagnosisById(id: string): Promise<{ id: string; visitId: string } | null>;
 
+  findConclusionByVisitId(visitId: string): Promise<any | null>;
+
   /** Atomic: upsert conclusion + transition visit to COMPLETED. */
   upsertConclusionAndCompleteVisit(data: UpsertConclusionData): Promise<unknown>;
 }

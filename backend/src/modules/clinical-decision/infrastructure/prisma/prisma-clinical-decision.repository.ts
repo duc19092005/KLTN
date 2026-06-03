@@ -85,6 +85,10 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
     return this.prisma.aiDiagnosis.findUnique({ where: { id }, select: { id: true, visitId: true } });
   }
 
+  async findConclusionByVisitId(visitId: string): Promise<any | null> {
+    return this.prisma.medicalConclusion.findUnique({ where: { visitId } });
+  }
+
   async upsertConclusionAndCompleteVisit(data: UpsertConclusionData): Promise<unknown> {
     return this.prisma.$transaction(async (tx) => {
       const conclusion = await tx.medicalConclusion.upsert({

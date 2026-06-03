@@ -1,98 +1,143 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# KLTN Hospital Management System - Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A NestJS-based enterprise healthcare platform with ZKP identity verification, biometric authentication, PostgreSQL database, and blockchain audit anchoring.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+## Project Setup
 
 ```bash
+# Install dependencies
 $ npm install
-```
 
-## Compile and run the project
+# Generate Prisma client
+$ npm run prisma:generate
 
-```bash
-# development
-$ npm run start
+# Build project
+$ npm run build
 
-# watch mode
+# Start development server
 $ npm run start:dev
-
-# production mode
-$ npm run start:prod
 ```
 
-## Run tests
+---
 
-```bash
-# unit tests
-$ npm run test
+## ⛓️ Blockchain Audit & Merkle Tree Anchoring
 
-# e2e tests
-$ npm run test:e2e
+To guarantee maximum data integrity while avoiding excessive gas costs on public/private blockchains, this system implements a hybrid **Hash-Chain + Merkle Tree Anchoring** mechanism.
 
-# test coverage
-$ npm run test:cov
+```mermaid
+graph TD
+    subgraph PostgreSQL Database
+        MC[MedicalConclusion #10] -->|1. Generate Hash| SNAP[Snapshot Hash256]
+        SNAP -->|2. Append to Log| BL[BlockchainLogger seq=10]
+        BL -->|3. Linked List| BL_NEXT[BlockchainLogger seq=11]
+    end
+    
+    subgraph Merkle Tree Generator
+        BL -->|Leaf 0| MT[Merkle Tree Batch]
+        BL_NEXT -->|Leaf 1| MT
+        MT -->|Compute Root| MR[Merkle Root]
+    end
+
+    subgraph Blockchain (Smart Contract)
+        MR -->|4. commitRoot| AA[AuditAnchor Contract]
+    end
 ```
 
-## Deployment
+### 1. Merkle Tree Mechanism
+Instead of committing every medical event individually to the blockchain, the system batches log entries:
+1. **Leaves generation:** Each log entry in the `BlockchainLogger` table represents a leaf. Its hash is the `entryHash`, which is computed as:
+   `entryHash = SHA256(pepper | seq | prevHash | dataHash | createdAt)`
+2. **Tree Building:** The system hashes adjacent leaves together recursively to build a binary tree (Merkle Tree) until a single hash remains at the top: the **Merkle Root**.
+3. **On-chain Anchor:** Only this **Merkle Root** is written to the blockchain in the `AuditAnchor` smart contract via the `commitRoot(batchId, root, leafCount)` function.
+4. **Inclusion Proof (Merkle Proof):** To verify that a specific log entry exists in that batch on-chain, we compute a list of hashes (sibling hashes) called a **Merkle Proof**. Using this proof and the leaf hash, anyone can recompute the root and verify it against the immutable root stored on-chain.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+---
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 2. Scenario: Hacker Tampers with Doctor A's Conclusion #10
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+Let's assume **Doctor A** created **Medical Conclusion #10** with the text: `"Bệnh nhân bị viêm dạ dày, chỉ định uống thuốc X."`
+The system generated a snapshot, calculated `hash256` and `dataSalt`, saved them in the `MedicalConclusion` table, and appended a log entry in `BlockchainLogger` (e.g. `seq = 10`, `dataHash` = `hash256`). The batch was then anchored on-chain with Merkle Root `0xRootABC`.
+
+Now, a **Hacker** attempts to silently modify Conclusion #10's diagnosis text in the database to: `"Bệnh nhân hoàn toàn khỏe mạnh, không cần uống thuốc."` (e.g., to cover up a medical error or malicious prescription change).
+
+Here is how the checker service detects the fraud step-by-step:
+
+#### Lớp 1: Kiểm tra tính toàn vẹn cục bộ (Local Integrity Check)
+The checker recomputes the SHA-256 hash of the current conclusion text in the `MedicalConclusion` table using the stored `dataSalt` and compares it against the `hash256` field in the same table.
+* **If the hacker only modified the text** but left the `hash256` column untouched:
+  * `recomputedHash !== storedHash` $\rightarrow$ **TAMPER DETECTED!**
+
+#### Lớp 2: Kiểm tra chéo với Nhật ký hệ thống (Cross-Log Integrity Check)
+To bypass Lớp 1, the hacker also updates the `hash256` column in the `MedicalConclusion` table to match the new text's hash.
+* The checker queries the matching log entry in the `BlockchainLogger` table (where `entity = "MedicalConclusion"` and `entityId = conclusion.id`).
+* The checker compares the conclusion's `hash256` with the log's `dataHash`.
+* **Since the `BlockchainLogger` is protected by database triggers** that block updates/deletes, the log's `dataHash` remains the original hash.
+* `conclusion.hash256 !== logger.dataHash` $\rightarrow$ **TAMPER DETECTED!**
+
+#### Lớp 3: Kiểm tra đứt gãy chuỗi liên kết (Hash-Chain Verification)
+To bypass Lớp 2, the hacker attempts to bypass database triggers (e.g., by gaining superuser DB access, disabling triggers, and modifying the `dataHash` in the log entry `seq = 10` to match the new hash).
+* To prevent this, `BlockchainLogger` is a hash chain (each entry points to `prevHash`).
+* Since the hacker modified `dataHash` of `seq = 10`, the `entryHash` of `seq = 10` changes.
+* This breaks the chain because the next record (`seq = 11`) expects the old `entryHash` in its `prevHash` column.
+* `logger[11].prevHash !== logger[10].entryHash` $\rightarrow$ **TAMPER DETECTED!** (The chain is broken at `seq = 10`).
+
+#### Lớp 4: Xác thực On-chain với Merkle Root (On-Chain Blockchain Anchor check)
+To bypass Lớp 3, the hacker recalculates the entire hash-chain from `seq = 10` to the latest record in the database so that all `prevHash` linkages align.
+* The checker requests the **Merkle Proof** for log `seq = 10` from the current database.
+* The checker queries the `AuditAnchor` smart contract on the blockchain to get the committed Merkle Root for the batch containing `seq = 10` (which is `0xRootABC`).
+* The checker recalculates the Merkle Root using the current database leaf hash of `seq = 10` and the sibling hashes provided by the proof.
+* Since the leaf hash of `seq = 10` has been changed by the hacker, the recalculated root will be `0xRootXYZ`.
+* `recalculatedRoot (0xRootXYZ) !== onChainRoot (0xRootABC)` $\rightarrow$ **TAMPER DETECTED!**
+* **Conclusion:** Because the blockchain root `0xRootABC` is immutable and cannot be modified by any hacker or admin, the tampering of Doctor A's Conclusion #10 is mathematically proven.
+
+---
+
+### 3. Database Backup & Verified Restore Workflow
+
+What happens if Doctor A's Conclusion #10 is indeed modified, and we need to recover the correct data?
+
+```text
+[Hacker modifies DB] -> [Verification fails at seq=10]
+                                  ↓
+                  [Retrieve PostgreSQL Backups]
+                                  ↓
+      [Run Verification check on Backup DB against Blockchain Root]
+                                  ↓
+             Is Backup Valid? ── NO ──> [Reject Backup]
+                   │
+                  YES
+                   ↓
+   [Superadmin Face Scan Step-Up] ── Fail ──> [Abort Restore]
+                   │
+                Success
+                   ↓
+       [Restore Database to Clean State]
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+#### 3.1. How Backup Data is Structured
+The system uses automated, periodic PostgreSQL backups (dump files or WAL logs for PITR) saved to a secure, write-once-read-many (WORM) storage (e.g., AWS S3 with Object Lock or a read-only local backup vault).
 
-## Resources
+#### 3.2. Verification of the Backup Database
+Before performing any restoration, the backup database **must be verified** against the blockchain to ensure it was not also tampered with or corrupted:
+1. The backup database is restored onto an isolated staging environment.
+2. The verification engine runs Lớp 3 and Lớp 4 checks on this backup database, comparing its local hash-chains and Merkle roots against the immutable roots stored in the on-chain `AuditAnchor` contract.
+3. If the backup's calculated Merkle roots match the on-chain roots, the backup is certified as **100% authentic and clean**.
 
-Check out a few resources that may come in handy when working with NestJS:
+#### 3.3. Biometric-Secured Restore Execution
+To prevent malicious actors from triggering unauthorized database restores (e.g., to rollback database transactions, remove billing records, or overwrite active data with a stale backup):
+1. **Mandatory Face Verification:** The database restore script is protected by a **Face Step-up authentication guard**.
+2. **Superadmin authorization:** The physical superadmin must perform a live facial scan (verified against the on-chain `FaceRegistry`).
+3. **Execution:** Only when the biometric match is verified and a single-use restore token is minted, the database restoration process is allowed to run, restoring the database to the verified clean state.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+#### 3.4. Emergency Database Recovery (Out-of-Band CLI)
+If the database or `User` table is completely compromised, preventing the Admin from logging into the web dashboard (e.g., deleted credentials, changed passwords, or tampered face templates):
+1. Run the emergency CLI restore command directly on the server host:
+   ```bash
+   npm run db:emergency-restore <path_to_backup_file>
+   ```
+2. The tool will print a dynamic cryptographic challenge.
+3. The Admin signs this challenge using their Web3 wallet (via MetaMask or hardware wallets).
+4. Paste the signature back into the CLI prompt.
+5. The script recovers the signer's address, calls the blockchain (`IdentityRegistry`) directly via RPC, and if the signer is recognized as an authorized Admin or the owner, it executes the restore (using docker-compose fallback or local psql), bypassing database authentication checks entirely.
+6. **Note on Face Scanning:** This flow **does not perform a face scan** because (a) SSH/Terminal sessions do not have access to camera hardware, and (b) if the database is compromised, the face template comparison data in the DB cannot be trusted. Web3 cryptographic signing is used instead as the root of trust.
 
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).

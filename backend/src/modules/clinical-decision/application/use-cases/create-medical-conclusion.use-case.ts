@@ -5,6 +5,11 @@ import {
   CLINICAL_DECISION_REPOSITORY,
   ClinicalDecisionRepositoryPort,
 } from '../ports/clinical-decision.repository.port';
+import {
+  MEDICAL_CONCLUSION_INTEGRITY_ANCHOR,
+  MedicalConclusionIntegrityAnchorPort,
+} from '../ports/medical-conclusion-integrity-anchor.port';
+import { buildMedicalConclusionSnapshot } from '../../domain/medical-conclusion-snapshot';
 
 /**
  * Doctor finalizes a visit with a MedicalConclusion. Behavior copied verbatim
@@ -19,6 +24,7 @@ import {
 export class CreateMedicalConclusionUseCase {
   constructor(
     @Inject(CLINICAL_DECISION_REPOSITORY) private readonly repo: ClinicalDecisionRepositoryPort,
+    @Inject(MEDICAL_CONCLUSION_INTEGRITY_ANCHOR) private readonly integrity: MedicalConclusionIntegrityAnchorPort,
     private readonly policy: ClinicalDecisionPolicy,
   ) {}
 
@@ -37,7 +43,11 @@ export class CreateMedicalConclusionUseCase {
       }
     }
 
-    return this.repo.upsertConclusionAndCompleteVisit({
+    const existing = await this.repo.findConclusionByVisitId(dto.visitId);
+    const before = existing ? buildMedicalConclusionSnapshot(existing) : null;
+    const action = existing ? 'UPDATE' : 'CREATE';
+
+    const conclusion = await this.repo.upsertConclusionAndCompleteVisit({
       visitId: visit!.id,
       doctorId: visit!.doctorId,
       aiDiagnosisId: dto.aiDiagnosisId || null,
@@ -47,5 +57,9 @@ export class CreateMedicalConclusionUseCase {
       followUpNote: dto.followUpNote?.trim() || null,
       doctorNote: dto.doctorNote?.trim() || null,
     });
+
+    await this.integrity.anchorChange(conclusion, action, doctorUserId, before);
+
+    return conclusion;
   }
 }
