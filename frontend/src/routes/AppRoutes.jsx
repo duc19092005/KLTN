@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../providers/AuthProvider';
-import { LoginPage, AuthenticatePage, ChangePasswordPage } from '../features/auth';
+import { LoginPage, AuthenticatePage, ChangePasswordPage, ForgotPasswordPage } from '../features/auth';
 import { AdminPage, DepartmentsPage, StaffPage, DoctorsPage, ClinicalRoomsPage, AiModelsPage, AuditLogsPage } from '../features/admin';
 import { ReceptionistDashboard, DoctorDashboard, LabManagerDashboard } from '../features/role-dashboard';
 import ReceptionistIntakePage from '../features/receptionist/pages/ReceptionistIntakePage';
@@ -36,6 +36,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<PatientVerificationPage />} />
         <Route path="/login" element={!isAuthenticated || loading ? <LoginPage /> : <Navigate to={user?.firstLogin ? '/change-password' : dashboardRoute} replace />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/change-password" element={<ProtectedRoute allowFirstLogin><ChangePasswordPage /></ProtectedRoute>} />
         <Route path="/authenticate" element={<ProtectedRoute allowFirstLogin><AuthenticatePage /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute requireVerified roles={['ADMIN']}><AdminPage /></ProtectedRoute>} />

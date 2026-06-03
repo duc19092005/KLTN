@@ -16,6 +16,9 @@ import {
   StaffLoginDto,
   ChangePasswordDto,
   StepUpFaceDto,
+  ForgotPasswordChallengeDto,
+  ForgotPasswordVerifyFaceDto,
+  ForgotPasswordResetDto,
 } from '../dto/auth.dto';
 import { getAuthCookieOptions, getClearAuthCookieOptions } from '../constants/auth-security';
 
@@ -233,6 +236,57 @@ export class AuthController {
   private rateLimitKey(req: any, action: string, subject: string) {
     const ip = this.clientIp(req);
     return `${action}:${ip}:${subject}`;
+  }
+
+  @Post('forgot-password/challenge')
+  async forgotPasswordChallenge(@Body() body: ForgotPasswordChallengeDto, @Req() req) {
+    const key = this.rateLimitKey(req, 'forgot-challenge', body.username.toLowerCase());
+    this.rateLimiter.assertAllowed(key, 5, 5 * 60 * 1000);
+    try {
+      const result = await this.authService.forgotPasswordChallenge(body.username);
+      this.rateLimiter.reset(key);
+      return result;
+    } catch (error) {
+      this.rateLimiter.recordFailure(key, 5 * 60 * 1000);
+      throw error;
+    }
+  }
+
+  @Post('forgot-password/verify-face')
+  async forgotPasswordVerifyFace(@Body() body: ForgotPasswordVerifyFaceDto, @Req() req) {
+    const key = this.rateLimitKey(req, 'forgot-verify', body.userId);
+    this.rateLimiter.assertAllowed(key, 5, 5 * 60 * 1000);
+    try {
+      const result = await this.authService.forgotPasswordVerifyFace(
+        body.userId,
+        body.embedding,
+        body.challenge,
+        this.clientIp(req),
+      );
+      this.rateLimiter.reset(key);
+      return result;
+    } catch (error) {
+      this.rateLimiter.recordFailure(key, 5 * 60 * 1000);
+      throw error;
+    }
+  }
+
+  @Post('forgot-password/reset')
+  async forgotPasswordReset(@Body() body: ForgotPasswordResetDto, @Req() req) {
+    const key = this.rateLimitKey(req, 'forgot-reset', 'global');
+    this.rateLimiter.assertAllowed(key, 10, 5 * 60 * 1000);
+    try {
+      const result = await this.authService.forgotPasswordReset(
+        body.resetToken,
+        body.newPassword,
+        this.clientIp(req),
+      );
+      this.rateLimiter.reset(key);
+      return result;
+    } catch (error) {
+      this.rateLimiter.recordFailure(key, 5 * 60 * 1000);
+      throw error;
+    }
   }
 
   private clientIp(req: any): string {

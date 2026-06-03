@@ -115,3 +115,30 @@ export class ChangePasswordDto {
   @Length(8, 256)
   newPassword: string;
 }
+
+export class ForgotPasswordChallengeDto {
+  @IsString()
+  @Length(3, 128)
+  username: string;
+}
+
+export class ForgotPasswordVerifyFaceDto {
+  @IsString()
+  userId: string;
+
+  @IsArray()
+  embedding: number[];
+
+  @IsString()
+  @Length(32, 128)
+  challenge: string;
+}
+
+export class ForgotPasswordResetDto {
+  @IsString()
+  resetToken: string;
+
+  @IsString()
+  @Length(8, 256)
+  newPassword: string;
+}

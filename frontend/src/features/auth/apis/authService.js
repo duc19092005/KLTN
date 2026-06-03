@@ -35,4 +35,13 @@ export const authService = {
   getMe: () => api.get('/auth/me'),
 
   logout: () => api.post('/auth/logout'),
+
+  forgotPasswordChallenge: (username) =>
+    api.post('/auth/forgot-password/challenge', { username }),
+
+  forgotPasswordVerifyFace: (userId, embedding, challenge) =>
+    api.post('/auth/forgot-password/verify-face', { userId, embedding, challenge }),
+
+  forgotPasswordReset: (resetToken, newPassword) =>
+    api.post('/auth/forgot-password/reset', { resetToken, newPassword }),
 };

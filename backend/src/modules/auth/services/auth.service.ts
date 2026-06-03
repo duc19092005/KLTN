@@ -14,6 +14,9 @@ import { VerifyFaceForStepUpUseCase } from '../application/use-cases/verify-face
 import { GenerateMfaSecretUseCase } from '../application/use-cases/generate-mfa-secret.use-case';
 import { GetMeUseCase } from '../application/use-cases/get-me.use-case';
 import { LogoutUseCase } from '../application/use-cases/logout.use-case';
+import { ForgotPasswordChallengeUseCase } from '../application/use-cases/forgot-password-challenge.use-case';
+import { ForgotPasswordVerifyFaceUseCase } from '../application/use-cases/forgot-password-verify-face.use-case';
+import { ForgotPasswordResetUseCase } from '../application/use-cases/forgot-password-reset.use-case';
 
 /**
  * Facade preserving the controller-facing API. Each method delegates to a
@@ -39,6 +42,9 @@ export class AuthService {
     private readonly generateMfaSecretUseCase: GenerateMfaSecretUseCase,
     private readonly getMeUseCase: GetMeUseCase,
     private readonly logoutUseCase: LogoutUseCase,
+    private readonly forgotPasswordChallengeUseCase: ForgotPasswordChallengeUseCase,
+    private readonly forgotPasswordVerifyFaceUseCase: ForgotPasswordVerifyFaceUseCase,
+    private readonly forgotPasswordResetUseCase: ForgotPasswordResetUseCase,
   ) {}
 
   bootstrapFirstAdmin(username: string, email: string, superAdminSecret: string) {
@@ -110,5 +116,17 @@ export class AuthService {
 
   logoutToken(token?: string) {
     return this.logoutUseCase.logoutToken(token);
+  }
+
+  forgotPasswordChallenge(username: string) {
+    return this.forgotPasswordChallengeUseCase.execute(username);
+  }
+
+  forgotPasswordVerifyFace(userId: string, embedding: number[], challenge: string, ip?: string) {
+    return this.forgotPasswordVerifyFaceUseCase.execute(userId, embedding, challenge, ip);
+  }
+
+  forgotPasswordReset(resetToken: string, newPassword: string, ip?: string) {
+    return this.forgotPasswordResetUseCase.execute(resetToken, newPassword, ip);
   }
 }
