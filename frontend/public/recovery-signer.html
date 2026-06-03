@@ -1,290 +1,303 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html class="light" lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hospital OS - Emergency Restore Signer</title>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Hospital OS - Emergency Signer</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-surface": "#191c1e",
+                      "on-error": "#ffffff",
+                      "outline": "#737784",
+                      "surface-container-low": "#f2f4f6",
+                      "inverse-on-surface": "#eff1f3",
+                      "surface-container-highest": "#e0e3e5",
+                      "on-secondary-fixed-variant": "#374951",
+                      "surface-dim": "#d8dadc",
+                      "error-container": "#ffdad6",
+                      "on-tertiary-fixed-variant": "#004493",
+                      "primary-container": "#0f52ba",
+                      "on-tertiary-container": "#bacfff",
+                      "surface-container-high": "#e6e8ea",
+                      "tertiary-container": "#0055b4",
+                      "on-error-container": "#93000a",
+                      "inverse-surface": "#2d3133",
+                      "surface-variant": "#e0e3e5",
+                      "tertiary-fixed": "#d8e2ff",
+                      "surface": "#f7f9fb",
+                      "on-primary-fixed": "#001945",
+                      "outline-variant": "#c3c6d5",
+                      "on-primary-fixed-variant": "#00419c",
+                      "on-primary-container": "#bcceff",
+                      "secondary": "#4f6169",
+                      "on-surface-variant": "#434653",
+                      "primary": "#003c90",
+                      "on-tertiary": "#ffffff",
+                      "surface-tint": "#1d59c1",
+                      "surface-bright": "#f7f9fb",
+                      "secondary-container": "#d2e6ef",
+                      "background": "#f7f9fb",
+                      "on-secondary-container": "#55676f",
+                      "on-background": "#191c1e",
+                      "surface-container-lowest": "#ffffff",
+                      "inverse-primary": "#b0c6ff",
+                      "primary-fixed": "#d9e2ff",
+                      "secondary-fixed": "#d2e6ef",
+                      "primary-fixed-dim": "#b0c6ff",
+                      "on-primary": "#ffffff",
+                      "on-secondary-fixed": "#0b1e24",
+                      "on-secondary": "#ffffff",
+                      "secondary-fixed-dim": "#b6cad2",
+                      "error": "#ba1a1a",
+                      "surface-container": "#eceef0",
+                      "tertiary-fixed-dim": "#adc7ff",
+                      "tertiary": "#003e87",
+                      "on-tertiary-fixed": "#001a41"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "unit": "4px",
+                      "container-max-width": "560px",
+                      "margin-desktop": "40px",
+                      "margin-mobile": "16px",
+                      "gutter": "24px"
+              },
+              "fontFamily": {
+                      "headline-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "label-sm": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-lg-mobile": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "label-md": [
+                              "Hanken Grotesk"
+                      ]
+              },
+              "fontSize": {
+                      "headline-lg": [
+                              "30px",
+                              {
+                                      "lineHeight": "38px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0.01em",
+                                      "fontWeight": "500"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
     <style>
-        :root {
-            --bg-color: #0b0f19;
-            --card-bg: rgba(17, 24, 39, 0.7);
-            --primary: #06b6d4;
-            --primary-hover: #0891b2;
-            --text-main: #f3f4f6;
-            --text-muted: #9ca3af;
-            --border: rgba(6, 182, 212, 0.2);
-            --error: #ef4444;
-            --success: #10b981;
-        }
-
         body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background-image: 
-                radial-gradient(at 0% 0%, rgba(6, 182, 212, 0.15) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(15, 23, 42, 0.8) 0px, transparent 50%);
+            font-family: 'Hanken Grotesk', sans-serif;
+            background-color: #f7f9fb; /* bg-surface */
         }
-
-        .container {
-            width: 100%;
-            max-width: 550px;
-            padding: 2rem;
-            box-sizing: border-box;
-        }
-
-        .card {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 2.5rem;
-            backdrop-filter: blur(12px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.05);
-        }
-
-        .logo-area {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 1.5rem;
-        }
-
-        .logo-icon {
-            width: 32px;
-            height: 32px;
-            background: var(--primary);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            color: #0b0f19;
-            box-shadow: 0 0 15px rgba(6, 182, 212, 0.5);
-        }
-
-        h1 {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin: 0;
-            text-align: center;
-            letter-spacing: -0.5px;
-            background: linear-gradient(to right, #ffffff, #06b6d4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .description {
-            font-size: 0.875rem;
-            color: var(--text-muted);
-            text-align: center;
-            margin-top: 0.5rem;
-            margin-bottom: 2rem;
-            line-height: 1.5;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        label {
-            display: block;
-            font-size: 0.875rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: var(--text-main);
-        }
-
-        textarea {
-            width: 100%;
-            background: rgba(10, 15, 30, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 0.75rem;
-            color: var(--text-main);
-            font-family: monospace;
-            font-size: 0.875rem;
-            box-sizing: border-box;
-            resize: none;
-            transition: all 0.2s ease;
-        }
-
-        textarea:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 10px rgba(6, 182, 212, 0.2);
-        }
-
-        .btn {
-            width: 100%;
-            background: var(--primary);
-            color: #0b0f19;
-            border: none;
-            border-radius: 8px;
-            padding: 0.85rem;
-            font-size: 0.95rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            margin-top: 1rem;
-        }
-
-        .btn:hover {
-            background: var(--primary-hover);
-            box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
-        }
-
-        .btn:disabled {
-            background: rgba(255, 255, 255, 0.1);
-            color: var(--text-muted);
-            cursor: not-allowed;
-            box-shadow: none;
-        }
-
-        .status {
-            font-size: 0.875rem;
-            margin-top: 1rem;
-            padding: 0.75rem;
-            border-radius: 6px;
-            display: none;
-            line-height: 1.4;
-        }
-
-        .status.error {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.2);
-            color: var(--error);
-            display: block;
-        }
-
-        .status.success {
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid rgba(16, 185, 129, 0.2);
-            color: var(--success);
-            display: block;
-        }
-
-        .wallet-info {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 0.875rem;
-            background: rgba(255, 255, 255, 0.03);
-            padding: 0.75rem;
-            border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            margin-bottom: 1.5rem;
-        }
-
-        .wallet-address {
-            font-family: monospace;
-            color: var(--primary);
-            font-weight: 600;
-        }
-
-        .copy-btn {
-            background: transparent;
-            border: 1px solid var(--primary);
-            color: var(--primary);
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            margin-top: 0.5rem;
-        }
-
-        .copy-btn:hover {
-            background: var(--primary);
-            color: #0b0f19;
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
         }
     </style>
 </head>
-<body>
-
-<div class="container">
-    <div class="card">
-        <div class="logo-area">
-            <div class="logo-icon">➕</div>
-            <h1>Hospital OS Emergency Signer</h1>
-        </div>
-        <p class="description">
-            Công cụ ký số cứu hộ ngoại băng dành cho Admin. Không yêu cầu kết nối internet. Quá trình ký diễn ra hoàn toàn bảo mật trong ví MetaMask của bạn.
-        </p>
-
-        <div class="wallet-info" id="wallet-section">
-            <span>Ví kết nối:</span>
-            <span class="wallet-address" id="wallet-addr">Chưa kết nối</span>
-        </div>
-
-        <div class="form-group">
-            <label for="challenge-input">1. Dán chuỗi Challenge cứu hộ từ Terminal:</label>
-            <textarea id="challenge-input" rows="3" placeholder="Dán chuỗi dạng EMERGENCY_DATABASE_RESTORE_CHALLENGE:..."></textarea>
-        </div>
-
-        <button class="btn" id="action-btn" onclick="handleWalletAction()">
-            🔌 Kết nối ví MetaMask
-        </button>
-
-        <div class="form-group" id="signature-group" style="margin-top: 2rem; display: none;">
-            <label for="signature-output">3. Sao chép Chữ ký số tạo được:</label>
-            <textarea id="signature-output" rows="4" readonly placeholder="Chữ ký số dạng Hex sẽ xuất hiện ở đây..."></textarea>
-            <button class="copy-btn" id="copy-btn" onclick="copySignature()">📋 Sao chép chữ ký</button>
-        </div>
-
-        <div class="status" id="status-box"></div>
-    </div>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col items-center justify-center p-margin-mobile md:p-margin-desktop">
+<!-- Main Container -->
+<main class="w-full max-w-container-max-width mx-auto">
+<!-- Header Section -->
+<header class="text-center mb-8">
+<div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary-container text-on-primary-container mb-4">
+<span class="material-symbols-outlined text-2xl" data-icon="health_and_safety">health_and_safety</span>
+</div>
+<h1 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">
+                Hospital OS Emergency Signer
+            </h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-md mx-auto">
+                Công cụ ký số cứu hộ ngoại băng dành cho Admin. Không yêu cầu kết nối internet. Quá trình ký diễn ra hoàn toàn bảo mật trong ví MetaMask của bạn.
+            </p>
+</header>
+<!-- Signer Box -->
+<div class="bg-surface-container-lowest rounded-xl shadow-[0px_10px_30px_rgba(0,0,0,0.05)] p-6 md:p-8 border border-outline-variant/30">
+<!-- Connection Status -->
+<div class="flex items-center justify-between bg-surface-container px-4 py-3 rounded-lg mb-6 border border-outline-variant/50">
+<div class="flex items-center gap-3 text-on-surface-variant">
+<span class="material-symbols-outlined text-xl" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="font-label-md text-label-md">Ví kết nối</span>
+</div>
+<div class="flex items-center gap-2">
+<div id="wallet-indicator" class="w-2 h-2 rounded-full bg-gray-400"></div>
+<span id="wallet-addr" class="font-label-md text-label-md text-on-surface font-mono">Chưa kết nối</span>
+</div>
+</div>
+<!-- Input Area -->
+<div class="mb-6">
+<label class="block font-label-md text-label-md text-on-surface mb-2" for="challenge-input">
+                    1. Dán chuỗi Challenge cứu hộ từ Terminal:
+                </label>
+<textarea class="w-full bg-[#F1F5F9] border border-outline-variant rounded-lg p-4 font-body-md text-body-md text-on-surface placeholder:text-outline focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all outline-none resize-none font-mono" id="challenge-input" placeholder="Dán chuỗi dạng EMERGENCY_DATABASE_RESTORE_CHALLENGE:..." rows="4"></textarea>
 </div>
 
+<!-- Output Area (Hidden by default) -->
+<div class="mb-6 hidden" id="signature-group">
+<label class="block font-label-md text-label-md text-on-surface mb-2" for="signature-output">
+                    2. Sao chép Chữ ký số tạo được:
+                </label>
+<textarea class="w-full bg-[#F1F5F9] border border-outline-variant rounded-lg p-4 font-body-md text-body-md text-on-surface focus:border-primary transition-all outline-none resize-none font-mono" id="signature-output" readonly placeholder="Chữ ký số dạng Hex sẽ xuất hiện ở đây..." rows="4"></textarea>
+<button class="mt-2 inline-flex items-center gap-2 border border-primary text-primary hover:bg-primary/5 px-4 py-2 rounded-lg font-label-sm text-label-sm transition-colors cursor-pointer" onclick="copySignature()">
+    <span class="material-symbols-outlined text-sm" data-icon="content_copy">content_copy</span>
+    <span id="copy-btn-text">Sao chép chữ ký</span>
+</button>
+</div>
+
+<!-- Error Alert Banner (Hidden by default) -->
+<div class="hidden flex items-start gap-3 bg-error-container/30 border-l-2 border-error p-4 rounded-r-lg mb-6" id="error-banner">
+<span class="material-symbols-outlined text-error shrink-0" data-icon="info">info</span>
+<p class="font-body-md text-body-md text-error m-0" id="error-text">
+                    Vui lòng dán chuỗi Challenge lấy từ terminal máy chủ trước khi ký!
+                </p>
+</div>
+
+<!-- Success Alert Banner (Hidden by default) -->
+<div class="hidden flex items-start gap-3 bg-emerald-500/10 border-l-2 border-emerald-500 p-4 rounded-r-lg mb-6" id="success-banner">
+<span class="material-symbols-outlined text-emerald-600 shrink-0" data-icon="check_circle">check_circle</span>
+<p class="font-body-md text-body-md text-emerald-700 m-0" id="success-text">
+                    Kết nối ví thành công!
+                </p>
+</div>
+
+<!-- Action Button -->
+<button id="action-btn" onclick="handleWalletAction()" class="w-full bg-primary hover:bg-primary/90 text-on-primary font-label-md text-label-md py-4 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet" id="action-icon">account_balance_wallet</span>
+<span id="action-text">Kết nối ví MetaMask</span>
+</button>
+</div>
+<!-- Trust Indicators -->
+<div class="mt-8 text-center flex items-center justify-center gap-4 text-outline font-label-sm text-label-sm">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" data-icon="lock">lock</span>
+                Offline Mode
+            </div>
+<span>•</span>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" data-icon="verified_user">verified_user</span>
+                Client-Side Only
+            </div>
+</div>
+</main>
 <script>
     let connectedAddress = '';
 
     const actionBtn = document.getElementById('action-btn');
+    const actionIcon = document.getElementById('action-icon');
+    const actionText = document.getElementById('action-text');
     const walletAddr = document.getElementById('wallet-addr');
+    const walletIndicator = document.getElementById('wallet-indicator');
     const challengeInput = document.getElementById('challenge-input');
+    const errorBanner = document.getElementById('error-banner');
+    const errorText = document.getElementById('error-text');
+    const successBanner = document.getElementById('success-banner');
+    const successText = document.getElementById('success-text');
     const signatureGroup = document.getElementById('signature-group');
     const signatureOutput = document.getElementById('signature-output');
-    const statusBox = document.getElementById('status-box');
 
-    // Display error messages
     function showError(msg) {
-        statusBox.className = 'status error';
-        statusBox.innerText = msg;
+        successBanner.classList.add('hidden');
+        successBanner.style.display = 'none';
+        errorText.innerText = msg;
+        errorBanner.classList.remove('hidden');
+        errorBanner.style.display = 'flex';
     }
 
-    // Display success messages
     function showSuccess(msg) {
-        statusBox.className = 'status success';
-        statusBox.innerText = msg;
+        errorBanner.classList.add('hidden');
+        errorBanner.style.display = 'none';
+        successText.innerText = msg;
+        successBanner.classList.remove('hidden');
+        successBanner.style.display = 'flex';
     }
 
     function clearStatus() {
-        statusBox.style.display = 'none';
+        errorBanner.classList.add('hidden');
+        errorBanner.style.display = 'none';
+        successBanner.classList.add('hidden');
+        successBanner.style.display = 'none';
     }
 
-    // Helper to convert UTF-8 string to hex representation
     function utf8ToHex(str) {
         return '0x' + Array.from(new TextEncoder().encode(str))
             .map(val => val.toString(16).padStart(2, '0'))
             .join('');
     }
 
-    // Handle MetaMask connection and signing
     async function handleWalletAction() {
         clearStatus();
 
         if (typeof window.ethereum === 'undefined') {
-            showError('❌ Không tìm thấy ví MetaMask. Vui lòng cài đặt tiện ích MetaMask trên trình duyệt!');
+            showError('Không tìm thấy ví MetaMask. Vui lòng cài đặt tiện ích MetaMask trên trình duyệt!');
             return;
         }
 
@@ -292,27 +305,38 @@
             if (!connectedAddress) {
                 // Step 1: Connect Wallet
                 actionBtn.disabled = true;
-                actionBtn.innerText = '⏳ Đang kết nối ví...';
+                actionText.innerText = 'Đang kết nối ví...';
+                actionIcon.innerText = 'sync';
+                actionIcon.classList.add('animate-spin');
                 
                 const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
                 connectedAddress = accounts[0];
                 
+                // Update Wallet Info UI
                 walletAddr.innerText = connectedAddress.substring(0, 6) + '...' + connectedAddress.substring(connectedAddress.length - 4);
-                actionBtn.innerText = '✍️ Ký thông điệp cứu hộ';
+                walletIndicator.classList.remove('bg-gray-400');
+                walletIndicator.classList.add('bg-emerald-500', 'animate-pulse');
+                
+                // Update Button
+                actionText.innerText = 'Ký thông điệp cứu hộ';
+                actionIcon.innerText = 'edit_note';
+                actionIcon.classList.remove('animate-spin');
                 actionBtn.disabled = false;
-                showSuccess('✅ Đã kết nối thành công với ví MetaMask của bạn.');
+                
+                showSuccess('Đã kết nối thành công với ví MetaMask của bạn.');
             } else {
                 // Step 2: Sign Challenge
                 const challenge = challengeInput.value.trim();
                 if (!challenge) {
-                    showError('❌ Vui lòng dán chuỗi Challenge lấy từ terminal máy chủ trước khi ký!');
+                    showError('Vui lòng dán chuỗi Challenge lấy từ terminal máy chủ trước khi ký!');
                     return;
                 }
 
                 actionBtn.disabled = true;
-                actionBtn.innerText = '⏳ Đang chờ bạn xác nhận trên MetaMask...';
+                actionText.innerText = 'Đang chờ ký trên MetaMask...';
+                actionIcon.innerText = 'sync';
+                actionIcon.classList.add('animate-spin');
 
-                // Call MetaMask personal_sign method (Hex-encoded challenge required)
                 const hexChallenge = utf8ToHex(challenge);
                 const signature = await window.ethereum.request({
                     method: 'personal_sign',
@@ -320,29 +344,38 @@
                 });
 
                 signatureOutput.value = signature;
-                signatureGroup.style.display = 'block';
-                actionBtn.innerText = '✍️ Ký lại thông điệp';
+                signatureGroup.classList.remove('hidden');
+                
+                actionText.innerText = 'Ký lại thông điệp';
+                actionIcon.innerText = 'edit_note';
+                actionIcon.classList.remove('animate-spin');
                 actionBtn.disabled = false;
                 
-                showSuccess('🎉 Đã tạo chữ ký thành công! Hãy copy chuỗi chữ ký số bên dưới dán vào Terminal cứu hộ.');
+                showSuccess('Đã tạo chữ ký thành công! Hãy copy chuỗi chữ ký bên dưới dán vào Terminal.');
             }
         } catch (err) {
             console.error(err);
             actionBtn.disabled = false;
-            actionBtn.innerText = connectedAddress ? '✍️ Ký thông điệp cứu hộ' : '🔌 Kết nối ví MetaMask';
-            showError('❌ Lỗi: ' + (err.message || 'Yêu cầu bị từ chối hoặc có lỗi xảy ra.'));
+            actionIcon.classList.remove('animate-spin');
+            if (connectedAddress) {
+                actionText.innerText = 'Ký thông điệp cứu hộ';
+                actionIcon.innerText = 'edit_note';
+            } else {
+                actionText.innerText = 'Kết nối ví MetaMask';
+                actionIcon.innerText = 'account_balance_wallet';
+            }
+            showError('Lỗi: ' + (err.message || 'Yêu cầu bị từ chối hoặc có lỗi xảy ra.'));
         }
     }
 
-    // Copy signature to clipboard
     function copySignature() {
         signatureOutput.select();
         document.execCommand('copy');
         
-        const copyBtn = document.getElementById('copy-btn');
-        copyBtn.innerText = '✅ Đã sao chép!';
+        const copyBtnText = document.getElementById('copy-btn-text');
+        copyBtnText.innerText = 'Đã sao chép!';
         setTimeout(() => {
-            copyBtn.innerText = '📋 Sao chép chữ ký';
+            copyBtnText.innerText = 'Sao chép chữ ký';
         }, 2000);
     }
 </script>
