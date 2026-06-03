@@ -10,9 +10,11 @@ import { CreateMedicalConclusionUseCase } from './application/use-cases/create-m
 import { CLINICAL_DECISION_REPOSITORY } from './application/ports/clinical-decision.repository.port';
 import { AI_PROVIDER_GATEWAY } from './application/ports/ai-provider-gateway.port';
 import { MEDICAL_IMAGE_ATTACHMENT } from './application/ports/medical-image-attachment.port';
+import { MEDICAL_CONCLUSION_INTEGRITY_ANCHOR } from './application/ports/medical-conclusion-integrity-anchor.port';
 import { PrismaClinicalDecisionRepository } from './infrastructure/prisma/prisma-clinical-decision.repository';
 import { HttpAiProviderGateway } from './infrastructure/adapters/http-ai-provider.gateway';
 import { CloudinaryMedicalImageAttachmentAdapter } from './infrastructure/adapters/cloudinary-medical-image-attachment.adapter';
+import { BlockchainMedicalConclusionIntegrityAnchor } from './infrastructure/adapters/blockchain-medical-conclusion-integrity.anchor';
 
 @Module({
   controllers: [ClinicalDecisionController],
@@ -27,6 +29,7 @@ import { CloudinaryMedicalImageAttachmentAdapter } from './infrastructure/adapte
     { provide: CLINICAL_DECISION_REPOSITORY, useClass: PrismaClinicalDecisionRepository },
     { provide: AI_PROVIDER_GATEWAY, useClass: HttpAiProviderGateway },
     { provide: MEDICAL_IMAGE_ATTACHMENT, useClass: CloudinaryMedicalImageAttachmentAdapter },
+    { provide: MEDICAL_CONCLUSION_INTEGRITY_ANCHOR, useClass: BlockchainMedicalConclusionIntegrityAnchor },
   ],
   exports: [ClinicalDecisionService],
 })
