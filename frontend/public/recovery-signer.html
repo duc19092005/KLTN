@@ -163,6 +163,34 @@
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
         }
+        /* Toast style clone of React Hot Toast */
+        .toast-item {
+            animation: toast-enter 0.35s cubic-bezier(0.21, 1.02, 0.43, 1.01) forwards;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+        .toast-item.hide {
+            animation: toast-exit 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+        @keyframes toast-enter {
+            from {
+                transform: translateY(-20px) scale(0.9);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+        }
+        @keyframes toast-exit {
+            from {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+            to {
+                transform: translateY(-20px) scale(0.9);
+                opacity: 0;
+            }
+        }
     </style>
 </head>
 <body class="bg-surface text-on-surface min-h-screen flex flex-col items-center justify-center p-margin-mobile md:p-margin-desktop">
@@ -213,22 +241,6 @@
 </button>
 </div>
 
-<!-- Error Alert Banner (Hidden by default) -->
-<div class="hidden flex items-start gap-3 bg-error-container/30 border-l-2 border-error p-4 rounded-r-lg mb-6" id="error-banner">
-<span class="material-symbols-outlined text-error shrink-0" data-icon="info">info</span>
-<p class="font-body-md text-body-md text-error m-0" id="error-text">
-                    Vui lòng dán chuỗi Challenge lấy từ terminal máy chủ trước khi ký!
-                </p>
-</div>
-
-<!-- Success Alert Banner (Hidden by default) -->
-<div class="hidden flex items-start gap-3 bg-emerald-500/10 border-l-2 border-emerald-500 p-4 rounded-r-lg mb-6" id="success-banner">
-<span class="material-symbols-outlined text-emerald-600 shrink-0" data-icon="check_circle">check_circle</span>
-<p class="font-body-md text-body-md text-emerald-700 m-0" id="success-text">
-                    Kết nối ví thành công!
-                </p>
-</div>
-
 <!-- Action Button -->
 <button id="action-btn" onclick="handleWalletAction()" class="w-full bg-primary hover:bg-primary/90 text-on-primary font-label-md text-label-md py-4 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer">
 <span class="material-symbols-outlined" data-icon="account_balance_wallet" id="action-icon">account_balance_wallet</span>
@@ -257,35 +269,51 @@
     const walletAddr = document.getElementById('wallet-addr');
     const walletIndicator = document.getElementById('wallet-indicator');
     const challengeInput = document.getElementById('challenge-input');
-    const errorBanner = document.getElementById('error-banner');
-    const errorText = document.getElementById('error-text');
-    const successBanner = document.getElementById('success-banner');
-    const successText = document.getElementById('success-text');
     const signatureGroup = document.getElementById('signature-group');
     const signatureOutput = document.getElementById('signature-output');
 
-    function showError(msg) {
-        successBanner.classList.add('hidden');
-        successBanner.style.display = 'none';
-        errorText.innerText = msg;
-        errorBanner.classList.remove('hidden');
-        errorBanner.style.display = 'flex';
-    }
-
-    function showSuccess(msg) {
-        errorBanner.classList.add('hidden');
-        errorBanner.style.display = 'none';
-        successText.innerText = msg;
-        successBanner.classList.remove('hidden');
-        successBanner.style.display = 'flex';
-    }
-
-    function clearStatus() {
-        errorBanner.classList.add('hidden');
-        errorBanner.style.display = 'none';
-        successBanner.classList.add('hidden');
-        successBanner.style.display = 'none';
-    }
+    // Toast Notification System (React Hot Toast replica)
+    const toast = {
+        createContainer() {
+            let container = document.getElementById('toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-container';
+                container.className = 'fixed top-4 left-1/2 -translate-x-1/2 flex flex-col gap-2 z-50 pointer-events-none';
+                document.body.appendChild(container);
+            }
+            return container;
+        },
+        show(message, type = 'success') {
+            const container = this.createContainer();
+            const toastEl = document.createElement('div');
+            toastEl.className = 'toast-item bg-white text-[#191c1e] px-4 py-3 rounded-lg shadow-lg flex items-center gap-2.5 text-sm font-medium pointer-events-auto min-w-[280px] max-w-[450px]';
+            
+            let iconHtml = '';
+            if (type === 'success') {
+                iconHtml = '<span class="material-symbols-outlined text-emerald-500 text-lg shrink-0" data-icon="check_circle">check_circle</span>';
+            } else {
+                iconHtml = '<span class="material-symbols-outlined text-red-500 text-lg shrink-0" data-icon="info">info</span>';
+            }
+            
+            toastEl.innerHTML = `${iconHtml}<span>${message}</span>`;
+            container.appendChild(toastEl);
+            
+            // Auto-hide and remove
+            setTimeout(() => {
+                toastEl.classList.add('hide');
+                setTimeout(() => {
+                    toastEl.remove();
+                }, 300);
+            }, 3500);
+        },
+        success(msg) {
+            this.show(msg, 'success');
+        },
+        error(msg) {
+            this.show(msg, 'error');
+        }
+    };
 
     function utf8ToHex(str) {
         return '0x' + Array.from(new TextEncoder().encode(str))
@@ -294,10 +322,8 @@
     }
 
     async function handleWalletAction() {
-        clearStatus();
-
         if (typeof window.ethereum === 'undefined') {
-            showError('Không tìm thấy ví MetaMask. Vui lòng cài đặt tiện ích MetaMask trên trình duyệt!');
+            toast.error('Không tìm thấy ví MetaMask. Vui lòng cài đặt MetaMask!');
             return;
         }
 
@@ -323,12 +349,12 @@
                 actionIcon.classList.remove('animate-spin');
                 actionBtn.disabled = false;
                 
-                showSuccess('Đã kết nối thành công với ví MetaMask của bạn.');
+                toast.success('Đã kết nối thành công với ví MetaMask!');
             } else {
                 // Step 2: Sign Challenge
                 const challenge = challengeInput.value.trim();
                 if (!challenge) {
-                    showError('Vui lòng dán chuỗi Challenge lấy từ terminal máy chủ trước khi ký!');
+                    toast.error('Vui lòng dán chuỗi Challenge cứu hộ!');
                     return;
                 }
 
@@ -351,7 +377,7 @@
                 actionIcon.classList.remove('animate-spin');
                 actionBtn.disabled = false;
                 
-                showSuccess('Đã tạo chữ ký thành công! Hãy copy chuỗi chữ ký bên dưới dán vào Terminal.');
+                toast.success('Đã tạo chữ ký số cứu hộ thành công!');
             }
         } catch (err) {
             console.error(err);
@@ -364,7 +390,7 @@
                 actionText.innerText = 'Kết nối ví MetaMask';
                 actionIcon.innerText = 'account_balance_wallet';
             }
-            showError('Lỗi: ' + (err.message || 'Yêu cầu bị từ chối hoặc có lỗi xảy ra.'));
+            toast.error(err.message || 'Yêu cầu ký bị từ chối hoặc lỗi xảy ra.');
         }
     }
 
@@ -374,6 +400,7 @@
         
         const copyBtnText = document.getElementById('copy-btn-text');
         copyBtnText.innerText = 'Đã sao chép!';
+        toast.success('Đã sao chép chữ ký số vào bộ nhớ đệm!');
         setTimeout(() => {
             copyBtnText.innerText = 'Sao chép chữ ký';
         }, 2000);
