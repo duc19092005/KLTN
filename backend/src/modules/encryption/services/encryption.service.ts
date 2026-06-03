@@ -3,7 +3,7 @@ import * as crypto from 'crypto';
 import * as CryptoJS from 'crypto-js';
 
 @Injectable()
-export class ZkpService {
+export class EncryptionService {
   private readonly encryptionKey: Buffer;
 
   constructor() {

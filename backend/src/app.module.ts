@@ -5,7 +5,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { BlockchainModule } from './infrastructure/blockchain/blockchain.module';
 import { AuditModule } from './infrastructure/audit/audit.module';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
-import { ZkpModule } from './modules/zkp/zkp.module';
+import { EncryptionModule } from './modules/encryption/encryption.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DepartmentModule } from './modules/department/department.module';
@@ -28,7 +28,7 @@ import { StepUpModule } from './common/stepup/stepup.module';
     BlockchainModule,
     AuditModule,
     StepUpModule,
-    ZkpModule,
+    EncryptionModule,
     AuthModule,
     DepartmentModule,
     StaffEnterpriseModule,

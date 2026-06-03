@@ -37,7 +37,7 @@ import { AUTH_REPOSITORY } from './modules/auth/application/ports/auth.repositor
 import { ACCESS_TOKEN_SIGNER } from './modules/auth/application/ports/access-token-signer.port';
 import { SECURITY_EVENT_LOGGER } from './modules/auth/application/ports/security-event-logger.port';
 import { AUTH_CHAIN_GATEWAY } from './modules/auth/application/ports/auth-chain-gateway.port';
-import { ZKP_SECRET_CIPHER } from './modules/auth/application/ports/zkp-secret-cipher.port';
+import { ENCRYPTION_PORT } from './modules/auth/application/ports/encryption.port';
 import { STEPUP_TICKET_ISSUER } from './modules/auth/application/ports/stepup-ticket-issuer.port';
 import { CLINICAL_ROOM_REPOSITORY } from './modules/clinical-room/application/ports/clinical-room.repository.port';
 import { PATIENT_REPOSITORY } from './modules/patient/application/ports/patient.repository.port';
@@ -97,7 +97,7 @@ describe('AppModule dependency injection (Clean Architecture wiring)', () => {
       ACCESS_TOKEN_SIGNER,
       SECURITY_EVENT_LOGGER,
       AUTH_CHAIN_GATEWAY,
-      ZKP_SECRET_CIPHER,
+      ENCRYPTION_PORT,
       STEPUP_TICKET_ISSUER,
       CLINICAL_ROOM_REPOSITORY,
       PATIENT_REPOSITORY,

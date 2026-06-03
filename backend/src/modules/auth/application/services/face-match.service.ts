@@ -1,7 +1,7 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { User } from '@prisma/client';
 import { AUTH_REPOSITORY, AuthRepositoryPort } from '../ports/auth.repository.port';
-import { ZKP_SECRET_CIPHER, ZkpSecretCipherPort } from '../ports/zkp-secret-cipher.port';
+import { ENCRYPTION_PORT, EncryptionPort } from '../ports/encryption.port';
 import { AUTH_CHAIN_GATEWAY, AuthChainGatewayPort } from '../ports/auth-chain-gateway.port';
 import { hashToBytes32 } from '../../../../infrastructure/audit/audit-hash.util';
 import { FACE_MAX_FAILED_ATTEMPTS, FACE_LOCKOUT_MS } from '../../domain/auth.constants';
@@ -20,7 +20,7 @@ export type MatchResult = { distance: number; meanDistance: number; threshold: n
 export class FaceMatchService {
   constructor(
     @Inject(AUTH_REPOSITORY) private readonly repo: AuthRepositoryPort,
-    @Inject(ZKP_SECRET_CIPHER) private readonly cipher: ZkpSecretCipherPort,
+    @Inject(ENCRYPTION_PORT) private readonly cipher: EncryptionPort,
     @Inject(AUTH_CHAIN_GATEWAY) private readonly chain: AuthChainGatewayPort,
   ) {}
 

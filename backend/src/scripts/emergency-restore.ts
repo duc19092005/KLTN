@@ -29,7 +29,7 @@ function prompt(question: string): Promise<string> {
 
 // Extract database details from DATABASE_URL
 function getDbConfig() {
-  const url = process.env.DATABASE_URL || 'postgresql://postgres:change-me-local-only@localhost:5432/zkp_identity';
+  const url = process.env.DATABASE_URL || 'postgresql://postgres:change-me-local-only@localhost:5432/hospital_db';
   try {
     const match = url.match(/postgresql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/([^?]+)/);
     if (!match) throw new Error('Invalid DATABASE_URL format');
@@ -41,13 +41,13 @@ function getDbConfig() {
       database: match[5]
     };
   } catch (err) {
-    console.warn('⚠️ Could not parse DATABASE_URL, using defaults: postgres, zkp_identity');
+    console.warn('⚠️ Could not parse DATABASE_URL, using defaults: postgres, hospital_db');
     return {
       user: 'postgres',
       password: 'change-me-local-only',
       host: 'localhost',
       port: '5432',
-      database: 'zkp_identity'
+      database: 'hospital_db'
     };
   }
 }
