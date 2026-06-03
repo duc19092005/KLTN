@@ -5,7 +5,7 @@ import { AuthController } from './controllers/auth.controller';
 import { AuthService } from './services/auth.service';
 import { AuthRateLimiterService } from './services/auth-rate-limiter.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { ZkpModule } from '../zkp/zkp.module';
+import { EncryptionModule } from '../encryption/encryption.module';
 import { BlockchainModule } from '../../infrastructure/blockchain/blockchain.module';
 import { getJwtSecret } from './constants/auth-security';
 
@@ -36,13 +36,13 @@ import { AUTH_REPOSITORY } from './application/ports/auth.repository.port';
 import { ACCESS_TOKEN_SIGNER } from './application/ports/access-token-signer.port';
 import { SECURITY_EVENT_LOGGER } from './application/ports/security-event-logger.port';
 import { AUTH_CHAIN_GATEWAY } from './application/ports/auth-chain-gateway.port';
-import { ZKP_SECRET_CIPHER } from './application/ports/zkp-secret-cipher.port';
+import { ENCRYPTION_PORT } from './application/ports/encryption.port';
 import { STEPUP_TICKET_ISSUER } from './application/ports/stepup-ticket-issuer.port';
 import { PrismaAuthRepository } from './infrastructure/prisma/prisma-auth.repository';
 import { JwtAccessTokenSigner } from './infrastructure/adapters/jwt-access-token.signer';
 import { DualWriteSecurityEventLogger } from './infrastructure/adapters/dual-write-security-event.logger';
 import { BlockchainAuthChainGateway } from './infrastructure/adapters/blockchain-auth-chain.gateway';
-import { ZkpSecretCipherAdapter } from './infrastructure/adapters/zkp-secret-cipher.adapter';
+import { EncryptionAdapter } from './infrastructure/adapters/encryption.adapter';
 import { StepUpTicketIssuerAdapter } from './infrastructure/adapters/stepup-ticket-issuer.adapter';
 
 @Module({
@@ -54,7 +54,7 @@ import { StepUpTicketIssuerAdapter } from './infrastructure/adapters/stepup-tick
         signOptions: { expiresIn: (process.env.JWT_EXPIRATION || '1h') as any },
       }),
     }),
-    ZkpModule,
+    EncryptionModule,
     BlockchainModule,
   ],
   controllers: [AuthController],
@@ -90,7 +90,7 @@ import { StepUpTicketIssuerAdapter } from './infrastructure/adapters/stepup-tick
     { provide: ACCESS_TOKEN_SIGNER, useClass: JwtAccessTokenSigner },
     { provide: SECURITY_EVENT_LOGGER, useClass: DualWriteSecurityEventLogger },
     { provide: AUTH_CHAIN_GATEWAY, useClass: BlockchainAuthChainGateway },
-    { provide: ZKP_SECRET_CIPHER, useClass: ZkpSecretCipherAdapter },
+    { provide: ENCRYPTION_PORT, useClass: EncryptionAdapter },
     { provide: STEPUP_TICKET_ISSUER, useClass: StepUpTicketIssuerAdapter },
   ],
   exports: [AuthService, JwtModule],

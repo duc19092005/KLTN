@@ -1,6 +1,6 @@
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { AUTH_REPOSITORY, AuthRepositoryPort } from '../ports/auth.repository.port';
-import { ZKP_SECRET_CIPHER, ZkpSecretCipherPort } from '../ports/zkp-secret-cipher.port';
+import { ENCRYPTION_PORT, EncryptionPort } from '../ports/encryption.port';
 import { AUTH_CHAIN_GATEWAY, AuthChainGatewayPort } from '../ports/auth-chain-gateway.port';
 import { SECURITY_EVENT_LOGGER, SecurityEventLoggerPort } from '../ports/security-event-logger.port';
 import { AuthUserLookupService } from '../services/auth-user-lookup.service';
@@ -18,7 +18,7 @@ import { computeFaceHash, validateFaceDescriptorSet } from '../../domain/face.ut
 export class RegisterFaceUseCase {
   constructor(
     @Inject(AUTH_REPOSITORY) private readonly repo: AuthRepositoryPort,
-    @Inject(ZKP_SECRET_CIPHER) private readonly cipher: ZkpSecretCipherPort,
+    @Inject(ENCRYPTION_PORT) private readonly cipher: EncryptionPort,
     @Inject(AUTH_CHAIN_GATEWAY) private readonly chain: AuthChainGatewayPort,
     @Inject(SECURITY_EVENT_LOGGER) private readonly audit: SecurityEventLoggerPort,
     private readonly lookup: AuthUserLookupService,

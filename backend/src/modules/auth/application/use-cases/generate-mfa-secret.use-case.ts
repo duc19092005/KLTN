@@ -1,7 +1,7 @@
 import { ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { AUTH_REPOSITORY, AuthRepositoryPort } from '../ports/auth.repository.port';
 import { ACCESS_TOKEN_SIGNER, AccessTokenSignerPort } from '../ports/access-token-signer.port';
-import { ZKP_SECRET_CIPHER, ZkpSecretCipherPort } from '../ports/zkp-secret-cipher.port';
+import { ENCRYPTION_PORT, EncryptionPort } from '../ports/encryption.port';
 import { AuthUserLookupService } from '../services/auth-user-lookup.service';
 import { toPublicUser } from '../../domain/public-user';
 
@@ -16,7 +16,7 @@ export class GenerateMfaSecretUseCase {
   constructor(
     @Inject(AUTH_REPOSITORY) private readonly repo: AuthRepositoryPort,
     @Inject(ACCESS_TOKEN_SIGNER) private readonly tokenSigner: AccessTokenSignerPort,
-    @Inject(ZKP_SECRET_CIPHER) private readonly cipher: ZkpSecretCipherPort,
+    @Inject(ENCRYPTION_PORT) private readonly cipher: EncryptionPort,
     private readonly lookup: AuthUserLookupService,
   ) {}
 
