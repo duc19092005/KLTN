@@ -14,6 +14,7 @@ import ParaclinicalDashboardPage from '../features/paraclinical/pages/Paraclinic
 import ShiftManagementPage from '../features/paraclinical/pages/ShiftManagementPage';
 import LoadingIndicator from '../shared/components/LoadingIndicator';
 import { getDashboardRoute } from '../shared/constants/roleRoutes';
+import { PatientVerificationPage } from '../features/verification';
 
 function ProtectedRoute({ children, requireVerified = false, roles = [], allowFirstLogin = false }) {
   const { token, user, loading } = useAuth();
@@ -33,6 +34,7 @@ export default function App() {
   return (
     <div className="app">
       <Routes>
+        <Route path="/" element={<PatientVerificationPage />} />
         <Route path="/login" element={!isAuthenticated || loading ? <LoginPage /> : <Navigate to={user?.firstLogin ? '/change-password' : dashboardRoute} replace />} />
         <Route path="/change-password" element={<ProtectedRoute allowFirstLogin><ChangePasswordPage /></ProtectedRoute>} />
         <Route path="/authenticate" element={<ProtectedRoute allowFirstLogin><AuthenticatePage /></ProtectedRoute>} />
@@ -54,7 +56,7 @@ export default function App() {
         <Route path="/lab-manager/shifts" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER', 'DEPT_SHARED']}><ShiftManagementPage /></ProtectedRoute>} />
         <Route path="/lab-manager/orders" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER', 'DEPT_SHARED']}><LabOrdersPage /></ProtectedRoute>} />
         <Route path="/lab-manager/results" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER', 'DEPT_SHARED']}><LabResultsPage /></ProtectedRoute>} />
-        <Route path="*" element={<Navigate to={isAuthenticated ? (user?.firstLogin ? '/change-password' : dashboardRoute) : '/login'} replace />} />
+        <Route path="*" element={<Navigate to={isAuthenticated ? (user?.firstLogin ? '/change-password' : dashboardRoute) : '/'} replace />} />
       </Routes>
     </div>
   );
