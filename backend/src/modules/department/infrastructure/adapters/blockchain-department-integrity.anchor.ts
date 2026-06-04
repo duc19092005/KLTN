@@ -82,6 +82,17 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
     else if (dbMatches && chainMatches) status = 'VERIFIED';
     else status = 'TAMPERED';
 
+    if (status === 'TAMPERED') {
+      await this.auditAnchor.sendTelegramAlert(
+        'Phát hiện giả mạo phòng ban',
+        `Phòng ban: ${dept.name} (Mã: ${dept.departmentCode}, ID: ${dept.id})\n` +
+        `• Hash CSDL: ${dbHash}\n` +
+        `• Hash On-Chain: ${latestLog?.dataHash}\n` +
+        `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}\n` +
+        `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`
+      );
+    }
+
     return {
       id: dept.id,
       departmentCode: dept.departmentCode,

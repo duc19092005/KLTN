@@ -10,6 +10,7 @@ import { RejectShiftUseCase } from '../application/use-cases/reject-shift.use-ca
 import { AssignShiftUseCase } from '../application/use-cases/assign-shift.use-case';
 import { ListRoomShiftsUseCase } from '../application/use-cases/list-room-shifts.use-case';
 import { ListPendingShiftsUseCase } from '../application/use-cases/list-pending-shifts.use-case';
+import { VerifyParaclinicalShiftUseCase } from '../application/use-cases/verify-paraclinical-shift.use-case';
 import {
   RegisterShiftDto,
   ApproveShiftDto,
@@ -27,6 +28,7 @@ export class ShiftController {
     private readonly assignShift: AssignShiftUseCase,
     private readonly listRoomShifts: ListRoomShiftsUseCase,
     private readonly listPendingShifts: ListPendingShiftsUseCase,
+    private readonly verifyShift: VerifyParaclinicalShiftUseCase,
   ) {}
 
   /** Staff self-registers a shift (PENDING). */
@@ -92,5 +94,33 @@ export class ShiftController {
   @Get('pending')
   async pending(@Query('departmentId') departmentId?: string) {
     return this.listPendingShifts.execute(departmentId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Get('audit/history')
+  async history() {
+    return this.verifyShift.history();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Get('audit/verify')
+  async verifyAll() {
+    return this.verifyShift.verifyAll();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Get(':id/audit/history')
+  async historyOne(@Param('id') id: string) {
+    return this.verifyShift.history(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Get(':id/audit/verify')
+  async verifyOne(@Param('id') id: string) {
+    return this.verifyShift.verifyOne(id);
   }
 }

@@ -88,6 +88,17 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
     else if (dbMatches && chainMatches) status = 'VERIFIED';
     else status = 'TAMPERED';
 
+    if (status === 'TAMPERED') {
+      await this.auditAnchor.sendTelegramAlert(
+        'Phát hiện giả mạo thông tin nhân viên',
+        `Nhân viên: ${staff.fullName} (Mã: ${staff.employeeCode}, ID: ${staff.id})\n` +
+        `• Hash CSDL: ${dbHash}\n` +
+        `• Hash On-Chain: ${latestLog?.dataHash}\n` +
+        `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}\n` +
+        `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`
+      );
+    }
+
     return {
       id: staff.id,
       employeeCode: staff.employeeCode,
@@ -136,6 +147,17 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
     if (!latestLog || !latestLog.batchId) status = 'UNANCHORED';
     else if (dbMatches && chainMatches) status = 'VERIFIED';
     else status = 'TAMPERED';
+
+    if (status === 'TAMPERED') {
+      await this.auditAnchor.sendTelegramAlert(
+        'Phát hiện giả mạo thông tin bác sĩ (Staff)',
+        `Bác sĩ: ${staff.fullName} (Mã: ${staff.employeeCode}, ID: ${staff.id})\n` +
+        `• Hash CSDL: ${dbHash}\n` +
+        `• Hash On-Chain: ${latestLog?.dataHash}\n` +
+        `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}\n` +
+        `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`
+      );
+    }
 
     return {
       id: staff.id,

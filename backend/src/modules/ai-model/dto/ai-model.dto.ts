@@ -87,3 +87,14 @@ export class TestAiModelApiDto {
   @MaxLength(500)
   apiEndpoint?: string;
 }
+
+export class RateAiModelDto {
+  @ApiProperty({ example: true, description: 'True nếu hài lòng/mô hình dự đoán đúng, False nếu không' })
+  satisfied!: boolean;
+
+  @ApiPropertyOptional({ example: 'Mô hình dự đoán chưa chính xác về kết quả chụp X-quang phổi', description: 'Ghi chú lý do nếu không hài lòng' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  feedback?: string;
+}

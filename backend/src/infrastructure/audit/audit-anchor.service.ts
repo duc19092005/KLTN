@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit, OnApplicationBootstr
 import { PrismaService } from '../prisma/prisma.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { computeMerkleRoot, buildMerkleProof, rootToBytes32, verifyMerkleProof } from './merkle.util';
+import { computeEntryHash, GENESIS_PREV_HASH } from './audit-hash.util';
 
 /**
  * AuditAnchorService periodically seals a batch of not-yet-anchored audit logs, builds a Merkle
@@ -158,11 +159,33 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
         where: { batchId: null, seq: { not: null }, entryHash: { not: null } },
         orderBy: { seq: 'asc' },
         take: this.maxLeaves,
-        select: { id: true, seq: true, entryHash: true },
+        select: {
+          id: true,
+          seq: true,
+          prevHash: true,
+          entryHash: true,
+          actorId: true,
+          action: true,
+          entity: true,
+          entityId: true,
+          dataHash: true,
+          createdAt: true,
+        },
       });
 
       if (pending.length === 0) return { committed: false, reason: 'nothing to anchor' };
       void force; // size gating is advisory; we always drain when invoked
+
+      // Validate the chain of pending logs before building Merkle root
+      try {
+        await this.validatePendingChain(pending);
+      } catch (valErr: any) {
+        const brokenSeq = pending[0]?.seq ?? 0;
+        const reason = valErr.message || 'Unknown chain integrity failure';
+        this.logger.error(`🚨 CHAIN INTEGRITY FAILURE DETECTED: ${reason}. Aborting commit.`);
+        await this.sendTelegramAlert('Cảnh báo giả mạo Blockchain Logger (Pre-Commit)', reason, brokenSeq);
+        return { committed: false, reason: `Chain validation failed: ${reason}` };
+      }
 
       // Allocate a monotonic batchId, reconciling local state with the on-chain counter so we
       // never reuse an id the contract already has (it rejects duplicates).
@@ -250,5 +273,78 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
       rootToBytes32(merkleRoot).toLowerCase() === onChainRoot.toLowerCase();
 
     return { seq, batchId: log.batchId, entryHash: log.entryHash, proof, merkleRoot, onChainRoot, verified };
+  }
+
+  private async validatePendingChain(pending: any[]): Promise<void> {
+    if (pending.length === 0) return;
+
+    let expectedPrevHash = GENESIS_PREV_HASH;
+    if (pending[0].seq > 1) {
+      const precedingLog = await this.prisma.blockchainLogger.findFirst({
+        where: { seq: pending[0].seq - 1 },
+        select: { entryHash: true },
+      });
+      if (!precedingLog) {
+        throw new Error(`Sequence gap: preceding log for seq ${pending[0].seq} not found`);
+      }
+      expectedPrevHash = precedingLog.entryHash!;
+    }
+
+    let expectedSeq = pending[0].seq!;
+    for (const log of pending) {
+      if (log.seq !== expectedSeq) {
+        throw new Error(`Sequence gap: expected ${expectedSeq}, got ${log.seq}`);
+      }
+      if (log.prevHash !== expectedPrevHash) {
+        throw new Error(`prevHash mismatch: expected ${expectedPrevHash}, got ${log.prevHash}`);
+      }
+      const recomputed = computeEntryHash(
+        {
+          seq: log.seq!,
+          actorId: log.actorId,
+          action: log.action,
+          entity: log.entity,
+          entityId: log.entityId,
+          dataHash: log.dataHash,
+          createdAtIso: log.createdAt.toISOString(),
+        },
+        log.prevHash ?? GENESIS_PREV_HASH,
+      );
+      if (recomputed !== log.entryHash) {
+        throw new Error(`entryHash mismatch: recomputed ${recomputed}, got ${log.entryHash}`);
+      }
+      expectedPrevHash = log.entryHash!;
+      expectedSeq += 1;
+    }
+  }
+
+  async sendTelegramAlert(title: string, details: string, brokenSeq?: number): Promise<void> {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+    const phone = process.env.ADMIN_PHONE_NUMBER ?? 'N/A';
+    if (!token || !chatId || token === 'your_telegram_bot_token_here') {
+      this.logger.warn('Telegram alerts are not configured or still have default placeholders. Skipping alert.');
+      return;
+    }
+    const message = `🚨 [CẢNH BÁO BẢO MẬT] ${title.toUpperCase()}\n\n` +
+      `${details}\n\n` +
+      `• SĐT Admin: ${phone}\n` +
+      (brokenSeq !== undefined ? `• Sequence bị lỗi: ${brokenSeq}\n` : '') +
+      `• Thời gian: ${new Date().toLocaleString('vi-VN')}\n\n` +
+      `⚠️ Yêu cầu Quản trị viên kiểm tra tính toàn vẹn hệ thống ngay lập tức!`;
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: message }),
+      });
+      if (!res.ok) {
+        this.logger.error(`Failed to send Telegram alert: ${res.statusText}`);
+      } else {
+        this.logger.log('Telegram security alert sent successfully.');
+      }
+    } catch (err) {
+      this.logger.error('Failed to send Telegram alert via fetch', err);
+    }
   }
 }

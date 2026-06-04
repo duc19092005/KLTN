@@ -59,6 +59,15 @@ export default function DoctorQueuePage() {
   const [selectedAiId, setSelectedAiId] = useState('');
   const [selectedAiModelId, setSelectedAiModelId] = useState('');
 
+  // States for AI Model Rating Optional Countdown Popup
+  const [showRatingPopup, setShowRatingPopup] = useState(false);
+  const [ratingModelId, setRatingModelId] = useState('');
+  const [ratingModelName, setRatingModelName] = useState('');
+  const [countdown, setCountdown] = useState(10);
+  const [ratingFeedback, setRatingFeedback] = useState('');
+  const [ratingSelected, setRatingSelected] = useState(null);
+  const [pauseCountdown, setPauseCountdown] = useState(false);
+
   const loadVisits = async () => {
     setLoading(true);
     try {
@@ -174,9 +183,62 @@ export default function DoctorQueuePage() {
       await clinicalDecisionService.createConclusion({ ...conclusionForm, visitId: activeVisit.id, aiDiagnosisId: selectedAiId || undefined });
       toast.success('Đã đóng hồ sơ bệnh án và hoàn tất lượt khám của bệnh nhân.');
       setShowWorkflowModal(false);
+
+      // Check if AI Model was used and can be rated
+      const activeDiag = decision?.aiDiagnoses?.find((d) => d.id === selectedAiId);
+      if (activeDiag?.aiModel) {
+        setRatingModelId(activeDiag.aiModel.id);
+        setRatingModelName(activeDiag.aiModel.modelName);
+        setShowRatingPopup(true);
+        setCountdown(10);
+        setRatingSelected(null);
+        setRatingFeedback('');
+        setPauseCountdown(false);
+      } else {
+        await loadVisits();
+      }
+    } catch (err) { 
+      toast.error(err.response?.data?.message || 'Không lưu được kết luận cuối'); 
       await loadVisits();
-    } catch (err) { toast.error(err.response?.data?.message || 'Không lưu được kết luận cuối'); }
-    finally { setBusy(false); }
+    } finally { 
+      setBusy(false); 
+    }
+  };
+
+  useEffect(() => {
+    if (!showRatingPopup || pauseCountdown) return;
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setShowRatingPopup(false);
+          loadVisits();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [showRatingPopup, pauseCountdown]);
+
+  const handleRateModel = async (satisfied) => {
+    try {
+      setBusy(true);
+      await aiModelService.rate(ratingModelId, {
+        satisfied,
+        feedback: satisfied ? undefined : ratingFeedback,
+      });
+      toast.success('Cảm ơn bác sĩ đã đánh giá mô hình AI!');
+    } catch (err) {
+      toast.error('Không gửi được đánh giá.');
+    } finally {
+      setBusy(false);
+      setShowRatingPopup(false);
+      setRatingSelected(null);
+      setRatingFeedback('');
+      setPauseCountdown(false);
+      await loadVisits();
+    }
   };
 
   return (
@@ -213,6 +275,105 @@ export default function DoctorQueuePage() {
             aiProps={{ diagnoses: decision?.aiDiagnoses || [], aiModels, selectedAiModelId, setSelectedAiModelId, selectedAiId, setSelectedAiId, onGenerate: generateAi, busy }}
             conclusionProps={{ form: conclusionForm, setForm: setConclusionForm, onSubmit: submitConclusion, busy, completed: Boolean(decision?.finalConclusion) }}
           />
+        )}
+
+        {/* Optional Countdown Rating Popup */}
+        {showRatingPopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-md animate-fadeIn p-4">
+            <div className="w-full max-w-md rounded-3xl border border-slate-100 bg-white p-6 shadow-2xl space-y-6">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-[0.2em] font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md">Đánh giá Mô hình AI</span>
+                {!pauseCountdown && (
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-100">
+                    <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+                    Tự động đóng trong {countdown}s
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-base font-black text-slate-950">Bác sĩ có hài lòng với kết quả của mô hình?</h3>
+                <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+                  Mô hình: <span className="text-slate-800 font-bold">{ratingModelName}</span>
+                </p>
+              </div>
+
+              {ratingSelected === null ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => handleRateModel(true)}
+                    className="flex flex-col items-center justify-center py-4 px-3 rounded-2xl border border-emerald-100 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-800 font-bold transition-all text-xs gap-1.5 active:scale-95"
+                  >
+                    <span className="text-2xl">😊</span>
+                    Hài lòng (Có)
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      setRatingSelected('NO');
+                      setPauseCountdown(true);
+                    }}
+                    className="flex flex-col items-center justify-center py-4 px-3 rounded-2xl border border-rose-100 bg-rose-50/50 hover:bg-rose-50 text-rose-800 font-bold transition-all text-xs gap-1.5 active:scale-95"
+                  >
+                    <span className="text-2xl">😞</span>
+                    Không chính xác
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4 animate-slideUp">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">Lý do mô hình đánh giá chưa chuẩn xác <span className="text-red-500">*</span></label>
+                    <textarea
+                      value={ratingFeedback}
+                      onChange={(e) => setRatingFeedback(e.target.value)}
+                      placeholder="VD: Mô hình bỏ sót bóng mờ ở đáy phổi trái..."
+                      rows={3}
+                      className="w-full rounded-xl border border-slate-200 p-3 text-xs outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all font-medium"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRatingSelected(null);
+                        setPauseCountdown(false);
+                      }}
+                      className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                    >
+                      Quay lại
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy || !ratingFeedback.trim()}
+                      onClick={() => handleRateModel(false)}
+                      className="flex-1 rounded-xl bg-slate-900 py-2.5 text-xs font-black text-white hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      Gửi phản hồi
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="border-t border-slate-100 pt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRatingPopup(false);
+                    setRatingSelected(null);
+                    setRatingFeedback('');
+                    setPauseCountdown(false);
+                    loadVisits();
+                  }}
+                  className="text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  Bỏ qua đánh giá (Đóng)
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </DashboardLayout>

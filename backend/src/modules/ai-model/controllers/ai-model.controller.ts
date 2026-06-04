@@ -5,7 +5,7 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
-import { AiModelQueryDto, CreateAiModelDto, TestAiModelApiDto } from '../dto/ai-model.dto';
+import { AiModelQueryDto, CreateAiModelDto, TestAiModelApiDto, RateAiModelDto } from '../dto/ai-model.dto';
 import { AiModelService } from '../services/ai-model.service';
 
 @ApiTags('AI Model Registry')
@@ -40,6 +40,12 @@ export class AiModelController {
   }
 
   @Roles('ADMIN', 'DOCTOR')
+  @Get('stats/overview')
+  getStats() {
+    return this.service.getStats();
+  }
+
+  @Roles('ADMIN', 'DOCTOR')
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
@@ -61,6 +67,12 @@ export class AiModelController {
   @Get()
   findAll(@Query() query: AiModelQueryDto) {
     return this.service.findAll(query);
+  }
+
+  @Roles('DOCTOR')
+  @Post(':id/rate')
+  rate(@Param('id') id: string, @Body() dto: RateAiModelDto, @CurrentUser() user: AuthUser) {
+    return this.service.rateModel(id, user.sub, dto.satisfied, dto.feedback);
   }
 }
 

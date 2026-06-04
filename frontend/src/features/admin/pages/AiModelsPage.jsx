@@ -99,13 +99,25 @@ export default function AiModelsPage() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
+  const [statsData, setStatsData] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
   const load = async () => {
     setLoading(true);
+    setStatsLoading(true);
     try {
-      const res = await aiModelService.list();
+      const [res, statsRes] = await Promise.all([
+        aiModelService.list(),
+        aiModelService.stats(),
+      ]);
       setModels(getItems(res.data));
-    } catch (err) { toast.error(err.response?.data?.message || 'Không tải được AI Model Registry'); }
-    finally { setLoading(false); }
+      setStatsData(statsRes.data);
+    } catch (err) { 
+      toast.error(err.response?.data?.message || 'Không tải được AI Model Registry'); 
+    } finally { 
+      setLoading(false); 
+      setStatsLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -230,6 +242,126 @@ export default function AiModelsPage() {
             {!loading && !visibleModels.length && <Empty title="Chưa có AI model" desc="Bấm + Thêm model AI để mở modal đăng ký model." />}
           </div>
         </section>
+
+        {/* Bảng phân tích & Xác thực toàn vẹn Đánh giá AI */}
+        {statsData && (
+          <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm space-y-6">
+            <div>
+              <span className="text-[10px] uppercase tracking-[0.2em] font-black text-cyan-600 bg-cyan-50 px-2.5 py-1 rounded-md">AI Quality & Security Audit</span>
+              <h2 className="text-xl font-black text-slate-950 mt-2">Bảng điều khiển Chất lượng & Xác thực Đánh giá AI</h2>
+              <p className="text-xs text-slate-500 mt-1">Đánh giá thực tế từ các bác sĩ và kết quả đối soát chữ ký số/blockchain của từng phản hồi.</p>
+            </div>
+
+            {/* Top & Bottom Models */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/20 p-5 space-y-4">
+                <h3 className="text-sm font-black text-emerald-950 flex items-center gap-2">
+                  <span className="text-lg">⭐</span> Top Model Đánh Giá Cao Nhất
+                </h3>
+                <div className="space-y-2">
+                  {statsData.topModels?.map((m) => (
+                    <div key={m.id} className="flex justify-between items-center rounded-xl bg-white border border-emerald-100/60 p-3 shadow-xs">
+                      <div>
+                        <strong className="block text-xs text-slate-900">{m.modelName}</strong>
+                        <span className="text-[10px] font-bold text-slate-400">Ver {m.modelVersion} · {m.provider}</span>
+                      </div>
+                      <span className="rounded-lg bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-700">{m.averageAccuracy}% tin cậy</span>
+                    </div>
+                  ))}
+                  {!statsData.topModels?.length && <div className="text-xs text-slate-500 italic text-center py-4">Chưa có đánh giá nào.</div>}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-rose-100 bg-rose-50/20 p-5 space-y-4">
+                <h3 className="text-sm font-black text-rose-950 flex items-center gap-2">
+                  <span className="text-lg">⚠️</span> Top Model Đánh Giá Thấp Nhất
+                </h3>
+                <div className="space-y-2">
+                  {statsData.bottomModels?.map((m) => (
+                    <div key={m.id} className="flex justify-between items-center rounded-xl bg-white border border-rose-100/60 p-3 shadow-xs">
+                      <div>
+                        <strong className="block text-xs text-slate-900">{m.modelName}</strong>
+                        <span className="text-[10px] font-bold text-slate-400">Ver {m.modelVersion} · {m.provider}</span>
+                      </div>
+                      <span className="rounded-lg bg-rose-50 px-2 py-1 text-xs font-black text-rose-700">{m.averageAccuracy}% tin cậy</span>
+                    </div>
+                  ))}
+                  {!statsData.bottomModels?.length && <div className="text-xs text-slate-500 italic text-center py-4">Chưa có đánh giá nào.</div>}
+                </div>
+              </div>
+            </div>
+
+            {/* Ý kiến phản hồi & Xác thực toàn vẹn từ Blockchain */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                📂 Ý kiến phản hồi gần đây & Xác thực toàn vẹn dữ liệu
+              </h3>
+              <div className="space-y-3">
+                {statsData.recentNegativeFeedbacks?.map((f) => {
+                  let statusLabel = 'Chưa xác thực';
+                  let statusClass = 'bg-slate-100 text-slate-600 border-slate-200';
+                  if (f.audit?.status === 'VERIFIED') {
+                    statusLabel = '✓ Hợp lệ (On-chain)';
+                    statusClass = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+                  } else if (f.audit?.status === 'TAMPERED') {
+                    statusLabel = '🚨 BỊ GIẢ MẠO!';
+                    statusClass = 'bg-rose-50 text-rose-700 border-rose-100 animate-pulse';
+                  } else if (f.audit?.status === 'UNANCHORED') {
+                    statusLabel = '⏳ Chờ neo (5 phút)';
+                    statusClass = 'bg-amber-50 text-amber-700 border-amber-100';
+                  }
+
+                  return (
+                    <div key={f.id} className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 space-y-3">
+                      <div className="flex flex-wrap justify-between items-start gap-2">
+                        <div>
+                          <strong className="block text-xs text-slate-900">
+                            Mô hình: {f.modelName} (v{f.modelVersion})
+                          </strong>
+                          <span className="text-[10px] font-semibold text-slate-400">
+                            Bác sĩ: {f.doctorName} · {new Date(f.createdAt).toLocaleString('vi-VN')}
+                          </span>
+                        </div>
+                        <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-black ${statusClass}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+
+                      <div className="rounded-xl bg-white border border-slate-100 p-3">
+                        <p className="text-xs text-slate-700 italic">" {f.feedback} "</p>
+                      </div>
+
+                      {/* Audit Details */}
+                      {f.audit && (
+                        <div className="text-[10px] font-mono bg-white rounded-lg border border-slate-100 p-2 text-slate-500 space-y-1">
+                          <div className="flex justify-between">
+                            <span>Hash CSDL:</span>
+                            <span className="font-bold truncate max-w-[200px] text-slate-700">{f.audit.storedHash || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Hash Neo (Blockchain):</span>
+                            <span className="font-bold truncate max-w-[200px] text-slate-700">{f.audit.onChainHash || 'Chưa neo'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Đối khớp cục bộ:</span>
+                            <span className={`font-bold ${f.audit.dbMatches ? 'text-emerald-600' : 'text-rose-600'}`}>
+                              {f.audit.dbMatches ? 'KHỚP' : 'LỆCH (Cảnh báo)'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {!statsData.recentNegativeFeedbacks?.length && (
+                  <div className="text-xs text-slate-500 italic text-center py-6 border border-dashed border-slate-200 rounded-2xl bg-slate-50">
+                    Không có phản hồi kém chất lượng nào gần đây.
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
       </div>
       {showCreateModal && <CreateModelModal form={form} updateForm={updateForm} onSubmit={submit} onClose={closeCreateModal} saving={saving} testing={testing} testApi={testApi} testResult={testResult} />}
     </DashboardLayout>
@@ -359,7 +491,38 @@ function ModelCard({ model }) {
   const isLocal = model.provider === 'local';
   const badgeCls = isLocal ? 'bg-purple-50 text-purple-700 border-purple-100' : 'bg-blue-50 text-blue-700 border-blue-100';
   const badge = isLocal ? 'TỰ HOST' : (providerLabel(model.provider) || model.provider || 'API').toUpperCase();
-  return <article className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-black text-slate-950">{model.modelName}</h3><span className={`rounded-full border px-2 py-1 text-[10px] font-black ${badgeCls}`}>{badge}</span></div><p className="mt-1 text-xs font-semibold text-slate-500">Version {model.modelVersion} · {model.recommendedSpecialty || 'Chưa gán chuyên khoa'}</p></div><span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-emerald-700">AES-256</span></div><p className="mt-3 text-sm text-slate-600">{model.description || 'Chưa có mô tả'}</p>{model.apiEndpoint && <div className="mt-3 rounded-xl bg-white border border-slate-100 p-3"><p className="text-[10px] uppercase tracking-wider font-black text-slate-400">Endpoint</p><p className="mt-1 break-all text-xs font-mono text-slate-600">{model.apiEndpoint}</p></div>}<div className="mt-3 rounded-xl bg-white border border-slate-100 p-3"><p className="text-[10px] uppercase tracking-wider font-black text-slate-400">Fingerprint SHA-256</p><p className="mt-1 break-all text-xs font-mono text-slate-600">{model.ipHashPlain || 'Không hiển thị'}</p></div></article>;
+  const hasAccuracy = model.averageAccuracy !== null && model.averageAccuracy !== undefined;
+
+  return (
+    <article className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-black text-slate-950">{model.modelName}</h3>
+            <span className={`rounded-full border px-2 py-1 text-[10px] font-black ${badgeCls}`}>{badge}</span>
+            {hasAccuracy && (
+              <span className={`rounded-full border px-2 py-1 text-[10px] font-black ${model.averageAccuracy >= 80 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
+                🎯 Độ tin cậy: {model.averageAccuracy}% ({model.totalRatings} đánh giá)
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-xs font-semibold text-slate-500">Version {model.modelVersion} · {model.recommendedSpecialty || 'Chưa gán chuyên khoa'}</p>
+        </div>
+        <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-emerald-700">AES-256</span>
+      </div>
+      <p className="mt-3 text-sm text-slate-600">{model.description || 'Chưa có mô tả'}</p>
+      {model.apiEndpoint && (
+        <div className="mt-3 rounded-xl bg-white border border-slate-100 p-3">
+          <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">Endpoint</p>
+          <p className="mt-1 break-all text-xs font-mono text-slate-600">{model.apiEndpoint}</p>
+        </div>
+      )}
+      <div className="mt-3 rounded-xl bg-white border border-slate-100 p-3">
+        <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">Fingerprint SHA-256</p>
+        <p className="mt-1 break-all text-xs font-mono text-slate-600">{model.ipHashPlain || 'Không hiển thị'}</p>
+      </div>
+    </article>
+  );
 }
 function Alert({ tone, message }) { const cls = tone === 'error' ? 'bg-red-50 border-red-100 text-red-700' : 'bg-emerald-50 border-emerald-100 text-emerald-800'; return <div className={`rounded-2xl border p-4 text-sm font-bold ${cls}`}>{message}</div>; }
 function Empty({ title, desc }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><strong className="text-slate-800">{title}</strong><p className="mt-1 text-sm text-slate-500">{desc}</p></div>; }

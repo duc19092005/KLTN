@@ -7,6 +7,7 @@ import {
   computeEntryHash,
   GENESIS_PREV_HASH,
 } from './audit-hash.util';
+import { AuditAnchorService } from './audit-anchor.service';
 
 export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'ACCESS' | 'SECURITY';
 
@@ -46,7 +47,10 @@ export class AuditLoggerService {
   // Serializes chain writes so seq/prevHash are assigned without races (single-instance scope).
   private chainMutex: Promise<unknown> = Promise.resolve();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly anchor: AuditAnchorService,
+  ) {}
 
   /** Compute a fresh salt + integrity hash for a snapshot. */
   hashSnapshot(snapshot: unknown): { salt: string; hash: string } {
@@ -182,10 +186,14 @@ export class AuditLoggerService {
     let expectedSeq = 1;
     for (const row of rows) {
       if (row.seq !== expectedSeq) {
-        return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason: `Sequence gap: expected ${expectedSeq}, got ${row.seq}` };
+        const reason = `Sequence gap: expected ${expectedSeq}, got ${row.seq}`;
+        await this.anchor.sendTelegramAlert('Phát hiện đứt gãy chuỗi Log (Verify Chain)', reason, row.seq);
+        return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason };
       }
       if (row.prevHash !== expectedPrev) {
-        return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason: 'prevHash does not match previous entryHash (row inserted/removed/reordered)' };
+        const reason = 'prevHash does not match previous entryHash (row inserted/removed/reordered)';
+        await this.anchor.sendTelegramAlert('Phát hiện đứt gãy chuỗi Log (Verify Chain)', reason, row.seq);
+        return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason };
       }
       const recomputed = computeEntryHash(
         {
@@ -200,7 +208,9 @@ export class AuditLoggerService {
         row.prevHash ?? GENESIS_PREV_HASH,
       );
       if (recomputed !== row.entryHash) {
-        return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason: 'entryHash mismatch (row content was altered)' };
+        const reason = 'entryHash mismatch (row content was altered)';
+        await this.anchor.sendTelegramAlert('Phát hiện đứt gãy chuỗi Log (Verify Chain)', reason, row.seq);
+        return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason };
       }
       expectedPrev = row.entryHash!;
       expectedSeq += 1;

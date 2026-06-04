@@ -16,6 +16,9 @@ import { AiModelCryptoAdapter } from './infrastructure/adapters/ai-model-crypto.
 import { HttpAiModelConnectivityAdapter } from './infrastructure/adapters/http-ai-model-connectivity.adapter';
 import { BlockchainAiModelIntegrityAnchor } from './infrastructure/adapters/blockchain-ai-model-integrity.anchor';
 
+import { RateAiModelUseCase } from './application/use-cases/rate-ai-model.use-case';
+import { GetAiModelStatsUseCase } from './application/use-cases/get-ai-model-stats.use-case';
+
 @Module({
   imports: [BlockchainModule],
   controllers: [AiModelController],
@@ -26,6 +29,8 @@ import { BlockchainAiModelIntegrityAnchor } from './infrastructure/adapters/bloc
     FindAiModelUseCase,
     TestAiModelApiUseCase,
     VerifyAiModelUseCase,
+    RateAiModelUseCase,
+    GetAiModelStatsUseCase,
     { provide: AI_MODEL_REPOSITORY, useClass: PrismaAiModelRepository },
     { provide: AI_MODEL_CRYPTO, useClass: AiModelCryptoAdapter },
     { provide: AI_MODEL_CONNECTIVITY, useClass: HttpAiModelConnectivityAdapter },

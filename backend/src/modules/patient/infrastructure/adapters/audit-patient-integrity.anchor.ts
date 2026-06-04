@@ -81,6 +81,15 @@ export class AuditPatientIntegrityAnchor implements PatientIntegrityAnchorPort {
     else if (dbMatches && chainMatches) status = 'VERIFIED';
     else status = 'TAMPERED';
 
+    if (status === 'TAMPERED') {
+      await this.auditAnchor.sendTelegramAlert(
+        'Phát hiện giả mạo thông tin bệnh nhân',
+        `Bệnh nhân: ${patient.fullName} (Mã: ${patient.patientCode}, ID: ${patient.id})\n` +
+        `• Hash CSDL: ${dbHash}\n` +
+        `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}`
+      );
+    }
+
     return {
       id: patient.id,
       patientCode: patient.patientCode,

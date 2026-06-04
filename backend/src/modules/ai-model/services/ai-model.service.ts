@@ -5,6 +5,8 @@ import { ListAiModelsUseCase } from '../application/use-cases/list-ai-models.use
 import { FindAiModelUseCase } from '../application/use-cases/find-ai-model.use-case';
 import { TestAiModelApiUseCase } from '../application/use-cases/test-ai-model-api.use-case';
 import { VerifyAiModelUseCase } from '../application/use-cases/verify-ai-model.use-case';
+import { RateAiModelUseCase } from '../application/use-cases/rate-ai-model.use-case';
+import { GetAiModelStatsUseCase } from '../application/use-cases/get-ai-model-stats.use-case';
 
 /**
  * Facade preserving the controller-facing API. Each method delegates to a
@@ -18,6 +20,8 @@ export class AiModelService {
     private readonly findAiModelUseCase: FindAiModelUseCase,
     private readonly testAiModelApiUseCase: TestAiModelApiUseCase,
     private readonly verifyAiModelUseCase: VerifyAiModelUseCase,
+    private readonly rateAiModelUseCase: RateAiModelUseCase,
+    private readonly getAiModelStatsUseCase: GetAiModelStatsUseCase,
   ) {}
 
   create(dto: CreateAiModelDto, adminUserId: string) {
@@ -46,5 +50,13 @@ export class AiModelService {
 
   verifyAll() {
     return this.verifyAiModelUseCase.verifyAll();
+  }
+
+  rateModel(modelId: string, userId: string, satisfied: boolean, feedback?: string) {
+    return this.rateAiModelUseCase.execute(modelId, userId, satisfied, feedback);
+  }
+
+  getStats() {
+    return this.getAiModelStatsUseCase.execute();
   }
 }

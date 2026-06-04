@@ -78,6 +78,17 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
     else if (dbMatches && chainMatches) status = 'VERIFIED';
     else status = 'TAMPERED';
 
+    if (status === 'TAMPERED') {
+      await this.auditAnchor.sendTelegramAlert(
+        'Phát hiện giả mạo mô hình AI',
+        `Mô hình: ${model.modelName} (Phiên bản: ${model.modelVersion}, ID: ${model.id})\n` +
+        `• Hash CSDL: ${dbHash}\n` +
+        `• Hash On-Chain: ${latestLog?.dataHash}\n` +
+        `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}\n` +
+        `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`
+      );
+    }
+
     return {
       id: model.id,
       modelName: model.modelName,

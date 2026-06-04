@@ -55,6 +55,11 @@ export class PrismaAiModelRepository implements AiModelRepositoryPort {
 
   private includeRelations() {
     return {
+      aiQualities: {
+        select: {
+          trustablePercent: true,
+        },
+      },
       _count: { select: { diagnoses: true, aiQualities: true } },
     } as const;
   }

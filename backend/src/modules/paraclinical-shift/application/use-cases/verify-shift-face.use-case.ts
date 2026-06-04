@@ -7,6 +7,7 @@ import {
 import { SECURITY_EVENT_LOGGER, SecurityEventLoggerPort } from '../../../auth/application/ports/security-event-logger.port';
 import { FaceMatchService } from '../../../auth/application/services/face-match.service';
 import { validateFaceDescriptor, assertNotFaceLocked } from '../../../auth/domain/face.util';
+import { BlockchainParaclinicalShiftIntegrityAnchor } from '../../infrastructure/adapters/blockchain-paraclinical-shift-integrity.anchor';
 
 /**
  * Phase 2 of shared-account login:
@@ -21,6 +22,7 @@ export class VerifyShiftFaceUseCase {
     @Inject(SECURITY_EVENT_LOGGER) private readonly logger: SecurityEventLoggerPort,
     private readonly jwtService: JwtService,
     private readonly faceMatch: FaceMatchService,
+    private readonly shiftIntegrity: BlockchainParaclinicalShiftIntegrityAnchor,
   ) {}
 
   async execute(tempToken: string, faceDescriptor: number[]) {
@@ -71,6 +73,14 @@ export class VerifyShiftFaceUseCase {
     for (const room of rooms) {
       const activeShifts = await this.repo.findActiveShiftsForRoom(room.id, now);
       for (const shift of activeShifts) {
+        // Validate active shift integrity
+        const integrity = await this.shiftIntegrity.evaluate(shift);
+        if (integrity.status === 'TAMPERED') {
+          throw new ForbiddenException(
+            'Phát hiện dữ liệu ca trực bị sửa đổi trái phép (Tampered). Vui lòng liên hệ Quản trị viên.',
+          );
+        }
+
         const user = shift.staff.user;
         if (!user.faceEmbedding) continue;
 

@@ -79,6 +79,17 @@ export class BlockchainDoctorIntegrityAnchor implements DoctorIntegrityAnchorPor
     else if (dbMatches && chainMatches) status = 'VERIFIED';
     else status = 'TAMPERED';
 
+    if (status === 'TAMPERED') {
+      await this.auditAnchor.sendTelegramAlert(
+        'Phát hiện giả mạo thông tin bác sĩ',
+        `Bác sĩ ID: ${doctor.id} (Chuyên khoa: ${doctor.specialty}, Số CCHN: ${doctor.licenseNumber})\n` +
+        `• Hash CSDL: ${dbHash}\n` +
+        `• Hash On-Chain: ${latestLog?.dataHash}\n` +
+        `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}\n` +
+        `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`
+      );
+    }
+
     return {
       id: doctor.id,
       staffProfileId: doctor.staffProfileId,

@@ -10,6 +10,7 @@ import { VerifyShiftFaceUseCase } from '../application/use-cases/verify-shift-fa
 import { InitiateHandoverUseCase } from '../application/use-cases/initiate-handover.use-case';
 import { VerifyHandoverFaceAUseCase } from '../application/use-cases/verify-handover-face-a.use-case';
 import { VerifyHandoverFaceBUseCase } from '../application/use-cases/verify-handover-face-b.use-case';
+import { VerifyParaclinicalShiftUseCase } from '../application/use-cases/verify-paraclinical-shift.use-case';
 
 /**
  * Facade preserving a stable API surface. Each method delegates to a single use case.
@@ -28,6 +29,7 @@ export class ParaclinicalShiftService {
     private readonly initiateHandoverUC: InitiateHandoverUseCase,
     private readonly verifyHandoverFaceAUC: VerifyHandoverFaceAUseCase,
     private readonly verifyHandoverFaceBUC: VerifyHandoverFaceBUseCase,
+    private readonly verifyShiftUC: VerifyParaclinicalShiftUseCase,
   ) {}
 
   registerShift(staffId: string, clinicalRoomId: string, startTime: Date, endTime: Date, actorId: string) {
@@ -72,5 +74,17 @@ export class ParaclinicalShiftService {
 
   verifyHandoverFaceB(handoverId: string, faceDescriptor: number[]) {
     return this.verifyHandoverFaceBUC.execute(handoverId, faceDescriptor);
+  }
+
+  verifyShift(id: string) {
+    return this.verifyShiftUC.verifyOne(id);
+  }
+
+  verifyAllShifts() {
+    return this.verifyShiftUC.verifyAll();
+  }
+
+  getHistory(id?: string) {
+    return this.verifyShiftUC.history(id);
   }
 }

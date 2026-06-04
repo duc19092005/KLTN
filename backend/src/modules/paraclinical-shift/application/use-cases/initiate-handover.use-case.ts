@@ -4,6 +4,7 @@ import {
   ParaclinicalShiftRepositoryPort,
 } from '../ports/paraclinical-shift.repository.port';
 import { SECURITY_EVENT_LOGGER, SecurityEventLoggerPort } from '../../../auth/application/ports/security-event-logger.port';
+import { BlockchainParaclinicalShiftIntegrityAnchor } from '../../infrastructure/adapters/blockchain-paraclinical-shift-integrity.anchor';
 
 /**
  * Initiate a handover: the current shift-holder (A) declares they want to
@@ -14,6 +15,7 @@ export class InitiateHandoverUseCase {
   constructor(
     @Inject(PARACLINICAL_SHIFT_REPOSITORY) private readonly repo: ParaclinicalShiftRepositoryPort,
     @Inject(SECURITY_EVENT_LOGGER) private readonly logger: SecurityEventLoggerPort,
+    private readonly shiftIntegrity: BlockchainParaclinicalShiftIntegrityAnchor,
   ) {}
 
   async execute(fromStaffId: string, toStaffId: string, clinicalRoomId: string, reason?: string) {
@@ -26,6 +28,14 @@ export class InitiateHandoverUseCase {
     const activeShift = await this.repo.findActiveShiftForRoom(clinicalRoomId, now);
     if (!activeShift || activeShift.staffId !== fromStaffId) {
       throw new ForbiddenException('Bạn không phải là nhân viên đang phụ trách ca trực tại phòng này.');
+    }
+
+    // Verify active shift integrity
+    const integrity = await this.shiftIntegrity.evaluate(activeShift);
+    if (integrity.status === 'TAMPERED') {
+      throw new ForbiddenException(
+        'Phát hiện dữ liệu ca trực bị sửa đổi trái phép (Tampered). Vui lòng liên hệ Quản trị viên.',
+      );
     }
 
     const handover = await this.repo.createHandoverLog({

@@ -25,6 +25,9 @@ import { VerifyHandoverFaceBUseCase } from './application/use-cases/verify-hando
 // Ports -> adapters
 import { PARACLINICAL_SHIFT_REPOSITORY } from './application/ports/paraclinical-shift.repository.port';
 import { PrismaParaclinicalShiftRepository } from './infrastructure/prisma/prisma-paraclinical-shift.repository';
+import { BlockchainParaclinicalShiftIntegrityAnchor } from './infrastructure/adapters/blockchain-paraclinical-shift-integrity.anchor';
+
+import { VerifyParaclinicalShiftUseCase } from './application/use-cases/verify-paraclinical-shift.use-case';
 
 /**
  * Feature module for paraclinical shift management, shared-account login, and
@@ -39,6 +42,7 @@ import { PrismaParaclinicalShiftRepository } from './infrastructure/prisma/prism
   controllers: [ShiftController, ParaclinicalAuthController, HandoverController],
   providers: [
     ParaclinicalShiftService,
+    BlockchainParaclinicalShiftIntegrityAnchor,
 
     // Use cases
     RegisterShiftUseCase,
@@ -52,10 +56,11 @@ import { PrismaParaclinicalShiftRepository } from './infrastructure/prisma/prism
     InitiateHandoverUseCase,
     VerifyHandoverFaceAUseCase,
     VerifyHandoverFaceBUseCase,
+    VerifyParaclinicalShiftUseCase,
 
     // Ports -> adapters
     { provide: PARACLINICAL_SHIFT_REPOSITORY, useClass: PrismaParaclinicalShiftRepository },
   ],
-  exports: [ParaclinicalShiftService],
+  exports: [ParaclinicalShiftService, BlockchainParaclinicalShiftIntegrityAnchor],
 })
 export class ParaclinicalShiftModule {}

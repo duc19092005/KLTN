@@ -16,8 +16,15 @@ export class FindAiModelUseCase {
   async execute(id: string) {
     const model = await this.repo.findByIdOrThrow(id);
     const integrity = await this.integrity.evaluate(model);
+    
+    const totalRatings = model.aiQualities?.length || 0;
+    const positiveRatings = model.aiQualities?.filter((q: any) => q.trustablePercent === 100).length || 0;
+    const averageAccuracy = totalRatings > 0 ? Math.round((positiveRatings / totalRatings) * 100) : null;
+
     return {
       ...model,
+      averageAccuracy,
+      totalRatings,
       audit: {
         status: integrity.status,
         dbMatches: integrity.dbMatches,
