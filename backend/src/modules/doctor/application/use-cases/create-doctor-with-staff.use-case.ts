@@ -21,36 +21,36 @@ export class CreateDoctorWithStaffUseCase {
 
   async execute(dto: CreateDoctorWithStaffDto) {
     if (!dto.clinicalRoomId) {
-      throw new BadRequestException('Clinical room is required');
+      throw new BadRequestException('Vui lòng chọn phòng khám.');
     }
     if (!(await this.repo.roomExists(dto.clinicalRoomId))) {
-      throw new NotFoundException('Clinical room not found');
+      throw new NotFoundException('Không tìm thấy phòng khám.');
     }
     if (dto.departmentId) {
       const dept = await this.repo.findDepartment(dto.departmentId);
       if (!dept) {
-        throw new NotFoundException('Department not found');
+        throw new NotFoundException('Không tìm thấy phòng ban.');
       }
       if (dept.type !== 'CLINICAL') {
-        throw new BadRequestException('Doctor can only be assigned to a CLINICAL department');
+        throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng ban lâm sàng.');
       }
       if (dept.specialty && dept.specialty !== dto.specialty) {
         throw new BadRequestException(`Bác sĩ chuyên khoa "${dto.specialty}" không thể được xếp vào phòng ban chuyên khoa "${dept.specialty}"`);
       }
     }
     if (await this.repo.findUserByUsernameOrEmail(dto.username, dto.email)) {
-      throw new ConflictException('Username or email already exists');
+      throw new ConflictException('Tên đăng nhập hoặc email đã tồn tại.');
     }
     if (await this.repo.findStaffByCitizenId(dto.citizenId)) {
-      throw new ConflictException('Citizen ID already exists');
+      throw new ConflictException('CCCD/CMND đã tồn tại.');
     }
     if (await this.repo.findDoctorByLicense(dto.licenseNumber)) {
-      throw new ConflictException('License number already exists');
+      throw new ConflictException('Số chứng chỉ hành nghề đã tồn tại.');
     }
 
     const employeeCode = await this.repo.generateEmployeeCode();
     if (await this.repo.findStaffByEmployeeCode(employeeCode)) {
-      throw new ConflictException('Employee code already exists');
+      throw new ConflictException('Mã nhân viên đã tồn tại.');
     }
     const passwordHash = await bcrypt.hash(DEFAULT_STAFF_PASSWORD, 12);
 
@@ -61,7 +61,7 @@ export class CreateDoctorWithStaffUseCase {
       return doctor;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Unique constraint violation while saving doctor');
+        throw new ConflictException('Thông tin bác sĩ bị trùng khi lưu.');
       }
       throw error;
     }

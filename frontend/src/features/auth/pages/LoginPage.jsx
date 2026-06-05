@@ -25,7 +25,7 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
 
   const handleWalletLogin = async () => {
     if (!window.ethereum) {
-      toast.error('MetaMask is required for admin wallet login.');
+      toast.error('Vui lòng cài đặt MetaMask để đăng nhập quản trị bằng ví.');
       return;
     }
     try {
@@ -88,7 +88,7 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
           type="button"
           onClick={onClose}
           className="absolute top-4 right-4 text-[#757682] hover:text-[#4656a2] transition-colors z-20 flex items-center justify-center p-1 rounded-full hover:bg-slate-100"
-          aria-label="Close modal"
+          aria-label="Đóng hộp thoại"
         >
           <span className="material-symbols-outlined text-[20px]">close</span>
         </button>
@@ -99,7 +99,7 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#dde1ff] text-[#4656a2] mb-4">
           <span className="material-symbols-outlined fill text-[28px]">medical_services</span>
         </div>
-        <h1 className="text-2xl font-bold text-[#4656a2] tracking-tight">Medicare Identity</h1>
+        <h1 className="text-2xl font-bold text-[#4656a2] tracking-tight">Định danh Y tế</h1>
         <p className="text-sm font-semibold text-[#454651] mt-2">Cổng truy cập bảo mật y tế</p>
       </div>
 
@@ -149,7 +149,7 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
           {/* Email/Username Field */}
           <div>
             <label className="block font-semibold text-xs text-[#454651] mb-1.5" htmlFor="username">
-              Email or Username
+              Email hoặc tên đăng nhập
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#757682]">
@@ -161,7 +161,7 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
                 name="username"
                 value={credentials.username}
                 onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
-                placeholder="Enter your credential"
+                placeholder="Nhập email hoặc tên đăng nhập"
                 required
                 type="text"
                 disabled={isFormDisabled}
@@ -172,7 +172,7 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
           {/* Password Field */}
           <div>
             <label className="block font-semibold text-xs text-[#454651] mb-1.5" htmlFor="password">
-              Password
+              Mật khẩu
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#757682]">
@@ -209,7 +209,7 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
                 type="checkbox"
               />
               <span className="font-medium text-[#454651] group-hover:text-[#171b2b] transition-colors">
-                Remember me
+                Ghi nhớ đăng nhập
               </span>
             </label>
             <button
@@ -220,7 +220,7 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
               }}
               className="font-semibold text-[#4656a2] hover:text-[#5f6fbd] transition-colors"
             >
-              Forgot password?
+              Quên mật khẩu?
             </button>
           </div>
 
@@ -235,7 +235,7 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
                 <LoadingIndicator size="sm" tone="white" />
               ) : (
                 <>
-                  Sign In to Workspace
+                  Đăng nhập hệ thống
                   <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                 </>
               )}
@@ -271,15 +271,15 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
           </div>
 
           {/* Instructions */}
-          <h2 className="text-lg font-bold text-[#171b2b] mb-3">Authentication Required</h2>
+          <h2 className="text-lg font-bold text-[#171b2b] mb-3">Cần xác thực quản trị</h2>
           <p className="text-xs font-semibold text-[#454651] mb-8 max-w-[280px] mx-auto leading-relaxed">
-            Please connect your MetaMask or compatible Web3 wallet to access the administrative dashboard securely.
+            Vui lòng kết nối MetaMask hoặc ví Web3 tương thích để truy cập trang quản trị an toàn.
           </p>
 
           {/* Status Chip / Notice */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#f3f2ff] text-[#454651] font-semibold text-xs mb-8 border border-[#dee1f8]">
             <span className="w-2 h-2 rounded-full bg-[#545d82]"></span>
-            Network: Hardhat Local / Mainnet
+            Mạng: Hardhat Local / Mainnet
           </div>
 
           {/* Primary Action Button */}
@@ -300,7 +300,7 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
 
           {/* Help Link */}
           <a className="mt-6 text-xs text-[#757682] hover:text-[#4656a2] transition-colors hover:underline" href="#">
-            Need help connecting a wallet?
+            Cần hỗ trợ kết nối ví?
           </a>
         </div>
       )}
@@ -443,16 +443,16 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
         <footer className="w-full py-10 bg-[#ffffff] relative z-10 border-t border-[#dee1f8]/30">
           <div className="flex flex-col md:flex-row justify-between items-center px-10 max-w-[1280px] mx-auto gap-6 md:gap-0">
             <div className="flex flex-col items-center md:items-start gap-2">
-              <span className="text-sm font-bold text-[#4656a2]">Medicare Identity</span>
+              <span className="text-sm font-bold text-[#4656a2]">Định danh Y tế</span>
               <p className="text-xs font-semibold text-[#545d82] text-center md:text-left">
-                © 2026 Medicare Identity Blockchain Systems. All rights reserved.
+                © 2026 Hệ thống Định danh Y tế. Bảo lưu mọi quyền.
               </p>
             </div>
             <nav className="flex flex-wrap justify-center gap-6">
-              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Privacy Policy</span>
-              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Terms of Service</span>
-              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Security Audit</span>
-              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Support</span>
+              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Chính sách bảo mật</span>
+              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Điều khoản sử dụng</span>
+              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Kiểm toán bảo mật</span>
+              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Hỗ trợ</span>
             </nav>
           </div>
         </footer>

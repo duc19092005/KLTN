@@ -17,16 +17,16 @@ export class UpdateDoctorUseCase {
 
   async execute(id: string, dto: UpdateDoctorDto, actorId?: string) {
     const existing = await this.repo.findByIdWithRelations(id);
-    if (!existing) throw new NotFoundException('Doctor profile not found');
+    if (!existing) throw new NotFoundException('Không tìm thấy hồ sơ bác sĩ.');
 
     if (dto.licenseNumber) {
       const license = await this.repo.findDoctorByLicense(dto.licenseNumber);
-      if (license && license.id !== id) throw new ConflictException('License number already exists');
+      if (license && license.id !== id) throw new ConflictException('Số chứng chỉ hành nghề đã tồn tại.');
     }
     if (dto.citizenId) {
       const existingStaff = await this.repo.findStaffByCitizenId(dto.citizenId);
       if (existingStaff && existingStaff.id !== existing.staffProfileId) {
-        throw new ConflictException('Citizen ID already exists');
+        throw new ConflictException('CCCD/CMND đã tồn tại.');
       }
     }
     const targetSpecialty = dto.specialty !== undefined ? dto.specialty : existing.specialty;
@@ -35,10 +35,10 @@ export class UpdateDoctorUseCase {
     if (targetDepartmentId) {
       const dept = await this.repo.findDepartment(targetDepartmentId);
       if (!dept) {
-        throw new NotFoundException('Department not found');
+        throw new NotFoundException('Không tìm thấy phòng ban.');
       }
       if (dept.type !== 'CLINICAL') {
-        throw new BadRequestException('Doctor can only be assigned to a CLINICAL department');
+        throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng ban lâm sàng.');
       }
       if (dept.specialty && dept.specialty !== targetSpecialty) {
         throw new BadRequestException(`Bác sĩ chuyên khoa "${targetSpecialty}" không thể được xếp vào phòng ban chuyên khoa "${dept.specialty}"`);

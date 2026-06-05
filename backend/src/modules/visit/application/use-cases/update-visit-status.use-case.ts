@@ -19,13 +19,13 @@ export class UpdateVisitStatusUseCase {
   async execute(input: { id: string; status: VisitStatus; user?: AuthUser }) {
     const { id, status, user } = input;
     const visit = await this.repo.findById(id);
-    if (!visit) throw new NotFoundException('Visit not found');
+    if (!visit) throw new NotFoundException('Không tìm thấy lượt khám.');
 
     if (user?.role === UserRole.DOCTOR) {
       const doctorId = await this.repo.findDoctorIdByUserId(user.sub);
-      if (!doctorId) throw new ForbiddenException('Current user does not have doctor profile');
+      if (!doctorId) throw new ForbiddenException('Tài khoản hiện tại không có hồ sơ bác sĩ.');
       if (visit.doctorId !== doctorId) {
-        throw new ForbiddenException('Doctor can only update status for own visit');
+        throw new ForbiddenException('Bác sĩ chỉ có thể cập nhật lượt khám do mình phụ trách.');
       }
     }
 

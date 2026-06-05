@@ -13,12 +13,12 @@ export class AssignClinicalRoomUseCase {
 
   async execute(id: string, dto: AssignClinicalRoomDto) {
     const doctor = await this.repo.findByIdWithRelations(id);
-    if (!doctor) throw new NotFoundException('Doctor profile not found');
+    if (!doctor) throw new NotFoundException('Không tìm thấy hồ sơ bác sĩ.');
 
     await this.repo.assignRoom(id, dto.clinicalRoomId || undefined);
 
     const refreshed = await this.repo.findByIdWithRelations(id);
-    if (!refreshed) throw new NotFoundException('Doctor profile not found');
+    if (!refreshed) throw new NotFoundException('Không tìm thấy hồ sơ bác sĩ.');
     return refreshed;
   }
 }

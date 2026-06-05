@@ -9,6 +9,14 @@ const defaultNavItems = [
   { id: 'settings', label: 'Cài đặt', icon: 'settings' },
 ];
 
+const ROLE_LABELS = {
+  ADMIN: 'Quản trị viên',
+  RECEPTIONIST: 'Lễ tân',
+  DOCTOR: 'Bác sĩ',
+  LAB_MANAGER: 'Quản lý xét nghiệm',
+  DEPT_SHARED: 'Tài khoản phòng máy',
+};
+
 function SidebarIcon({ name, isActive, compact = false }) {
   const common = {
     className: `w-5 h-5 shrink-0 transition-all duration-300 ${compact ? '' : 'mr-3'} ${isActive ? 'scale-105 text-blue-600' : 'text-slate-400 group-hover:scale-105 group-hover:text-blue-500'}`,
@@ -51,6 +59,7 @@ export default function DashboardLayout({
   };
 
   const activeLabel = navItems.find(item => item.id === activeItem)?.label || 'Tổng quan';
+  const roleLabel = ROLE_LABELS[user?.role] || user?.role || 'Quản trị viên';
 
   const initials = (user?.username || user?.email || 'A')
     .split(/[\s@._-]+/)
@@ -87,8 +96,8 @@ export default function DashboardLayout({
                 </svg>
               </div>
               <div className={`flex flex-col min-w-0 transition-all duration-200 ${isSidebarCollapsed ? 'lg:hidden' : ''}`}>
-                <strong className="text-slate-900 text-[15px] font-bold tracking-tight leading-tight">Med Identity</strong>
-                <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider mt-0.5">Hospital OS</span>
+                <strong className="text-slate-900 text-[15px] font-bold tracking-tight leading-tight">Định danh Y tế</strong>
+                <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider mt-0.5">Hệ thống bệnh viện</span>
               </div>
             </div>
 
@@ -97,8 +106,8 @@ export default function DashboardLayout({
               type="button"
               className={`hidden lg:flex rounded-xl border border-blue-100 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all duration-200 ${isSidebarCollapsed ? 'h-9 w-9 items-center justify-center' : 'p-1.5'}`}
               onClick={() => setIsSidebarCollapsed((value) => !value)}
-              title={isSidebarCollapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'}
-              aria-label={isSidebarCollapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'}
+              title={isSidebarCollapsed ? 'Mở rộng thanh điều hướng' : 'Thu gọn thanh điều hướng'}
+              aria-label={isSidebarCollapsed ? 'Mở rộng thanh điều hướng' : 'Thu gọn thanh điều hướng'}
             >
               <svg className={`w-5 h-5 transition-transform duration-300 ${isSidebarCollapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -118,7 +127,7 @@ export default function DashboardLayout({
           </div>
 
           {/* Navigation Items */}
-          <nav className={`flex-1 overflow-y-auto py-6 space-y-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:px-4' : 'px-3'}`} aria-label="Dashboard navigation">
+          <nav className={`flex-1 overflow-y-auto py-6 space-y-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:px-4' : 'px-3'}`} aria-label="Điều hướng bảng làm việc">
             {navItems.map((item) => {
               const isActive = activeItem === item.id;
               return (
@@ -153,7 +162,7 @@ export default function DashboardLayout({
               </span>
               <div className="min-w-0">
                 <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Hệ thống an toàn</p>
-                <p className="text-xs font-semibold text-emerald-950 truncate">MFA + Hiệp ước Y tế</p>
+                <p className="text-xs font-semibold text-emerald-950 truncate">MFA + chuẩn y tế</p>
               </div>
             </div>
           </div>
@@ -172,7 +181,7 @@ export default function DashboardLayout({
               type="button"
               className="lg:hidden p-2 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-blue-600 border border-slate-200 transition-colors"
               onClick={() => setIsSidebarOpen(true)}
-              aria-label="Open sidebar"
+              aria-label="Mở thanh điều hướng"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -207,7 +216,7 @@ export default function DashboardLayout({
             <div className="flex items-center gap-2.5">
               <div className="text-right hidden sm:block">
                 <strong className="block text-xs font-bold text-slate-900 leading-tight">{user?.username || 'Bác sĩ trực'}</strong>
-                <span className="text-[11px] text-blue-600 font-semibold">{user?.role || 'Quản trị viên'}</span>
+                <span className="text-[11px] text-blue-600 font-semibold">{roleLabel}</span>
               </div>
               <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center text-xs font-bold shadow-sm">
                 {initials}

@@ -27,13 +27,19 @@ const ACTION_LABEL = {
   LOGIN_PASSWORD: 'Đăng nhập (mật khẩu)',
   LOGIN_INVITE: 'Đăng nhập (lời mời)',
   LOGIN_FAIL: 'Đăng nhập thất bại',
-  FACE_VERIFY_PASS: 'Xác thực khuôn mặt OK',
+  FACE_VERIFY_PASS: 'Xác thực khuôn mặt thành công',
   FACE_VERIFY_FAIL: 'Xác thực khuôn mặt lỗi',
   FACE_INTEGRITY_FAIL: 'Khuôn mặt bị sửa đổi',
   FACE_ENROLL: 'Đăng ký khuôn mặt',
   CREATE: 'Tạo mới',
   UPDATE: 'Cập nhật',
   DELETE: 'Xóa',
+};
+
+const BATCH_STATUS_LABEL = {
+  ANCHORED: 'Đã neo',
+  FAILED: 'Thất bại',
+  PENDING: 'Chờ neo',
 };
 
 function shortHash(hash) {
@@ -111,7 +117,7 @@ export default function AuditLogsPage() {
       const res = await auditService.anchorNow(ticket);
       const d = res.data || {};
       if (d.committed) {
-        toast.success(`Đã neo lô #${d.batchId} (${d.leafCount} log) lên blockchain.`);
+        toast.success(`Đã neo lô #${d.batchId} (${d.leafCount} bản ghi) lên blockchain.`);
       } else {
         toast.info(`Không có gì để neo: ${d.reason || 'hàng đợi trống'}.`);
       }
@@ -146,7 +152,7 @@ export default function AuditLogsPage() {
         <section className="relative overflow-hidden rounded-[28px] border border-blue-100 bg-gradient-to-br from-white via-blue-50 to-cyan-50 p-8 shadow-sm">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
             <div>
-              <p className="text-[11px] font-black text-blue-600 uppercase tracking-[0.24em] mb-3">Audit & Integrity</p>
+              <p className="text-[11px] font-black text-blue-600 uppercase tracking-[0.24em] mb-3">Nhật ký & toàn vẹn</p>
               <h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">Nhật ký hệ thống</h2>
               <p className="mt-3 max-w-3xl text-sm sm:text-base text-slate-600 leading-relaxed">
                 Toàn bộ hoạt động (đăng nhập, thay đổi dữ liệu) được ghi bằng chuỗi hash chống giả mạo và neo định kỳ lên blockchain.
@@ -158,7 +164,7 @@ export default function AuditLogsPage() {
               disabled={anchoring}
               className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-100 hover:bg-blue-700 disabled:opacity-50"
             >
-              {anchoring ? 'Đang neo…' : '⛓ Neo lên blockchain ngay'}
+              {anchoring ? 'Đang neo…' : 'Neo lên blockchain ngay'}
             </button>
           </div>
         </section>
@@ -168,10 +174,10 @@ export default function AuditLogsPage() {
 
         {/* Stats */}
         <section className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          <StatCard label="Tổng bản ghi" value={stats.total} hint="Trong 200 log gần nhất" icon="📜" />
-          <StatCard label="Đã neo on-chain" value={stats.anchored} hint="Đã đóng băng bất biến" icon="⛓" />
-          <StatCard label="Chờ neo" value={stats.pending} hint="Sẽ vào lô kế tiếp" icon="⏳" />
-          <StatCard label="Sự kiện đăng nhập" value={stats.logins} hint="Lịch sử truy cập" icon="🔐" />
+          <StatCard label="Tổng bản ghi" value={stats.total} hint="Trong 200 bản ghi gần nhất" />
+          <StatCard label="Đã neo trên chuỗi" value={stats.anchored} hint="Đã đóng băng bất biến" />
+          <StatCard label="Chờ neo" value={stats.pending} hint="Sẽ vào lô kế tiếp" />
+          <StatCard label="Sự kiện đăng nhập" value={stats.logins} hint="Lịch sử truy cập" />
         </section>
 
         {/* Tabs */}
@@ -179,7 +185,7 @@ export default function AuditLogsPage() {
           <TabButton active={tab === 'logs'} onClick={() => setTab('logs')}>Hoạt động ({logs.length})</TabButton>
           <TabButton active={tab === 'batches'} onClick={() => setTab('batches')}>Lô blockchain ({batches.length})</TabButton>
           <button onClick={load} disabled={loading} className="ml-auto rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-black text-blue-700 hover:bg-blue-100 disabled:opacity-50">
-            {loading ? 'Đang tải…' : '↻ Làm mới'}
+            {loading ? 'Đang tải…' : 'Làm mới'}
           </button>
         </div>
 
@@ -223,9 +229,6 @@ function ChainBanner({ chain, loading }) {
       className={`rounded-2xl border p-5 shadow-sm ${ok ? 'border-emerald-100 bg-emerald-50/70' : 'border-red-100 bg-red-50/70 animate-pulse'}`}
     >
       <div className="flex items-center gap-4">
-        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl ${ok ? 'bg-emerald-100' : 'bg-red-100'}`}>
-          {ok ? '🛡️' : '⚠️'}
-        </div>
         <div className="min-w-0">
           <p className={`text-sm font-black ${ok ? 'text-emerald-800' : 'text-red-800'}`}>
             {ok ? 'Chuỗi nhật ký toàn vẹn' : 'Phát hiện sửa đổi nhật ký!'}
@@ -260,12 +263,12 @@ function LogsTable({ logs, entities, entity, setEntity, onProof }) {
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500">
             <tr>
-              <th className="px-4 py-3">#Seq</th>
+              <th className="px-4 py-3">Seq</th>
               <th className="px-4 py-3">Hành động</th>
               <th className="px-4 py-3">Đối tượng</th>
               <th className="px-4 py-3">Người thực hiện</th>
               <th className="px-4 py-3">Thời gian</th>
-              <th className="px-4 py-3">On-chain</th>
+              <th className="px-4 py-3">Trên chuỗi</th>
               <th className="px-4 py-3 text-right">Bằng chứng</th>
             </tr>
           </thead>
@@ -292,7 +295,7 @@ function LogsTable({ logs, entities, entity, setEntity, onProof }) {
                 <td className="px-4 py-3 text-right">
                   {log.onChainStatus === 'ANCHORED' ? (
                     <button onClick={() => onProof(log.seq)} className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1 text-[11px] font-black text-blue-700 hover:bg-blue-100">
-                      Xem proof
+                      Xem bằng chứng
                     </button>
                   ) : (
                     <span className="text-[11px] text-slate-300">—</span>
@@ -311,7 +314,7 @@ function LogsTable({ logs, entities, entity, setEntity, onProof }) {
 
 function BatchesTable({ batches }) {
   if (!batches.length) {
-    return <Empty title="Chưa có lô nào được neo" desc="Hệ thống gom log thành lô và neo Merkle root định kỳ. Bấm 'Neo ngay' để tạo lô đầu tiên." />;
+    return <Empty title="Chưa có lô nào được neo" desc="Hệ thống gom bản ghi thành lô và neo Merkle root định kỳ. Bấm 'Neo ngay' để tạo lô đầu tiên." />;
   }
   return (
     <section className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
@@ -320,11 +323,11 @@ function BatchesTable({ batches }) {
           <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500">
             <tr>
               <th className="px-4 py-3">Lô</th>
-              <th className="px-4 py-3">Merkle Root</th>
-              <th className="px-4 py-3">Số log</th>
+              <th className="px-4 py-3">Root Merkle</th>
+              <th className="px-4 py-3">Số bản ghi</th>
               <th className="px-4 py-3">Khoảng seq</th>
               <th className="px-4 py-3">Trạng thái</th>
-              <th className="px-4 py-3">Tx Hash</th>
+              <th className="px-4 py-3">Hash giao dịch</th>
               <th className="px-4 py-3">Neo lúc</th>
             </tr>
           </thead>
@@ -340,7 +343,7 @@ function BatchesTable({ batches }) {
                     b.status === 'ANCHORED' ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
                     : b.status === 'FAILED' ? 'border-red-100 bg-red-50 text-red-700'
                     : 'border-amber-100 bg-amber-50 text-amber-700'}`}>
-                    {b.status}
+                    {BATCH_STATUS_LABEL[b.status] || b.status}
                   </span>
                 </td>
                 <td className="px-4 py-3 font-mono text-[11px] text-slate-500">{shortHash(b.txHash)}</td>
@@ -363,39 +366,39 @@ function ProofModal({ proof, onClose }) {
       <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
         <div className="shrink-0 border-b border-slate-100 p-6 flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-indigo-600">Merkle Inclusion Proof</p>
-            <h3 className="mt-1 text-2xl font-black text-slate-950">Bằng chứng log #{proof.seq}</h3>
-            <p className="mt-1 text-sm text-slate-500">Chứng minh log này nằm trong lô đã neo, đối chiếu trực tiếp với root on-chain.</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-indigo-600">Bằng chứng bao hàm Merkle</p>
+            <h3 className="mt-1 text-2xl font-black text-slate-950">Bằng chứng bản ghi #{proof.seq}</h3>
+            <p className="mt-1 text-sm text-slate-500">Chứng minh bản ghi này nằm trong lô đã neo, đối chiếu trực tiếp với root trên chuỗi.</p>
           </div>
           <button onClick={onClose} className="rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-black text-slate-600 hover:bg-slate-50">Đóng</button>
         </div>
         <div className="flex-1 overflow-y-auto bg-slate-50/60 p-5">
           {proof.loading ? (
-            <LoadingIndicator size="md" label="Đang tạo proof..." />
+            <LoadingIndicator size="md" label="Đang tạo bằng chứng..." />
           ) : proof.error ? (
             <div className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-bold text-red-700">{proof.error}</div>
           ) : !d ? (
-            <Empty title="Không có proof" desc="Log này chưa được neo vào lô nào." />
+            <Empty title="Không có bằng chứng" desc="Bản ghi này chưa được neo vào lô nào." />
           ) : (
             <div className="space-y-4">
               <div className={`rounded-2xl border p-4 ${d.verified ? 'border-emerald-100 bg-emerald-50' : 'border-red-100 bg-red-50'}`}>
                 <p className={`text-sm font-black ${d.verified ? 'text-emerald-800' : 'text-red-800'}`}>
-                  {d.verified ? '✅ Proof hợp lệ — khớp với root trên blockchain' : '❌ Proof KHÔNG khớp root on-chain'}
+                  {d.verified ? 'Bằng chứng hợp lệ - khớp với root trên blockchain' : 'Bằng chứng KHÔNG khớp root trên chuỗi'}
                 </p>
               </div>
               <KV label="Lô (batchId)" value={`#${d.batchId}`} />
-              <KV label="Entry Hash (lá Merkle)" value={d.entryHash} mono />
+              <KV label="Hash bản ghi (lá Merkle)" value={d.entryHash} mono />
               <KV label="Merkle Root (tính lại)" value={d.merkleRoot} mono />
               <KV label="Root trên blockchain" value={d.onChainRoot} mono />
               <div>
-                <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-slate-400">Đường dẫn proof ({d.proof?.length || 0} nút)</p>
+                <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-slate-400">Đường dẫn bằng chứng ({d.proof?.length || 0} nút)</p>
                 <div className="space-y-1.5">
                   {(d.proof || []).map((p, i) => (
                     <div key={i} className="rounded-lg border border-slate-100 bg-white px-3 py-2 font-mono text-[11px] text-slate-500">
                       [{i}] {shortHash(p)}
                     </div>
                   ))}
-                  {!d.proof?.length && <p className="text-xs text-slate-400">Lô chỉ có 1 log — không cần nút trung gian.</p>}
+                  {!d.proof?.length && <p className="text-xs text-slate-400">Lô chỉ có 1 bản ghi - không cần nút trung gian.</p>}
                 </div>
               </div>
             </div>
@@ -408,7 +411,7 @@ function ProofModal({ proof, onClose }) {
 
 // ---- Small presentational bits ----------------------------------------------
 
-function StatCard({ label, value, hint, icon }) {
+function StatCard({ label, value, hint }) {
   return (
     <article className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
       <div className="flex justify-between">
@@ -416,7 +419,6 @@ function StatCard({ label, value, hint, icon }) {
           <p className="text-xs font-bold text-slate-500">{label}</p>
           <strong className="block text-3xl font-black text-slate-950 mt-2">{String(value).padStart(2, '0')}</strong>
         </div>
-        <span className="text-2xl">{icon}</span>
       </div>
       <p className="mt-3 text-xs font-semibold text-blue-600">{hint}</p>
     </article>

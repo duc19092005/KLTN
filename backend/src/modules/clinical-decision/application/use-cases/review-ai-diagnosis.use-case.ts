@@ -18,12 +18,12 @@ export class ReviewAiDiagnosisUseCase {
 
   async execute(id: string, dto: ReviewAiDiagnosisDto, doctorUserId: string) {
     const doctor = await this.repo.findDoctorByUserId(doctorUserId);
-    if (!doctor) throw new BadRequestException('Current user does not have doctor profile');
+    if (!doctor) throw new BadRequestException('Tài khoản hiện tại không có hồ sơ bác sĩ.');
 
     const diagnosis = await this.repo.findAiDiagnosisWithVisit(id);
-    if (!diagnosis) throw new NotFoundException('AI diagnosis not found');
+    if (!diagnosis) throw new NotFoundException('Không tìm thấy phân tích AI.');
     if (!diagnosis.visit || diagnosis.visit.doctorId !== doctor.id) {
-      throw new BadRequestException('Doctor can only review own visit AI analysis');
+      throw new BadRequestException('Bác sĩ chỉ được đánh giá phân tích AI của lượt khám do mình phụ trách.');
     }
 
     return this.repo.updateAiDiagnosisReview(id, doctor.id, dto.doctorFeedback?.trim() || null);

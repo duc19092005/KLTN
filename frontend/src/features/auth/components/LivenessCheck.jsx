@@ -549,7 +549,7 @@ export default function LivenessCheck({
           {status === 'loading' && (
             <div className="absolute inset-0 bg-slate-900/95 backdrop-blur-md rounded-inherit flex flex-col items-center justify-center z-20">
               <LoadingIndicator size="md" tone="blue" />
-              <p className="text-[11px] font-semibold text-slate-400 mt-3 tracking-wide">Đang khởi tạo AI Model...</p>
+              <p className="text-[11px] font-semibold text-slate-400 mt-3 tracking-wide">Đang khởi tạo mô hình AI...</p>
             </div>
           )}
 

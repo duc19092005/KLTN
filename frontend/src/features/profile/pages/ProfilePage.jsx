@@ -140,7 +140,7 @@ export default function ProfilePage() {
             </section>
 
             {/* Account info (common) */}
-            <Card title="Thông tin tài khoản" icon="🔐">
+            <Card title="Thông tin tài khoản">
               <Field label="Tên đăng nhập" value={account.username} />
               <Field label="Email" value={account.email} />
               <Field label="Vai trò" value={roleLabel} />
@@ -151,7 +151,7 @@ export default function ProfilePage() {
 
             {/* Personal info (staff / doctor / lab) */}
             {staff && (
-              <Card title="Thông tin cá nhân" icon="🪪">
+              <Card title="Thông tin cá nhân">
                 <Field label="Họ và tên" value={staff.fullName} />
                 <Field label="Giới tính" value={genderLabel(staff.gender)} />
                 <Field label="Ngày sinh" value={formatDate(staff.birthDate)} />
@@ -168,7 +168,7 @@ export default function ProfilePage() {
 
             {/* Clinical credentials (doctor only) */}
             {doctor && (
-              <Card title="Thông tin chuyên môn" icon="🩺">
+              <Card title="Thông tin chuyên môn">
                 <Field label="Chuyên khoa" value={doctor.specialty} />
                 <Field label="Số chứng chỉ hành nghề" value={doctor.licenseNumber} />
                 <Field label="Trình độ" value={doctor.qualification} />
@@ -181,7 +181,7 @@ export default function ProfilePage() {
 
             {/* Admin info */}
             {admin && (
-              <Card title="Thông tin quản trị" icon="⚙️">
+              <Card title="Thông tin quản trị">
                 <Field label="Tên quản trị" value={admin.adminUserName} />
                 <Field label="Địa chỉ ví" value={shortenWallet(admin.walletAddress)} mono={admin.hasWallet} />
                 <Field label="Mã khôi phục (MFA)" value={admin.hasRecoverySecret ? 'Đã thiết lập' : 'Chưa thiết lập'} />
@@ -193,7 +193,6 @@ export default function ProfilePage() {
               <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-start gap-3">
-                    <span className="text-xl">🔑</span>
                     <div>
                       <h3 className="text-lg font-black text-slate-950">Bảo mật</h3>
                       <p className="mt-1 text-sm text-slate-500">
@@ -220,11 +219,10 @@ export default function ProfilePage() {
   );
 }
 
-function Card({ title, icon, children }) {
+function Card({ title, children }) {
   return (
     <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
       <div className="mb-5 flex items-center gap-2">
-        <span className="text-xl">{icon}</span>
         <h3 className="text-lg font-black text-slate-950">{title}</h3>
       </div>
       <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">{children}</dl>

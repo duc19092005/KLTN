@@ -217,7 +217,7 @@ export default function ShiftManagementPage() {
               <h3 className="text-lg font-black text-slate-950 mb-4">Đăng ký ca trực mới</h3>
               <form onSubmit={handleRegister} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Mã phòng (Room ID)</label>
+	                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Mã phòng</label>
                   <input type="text" value={registerForm.roomId} onChange={(e) => setRegisterForm((f) => ({ ...f, roomId: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none" required placeholder="UUID phòng máy" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">

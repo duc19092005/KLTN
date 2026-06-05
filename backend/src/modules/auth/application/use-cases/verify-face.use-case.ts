@@ -27,26 +27,26 @@ export class VerifyFaceUseCase {
     const user = await this.lookup.getAuthUser(userId);
 
     if (user.role === 'ADMIN' && !tokenWalletAddress) {
-      throw new UnauthorizedException('Wallet authentication is required before face verification');
+      throw new UnauthorizedException('Vui lòng xác thực ví trước khi xác thực khuôn mặt.');
     }
     if (user.status !== 'ACTIVE' || user.firstLogin) {
-      throw new UnauthorizedException('Admin setup is not complete');
+      throw new UnauthorizedException('Tài khoản chưa hoàn tất thiết lập.');
     }
     if (!user.faceEmbedding) {
-      throw new UnauthorizedException('Face data is not registered');
+      throw new UnauthorizedException('Tài khoản chưa đăng ký dữ liệu khuôn mặt.');
     }
     if (user.role === 'ADMIN' && !user.adminProfile?.walletAddress) {
-      throw new UnauthorizedException('Wallet data is not registered');
+      throw new UnauthorizedException('Tài khoản chưa đăng ký ví.');
     }
     if (user.role === 'ADMIN' && user.adminProfile?.walletAddress.toLowerCase() !== tokenWalletAddress!.toLowerCase()) {
-      throw new UnauthorizedException('Wallet session mismatch');
+      throw new UnauthorizedException('Phiên ví không khớp với tài khoản.');
     }
 
     assertNotFaceLocked(user);
 
     // Consume the single-use challenge atomically before matching (anti-replay).
     const consumed = await this.repo.consumeFaceChallenge(userId, challenge, new Date());
-    if (consumed !== 1) throw new UnauthorizedException('Invalid or expired face challenge');
+    if (consumed !== 1) throw new UnauthorizedException('Yêu cầu xác thực khuôn mặt không hợp lệ hoặc đã hết hạn.');
 
     const storedDescriptors = this.faceMatch.decodeStoredDescriptors(user.faceEmbedding);
 
@@ -78,9 +78,9 @@ export class VerifyFaceUseCase {
         ip,
       });
       if (lockInfo.locked) {
-        throw new UnauthorizedException('Too many failed face attempts. Account temporarily locked.');
+        throw new UnauthorizedException('Thử sai quá nhiều lần. Tài khoản tạm thời bị khóa.');
       }
-      throw new UnauthorizedException('Face verification failed');
+      throw new UnauthorizedException('Xác thực khuôn mặt thất bại.');
     }
 
     await this.faceMatch.resetFailures(userId);

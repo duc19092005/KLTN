@@ -16,7 +16,7 @@ export class VerifyDoctorUseCase {
 
   async findOne(id: string) {
     const doctor = await this.repo.findByIdWithRelations(id);
-    if (!doctor) throw new NotFoundException('Doctor profile not found');
+    if (!doctor) throw new NotFoundException('Không tìm thấy hồ sơ bác sĩ.');
     const integrity = await this.integrity.evaluate(doctor);
     return {
       ...doctor,
@@ -33,7 +33,7 @@ export class VerifyDoctorUseCase {
 
   async verifyOne(id: string) {
     const doctor = await this.repo.findByIdWithRelations(id);
-    if (!doctor) throw new NotFoundException('Doctor profile not found');
+    if (!doctor) throw new NotFoundException('Không tìm thấy hồ sơ bác sĩ.');
     return this.integrity.evaluate(doctor);
   }
 

@@ -147,11 +147,11 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
    * timer always attempts to drain whatever is pending.
    */
   private async runCycle(force = false): Promise<{ committed: boolean; batchId?: number; leafCount?: number; reason?: string }> {
-    if (this.running) return { committed: false, reason: 'cycle already running' };
+    if (this.running) return { committed: false, reason: 'Chu trình neo đang chạy.' };
     this.running = true;
     try {
       if (!this.blockchain.isAuditAnchorReady()) {
-        return { committed: false, reason: 'AuditAnchor not configured' };
+        return { committed: false, reason: 'Chưa cấu hình AuditAnchor.' };
       }
 
       // Pull unanchored, chained logs in seq order, capped at maxLeaves per batch.
@@ -173,7 +173,7 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
         },
       });
 
-      if (pending.length === 0) return { committed: false, reason: 'nothing to anchor' };
+      if (pending.length === 0) return { committed: false, reason: 'Không có bản ghi nào cần neo.' };
       void force; // size gating is advisory; we always drain when invoked
 
       // Validate the chain of pending logs before building Merkle root
@@ -181,10 +181,10 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
         await this.validatePendingChain(pending);
       } catch (valErr: any) {
         const brokenSeq = pending[0]?.seq ?? 0;
-        const reason = valErr.message || 'Unknown chain integrity failure';
+        const reason = valErr.message || 'Không xác định được lỗi toàn vẹn chuỗi.';
         this.logger.error(`🚨 CHAIN INTEGRITY FAILURE DETECTED: ${reason}. Aborting commit.`);
         await this.sendTelegramAlert('Cảnh báo giả mạo Blockchain Logger (Pre-Commit)', reason, brokenSeq);
-        return { committed: false, reason: `Chain validation failed: ${reason}` };
+        return { committed: false, reason: `Kiểm tra chuỗi thất bại: ${reason}` };
       }
 
       // Allocate a monotonic batchId, reconciling local state with the on-chain counter so we
@@ -208,7 +208,7 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
       if (!res.success) {
         await this.prisma.auditBatch.update({
           where: { batchId },
-          data: { status: 'FAILED', error: (res as any).error ?? 'commit failed' },
+          data: { status: 'FAILED', error: (res as any).error ?? 'Ghi lô lên blockchain thất bại.' },
         });
         this.logger.error(`Batch ${batchId} commit failed: ${(res as any).error}`);
         return { committed: false, batchId, reason: (res as any).error };
@@ -285,7 +285,7 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
         select: { entryHash: true },
       });
       if (!precedingLog) {
-        throw new Error(`Sequence gap: preceding log for seq ${pending[0].seq} not found`);
+        throw new Error(`Đứt quãng số thứ tự: không tìm thấy bản ghi liền trước seq ${pending[0].seq}`);
       }
       expectedPrevHash = precedingLog.entryHash!;
     }
@@ -293,10 +293,10 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
     let expectedSeq = pending[0].seq!;
     for (const log of pending) {
       if (log.seq !== expectedSeq) {
-        throw new Error(`Sequence gap: expected ${expectedSeq}, got ${log.seq}`);
+        throw new Error(`Đứt quãng số thứ tự: mong đợi ${expectedSeq}, nhận được ${log.seq}`);
       }
       if (log.prevHash !== expectedPrevHash) {
-        throw new Error(`prevHash mismatch: expected ${expectedPrevHash}, got ${log.prevHash}`);
+        throw new Error(`prevHash không khớp: mong đợi ${expectedPrevHash}, nhận được ${log.prevHash}`);
       }
       const recomputed = computeEntryHash(
         {
@@ -311,7 +311,7 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
         log.prevHash ?? GENESIS_PREV_HASH,
       );
       if (recomputed !== log.entryHash) {
-        throw new Error(`entryHash mismatch: recomputed ${recomputed}, got ${log.entryHash}`);
+        throw new Error(`entryHash không khớp: tính lại ${recomputed}, nhận được ${log.entryHash}`);
       }
       expectedPrevHash = log.entryHash!;
       expectedSeq += 1;

@@ -12,15 +12,15 @@ export class ClinicalRoomValidator {
 
   async ensureRoom(id: string): Promise<void> {
     const room = await this.repo.findById(id);
-    if (!room) throw new NotFoundException('Clinical room not found');
+    if (!room) throw new NotFoundException('Không tìm thấy phòng khám.');
   }
 
   async assertRoomCodeUnique(roomCode: string, excludeId?: string): Promise<void> {
     const existing = await this.repo.findByRoomCode(roomCode);
-    if (existing && existing.id !== excludeId) throw new ConflictException('Room code already exists');
+    if (existing && existing.id !== excludeId) throw new ConflictException('Mã phòng khám đã tồn tại.');
   }
 
   async assertDoctorExists(doctorId: string): Promise<void> {
-    if (!(await this.repo.doctorExists(doctorId))) throw new NotFoundException('Doctor profile not found');
+    if (!(await this.repo.doctorExists(doctorId))) throw new NotFoundException('Không tìm thấy hồ sơ bác sĩ.');
   }
 }

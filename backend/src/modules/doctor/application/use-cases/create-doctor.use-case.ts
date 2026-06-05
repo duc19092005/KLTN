@@ -17,15 +17,15 @@ export class CreateDoctorUseCase {
 
   async execute(dto: CreateDoctorDto) {
     const staff = await this.repo.findStaffForDoctorCreate(dto.staffProfileId);
-    if (!staff) throw new NotFoundException('Staff profile not found');
-    if (staff.userRole !== UserRole.DOCTOR) throw new BadRequestException('Staff user role must be DOCTOR');
-    if (staff.hasDoctorProfile) throw new ConflictException('Doctor profile already exists for this staff');
+    if (!staff) throw new NotFoundException('Không tìm thấy hồ sơ nhân sự.');
+    if (staff.userRole !== UserRole.DOCTOR) throw new BadRequestException('Nhân sự phải có vai trò bác sĩ.');
+    if (staff.hasDoctorProfile) throw new ConflictException('Nhân sự này đã có hồ sơ bác sĩ.');
 
     if (staff.departmentId) {
       const dept = await this.repo.findDepartment(staff.departmentId);
       if (dept) {
         if (dept.type !== 'CLINICAL') {
-          throw new BadRequestException('Doctor can only be assigned to a CLINICAL department');
+          throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng ban lâm sàng.');
         }
         if (dept.specialty && dept.specialty !== dto.specialty) {
           throw new BadRequestException(`Bác sĩ chuyên khoa "${dto.specialty}" không thể được xếp vào phòng ban chuyên khoa "${dept.specialty}"`);
@@ -34,7 +34,7 @@ export class CreateDoctorUseCase {
     }
 
     const license = await this.repo.findDoctorByLicense(dto.licenseNumber);
-    if (license) throw new ConflictException('License number already exists');
+    if (license) throw new ConflictException('Số chứng chỉ hành nghề đã tồn tại.');
 
     const doctor = await this.repo.createForExistingStaff(dto);
     await this.integrity.anchorChange(doctor, 'CREATE', undefined, null);

@@ -191,7 +191,7 @@ export default function ForgotPasswordPage() {
                       id="username"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      placeholder="Nhập username của bạn..."
+                      placeholder="Nhập tên đăng nhập của bạn..."
                       required
                       type="text"
                       disabled={busy}
@@ -332,16 +332,16 @@ export default function ForgotPasswordPage() {
         <footer className="w-full py-10 bg-[#ffffff] relative z-10 border-t border-[#dee1f8]/30">
           <div className="flex flex-col md:flex-row justify-between items-center px-10 max-w-[1280px] mx-auto gap-6 md:gap-0">
             <div className="flex flex-col items-center md:items-start gap-2">
-              <span className="text-sm font-bold text-[#4656a2]">Medicare Identity</span>
+              <span className="text-sm font-bold text-[#4656a2]">Định danh Y tế</span>
               <p className="text-xs font-semibold text-[#545d82] text-center md:text-left">
-                © 2026 Medicare Identity Blockchain Systems. All rights reserved.
+                © 2026 Hệ thống Định danh Y tế. Bảo lưu mọi quyền.
               </p>
             </div>
             <nav className="flex flex-wrap justify-center gap-6">
-              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Privacy Policy</span>
-              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Terms of Service</span>
-              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Security Audit</span>
-              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Support</span>
+              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Chính sách bảo mật</span>
+              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Điều khoản sử dụng</span>
+              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Kiểm toán bảo mật</span>
+              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Hỗ trợ</span>
             </nav>
           </div>
         </footer>

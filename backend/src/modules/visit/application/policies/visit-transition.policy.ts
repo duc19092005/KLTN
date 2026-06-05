@@ -25,13 +25,13 @@ export class VisitTransitionPolicy {
   ensureCanCancel(visit: VisitEntity, user?: AuthUser): void {
     if (!user || user.role === UserRole.ADMIN) return;
     if (user.role === UserRole.RECEPTIONIST && visit.status !== VisitStatus.WAITING) {
-      throw new BadRequestException('Receptionist can only cancel visits before examination starts');
+      throw new BadRequestException('Lễ tân chỉ có thể hủy lượt khám trước khi bắt đầu khám.');
     }
     if (
       user.role === UserRole.DOCTOR &&
       !([VisitStatus.WAITING, VisitStatus.IN_PROGRESS] as VisitStatus[]).includes(visit.status)
     ) {
-      throw new BadRequestException('Doctor can only cancel visits before test orders/results are created');
+      throw new BadRequestException('Bác sĩ chỉ có thể hủy lượt khám trước khi tạo chỉ định hoặc có kết quả.');
     }
   }
 
@@ -41,7 +41,7 @@ export class VisitTransitionPolicy {
    */
   assertTransitionAllowed(current: VisitStatus, next: VisitStatus): void {
     if (current === VisitStatus.COMPLETED || current === VisitStatus.CANCELLED) {
-      throw new BadRequestException('Cannot update a completed/cancelled visit');
+      throw new BadRequestException('Không thể cập nhật lượt khám đã hoàn tất hoặc đã hủy.');
     }
     if (next !== current && !ALLOWED_VISIT_TRANSITIONS[current].includes(next)) {
       throw new BadRequestException(`Không thể chuyển trạng thái lượt khám từ ${current} sang ${next}`);

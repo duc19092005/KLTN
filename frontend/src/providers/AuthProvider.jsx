@@ -53,7 +53,7 @@ export function AuthProvider({ children }) {
       return { success: true, ...response.data };
     } catch (err) {
       clearSession();
-      return { success: false, error: err.response?.data?.message || 'Wallet login failed' };
+      return { success: false, error: err.response?.data?.message || 'Đăng nhập bằng ví thất bại.' };
     } finally {
       setLoading(false);
     }
@@ -67,7 +67,7 @@ export function AuthProvider({ children }) {
       return { success: true, user: response.data.user };
     } catch (err) {
       clearSession();
-      return { success: false, error: err.response?.data?.message || 'Invalid invite token' };
+      return { success: false, error: err.response?.data?.message || 'Mã mời không hợp lệ.' };
     } finally {
       setLoading(false);
     }
@@ -81,7 +81,7 @@ export function AuthProvider({ children }) {
       return { success: true, ...response.data };
     } catch (err) {
       clearSession();
-      return { success: false, error: err.response?.data?.message || 'Invalid credentials' };
+      return { success: false, error: err.response?.data?.message || 'Tên đăng nhập hoặc mật khẩu không đúng.' };
     } finally {
       setLoading(false);
     }

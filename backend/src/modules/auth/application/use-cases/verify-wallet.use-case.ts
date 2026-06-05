@@ -28,16 +28,16 @@ export class VerifyWalletUseCase {
     const user = await this.lookup.getAdminUser(userId);
 
     if (!user.firstLogin) {
-      throw new ForbiddenException('Wallet binding is only available during first admin setup');
+      throw new ForbiddenException('Chỉ có thể liên kết ví trong lần thiết lập quản trị đầu tiên.');
     }
     if (!user.faceEmbedding) {
-      throw new UnauthorizedException('Please register face before binding wallet');
+      throw new UnauthorizedException('Vui lòng đăng ký khuôn mặt trước khi liên kết ví.');
     }
     if (
       user.adminProfile!.walletAddress &&
       user.adminProfile!.walletAddress.toLowerCase() !== walletAddress.toLowerCase()
     ) {
-      throw new UnauthorizedException('Wallet address does not match registered address');
+      throw new UnauthorizedException('Địa chỉ ví không khớp với ví đã đăng ký.');
     }
 
     await this.walletChallenge.consume(user.adminProfile!, walletAddress, signature, message, WALLET_PURPOSE_BIND, user.id);

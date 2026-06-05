@@ -15,8 +15,8 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('trả về trạng thái hoạt động của hệ thống', () => {
+      expect(appController.getHello()).toBe('Hệ thống bệnh viện đang hoạt động.');
     });
   });
 });

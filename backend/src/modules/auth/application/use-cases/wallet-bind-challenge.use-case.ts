@@ -22,21 +22,21 @@ export class WalletBindChallengeUseCase {
     const user = await this.lookup.getAdminUser(userId);
 
     if (!user.firstLogin) {
-      throw new ForbiddenException('Wallet binding is only available during first admin setup');
+      throw new ForbiddenException('Chỉ có thể liên kết ví trong lần thiết lập quản trị đầu tiên.');
     }
     if (!user.faceEmbedding) {
-      throw new UnauthorizedException('Please register face before binding wallet');
+      throw new UnauthorizedException('Vui lòng đăng ký khuôn mặt trước khi liên kết ví.');
     }
     if (
       user.adminProfile!.walletAddress &&
       user.adminProfile!.walletAddress.toLowerCase() !== walletAddress.toLowerCase()
     ) {
-      throw new UnauthorizedException('Wallet address does not match registered address');
+      throw new UnauthorizedException('Địa chỉ ví không khớp với ví đã đăng ký.');
     }
 
     const existingWallet = await this.repo.findAdminByWalletExcludingUser(walletAddress, userId);
     if (existingWallet) {
-      throw new UnauthorizedException('Wallet is already bound to another admin');
+      throw new UnauthorizedException('Ví này đã được liên kết với quản trị viên khác.');
     }
 
     return this.walletChallenge.create(user.adminProfile!.id, walletAddress, WALLET_PURPOSE_BIND, user.id);

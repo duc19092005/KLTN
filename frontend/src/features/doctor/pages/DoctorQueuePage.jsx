@@ -306,7 +306,6 @@ export default function DoctorQueuePage() {
                     onClick={() => handleRateModel(true)}
                     className="flex flex-col items-center justify-center py-4 px-3 rounded-2xl border border-emerald-100 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-800 font-bold transition-all text-xs gap-1.5 active:scale-95"
                   >
-                    <span className="text-2xl">😊</span>
                     Hài lòng (Có)
                   </button>
                   <button
@@ -318,7 +317,6 @@ export default function DoctorQueuePage() {
                     }}
                     className="flex flex-col items-center justify-center py-4 px-3 rounded-2xl border border-rose-100 bg-rose-50/50 hover:bg-rose-50 text-rose-800 font-bold transition-all text-xs gap-1.5 active:scale-95"
                   >
-                    <span className="text-2xl">😞</span>
                     Không chính xác
                   </button>
                 </div>
@@ -563,7 +561,7 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
       step: 2,
       eyebrow: 'Bước 02',
       title: 'Đọc kết quả & tham vấn AI',
-      desc: 'Kiểm tra file Lab trả về, sau đó chạy AI nếu cần hỗ trợ phân tích.',
+      desc: 'Kiểm tra tệp kết quả trả về, sau đó chạy AI nếu cần hỗ trợ phân tích.',
       status: pendingOrders.length ? `Còn ${pendingOrders.length} phiếu đang xử lý` : readyOrders.length ? `${readyOrders.length} phiếu có kết quả` : 'Chưa có kết quả',
       tone: 'violet',
       enabled: canReviewResults,
@@ -865,7 +863,7 @@ function ResultsPanel({ orders }) {
                                   const dl = await medicalOrderService.getResultFileDownloadUrl(f.id);
                                   if (dl.data?.url) window.open(dl.data.url, '_blank', 'noopener,noreferrer');
                                 } catch {
-                                  toast.error('Không tải được file kết quả hoặc bạn không có quyền truy cập.');
+	                                  toast.error('Không tải được tệp kết quả hoặc bạn không có quyền truy cập.');
                                 }
                               }}
                               className="flex items-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 px-3 py-2 rounded-lg border border-blue-100 hover:bg-blue-100 transition-colors"
@@ -904,8 +902,8 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
         </div>
         <div className="flex flex-col sm:flex-row gap-2 xl:min-w-[520px]">
           <select value={selectedAiModelId} onChange={(e) => setSelectedAiModelId(e.target.value)} disabled={busy} className="flex-1 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:opacity-50 transition-all">
-            <option value="">-- Chọn AI model --</option>
-            {aiModels.map((model) => <option key={model.id} value={model.id}>{model.modelName || model.name || 'AI Model'} {model.modelVersion ? `(${model.modelVersion})` : ''} - {model.provider || 'other'}</option>)}
+	            <option value="">-- Chọn mô hình AI --</option>
+	            {aiModels.map((model) => <option key={model.id} value={model.id}>{model.modelName || model.name || 'Mô hình AI'} {model.modelVersion ? `(${model.modelVersion})` : ''} - {model.provider || 'khác'}</option>)}
           </select>
           <button type="button" onClick={onGenerate} disabled={busy || !selectedAiModelId} className="rounded-xl bg-indigo-600 px-5 py-3 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-indigo-600/25 hover:bg-indigo-700 disabled:opacity-50 disabled:shadow-none whitespace-nowrap transition-all flex items-center justify-center gap-2">
             {busy ? (<><LoadingIndicator size="sm" /><span>Đang phân tích...</span></>) : (`Chạy ${selectedModel?.provider || 'AI'}`)}
@@ -930,7 +928,7 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
                       <span className="rounded-lg bg-indigo-50 px-2 py-1 text-[10px] font-black uppercase text-indigo-700 border border-indigo-100">{parsed.provider || diagnosis.aiModel?.provider || 'AI'}</span>
                       <span className="text-[10px] font-bold text-slate-400">{formatTime(diagnosis.createdAt)}</span>
                     </div>
-                    <strong className="mt-2 block text-xs font-black text-slate-900">{parsed.modelName || diagnosis.aiModel?.modelName || 'AI Model'}</strong>
+	                    <strong className="mt-2 block text-xs font-black text-slate-900">{parsed.modelName || diagnosis.aiModel?.modelName || 'Mô hình AI'}</strong>
                     <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-relaxed text-slate-500">{parsed.summary || 'Bản phân tích AI đã được lưu.'}</p>
                   </button>
                 );
@@ -942,8 +940,8 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-indigo-100 pb-4">
               <div>
 
-                <h4 className="mt-1 text-lg font-black text-slate-950">{parsedResult.modelName || currentDiagnosis?.aiModel?.modelName || 'AI Model'}</h4>
-                <p className="mt-1 text-[11px] font-semibold text-slate-500">Provider: {parsedResult.provider || currentDiagnosis?.aiModel?.provider || 'other'} · {currentDiagnosis?.createdAt ? new Date(currentDiagnosis.createdAt).toLocaleString('vi-VN') : 'N/A'}</p>
+	                <h4 className="mt-1 text-lg font-black text-slate-950">{parsedResult.modelName || currentDiagnosis?.aiModel?.modelName || 'Mô hình AI'}</h4>
+	                <p className="mt-1 text-[11px] font-semibold text-slate-500">Nền tảng: {parsedResult.provider || currentDiagnosis?.aiModel?.provider || 'khác'} · {currentDiagnosis?.createdAt ? new Date(currentDiagnosis.createdAt).toLocaleString('vi-VN') : 'N/A'}</p>
               </div>
               <span className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-[10px] font-black text-emerald-700">Đã lưu DB</span>
             </div>
@@ -961,7 +959,7 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
             {!parsedResult.summary && currentDiagnosis?.result && <div className="whitespace-pre-wrap rounded-xl border border-white bg-white/80 p-4 text-xs font-medium leading-relaxed text-slate-700">{currentDiagnosis.result}</div>}
           </section>
         </div>
-      ) : (<Empty title="Chưa có phân tích AI" desc="Chọn Gemini, ChatGPT/OpenAI hoặc model khác rồi bấm chạy để lưu bản phân tích đầu tiên." />)}
+      ) : (<Empty title="Chưa có phân tích AI" desc="Chọn Gemini, ChatGPT/OpenAI hoặc mô hình khác rồi bấm chạy để lưu bản phân tích đầu tiên." />)}
     </div>
   );
 }

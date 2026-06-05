@@ -28,11 +28,11 @@ export class MedicalOrderAccessPolicy {
 
     if (user.role === UserRole.LAB_MANAGER) {
       const staff = await resolveStaff();
-      if (!staff.departmentId) throw new ForbiddenException('LAB_MANAGER staff profile is not assigned to any department');
+      if (!staff.departmentId) throw new ForbiddenException('Tài khoản trưởng khoa chưa được gán phòng ban.');
       return { targetDepartmentId: staff.departmentId };
     }
 
-    throw new ForbiddenException('User role is not allowed to access medical orders');
+    throw new ForbiddenException('Vai trò hiện tại không được phép truy cập phiếu chỉ định.');
   }
 
   /** Manage (update status / create result / upload files) authorization. */
@@ -44,13 +44,13 @@ export class MedicalOrderAccessPolicy {
     if (user.role === UserRole.ADMIN) return;
 
     if (user.role !== UserRole.LAB_MANAGER) {
-      throw new ForbiddenException('Only ADMIN or LAB_MANAGER can update/upload results for medical orders');
+      throw new ForbiddenException('Chỉ quản trị viên hoặc trưởng khoa được cập nhật/tải kết quả phiếu chỉ định.');
     }
 
     const staff = await resolveStaff();
-    if (!staff.departmentId) throw new ForbiddenException('LAB_MANAGER staff profile is not assigned to any department');
+    if (!staff.departmentId) throw new ForbiddenException('Tài khoản trưởng khoa chưa được gán phòng ban.');
     if (!order.targetDepartmentId || order.targetDepartmentId !== staff.departmentId) {
-      throw new ForbiddenException('LAB_MANAGER can only process medical orders assigned to their department');
+      throw new ForbiddenException('Trưởng khoa chỉ được xử lý phiếu chỉ định thuộc phòng ban của mình.');
     }
   }
 
@@ -65,7 +65,7 @@ export class MedicalOrderAccessPolicy {
     if (user.role === UserRole.DOCTOR) {
       const doctorId = await resolvers.resolveDoctorId();
       if (order.doctorId !== doctorId) {
-        throw new ForbiddenException('Doctor can only access result files of their own visits');
+        throw new ForbiddenException('Bác sĩ chỉ được truy cập file kết quả của lượt khám do mình phụ trách.');
       }
       return;
     }
@@ -75,6 +75,6 @@ export class MedicalOrderAccessPolicy {
       return;
     }
 
-    throw new ForbiddenException('User role is not allowed to access result files');
+    throw new ForbiddenException('Vai trò hiện tại không được phép truy cập file kết quả.');
   }
 }

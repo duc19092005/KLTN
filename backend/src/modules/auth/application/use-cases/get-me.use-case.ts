@@ -13,7 +13,7 @@ export class GetMeUseCase {
 
   async execute(userId: string, verified: boolean) {
     const user = await this.repo.findUserWithProfile(userId);
-    if (!user) throw new UnauthorizedException('User not found');
+    if (!user) throw new UnauthorizedException('Không tìm thấy tài khoản.');
 
     const isVerified = Boolean(verified) && user.status === 'ACTIVE' && !user.firstLogin;
     return { user: toPublicUser(user, isVerified) };

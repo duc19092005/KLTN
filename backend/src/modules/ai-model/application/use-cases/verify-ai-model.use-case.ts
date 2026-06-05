@@ -16,7 +16,7 @@ export class VerifyAiModelUseCase {
   /** Verify a single AI model's integrity against the on-chain hash. */
   async verifyOne(id: string) {
     const model = await this.repo.findById(id);
-    if (!model) throw new NotFoundException('AI model not found');
+    if (!model) throw new NotFoundException('Không tìm thấy mô hình AI.');
     return this.integrity.evaluate(model);
   }
 

@@ -45,7 +45,7 @@ export class WalletChallengeService {
       adminProfile.nonceExpiresAt < now ||
       adminProfile.noncePurpose !== purpose
     ) {
-      throw new UnauthorizedException('Invalid or expired wallet challenge');
+      throw new UnauthorizedException('Yêu cầu xác thực ví không hợp lệ hoặc đã hết hạn.');
     }
 
     const expectedMessage = buildWalletMessage(
@@ -56,14 +56,14 @@ export class WalletChallengeService {
       userId,
     );
     if (message !== expectedMessage) {
-      throw new UnauthorizedException('Invalid wallet challenge message');
+      throw new UnauthorizedException('Nội dung xác thực ví không hợp lệ.');
     }
 
     verifyWalletSignature(message, signature, walletAddress);
 
     const count = await this.repo.consumeWalletNonce(adminProfile.id, adminProfile.nonce, purpose, now);
     if (count !== 1) {
-      throw new UnauthorizedException('Wallet challenge has already been used');
+      throw new UnauthorizedException('Yêu cầu xác thực ví đã được sử dụng.');
     }
   }
 }

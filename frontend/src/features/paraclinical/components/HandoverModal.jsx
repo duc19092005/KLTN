@@ -206,7 +206,7 @@ export default function HandoverModal({ isOpen, onClose, currentStaff, clinicalR
                   Ca trực đã được chuyển sang <span className="font-black text-emerald-700">{selectedStaffInfo?.fullName}</span>.
                 </p>
                 <p className="text-xs font-bold text-cyan-600 mt-1">
-                  ⛓ Sự kiện đã được neo bất biến lên chuỗi khối
+                  Sự kiện đã được neo bất biến lên chuỗi khối
                 </p>
               </div>
               <button onClick={handleClose} className="rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-black text-white hover:bg-emerald-700">

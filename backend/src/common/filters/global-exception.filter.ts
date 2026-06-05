@@ -8,16 +8,17 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest();
     const status = exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
     const exceptionResponse = exception instanceof HttpException ? exception.getResponse() : null;
-    const message = typeof exceptionResponse === 'object' && exceptionResponse && 'message' in exceptionResponse
+    const rawMessage = typeof exceptionResponse === 'object' && exceptionResponse && 'message' in exceptionResponse
       ? (exceptionResponse as any).message
-      : exception instanceof Error
+      : exception instanceof Error && status < HttpStatus.INTERNAL_SERVER_ERROR
         ? exception.message
-        : 'Internal server error';
+        : 'Lỗi máy chủ nội bộ.';
+    const message = Array.isArray(rawMessage) ? rawMessage.join(' ') : rawMessage;
 
     response.status(status).json({
       success: false,
       statusCode: status,
-      message,
+      message: message || 'Yêu cầu không hợp lệ.',
       path: request.url,
       timestamp: new Date().toISOString(),
     });

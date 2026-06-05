@@ -25,7 +25,7 @@ export default function LabManagerDashboardPage() {
         const res = await medicalOrderService.list({});
         if (mounted) setOrders(getItems(res.data));
       } catch (err) {
-        if (mounted) toast.error(err.response?.data?.message || 'Không tải được thống kê Lab');
+        if (mounted) toast.error(err.response?.data?.message || 'Không tải được thống kê cận lâm sàng');
       } finally { if (mounted) setLoading(false); }
     }
     load();
@@ -52,7 +52,7 @@ export default function LabManagerDashboardPage() {
       <div className="max-w-7xl mx-auto space-y-4">
         <section className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div><p className="text-[10px] uppercase tracking-[0.18em] font-black text-emerald-600">Lab Dashboard</p><h1 className="mt-1 text-2xl font-black text-slate-950">Tổng quan CLS</h1></div>
+            <div><p className="text-[10px] uppercase tracking-[0.18em] font-black text-emerald-600">Bảng điều khiển CLS</p><h1 className="mt-1 text-2xl font-black text-slate-950">Tổng quan CLS</h1></div>
             <button onClick={() => navigate('/lab-manager/orders')} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-700">Xử lý phiếu</button>
           </div>
         </section>
@@ -63,11 +63,11 @@ export default function LabManagerDashboardPage() {
           </section>
           <section className="grid grid-cols-1 xl:grid-cols-2 gap-5">
             <ChartCard title="Trạng thái phiếu"><StatusChart rows={analytics.statuses} /></ChartCard>
-            <ChartCard title="Top chỉ định"><TypeChart rows={analytics.types} /></ChartCard>
+            <ChartCard title="Chỉ định nhiều nhất"><TypeChart rows={analytics.types} /></ChartCard>
           </section>
           <section className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Shortcut title="Phiếu CLS" desc="Nhận xử lý, upload kết quả." onClick={() => navigate('/lab-manager/orders')} />
-            <Shortcut title="Kết quả" desc="Tra cứu file đã trả." onClick={() => navigate('/lab-manager/results')} />
+            <Shortcut title="Phiếu CLS" desc="Nhận xử lý, tải lên kết quả." onClick={() => navigate('/lab-manager/orders')} />
+            <Shortcut title="Kết quả" desc="Tra cứu tệp đã trả." onClick={() => navigate('/lab-manager/results')} />
           </section>
         </>}
       </div>

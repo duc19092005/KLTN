@@ -80,7 +80,7 @@ export default function ParaclinicalDashboardPage() {
               onClick={() => setShowHandover(true)}
               className="rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 px-6 py-3 text-sm font-black text-white shadow-lg hover:shadow-xl hover:from-orange-600 hover:to-red-600 transition-all animate-pulse"
             >
-              🔄 Bàn Giao Ca Trực
+              Bàn Giao Ca Trực
             </button>
           </div>
         </section>
@@ -89,11 +89,11 @@ export default function ParaclinicalDashboardPage() {
         <section className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-[10px] uppercase tracking-[0.18em] font-black text-emerald-600">Dashboard CLS</p>
+              <p className="text-[10px] uppercase tracking-[0.18em] font-black text-emerald-600">Bảng điều khiển CLS</p>
               <h1 className="mt-1 text-2xl font-black text-slate-950">Tổng quan cận lâm sàng</h1>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => navigate('/lab-manager/shifts')} className="rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-2.5 text-xs font-black text-cyan-700 hover:bg-cyan-100">📅 Lịch trực</button>
+              <button onClick={() => navigate('/lab-manager/shifts')} className="rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-2.5 text-xs font-black text-cyan-700 hover:bg-cyan-100">Lịch trực</button>
               <button onClick={() => navigate('/lab-manager/orders')} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-700">Xử lý phiếu</button>
             </div>
           </div>
@@ -109,8 +109,8 @@ export default function ParaclinicalDashboardPage() {
           </section>
           <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Shortcut title="Lịch trực" desc="Xem và đăng ký ca trực." onClick={() => navigate('/lab-manager/shifts')} />
-            <Shortcut title="Phiếu CLS" desc="Nhận xử lý, upload kết quả." onClick={() => navigate('/lab-manager/orders')} />
-            <Shortcut title="Kết quả" desc="Tra cứu file đã trả." onClick={() => navigate('/lab-manager/results')} />
+            <Shortcut title="Phiếu CLS" desc="Nhận xử lý, tải lên kết quả." onClick={() => navigate('/lab-manager/orders')} />
+            <Shortcut title="Kết quả" desc="Tra cứu tệp đã trả." onClick={() => navigate('/lab-manager/results')} />
           </section>
         </>}
       </div>

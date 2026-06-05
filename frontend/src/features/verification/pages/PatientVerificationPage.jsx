@@ -5,6 +5,13 @@ import { API_URL } from '../../../utils/constants';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { LoginPage } from '../../auth';
 
+function genderLabel(value) {
+  if (value === 'MALE' || value === 'Nam') return 'Nam';
+  if (value === 'FEMALE' || value === 'Nữ') return 'Nữ';
+  if (value === 'OTHER' || value === 'Khác') return 'Khác';
+  return value || 'Chưa rõ';
+}
+
 export default function PatientVerificationPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -89,7 +96,7 @@ export default function PatientVerificationPage() {
             className="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary flex items-center gap-2 cursor-pointer"
           >
             <span className="material-symbols-outlined fill" style={{ fontVariationSettings: "'FILL' 1" }}>health_and_safety</span>
-            Medicare Identity
+            Định danh Y tế
           </div>
           {/* Desktop Nav */}
           {/* Actions */}
@@ -99,13 +106,13 @@ export default function PatientVerificationPage() {
               className="hidden md:flex items-center gap-2 bg-primary text-on-primary font-label-md text-label-md px-6 py-2.5 rounded-lg hover:translate-y-[-1px] shadow-[0px_4px_12px_rgba(70,86,162,0.2)] transition-all font-bold"
             >
               <span className="material-symbols-outlined text-[18px]">login</span>
-              Đăng nhập Staff
+              Đăng nhập nhân sự
             </button>
             {/* Mobile Login Toggle */}
             <button 
               onClick={() => setSearchParams({ login: 'true', tab: 'staff' })}
               className="md:hidden text-primary flex items-center justify-center p-2 rounded-full hover:bg-slate-100"
-              title="Đăng nhập Staff"
+              title="Đăng nhập nhân sự"
             >
               <span className="material-symbols-outlined text-[24px]">login</span>
             </button>
@@ -187,7 +194,7 @@ export default function PatientVerificationPage() {
                   <div className="flex gap-4 text-xs font-semibold text-[#424752] mt-1">
                     <span>Mã số: <strong className="text-[#003f87]">{data.patient.patientCode}</strong></span>
                     <span>•</span>
-                    <span>Giới tính: <strong>{data.patient.gender === 'MALE' ? 'Nam' : 'Nữ'}</strong></span>
+                    <span>Giới tính: <strong>{genderLabel(data.patient.gender)}</strong></span>
                     <span>•</span>
                     <span>Sinh: <strong>{new Date(data.patient.dateOfBirth).toLocaleDateString('vi-VN')}</strong></span>
                   </div>
@@ -236,19 +243,19 @@ export default function PatientVerificationPage() {
                           {verification.status === 'verified' && (
                             <span className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold rounded-full flex items-center gap-1.5 shadow-sm">
                               <span className="material-symbols-outlined fill text-[14px]">check_circle</span>
-                              Verified (Đúng khớp Blockchain)
+                              Đã xác thực (khớp blockchain)
                             </span>
                           )}
                           {verification.status === 'tampered' && (
                             <span className="px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-full flex items-center gap-1.5 animate-pulse shadow-sm shadow-rose-100">
                               <span className="material-symbols-outlined fill text-[14px]">gpp_maybe</span>
-                              TAMPERED (CẢNH BÁO BỊ SỬA!)
+                              Bị sửa đổi (cảnh báo toàn vẹn)
                             </span>
                           )}
                           {verification.status === 'unanchored' && (
                             <span className="px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold rounded-full flex items-center gap-1.5">
                               <span className="material-symbols-outlined text-[14px]">hourglass_empty</span>
-                              Unanchored (Đang đợi neo)
+                              Chưa neo (đang chờ blockchain)
                             </span>
                           )}
                         </div>
@@ -302,7 +309,7 @@ export default function PatientVerificationPage() {
                                   {visit.aiDiagnosis.imageUrl && (
                                     <img
                                       src={visit.aiDiagnosis.imageUrl}
-                                      alt="Dermatology Scan"
+                                      alt="Ảnh quét da liễu"
                                       className="w-16 h-16 rounded-xl object-cover border border-slate-200 shadow-sm"
                                     />
                                   )}
@@ -352,25 +359,25 @@ export default function PatientVerificationPage() {
                               <div className="mt-3 p-5 bg-[#1e293b] text-slate-300 font-mono text-[11px] rounded-xl space-y-2 border border-slate-800 overflow-x-auto shadow-inner">
                                 <p className="text-[#38bdf8] font-bold border-b border-slate-800 pb-1.5 mb-3 flex items-center gap-1.5">
                                   <span className="material-symbols-outlined text-[16px] text-[#38bdf8]">account_tree</span>
-                                  ⛓️ BẰNG CHỨNG MẬT MÃ TRÊN BLOCKCHAIN (MERKLE PROOF)
+                                  BẰNG CHỨNG MẬT MÃ TRÊN BLOCKCHAIN (BẰNG CHỨNG MERKLE)
                                 </p>
                                 <p>
-                                  <span className="text-slate-500">Contract Address:</span> {API_URL.includes('localhost') ? '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9' : 'AUDIT_ANCHOR'}
+                                  <span className="text-slate-500">Địa chỉ hợp đồng:</span> {API_URL.includes('localhost') ? '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9' : 'AUDIT_ANCHOR'}
                                 </p>
                                 <p>
-                                  <span className="text-slate-500">Batch ID:</span> {verification.proofDetails.batchId}
+                                  <span className="text-slate-500">Mã lô:</span> {verification.proofDetails.batchId}
                                 </p>
                                 <p>
-                                  <span className="text-slate-500">Sequence No (seq):</span> {verification.proofDetails.seq}
+                                  <span className="text-slate-500">Số thứ tự (seq):</span> {verification.proofDetails.seq}
                                 </p>
                                 <p>
-                                  <span className="text-slate-500">Local Entry Hash:</span> {verification.proofDetails.entryHash}
+                                  <span className="text-slate-500">Hash bản ghi cục bộ:</span> {verification.proofDetails.entryHash}
                                 </p>
                                 <p>
-                                  <span className="text-slate-500">On-Chain Merkle Root:</span> {verification.proofDetails.onChainRoot}
+                                  <span className="text-slate-500">Root Merkle trên chuỗi:</span> {verification.proofDetails.onChainRoot}
                                 </p>
                                 <div>
-                                  <span className="text-slate-500">Merkle Path (proof):</span>
+                                  <span className="text-slate-500">Đường dẫn Merkle:</span>
                                   <ul className="list-disc pl-5 mt-1.5 space-y-1 text-slate-400">
                                     {verification.proofDetails.proof.map((pHash, idx) => (
                                       <li key={idx} className="break-all">{pHash}</li>
@@ -379,7 +386,7 @@ export default function PatientVerificationPage() {
                                 </div>
                                 <div className="text-emerald-400 font-bold mt-3 pt-2.5 border-t border-slate-800 flex items-center gap-1.5">
                                   <span className="material-symbols-outlined text-[16px] text-emerald-400">verified</span>
-                                  ✓ Trạng thái Smart Contract: Verified &amp; Anchored (Tính toàn vẹn tuyệt đối)
+                                  Trạng thái hợp đồng thông minh: đã xác thực và đã neo (toàn vẹn tuyệt đối)
                                 </div>
                               </div>
                             )}
@@ -403,7 +410,7 @@ export default function PatientVerificationPage() {
             className="font-label-md text-label-md font-bold text-primary flex items-center gap-2 cursor-pointer"
           >
             <span className="material-symbols-outlined fill" style={{ fontVariationSettings: "'FILL' 1" }}>health_and_safety</span>
-            Medicare Identity
+            Định danh Y tế
           </div>
           <div className="flex flex-wrap justify-center gap-6 font-caption text-caption text-on-surface-variant dark:text-outline-variant font-semibold">
             <a className="hover:text-primary dark:hover:text-primary-fixed underline transition-opacity duration-200" href="#" onClick={(e) => e.preventDefault()}>Chính sách bảo mật</a>
@@ -412,7 +419,7 @@ export default function PatientVerificationPage() {
             <a className="hover:text-primary dark:hover:text-primary-fixed underline transition-opacity duration-200" href="#" onClick={(e) => e.preventDefault()}>Hỗ trợ</a>
           </div>
           <div className="font-caption text-caption text-secondary dark:text-secondary-fixed font-semibold">
-            © 2026 Medicare Identity Blockchain Systems. Tất cả các quyền được bảo lưu.
+            © 2026 Hệ thống Blockchain Định danh Y tế. Tất cả các quyền được bảo lưu.
           </div>
         </div>
       </footer>

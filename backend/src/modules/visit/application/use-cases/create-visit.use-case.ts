@@ -12,16 +12,16 @@ export class CreateVisitUseCase {
   constructor(@Inject(VISIT_REPOSITORY) private readonly repo: VisitRepositoryPort) {}
 
   async execute(dto: CreateVisitDto): Promise<unknown> {
-    if (!dto.patientId && !dto.patient) throw new BadRequestException('patientId or patient is required');
+    if (!dto.patientId && !dto.patient) throw new BadRequestException('Vui lòng chọn bệnh nhân hoặc nhập thông tin bệnh nhân mới.');
 
     const room = await this.repo.findRoomWithDoctor(dto.clinicalRoomId);
-    if (!room) throw new NotFoundException('Clinical room not found');
+    if (!room) throw new NotFoundException('Không tìm thấy phòng khám.');
 
     const doctor = await this.repo.findDoctorProfileById(dto.doctorId);
-    if (!doctor) throw new NotFoundException('Doctor profile not found');
+    if (!doctor) throw new NotFoundException('Không tìm thấy hồ sơ bác sĩ.');
 
     if (room.doctorId && room.doctorId !== dto.doctorId) {
-      throw new BadRequestException('Selected doctor is not assigned to this clinical room');
+      throw new BadRequestException('Bác sĩ được chọn không phụ trách phòng khám này.');
     }
 
     return this.repo.createVisitWithOptionalPatient({

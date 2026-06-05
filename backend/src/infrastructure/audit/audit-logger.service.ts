@@ -186,13 +186,13 @@ export class AuditLoggerService {
     let expectedSeq = 1;
     for (const row of rows) {
       if (row.seq !== expectedSeq) {
-        const reason = `Sequence gap: expected ${expectedSeq}, got ${row.seq}`;
-        await this.anchor.sendTelegramAlert('Phát hiện đứt gãy chuỗi Log (Verify Chain)', reason, row.seq);
+        const reason = `Đứt quãng số thứ tự: mong đợi ${expectedSeq}, nhận được ${row.seq}`;
+        await this.anchor.sendTelegramAlert('Phát hiện đứt gãy chuỗi nhật ký (kiểm tra chuỗi)', reason, row.seq);
         return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason };
       }
       if (row.prevHash !== expectedPrev) {
-        const reason = 'prevHash does not match previous entryHash (row inserted/removed/reordered)';
-        await this.anchor.sendTelegramAlert('Phát hiện đứt gãy chuỗi Log (Verify Chain)', reason, row.seq);
+        const reason = 'prevHash không khớp entryHash liền trước; bản ghi có thể đã bị chèn, xóa hoặc sắp xếp lại';
+        await this.anchor.sendTelegramAlert('Phát hiện đứt gãy chuỗi nhật ký (kiểm tra chuỗi)', reason, row.seq);
         return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason };
       }
       const recomputed = computeEntryHash(
@@ -208,8 +208,8 @@ export class AuditLoggerService {
         row.prevHash ?? GENESIS_PREV_HASH,
       );
       if (recomputed !== row.entryHash) {
-        const reason = 'entryHash mismatch (row content was altered)';
-        await this.anchor.sendTelegramAlert('Phát hiện đứt gãy chuỗi Log (Verify Chain)', reason, row.seq);
+        const reason = 'entryHash không khớp; nội dung bản ghi có thể đã bị sửa';
+        await this.anchor.sendTelegramAlert('Phát hiện đứt gãy chuỗi nhật ký (kiểm tra chuỗi)', reason, row.seq);
         return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason };
       }
       expectedPrev = row.entryHash!;

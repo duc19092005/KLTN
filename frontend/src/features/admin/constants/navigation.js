@@ -4,7 +4,7 @@ export const ADMIN_NAV_ITEMS = [
   { id: 'staff', label: 'Nhân sự', icon: 'users' },
   { id: 'doctors', label: 'Bác sĩ', icon: 'stethoscope' },
   { id: 'clinicalRooms', label: 'Phòng khám', icon: 'building' },
-  { id: 'aiModels', label: 'Model AI', icon: 'activity' },
+  { id: 'aiModels', label: 'Mô hình AI', icon: 'activity' },
   { id: 'audit', label: 'Nhật ký', icon: 'shield' },
   { id: 'profile', label: 'Thông tin cá nhân', icon: 'user' },
 ];

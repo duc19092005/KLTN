@@ -20,7 +20,7 @@ export class GetResultFileDownloadUrlUseCase {
 
   async execute(fileId: string, user: AuthUser) {
     const file = await this.repo.findResultFileWithOrder(fileId);
-    if (!file || !file.order) throw new NotFoundException('Result file not found');
+    if (!file || !file.order) throw new NotFoundException('Không tìm thấy file kết quả.');
 
     await this.accessPolicy.assertCanDownloadResultFile(file.order, user, {
       resolveDoctorId: () => this.resolveDoctorId(user.sub),
@@ -36,13 +36,13 @@ export class GetResultFileDownloadUrlUseCase {
 
   private async resolveDoctorId(userId: string) {
     const doctorId = await this.repo.findDoctorIdByUserId(userId);
-    if (!doctorId) throw new ForbiddenException('Current user does not have doctor profile');
+    if (!doctorId) throw new ForbiddenException('Tài khoản hiện tại không có hồ sơ bác sĩ.');
     return doctorId;
   }
 
   private async resolveStaff(userId: string) {
     const staff = await this.repo.findStaffByUserId(userId);
-    if (!staff) throw new ForbiddenException('Current user does not have staff profile');
+    if (!staff) throw new ForbiddenException('Tài khoản hiện tại không có hồ sơ nhân sự.');
     return staff;
   }
 }

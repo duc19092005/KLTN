@@ -105,14 +105,14 @@ export class HttpAiProviderGateway implements AiProviderGatewayPort {
       const responseJson = this.tryParseJson(responseText);
 
       if (!response.ok) {
-        throw new BadRequestException(`AI provider request failed (${response.status}): ${this.extractProviderError(responseJson, responseText)}`);
+        throw new BadRequestException(`Yêu cầu đến nhà cung cấp AI thất bại (${response.status}): ${this.extractProviderError(responseJson, responseText)}`);
       }
 
       return responseJson || { text: responseText };
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
       const message = error instanceof Error ? error.message : 'Unknown AI provider error';
-      throw new BadRequestException(`AI provider request failed: ${this.truncate(message)}`);
+      throw new BadRequestException(`Yêu cầu đến nhà cung cấp AI thất bại: ${this.truncate(message)}`);
     } finally {
       clearTimeout(timeout);
     }
@@ -120,15 +120,15 @@ export class HttpAiProviderGateway implements AiProviderGatewayPort {
 
   private decryptSecret(encryptedValue: string) {
     const rawKey = process.env.ENCRYPTION_KEY;
-    if (!rawKey) throw new BadRequestException('ENCRYPTION_KEY is not configured');
+    if (!rawKey) throw new BadRequestException('Chưa cấu hình khóa mã hóa ENCRYPTION_KEY.');
 
     const key = Buffer.from(rawKey, 'hex');
-    if (key.length !== 32) throw new BadRequestException('ENCRYPTION_KEY must be 32 bytes hex for AES-256');
+    if (key.length !== 32) throw new BadRequestException('ENCRYPTION_KEY phải là chuỗi hex 32 bytes cho AES-256.');
 
     // Expected format: v1:ivHex:tagHex:cipherHex (AES-256-GCM, authenticated).
-    if (!encryptedValue.startsWith('v1:')) throw new BadRequestException('AI model secret is invalid or uses a legacy format; please re-enter the API key');
+    if (!encryptedValue.startsWith('v1:')) throw new BadRequestException('Khóa bí mật của mô hình AI không hợp lệ hoặc dùng định dạng cũ. Vui lòng nhập lại API key.');
     const [, ivHex, tagHex, cipherHex] = encryptedValue.split(':');
-    if (!ivHex || !tagHex || !cipherHex) throw new BadRequestException('AI model secret is invalid');
+    if (!ivHex || !tagHex || !cipherHex) throw new BadRequestException('Khóa bí mật của mô hình AI không hợp lệ.');
 
     const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
     decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
@@ -141,7 +141,7 @@ export class HttpAiProviderGateway implements AiProviderGatewayPort {
       if (!url.searchParams.has('key')) url.searchParams.set('key', token);
       return url.toString();
     } catch {
-      throw new BadRequestException('Selected Gemini API endpoint is invalid');
+      throw new BadRequestException('Gemini API endpoint đã chọn không hợp lệ.');
     }
   }
 

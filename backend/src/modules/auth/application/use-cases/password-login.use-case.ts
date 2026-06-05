@@ -29,15 +29,15 @@ export class PasswordLoginUseCase {
         reason: user?.role === 'DEPT_SHARED' ? 'dept_shared_wrong_flow' : 'invalid_credentials',
         attemptedIdentity: identity,
       });
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không đúng.');
     }
     if (user.status !== 'ACTIVE') {
       await this.audit.write(user.id, 'LOGIN_FAIL', 'User', user.id, { method: 'PASSWORD', reason: 'inactive_account' });
-      throw new UnauthorizedException('Account is not active');
+      throw new UnauthorizedException('Tài khoản chưa được kích hoạt hoặc đã bị khóa.');
     }
     if (!user.passwordHash || !verifyPassword(password, user.passwordHash)) {
       await this.audit.write(user.id, 'LOGIN_FAIL', 'User', user.id, { method: 'PASSWORD', reason: 'wrong_password' });
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không đúng.');
     }
 
     await this.audit.write(user.id, 'LOGIN_PASSWORD', 'User', user.id, { method: 'PASSWORD', role: user.role });

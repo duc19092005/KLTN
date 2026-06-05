@@ -110,7 +110,7 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
       });
 
       const doctorId = user.staffProfile?.doctorProfile?.id;
-      if (!doctorId) throw new BadRequestException('Doctor profile was not created');
+      if (!doctorId) throw new BadRequestException('Chưa tạo được hồ sơ bác sĩ.');
 
       if (dto.clinicalRoomId) {
         await tx.clinicalRoom.update({ where: { id: dto.clinicalRoomId }, data: { doctorId } });
@@ -138,7 +138,7 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
         const targetRoomId = dto.clinicalRoomId || null;
         if (targetRoomId) {
           const room = await tx.clinicalRoom.findUnique({ where: { id: targetRoomId } });
-          if (!room) throw new NotFoundException('Clinical room not found');
+          if (!room) throw new NotFoundException('Không tìm thấy phòng khám.');
         }
         await tx.clinicalRoom.updateMany({ where: { doctorId: id }, data: { doctorId: null } });
         if (targetRoomId) {
@@ -177,7 +177,7 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
     await this.prisma.$transaction(async (tx) => {
       if (clinicalRoomId) {
         const room = await tx.clinicalRoom.findUnique({ where: { id: clinicalRoomId } });
-        if (!room) throw new NotFoundException('Clinical room not found');
+        if (!room) throw new NotFoundException('Không tìm thấy phòng khám.');
       }
 
       await tx.clinicalRoom.updateMany({ where: { doctorId: id }, data: { doctorId: null } });

@@ -119,7 +119,7 @@ export class BlockchainService implements OnModuleInit {
   async setFaceHash(userId: string, valueBytes32: string) {
     return this.enqueueWrite(async () => {
       if (!this.faceRegistry || !this.superAdminSigner) {
-        return { success: false, error: 'FaceRegistry or Super Admin signer not configured' };
+        return { success: false, error: 'Chưa cấu hình FaceRegistry hoặc khóa ký của Super Admin.' };
       }
       try {
         const key = this.faceKey(userId);
@@ -137,7 +137,7 @@ export class BlockchainService implements OnModuleInit {
   async removeFaceHash(userId: string) {
     return this.enqueueWrite(async () => {
       if (!this.faceRegistry || !this.superAdminSigner) {
-        return { success: false, error: 'FaceRegistry or Super Admin signer not configured' };
+        return { success: false, error: 'Chưa cấu hình FaceRegistry hoặc khóa ký của Super Admin.' };
       }
       try {
         const key = this.faceKey(userId);
@@ -183,7 +183,7 @@ export class BlockchainService implements OnModuleInit {
   async authorizeAdmin(walletAddress: string) {
     return this.enqueueWrite(async () => {
       if (!this.contract || !this.superAdminSigner) {
-        return { success: false, error: 'IdentityRegistry or Super Admin signer not configured' };
+        return { success: false, error: 'Chưa cấu hình IdentityRegistry hoặc khóa ký của Super Admin.' };
       }
       try {
         const normalizedWalletAddress = ethers.getAddress(walletAddress);
@@ -207,7 +207,7 @@ export class BlockchainService implements OnModuleInit {
   async revokeAdmin(walletAddress: string) {
     return this.enqueueWrite(async () => {
       if (!this.contract || !this.superAdminSigner) {
-        return { success: false, error: 'IdentityRegistry or Super Admin signer not configured' };
+        return { success: false, error: 'Chưa cấu hình IdentityRegistry hoặc khóa ký của Super Admin.' };
       }
       try {
         const normalizedWalletAddress = ethers.getAddress(walletAddress);
@@ -231,7 +231,7 @@ export class BlockchainService implements OnModuleInit {
   async recordActionAsSuperAdmin(actionPayload: unknown) {
     return this.enqueueWrite(async () => {
       if (!this.contract || !this.superAdminSigner) {
-        return { success: false, error: 'IdentityRegistry or Super Admin signer not configured' };
+        return { success: false, error: 'Chưa cấu hình IdentityRegistry hoặc khóa ký của Super Admin.' };
       }
       try {
         const canonicalPayload = JSON.stringify(actionPayload);
@@ -268,7 +268,7 @@ export class BlockchainService implements OnModuleInit {
   async commitAuditRoot(batchId: number, rootBytes32: string, leafCount: number) {
     return this.enqueueWrite(async () => {
       if (!this.auditAnchor || !this.superAdminSigner) {
-        return { success: false, error: 'AuditAnchor or Super Admin signer not configured' };
+        return { success: false, error: 'Chưa cấu hình AuditAnchor hoặc khóa ký của Super Admin.' };
       }
       try {
         const writable = this.auditAnchor.connect(this.superAdminSigner) as ethers.Contract;

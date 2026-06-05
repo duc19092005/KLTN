@@ -25,10 +25,10 @@ export class CreateStaffUseCase {
 
   async execute(dto: CreateStaffDto, actorId?: string) {
     if (dto.role === UserRole.ADMIN) {
-      throw new BadRequestException('Staff module cannot create ADMIN users');
+      throw new BadRequestException('Không thể tạo tài khoản quản trị từ module nhân sự.');
     }
     if (dto.role === UserRole.DOCTOR) {
-      throw new BadRequestException('Use doctor module to create doctors with professional profile');
+      throw new BadRequestException('Vui lòng tạo bác sĩ tại module bác sĩ để có đầy đủ hồ sơ chuyên môn.');
     }
     if (dto.departmentId) await this.validator.ensureDepartment(dto.departmentId);
     await this.validator.assertUserUnique(dto.username, dto.email);
@@ -63,7 +63,7 @@ export class CreateStaffUseCase {
       return user;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Unique constraint violation while saving staff');
+        throw new ConflictException('Thông tin nhân sự bị trùng khi lưu.');
       }
       throw error;
     }

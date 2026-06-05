@@ -19,7 +19,7 @@ export class GetPatientUseCase {
 
   async findOne(id: string) {
     const patient = await this.repo.findByIdWithRelations(id);
-    if (!patient) throw new NotFoundException('Patient not found');
+    if (!patient) throw new NotFoundException('Không tìm thấy hồ sơ bệnh nhân.');
     return patient;
   }
 

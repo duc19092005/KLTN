@@ -10,10 +10,10 @@ import { AiModelCryptoPort } from '../../application/ports/ai-model-crypto.port'
 export class AiModelCryptoAdapter implements AiModelCryptoPort {
   encrypt(value: string): string {
     const rawKey = process.env.ENCRYPTION_KEY;
-    if (!rawKey) throw new BadRequestException('ENCRYPTION_KEY is not configured');
+    if (!rawKey) throw new BadRequestException('Chưa cấu hình khóa mã hóa ENCRYPTION_KEY.');
 
     const key = Buffer.from(rawKey, 'hex');
-    if (key.length !== 32) throw new BadRequestException('ENCRYPTION_KEY must be 32 bytes hex for AES-256');
+    if (key.length !== 32) throw new BadRequestException('ENCRYPTION_KEY phải là chuỗi hex 32 bytes cho AES-256.');
 
     // AES-256-GCM: authenticated encryption. The auth tag lets decryption detect
     // tampering/corruption, which plain CBC cannot. Stored as v1:ivHex:tagHex:cipherHex.

@@ -28,7 +28,7 @@ export class GenerateAiAnalysisUseCase {
 
   async execute(dto: GenerateAiAnalysisDto, doctorUserId: string) {
     const doctor = await this.repo.findDoctorByUserId(doctorUserId);
-    if (!doctor) throw new BadRequestException('Current user does not have doctor profile');
+    if (!doctor) throw new BadRequestException('Tài khoản hiện tại không có hồ sơ bác sĩ.');
 
     const visit = await this.repo.findVisitById(dto.visitId);
     this.policy.assertDoctorOwnsVisit(visit, doctor.id);
@@ -40,9 +40,9 @@ export class GenerateAiAnalysisUseCase {
       ? await this.repo.findAiModelById(dto.aiModelId)
       : await this.repo.findDefaultAiModelForSpecialty(fullVisit.doctor.specialty);
 
-    if (!aiModel) throw new NotFoundException('No AI model registered');
-    if (aiModel.type !== 'API') throw new BadRequestException('Selected model is not API-backed and cannot generate live AI analysis');
-    if (!aiModel.apiEndpoint) throw new BadRequestException('Selected AI model does not have an API endpoint configured');
+    if (!aiModel) throw new NotFoundException('Chưa đăng ký mô hình AI.');
+    if (aiModel.type !== 'API') throw new BadRequestException('Mô hình đã chọn không hỗ trợ API nên không thể phân tích trực tiếp.');
+    if (!aiModel.apiEndpoint) throw new BadRequestException('Mô hình AI đã chọn chưa cấu hình API endpoint.');
 
     const prompt = this.promptBuilder.build(fullVisit);
     // Pull the actual image bytes so the model can SEE the X-ray/MRI, not just a private URL.

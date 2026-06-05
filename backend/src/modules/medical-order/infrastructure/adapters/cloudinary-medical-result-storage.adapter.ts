@@ -37,7 +37,7 @@ export class CloudinaryMedicalResultStorageAdapter implements MedicalResultStora
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
     const apiKey = process.env.CLOUDINARY_API_KEY;
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
-    if (!cloudName || !apiKey || !apiSecret) throw new BadRequestException('Cloudinary is not configured');
+    if (!cloudName || !apiKey || !apiSecret) throw new BadRequestException('Chưa cấu hình Cloudinary.');
 
     const resourceType = file.mimeType === 'application/pdf' ? 'raw' : 'image';
     const format = this.extractFileFormat(file.originalName, file.mimeType);
@@ -80,7 +80,7 @@ export class CloudinaryMedicalResultStorageAdapter implements MedicalResultStora
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
     const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET;
     if (!cloudName || !apiKey || !apiSecret) {
-      throw new BadRequestException('Cloudinary upload is not configured');
+      throw new BadRequestException('Chưa cấu hình upload Cloudinary.');
     }
 
     const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -110,7 +110,7 @@ export class CloudinaryMedicalResultStorageAdapter implements MedicalResultStora
       const bodyText = await response.text();
       const body = this.tryParseJson(bodyText);
       if (!response.ok) {
-        throw new BadRequestException(`Cloudinary upload failed (${response.status}): ${body?.error?.message || bodyText}`);
+        throw new BadRequestException(`Tải file lên Cloudinary thất bại (${response.status}): ${body?.error?.message || bodyText}`);
       }
       return { file, cloudinary: body as CloudinaryUploadResult };
     });

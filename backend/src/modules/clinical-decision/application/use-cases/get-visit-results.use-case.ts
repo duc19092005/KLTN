@@ -18,7 +18,7 @@ export class GetVisitResultsUseCase {
 
   async execute(visitId: string, doctorUserId: string) {
     const doctor = await this.repo.findDoctorByUserId(doctorUserId);
-    if (!doctor) throw new BadRequestException('Current user does not have doctor profile');
+    if (!doctor) throw new BadRequestException('Tài khoản hiện tại không có hồ sơ bác sĩ.');
 
     const visit = await this.repo.findVisitById(visitId);
     this.policy.assertDoctorOwnsVisit(visit, doctor.id);

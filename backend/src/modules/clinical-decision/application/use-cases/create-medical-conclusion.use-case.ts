@@ -30,7 +30,7 @@ export class CreateMedicalConclusionUseCase {
 
   async execute(dto: CreateMedicalConclusionDto, doctorUserId: string) {
     const doctor = await this.repo.findDoctorByUserId(doctorUserId);
-    if (!doctor) throw new BadRequestException('Current user does not have doctor profile');
+    if (!doctor) throw new BadRequestException('Tài khoản hiện tại không có hồ sơ bác sĩ.');
 
     const visit = await this.repo.findVisitById(dto.visitId);
     this.policy.assertDoctorOwnsVisit(visit, doctor.id);
@@ -39,7 +39,7 @@ export class CreateMedicalConclusionUseCase {
     if (dto.aiDiagnosisId) {
       const aiDiagnosis = await this.repo.findAiDiagnosisById(dto.aiDiagnosisId);
       if (!aiDiagnosis || aiDiagnosis.visitId !== visit!.id) {
-        throw new BadRequestException('AI diagnosis does not belong to this visit');
+        throw new BadRequestException('Phân tích AI không thuộc lượt khám này.');
       }
     }
 

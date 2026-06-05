@@ -14,7 +14,7 @@ export class GetMyProfileUseCase {
 
   async execute(userId: string) {
     const user = await this.repo.findUserFullProfile(userId);
-    if (!user) throw new UnauthorizedException('User not found');
+    if (!user) throw new UnauthorizedException('Không tìm thấy tài khoản.');
 
     return { profile: toPublicProfile(user) };
   }

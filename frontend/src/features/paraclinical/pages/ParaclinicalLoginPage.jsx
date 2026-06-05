@@ -74,15 +74,15 @@ export default function ParaclinicalLoginPage() {
           <span className="material-symbols-outlined text-[#00346f]" style={{ fontVariationSettings: "'FILL' 1" }}>
             medical_services
           </span>
-          Med Identity OS
+          Hệ thống định danh y tế
         </div>
         <nav className="hidden md:flex gap-6 items-center">
-          <a className="text-[#424751] text-sm hover:text-[#00346f] transition-colors" href="#">Support Center</a>
-          <a className="text-[#424751] text-sm hover:text-[#00346f] transition-colors" href="#">Staff Directory</a>
-          <a className="text-[#424751] text-sm hover:text-[#00346f] transition-colors" href="#">Emergency Access</a>
+          <a className="text-[#424751] text-sm hover:text-[#00346f] transition-colors" href="#">Trung tâm hỗ trợ</a>
+          <a className="text-[#424751] text-sm hover:text-[#00346f] transition-colors" href="#">Danh bạ nhân sự</a>
+          <a className="text-[#424751] text-sm hover:text-[#00346f] transition-colors" href="#">Truy cập khẩn cấp</a>
         </nav>
         <button className="hidden md:flex items-center gap-2 text-[#00346f] text-xs font-semibold border border-[#c2c6d3] px-4 py-2 rounded hover:bg-slate-50 transition-colors">
-          Contact IT Support
+          Liên hệ hỗ trợ CNTT
         </button>
       </header>
 
@@ -162,7 +162,7 @@ export default function ParaclinicalLoginPage() {
                       className="w-full pl-10 pr-4 py-3 border border-[#c2c6d3] rounded-xl bg-white text-sm focus:border-[#004a99] focus:ring-2 focus:ring-[#004a99]/10 transition-all outline-none placeholder-[#737783]/60"
                       id="machine_account"
                       name="machine_account"
-                      placeholder="vd: mri_department"
+                      placeholder="VD: mri_department"
                       type="text"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
@@ -255,12 +255,12 @@ export default function ParaclinicalLoginPage() {
       {/* Footer */}
       <footer className="bg-[#eff4ff] text-[#424751] flex flex-col md:flex-row justify-between items-center w-full px-10 py-5 max-w-[1440px] mx-auto border-t border-[#c2c6d3] z-10 relative">
         <div className="text-xs font-medium text-[#0b1c30] mb-4 md:mb-0">
-          © {new Date().getFullYear()} Clinical Laboratory Services. All rights reserved.
+          © {new Date().getFullYear()} Dịch vụ cận lâm sàng. Bảo lưu mọi quyền.
         </div>
         <nav className="flex gap-4 md:gap-6 items-center">
-          <a className="text-xs font-medium hover:text-[#00346f] transition-colors" href="#">Security Policy</a>
-          <a className="text-xs font-medium hover:text-[#00346f] transition-colors" href="#">HIPAA Compliance</a>
-          <a className="text-xs font-medium hover:text-[#00346f] transition-colors" href="#">Version 4.2.0-stable</a>
+          <a className="text-xs font-medium hover:text-[#00346f] transition-colors" href="#">Chính sách bảo mật</a>
+          <a className="text-xs font-medium hover:text-[#00346f] transition-colors" href="#">Tuân thủ HIPAA</a>
+          <a className="text-xs font-medium hover:text-[#00346f] transition-colors" href="#">Phiên bản 4.2.0 ổn định</a>
         </nav>
       </footer>
     </div>

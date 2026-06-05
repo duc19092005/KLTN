@@ -75,7 +75,7 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
       }
     }
 
-    throw new BadRequestException('Cannot generate unique medical order code');
+    throw new BadRequestException('Không thể tạo mã phiếu chỉ định duy nhất.');
   }
 
   async findAll(filter: OrderListFilter): Promise<unknown[]> {

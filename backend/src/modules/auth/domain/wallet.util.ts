@@ -11,7 +11,7 @@ export function normalizeWalletAddress(address: string): string {
   try {
     return ethers.getAddress(address);
   } catch {
-    throw new BadRequestException('Invalid wallet address');
+    throw new BadRequestException('Địa chỉ ví không hợp lệ.');
   }
 }
 
@@ -42,10 +42,10 @@ export function verifyWalletSignature(message: string, signature: string, wallet
   try {
     recovered = ethers.verifyMessage(message, signature);
   } catch {
-    throw new UnauthorizedException('Invalid wallet signature');
+    throw new UnauthorizedException('Chữ ký ví không hợp lệ.');
   }
 
   if (ethers.getAddress(recovered) !== walletAddress) {
-    throw new UnauthorizedException('Invalid wallet signature');
+    throw new UnauthorizedException('Chữ ký ví không hợp lệ.');
   }
 }

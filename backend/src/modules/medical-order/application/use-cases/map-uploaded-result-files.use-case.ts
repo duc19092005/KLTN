@@ -20,11 +20,11 @@ export class MapUploadedResultFilesUseCase {
   ) {}
 
   async execute(orderId: string, files: UploadedResultFileInput[]) {
-    if (!files.length) throw new BadRequestException('Please upload at least one PDF/image file');
+    if (!files.length) throw new BadRequestException('Vui lòng tải lên ít nhất một file PDF hoặc hình ảnh.');
     const order = await this.repo.findOrderForManage(orderId);
-    if (!order) throw new NotFoundException('Medical order not found');
+    if (!order) throw new NotFoundException('Không tìm thấy phiếu chỉ định.');
     if (([MedicalOrderStatus.RESULT_READY, MedicalOrderStatus.CANCELLED] as MedicalOrderStatus[]).includes(order.status)) {
-      throw new BadRequestException('Cannot upload files for an order that is already ready/completed/cancelled');
+      throw new BadRequestException('Không thể tải file cho phiếu đã sẵn sàng, hoàn tất hoặc đã hủy.');
     }
 
     return this.storage.uploadResultFiles(orderId, files);

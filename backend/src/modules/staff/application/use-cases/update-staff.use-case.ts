@@ -26,10 +26,10 @@ export class UpdateStaffUseCase {
     const staff = await this.validator.ensureStaff(id);
     if (dto.departmentId) {
       const dept = await this.repo.findDepartment(dto.departmentId);
-      if (!dept) throw new NotFoundException('Department not found');
+      if (!dept) throw new NotFoundException('Không tìm thấy phòng ban.');
       if (staff.doctorProfile) {
         if (dept.type !== 'CLINICAL') {
-          throw new BadRequestException('Doctor can only be assigned to a CLINICAL department');
+          throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng ban lâm sàng.');
         }
         if (dept.specialty && dept.specialty !== staff.doctorProfile.specialty) {
           throw new BadRequestException(`Bác sĩ chuyên khoa "${staff.doctorProfile.specialty}" không thể được xếp vào phòng ban chuyên khoa "${dept.specialty}"`);
@@ -37,13 +37,13 @@ export class UpdateStaffUseCase {
       }
     }
     if (dto.role === UserRole.ADMIN) {
-      throw new BadRequestException('Staff module cannot promote users to ADMIN');
+      throw new BadRequestException('Không thể nâng quyền người dùng thành quản trị từ module nhân sự.');
     }
     if (dto.role === UserRole.DOCTOR && staff.user.role !== UserRole.DOCTOR) {
-      throw new BadRequestException('Use doctor module to create or promote doctors with professional profile');
+      throw new BadRequestException('Vui lòng dùng module bác sĩ để tạo hoặc nâng quyền bác sĩ với hồ sơ chuyên môn.');
     }
     if (staff.doctorProfile && dto.role && dto.role !== UserRole.DOCTOR) {
-      throw new BadRequestException('Cannot change doctor role while DoctorProfile exists');
+      throw new BadRequestException('Không thể đổi vai trò bác sĩ khi hồ sơ bác sĩ vẫn tồn tại.');
     }
     if (dto.username || dto.email) await this.validator.assertUserUnique(dto.username, dto.email, staff.userId);
     if (dto.citizenId) await this.validator.assertCitizenIdUnique(dto.citizenId, staff.id);
@@ -79,7 +79,7 @@ export class UpdateStaffUseCase {
       return updated;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Unique constraint violation while saving staff');
+        throw new ConflictException('Thông tin nhân sự bị trùng khi lưu.');
       }
       throw error;
     }

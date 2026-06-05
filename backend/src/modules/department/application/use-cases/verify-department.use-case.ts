@@ -16,7 +16,7 @@ export class VerifyDepartmentUseCase {
 
   async verifyOne(id: string) {
     const dept = await this.repo.findById(id);
-    if (!dept) throw new NotFoundException('Department not found');
+    if (!dept) throw new NotFoundException('Không tìm thấy phòng ban.');
     return this.integrity.evaluate(dept);
   }
 

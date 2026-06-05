@@ -5,6 +5,7 @@ import { useToast } from '../../../providers/ToastProvider';
 
 const emptyPatient = { fullName: '', gender: 'MALE', birthDate: '', citizenId: '', phone: '', address: '', insuranceNumber: '', emergencyContact: '' };
 const GENDERS = [{ value: 'MALE', label: 'Nam' }, { value: 'FEMALE', label: 'Nữ' }, { value: 'OTHER', label: 'Khác' }];
+const genderLabel = (value) => GENDERS.find((item) => item.value === value)?.label || value || 'Chưa rõ';
 function Input({ id, label, value, onChange, required, type = 'text', placeholder }) { return <label htmlFor={id} className="block space-y-1"><span className="text-[12px] font-bold text-slate-600">{label}{required && <span className="text-red-500 ml-0.5">*</span>}</span><input id={id} type={type} value={value || ''} required={required} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none" /></label>; }
 function Select({ id, label, value, onChange, options }) { return <label htmlFor={id} className="block space-y-1"><span className="text-[12px] font-bold text-slate-600">{label}</span><select id={id} value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none">{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></label>; }
 
@@ -70,7 +71,7 @@ export default function PatientFinder({ onPatientSelected }) {
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="font-black text-slate-900 group-hover:text-cyan-700">{p.fullName}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{p.patientCode} · {p.gender} · {p.birthDate ? new Date(p.birthDate).toLocaleDateString('vi-VN') : ''}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{p.patientCode} · {genderLabel(p.gender)} · {p.birthDate ? new Date(p.birthDate).toLocaleDateString('vi-VN') : ''}</p>
                     <p className="text-xs text-slate-500">{p.citizenId ? `CCCD: ${p.citizenId}` : ''}{p.citizenId && p.phone ? ' · ' : ''}{p.phone ? `SĐT: ${p.phone}` : ''}</p>
                   </div>
                   <span className="text-xs font-bold text-cyan-600 border border-cyan-100 rounded-xl px-2.5 py-1 bg-cyan-50 group-hover:bg-cyan-100">Chọn</span>

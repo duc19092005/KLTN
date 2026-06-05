@@ -22,10 +22,10 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
 
   const stats = useMemo(() => [
-    { label: 'Phòng ban', value: departments.length, hint: 'Đơn vị chuyên môn', icon: '🏥' },
-    { label: 'Nhân sự', value: staffs.length, hint: 'Hồ sơ nhân sự', icon: '👥' },
-    { label: 'Đang hoạt động', value: staffs.filter((s) => s.user?.status === 'ACTIVE').length, hint: 'Tài khoản ACTIVE', icon: '✅' },
-    { label: 'Ngưng hoạt động', value: staffs.filter((s) => s.user?.status === 'INACTIVE').length, hint: 'Tài khoản bị ẩn/khóa', icon: '⛔' },
+    { label: 'Phòng ban', value: departments.length, hint: 'Đơn vị chuyên môn' },
+    { label: 'Nhân sự', value: staffs.length, hint: 'Hồ sơ nhân sự' },
+    { label: 'Đang hoạt động', value: staffs.filter((s) => s.user?.status === 'ACTIVE').length, hint: 'Tài khoản đang hoạt động' },
+    { label: 'Ngưng hoạt động', value: staffs.filter((s) => s.user?.status === 'INACTIVE').length, hint: 'Tài khoản bị ẩn/khóa' },
   ], [departments, staffs]);
 
   useEffect(() => {
@@ -48,10 +48,10 @@ export default function AdminPage() {
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="overview" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
       <div className="max-w-7xl mx-auto space-y-6">
         <section className="relative overflow-hidden rounded-[28px] border border-blue-100 bg-gradient-to-br from-white via-blue-50 to-cyan-50 p-8 shadow-sm">
-          <p className="text-[11px] font-black text-blue-600 uppercase tracking-[0.24em] mb-3">System analytics</p>
+          <p className="text-[11px] font-black text-blue-600 uppercase tracking-[0.24em] mb-3">Phân tích hệ thống</p>
           <h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">Tổng quan hệ thống</h2>
           <p className="mt-3 max-w-3xl text-sm sm:text-base text-slate-600 leading-relaxed">
-            Trang thống kê nhanh tình trạng phòng ban, nhân sự, tài khoản hoạt động và các hồ sơ đang chờ kích hoạt trong Hospital OS.
+            Trang thống kê nhanh tình trạng phòng ban, nhân sự, tài khoản hoạt động và các hồ sơ đang chờ kích hoạt trong hệ thống bệnh viện.
           </p>
         </section>
 
@@ -91,8 +91,8 @@ export default function AdminPage() {
   );
 }
 
-function StatCard({ label, value, hint, icon }) {
-  return <article className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm"><div className="flex justify-between"><div><p className="text-xs font-bold text-slate-500">{label}</p><strong className="block text-3xl font-black text-slate-950 mt-2">{String(value).padStart(2, '0')}</strong></div><span className="text-2xl">{icon}</span></div><p className="mt-3 text-xs font-semibold text-blue-600">{hint}</p></article>;
+function StatCard({ label, value, hint }) {
+  return <article className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm"><div className="flex justify-between"><div><p className="text-xs font-bold text-slate-500">{label}</p><strong className="block text-3xl font-black text-slate-950 mt-2">{String(value).padStart(2, '0')}</strong></div></div><p className="mt-3 text-xs font-semibold text-blue-600">{hint}</p></article>;
 }
 function Card({ title, action, onAction, children }) { return <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm"><div className="mb-5 flex items-center justify-between"><h3 className="text-xl font-black text-slate-950">{title}</h3><button onClick={onAction} className="text-sm font-black text-blue-600">{action}</button></div>{children}</section>; }
 function StaffMini({ staff }) { return <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><strong className="block text-slate-950">{staff.fullName}</strong><span className="text-xs text-slate-500">{staff.department?.name || 'Chưa gán phòng ban'}</span></div>; }
