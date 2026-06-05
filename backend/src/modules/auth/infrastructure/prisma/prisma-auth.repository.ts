@@ -6,6 +6,7 @@ import {
   AuthRepositoryPort,
   CreateBootstrapAdminData,
   FaceEnrollmentData,
+  UserWithFullProfile,
   UserWithProfile,
 } from '../../application/ports/auth.repository.port';
 
@@ -58,6 +59,22 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
 
   async findUserWithProfile(userId: string): Promise<UserWithProfile | null> {
     return this.prisma.user.findUnique({ where: { id: userId }, include: { adminProfile: true } });
+  }
+
+  async findUserFullProfile(userId: string): Promise<UserWithFullProfile | null> {
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        adminProfile: true,
+        staffProfile: {
+          include: {
+            department: true,
+            doctorProfile: true,
+            managedDepartment: true,
+          },
+        },
+      },
+    });
   }
 
   async updatePasswordChange(userId: string, passwordHash: string, registrationStep: number): Promise<UserWithProfile> {

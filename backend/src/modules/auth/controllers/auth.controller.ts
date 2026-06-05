@@ -215,6 +215,12 @@ export class AuthController {
     return this.authService.getMe(user.sub, Boolean(user.verified));
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('profile')
+  async getProfile(@CurrentUser() user: AuthUser) {
+    return this.authService.getMyProfile(user.sub);
+  }
+
   @Post('logout')
   async logout(@Req() req, @Res({ passthrough: true }) res: Response) {
     const bearerToken = String(req.headers?.authorization || '').replace(/^Bearer\s+/i, '') || undefined;

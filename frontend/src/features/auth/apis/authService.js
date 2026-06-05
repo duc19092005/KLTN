@@ -34,6 +34,8 @@ export const authService = {
 
   getMe: () => api.get('/auth/me'),
 
+  getProfile: () => api.get('/auth/profile'),
+
   logout: () => api.post('/auth/logout'),
 
   forgotPasswordChallenge: (username) =>

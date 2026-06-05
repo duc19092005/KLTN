@@ -6,6 +6,7 @@ export const ADMIN_NAV_ITEMS = [
   { id: 'clinicalRooms', label: 'Phòng khám', icon: 'building' },
   { id: 'aiModels', label: 'Model AI', icon: 'activity' },
   { id: 'audit', label: 'Nhật ký', icon: 'shield' },
+  { id: 'profile', label: 'Thông tin cá nhân', icon: 'user' },
 ];
 
 export const ADMIN_ROUTES = {
@@ -16,6 +17,7 @@ export const ADMIN_ROUTES = {
   clinicalRooms: '/admin/clinical-rooms',
   aiModels: '/admin/ai-models',
   audit: '/admin/audit',
+  profile: '/profile',
 };
 
 export function navigateAdmin(navigate, id) {

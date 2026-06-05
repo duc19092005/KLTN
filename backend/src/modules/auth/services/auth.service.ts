@@ -13,6 +13,7 @@ import { VerifyFaceUseCase } from '../application/use-cases/verify-face.use-case
 import { VerifyFaceForStepUpUseCase } from '../application/use-cases/verify-face-for-stepup.use-case';
 import { GenerateMfaSecretUseCase } from '../application/use-cases/generate-mfa-secret.use-case';
 import { GetMeUseCase } from '../application/use-cases/get-me.use-case';
+import { GetMyProfileUseCase } from '../application/use-cases/get-my-profile.use-case';
 import { LogoutUseCase } from '../application/use-cases/logout.use-case';
 import { ForgotPasswordChallengeUseCase } from '../application/use-cases/forgot-password-challenge.use-case';
 import { ForgotPasswordVerifyFaceUseCase } from '../application/use-cases/forgot-password-verify-face.use-case';
@@ -41,6 +42,7 @@ export class AuthService {
     private readonly verifyFaceForStepUpUseCase: VerifyFaceForStepUpUseCase,
     private readonly generateMfaSecretUseCase: GenerateMfaSecretUseCase,
     private readonly getMeUseCase: GetMeUseCase,
+    private readonly getMyProfileUseCase: GetMyProfileUseCase,
     private readonly logoutUseCase: LogoutUseCase,
     private readonly forgotPasswordChallengeUseCase: ForgotPasswordChallengeUseCase,
     private readonly forgotPasswordVerifyFaceUseCase: ForgotPasswordVerifyFaceUseCase,
@@ -108,6 +110,10 @@ export class AuthService {
 
   getMe(userId: string, verified: boolean) {
     return this.getMeUseCase.execute(userId, verified);
+  }
+
+  getMyProfile(userId: string) {
+    return this.getMyProfileUseCase.execute(userId);
   }
 
   logout(userId: string) {

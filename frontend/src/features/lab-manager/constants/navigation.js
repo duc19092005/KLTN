@@ -3,6 +3,7 @@ export const LAB_MANAGER_NAV_ITEMS = [
   { id: 'shifts', label: 'Lịch trực', icon: 'calendar' },
   { id: 'orders', label: 'Chỉ định xét nghiệm', icon: 'activity' },
   { id: 'results', label: 'Kết quả đã trả', icon: 'file' },
+  { id: 'profile', label: 'Thông tin cá nhân', icon: 'user' },
 ];
 
 export const LAB_MANAGER_ROUTES = {
@@ -10,6 +11,7 @@ export const LAB_MANAGER_ROUTES = {
   shifts: '/lab-manager/shifts',
   orders: '/lab-manager/orders',
   results: '/lab-manager/results',
+  profile: '/profile',
 };
 
 export function labManagerRouteFor(id) {
