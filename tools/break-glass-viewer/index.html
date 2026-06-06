@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Break-Glass · Trình xác minh sổ Backup (Offline)</title>
+<!--
+  BREAK-GLASS BACKUP LEDGER VIEWER — fully self-contained, offline, zero-dependency.
+
+  Purpose: when the server / database is down or compromised, this single HTML file lets an operator
+  open the offsite JSONL backup ledger (backup-ledger.jsonl) directly from a laptop — no backend,
+  no build step, no internet — and verify its hash-chain integrity.
+
+  It verifies two things:
+    1. Chain linkage: each line's prevHash equals the previous line's entryHash (detects deletion /
+       reordering / insertion). This needs NO secret.
+    2. Full entryHash (optional): if the operator enters the AUDIT_PEPPER, every entryHash is
+       recomputed with the same formula as the backend and compared, proving the line content is
+       authentic. SHA-256 is implemented in pure JS so it works even without window.crypto.subtle.
+
+  Keep a copy of THIS FILE next to the ledger on the offsite/separate volume.
+
+  STYLING NOTE: All CSS is inlined and uses only system fonts. No CDN, no internet. The icon set is
+  Lucide (MIT) inlined as raw SVG so the visual language matches the rest of the system without
+  pulling network resources.
+-->
+<style>
+  :root {
+    --bg: #f4f7fa;
+    --surface: #ffffff;
+    --surface-alt: #f8fafc;
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --text-subtle: #94a3b8;
+    --accent: #0891b2;
+    --accent-soft: #ecfeff;
+    --accent-border: #a5f3fc;
+    --ok: #059669;
+    --ok-soft: #ecfdf5;
+    --ok-border: #a7f3d0;
+    --bad: #dc2626;
+    --bad-soft: #fef2f2;
+    --bad-border: #fecaca;
+    --warn: #d97706;
+    --warn-soft: #fffbeb;
+    --warn-border: #fde68a;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+    --shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+    --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.08);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Layout */
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* Header */
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    padding: 6px 12px; border-radius: 999px;
+  }
+  .eyebrow .pulse {
+    width: 6px; height: 6px; border-radius: 999px; background: var(--accent);
+    box-shadow: 0 0 0 0 rgba(8, 145, 178, 0.4);
+    animation: pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(8, 145, 178, 0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(8, 145, 178, 0); }
+  }
+  header h1 {
+    font-size: 28px; font-weight: 800; margin: 14px 0 8px; letter-spacing: -0.025em;
+    color: var(--text);
+  }
+  header p {
+    color: var(--text-muted); margin: 0; max-width: 760px; font-size: 14px;
+  }
+  header p strong { color: var(--text); font-weight: 700; }
+  header p .mono { font-family: var(--mono); font-size: 13px; color: var(--text); }
+
+  /* Card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* Drop zone */
+  .drop {
+    border: 1.5px dashed var(--border-strong);
+    border-radius: 14px;
+    padding: 40px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    background: var(--surface-alt);
+  }
+  .drop:hover, .drop.over {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .drop .drop-icon {
+    width: 48px; height: 48px; margin: 0 auto 14px;
+    border-radius: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent);
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.18s ease;
+  }
+  .drop:hover .drop-icon, .drop.over .drop-icon { transform: translateY(-2px); }
+  .drop strong { display: block; font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .drop span { color: var(--text-muted); font-size: 13px; }
+
+  /* Pepper row */
+  .pepper-row {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .pepper-input-wrap {
+    position: relative; flex: 1 1 320px; min-width: 280px;
+  }
+  .pepper-input-wrap .icon {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--text-subtle); pointer-events: none;
+  }
+  input[type="password"] {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 11px 12px 11px 40px;
+    font-family: var(--mono); font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  input[type="password"]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  input[type="password"]:focus + .icon { color: var(--accent); }
+  /* Reorder so :focus + .icon doesn't matter — easier: use sibling on label */
+
+  button {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--text);
+    color: #ffffff;
+    border: 0;
+    font-weight: 700; font-size: 13px;
+    padding: 11px 18px; border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.05s ease;
+    font-family: inherit;
+  }
+  button:hover { background: #1e293b; }
+  button:active { transform: translateY(1px); }
+  button:disabled { background: var(--border-strong); color: #ffffff; cursor: not-allowed; transform: none; }
+
+  .note {
+    color: var(--text-muted); font-size: 12px;
+    flex-basis: 100%;
+  }
+
+  /* Verdict */
+  .verdict {
+    border-radius: 14px; padding: 18px 20px;
+    display: flex; align-items: flex-start; gap: 14px;
+    border: 1px solid;
+  }
+  .verdict.ok { background: var(--ok-soft); border-color: var(--ok-border); color: var(--ok); }
+  .verdict.bad { background: var(--bad-soft); border-color: var(--bad-border); color: var(--bad); }
+  .verdict .icon-wrap {
+    flex-shrink: 0; width: 40px; height: 40px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface);
+    border: 1px solid currentColor;
+  }
+  .verdict .title { font-weight: 800; font-size: 15px; line-height: 1.3; }
+  .verdict .sub { color: var(--text-muted); font-weight: 500; font-size: 13px; margin-top: 4px; }
+  .verdict.bad .sub { color: var(--bad); opacity: 0.8; }
+
+  /* Stats grid */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow-sm);
+  }
+  .stat .k {
+    color: var(--text-muted); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .stat .v { font-size: 26px; font-weight: 800; margin-top: 8px; color: var(--text); letter-spacing: -0.02em; }
+  .stat.ok .v { color: var(--ok); }
+  .stat.bad .v { color: var(--bad); }
+  .stat.warn .v { color: var(--warn); }
+
+  /* Table */
+  .table-card { padding: 0; overflow: hidden; }
+  .table-card h2 {
+    font-size: 14px; font-weight: 700; margin: 0; padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    color: var(--text);
+  }
+  .table-card h2 .count {
+    font-size: 11px; font-weight: 700; color: var(--accent);
+    background: var(--accent-soft); border: 1px solid var(--accent-border);
+    padding: 3px 10px; border-radius: 999px;
+    margin-left: auto;
+  }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    text-align: left; color: var(--text-muted); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-alt);
+    white-space: nowrap;
+  }
+  td {
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: 0; }
+  tr:hover td { background: var(--surface-alt); }
+  .mono { font-family: var(--mono); font-size: 12px; color: var(--text-muted); }
+
+  /* Pills */
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 700;
+    padding: 3px 8px; border-radius: 6px;
+    border: 1px solid;
+  }
+  .pill.ok { background: var(--ok-soft); border-color: var(--ok-border); color: var(--ok); }
+  .pill.bad { background: var(--bad-soft); border-color: var(--bad-border); color: var(--bad); }
+  .pill.warn { background: var(--warn-soft); border-color: var(--warn-border); color: var(--warn); }
+
+  .hide { display: none; }
+
+  /* Stack utility */
+  .stack { display: grid; gap: 18px; }
+  .stack-sm { display: grid; gap: 12px; }
+
+  /* Footer */
+  .footer {
+    margin-top: 32px;
+    color: var(--text-subtle);
+    font-size: 12px;
+    display: flex; align-items: center; gap: 8px;
+    justify-content: center;
+  }
+  .footer .icon { color: var(--text-subtle); }
+
+  /* Animation */
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  #result:not(.hide) { animation: fade-in 0.25s ease; }
+</style>
+</head>
+<body>
+<div class="wrap stack">
+
+  <header>
+    <span class="eyebrow"><span class="pulse"></span>Chế độ khẩn cấp · Offline</span>
+    <h1>Trình xác minh sổ Backup (Break-Glass)</h1>
+    <p>
+      Mở tệp <span class="mono">backup-ledger.jsonl</span> để kiểm tra tính toàn vẹn của lịch sử sao lưu mà
+      <strong>không cần máy chủ, không cần internet</strong>. Công cụ kiểm tra chuỗi hash (phát hiện xóa/chèn/đảo dòng).
+      Nhập AUDIT_PEPPER để xác minh đầy đủ từng dòng.
+    </p>
+  </header>
+
+  <div class="card">
+    <div id="drop" class="drop">
+      <div class="drop-icon">
+        <!-- Lucide: upload-cloud -->
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/>
+          <path d="M12 12v9"/>
+          <path d="m16 16-4-4-4 4"/>
+        </svg>
+      </div>
+      <strong>Kéo &amp; thả tệp backup-ledger.jsonl vào đây</strong>
+      <span>hoặc bấm để chọn tệp · dữ liệu được xử lý hoàn toàn trên máy bạn</span>
+      <input id="file" type="file" accept=".jsonl,.json,.txt" class="hide" />
+    </div>
+    <div class="pepper-row">
+      <div class="pepper-input-wrap">
+        <span class="icon">
+          <!-- Lucide: key-round -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/>
+            <circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>
+          </svg>
+        </span>
+        <input id="pepper" type="password" placeholder="AUDIT_PEPPER (tùy chọn — để xác minh đầy đủ entryHash)" />
+      </div>
+      <button id="reverify" disabled>
+        <!-- Lucide: refresh-cw -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+          <path d="M21 3v5h-5"/>
+          <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+          <path d="M8 16H3v5"/>
+        </svg>
+        Xác minh lại với pepper
+      </button>
+      <span class="note">Không nhập pepper: vẫn kiểm tra được liên kết chuỗi (prevHash ↔ entryHash).</span>
+    </div>
+  </div>
+
+  <div id="result" class="stack hide">
+    <div id="verdict"></div>
+    <div class="stats" id="stats"></div>
+    <div class="card table-card">
+      <h2>
+        <!-- Lucide: database -->
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <ellipse cx="12" cy="5" rx="9" ry="3"/>
+          <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
+          <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/>
+        </svg>
+        Danh sách bản sao lưu
+        <span class="count" id="count">0</span>
+      </h2>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Mã backup</th>
+              <th>SHA256 tệp dump</th>
+              <th>Tới seq</th>
+              <th>Liên kết chuỗi</th>
+              <th>entryHash</th>
+              <th>Neo on-chain (tx)</th>
+              <th>Tạo lúc</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <!-- Lucide: lock -->
+    <svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+    <span>Hoạt động hoàn toàn offline · Không gửi dữ liệu ra ngoài · SHA-256 thuần JS</span>
+  </div>
+
+</div>
+
+<!-- Inline icon templates (cloned via JS into dynamic content) -->
+<template id="icon-shield-check">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+    <path d="m9 12 2 2 4-4"/>
+  </svg>
+</template>
+<template id="icon-alert-triangle">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+    <path d="M12 9v4"/>
+    <path d="M12 17h.01"/>
+  </svg>
+</template>
+<template id="icon-link2">
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 17H7A5 5 0 0 1 7 7h2"/>
+    <path d="M15 7h2a5 5 0 1 1 0 10h-2"/>
+    <line x1="8" y1="12" x2="16" y2="12"/>
+  </svg>
+</template>
+<template id="icon-link-broken">
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 17H7A5 5 0 0 1 7 7h2"/>
+    <path d="M15 7h2a5 5 0 1 1 0 10h-2"/>
+    <line x1="13" y1="8" x2="11" y2="16"/>
+  </svg>
+</template>
+<template id="icon-check">
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+</template>
+<template id="icon-x">
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"/>
+    <line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+</template>
+<template id="icon-help">
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+    <line x1="12" y1="17" x2="12.01" y2="17"/>
+  </svg>
+</template>
+<template id="icon-hash">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="4" y1="9" x2="20" y2="9"/>
+    <line x1="4" y1="15" x2="20" y2="15"/>
+    <line x1="10" y1="3" x2="8" y2="21"/>
+    <line x1="16" y1="3" x2="14" y2="21"/>
+  </svg>
+</template>
+<template id="icon-clock">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <polyline points="12 6 12 12 16 14"/>
+  </svg>
+</template>
+<template id="icon-anchor">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="5" r="3"/>
+    <line x1="12" y1="22" x2="12" y2="8"/>
+    <path d="M5 12H2a10 10 0 0 0 20 0h-3"/>
+  </svg>
+</template>
+
+<script>
+/* ----------------------------- Pure-JS SHA-256 ----------------------------- */
+/* Works fully offline regardless of window.crypto.subtle (file:// secure-context quirks). */
+function sha256Hex(ascii) {
+  function rotr(n, x) { return (x >>> n) | (x << (32 - n)); }
+  const K = [
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  // UTF-8 encode
+  const utf8 = unescape(encodeURIComponent(ascii));
+  const words = []; const len = utf8.length;
+  for (let i = 0; i < len; i++) words[i >> 2] |= utf8.charCodeAt(i) << ((3 - (i % 4)) * 8);
+  words[len >> 2] |= 0x80 << ((3 - (len % 4)) * 8);
+  words[((len + 8) >> 6) * 16 + 15] = len * 8;
+  let H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const w = new Array(64);
+  for (let j = 0; j < words.length; j += 16) {
+    for (let i = 0; i < 16; i++) w[i] = words[j + i] | 0;
+    for (let i = 16; i < 64; i++) {
+      const s0 = rotr(7, w[i-15]) ^ rotr(18, w[i-15]) ^ (w[i-15] >>> 3);
+      const s1 = rotr(17, w[i-2]) ^ rotr(19, w[i-2]) ^ (w[i-2] >>> 10);
+      w[i] = (w[i-16] + s0 + w[i-7] + s1) | 0;
+    }
+    let [a,b,c,d,e,f,g,h] = H;
+    for (let i = 0; i < 64; i++) {
+      const S1 = rotr(6, e) ^ rotr(11, e) ^ rotr(25, e);
+      const ch = (e & f) ^ (~e & g);
+      const t1 = (h + S1 + ch + K[i] + w[i]) | 0;
+      const S0 = rotr(2, a) ^ rotr(13, a) ^ rotr(22, a);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + maj) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    H = [(H[0]+a)|0,(H[1]+b)|0,(H[2]+c)|0,(H[3]+d)|0,(H[4]+e)|0,(H[5]+f)|0,(H[6]+g)|0,(H[7]+h)|0];
+  }
+  return H.map((x) => (x >>> 0).toString(16).padStart(8, '0')).join('');
+}
+
+/* --- Canonicalization: must match backend audit-hash.util.canonicalize (sorted keys). --- */
+function sortValue(v) {
+  if (v === null || v === undefined) return null;
+  if (Array.isArray(v)) return v.map(sortValue);
+  if (typeof v === 'object') {
+    return Object.keys(v).sort().reduce((acc, k) => { acc[k] = sortValue(v[k]); return acc; }, {});
+  }
+  return v;
+}
+function canonicalize(v) { return JSON.stringify(sortValue(v)); }
+
+/* --- entryHash: must match backend domain/backup-manifest.computeBackupEntryHash. --- */
+const GENESIS = '0'.repeat(64);
+function computeBackupEntryHash(m, prevHash, pepper) {
+  const canonical = canonicalize({
+    backupCode: m.backupCode, fileName: m.fileName, sha256: m.sha256,
+    sizeBytes: m.sizeBytes, maxSeq: (m.maxSeq ?? null), createdAtIso: m.createdAtIso,
+  });
+  return sha256Hex(`${pepper}|${m.backupCode}|${m.sha256}|${m.maxSeq ?? ''}|${m.createdAtIso}|${prevHash}|${canonical}`);
+}
+
+/* ------------------------------- UI wiring -------------------------------- */
+let LEDGER = [];
+const $ = (id) => document.getElementById(id);
+const iconHTML = (id) => $(id).innerHTML;
+
+function shortHash(h) {
+  if (!h) return '—';
+  const c = h.startsWith('0x') ? h.slice(2) : h;
+  return c.length <= 18 ? c : c.slice(0, 10) + '…' + c.slice(-8);
+}
+function fmtTime(v) { try { return v ? new Date(v).toLocaleString('vi-VN') : '—'; } catch { return v || '—'; } }
+
+function render() {
+  const pepper = $('pepper').value || '';
+  let linkOk = true, hashOk = true, hashChecked = pepper.length > 0;
+  let prev = GENESIS;
+  const rows = LEDGER.map((e, i) => {
+    const linkGood = e.prevHash === prev;
+    if (!linkGood) linkOk = false;
+    let hashGood = null;
+    if (hashChecked) {
+      const recomputed = computeBackupEntryHash(e, e.prevHash ?? GENESIS, pepper);
+      hashGood = recomputed === e.entryHash;
+      if (!hashGood) hashOk = false;
+    }
+    prev = e.entryHash;
+    return { e, i, linkGood, hashGood };
+  });
+
+  // Verdict
+  const v = $('verdict');
+  const allGood = linkOk && (!hashChecked || hashOk);
+  const verdictIcon = allGood ? iconHTML('icon-shield-check') : iconHTML('icon-alert-triangle');
+  v.className = 'verdict ' + (allGood ? 'ok' : 'bad');
+  v.innerHTML = `
+    <div class="icon-wrap">${verdictIcon}</div>
+    <div>
+      <div class="title">${allGood ? 'Sổ backup TOÀN VẸN' : 'PHÁT HIỆN BẤT THƯỜNG'}</div>
+      <div class="sub">${
+        allGood
+          ? `${LEDGER.length} bản ghi · liên kết chuỗi liền mạch${hashChecked ? ' · entryHash khớp với pepper đã nhập' : ' · (chưa nhập pepper để xác minh entryHash đầy đủ)'}`
+          : `${!linkOk ? 'Chuỗi bị đứt (có dòng bị xóa/chèn/đảo). ' : ''}${hashChecked && !hashOk ? 'entryHash không khớp (nội dung bị sửa hoặc pepper sai).' : ''}`
+      }</div>
+    </div>`;
+
+  // Stats
+  const linkBadge = linkOk
+    ? `<span style="display:inline-flex;align-items:center;gap:6px;">${iconHTML('icon-check')}Liền mạch</span>`
+    : `<span style="display:inline-flex;align-items:center;gap:6px;">${iconHTML('icon-x')}ĐỨT</span>`;
+  const hashBadge = !hashChecked
+    ? 'Chưa nhập pepper'
+    : hashOk
+      ? `<span style="display:inline-flex;align-items:center;gap:6px;">${iconHTML('icon-check')}Khớp</span>`
+      : `<span style="display:inline-flex;align-items:center;gap:6px;">${iconHTML('icon-x')}LỆCH</span>`;
+
+  $('stats').innerHTML = [
+    { k: 'Tổng bản backup', v: LEDGER.length, icon: 'icon-hash', tone: '' },
+    { k: 'Liên kết chuỗi', v: linkBadge, icon: 'icon-link2', tone: linkOk ? 'ok' : 'bad', isHtml: true },
+    { k: 'Xác minh entryHash', v: hashBadge, icon: 'icon-shield-check', tone: !hashChecked ? 'warn' : (hashOk ? 'ok' : 'bad'), isHtml: true },
+    { k: 'Đã neo on-chain', v: LEDGER.filter((e) => e.anchorTxHash).length, icon: 'icon-anchor', tone: '' },
+  ].map((s) => `
+    <div class="stat ${s.tone}">
+      <div class="k">${iconHTML(s.icon)}${s.k}</div>
+      <div class="v">${s.isHtml ? s.v : s.v}</div>
+    </div>
+  `).join('');
+
+  // Rows
+  $('count').textContent = LEDGER.length;
+  const okPill = `<span class="pill ok">${iconHTML('icon-check')}OK</span>`;
+  const badPill = `<span class="pill bad">${iconHTML('icon-x')}ĐỨT</span>`;
+  const matchPill = `<span class="pill ok">${iconHTML('icon-check')}KHỚP</span>`;
+  const mismatchPill = `<span class="pill bad">${iconHTML('icon-x')}LỆCH</span>`;
+  const unknownPill = `<span class="pill warn">${iconHTML('icon-help')}?</span>`;
+
+  $('rows').innerHTML = rows.map(({ e, i, linkGood, hashGood }) => `
+    <tr>
+      <td class="mono">${i + 1}</td>
+      <td><strong>${e.backupCode || '—'}</strong></td>
+      <td class="mono">${shortHash(e.sha256)}</td>
+      <td class="mono">${e.maxSeq ?? '—'}</td>
+      <td>${linkGood ? okPill : badPill}</td>
+      <td>${hashGood === null ? unknownPill : (hashGood ? matchPill : mismatchPill)}</td>
+      <td class="mono">${shortHash(e.anchorTxHash)}</td>
+      <td class="mono">${fmtTime(e.createdAtIso || e.createdAt)}</td>
+    </tr>`).join('');
+
+  $('result').classList.remove('hide');
+  $('reverify').disabled = LEDGER.length === 0;
+}
+
+function loadText(text) {
+  try {
+    LEDGER = text.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => JSON.parse(l));
+    render();
+  } catch (err) {
+    alert('Không đọc được tệp JSONL: ' + err.message);
+  }
+}
+
+// File input + drag/drop
+const drop = $('drop'), fileInput = $('file');
+drop.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => { const f = e.target.files[0]; if (f) f.text().then(loadText); });
+['dragover', 'dragenter'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]; if (f) f.text().then(loadText); });
+$('reverify').addEventListener('click', render);
+</script>
+</body>
+</html>

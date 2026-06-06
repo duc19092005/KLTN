@@ -16,35 +16,35 @@ export class DepartmentValidator {
 
   async ensureDepartment(id: string): Promise<any> {
     const department = await this.repo.findById(id);
-    if (!department) throw new NotFoundException('Department not found');
+    if (!department) throw new NotFoundException('Không tìm thấy phòng ban.');
     return department;
   }
 
   async assertStaffExists(id: string): Promise<StaffProfileInfo> {
     const staff = await this.repo.findStaffById(id);
-    if (!staff) throw new NotFoundException('Staff profile not found');
+    if (!staff) throw new NotFoundException('Không tìm thấy hồ sơ nhân sự.');
     return staff;
   }
 
   async assertNameUnique(name: string, excludeId?: string): Promise<void> {
     const existing = await this.repo.findByName(name);
-    if (existing && existing.id !== excludeId) throw new ConflictException('Department name already exists');
+    if (existing && existing.id !== excludeId) throw new ConflictException('Tên phòng ban đã tồn tại.');
   }
 
   async assertDepartmentCodeUnique(departmentCode: string, excludeId?: string): Promise<void> {
     const existing = await this.repo.findByDepartmentCode(departmentCode);
-    if (existing && existing.id !== excludeId) throw new ConflictException('Department code already exists');
+    if (existing && existing.id !== excludeId) throw new ConflictException('Mã phòng ban đã tồn tại.');
   }
 
   async assertManagerAvailable(managerId: string, departmentId?: string): Promise<void> {
     const existing = await this.repo.findDepartmentByManagerId(managerId);
-    if (existing && existing.id !== departmentId) throw new ConflictException('Staff is already manager of another department');
+    if (existing && existing.id !== departmentId) throw new ConflictException('Nhân sự này đã là trưởng phòng ban khác.');
   }
 
   /** Used by create(): a fresh manager must not already belong to a department. */
   assertManagerUnassignedForCreate(manager: StaffProfileInfo): void {
     if (manager.departmentId) {
-      throw new BadRequestException('Manager is already assigned to another department');
+      throw new BadRequestException('Trưởng phòng ban đã được gán cho phòng ban khác.');
     }
   }
 }

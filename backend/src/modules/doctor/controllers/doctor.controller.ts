@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
@@ -6,9 +8,10 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
-import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
+import { RequireStepUpSession } from '../../../common/stepup/require-stepup-session.decorator';
 import { AssignClinicalRoomDto, CreateDoctorDto, CreateDoctorWithStaffDto, DoctorQueryDto, UpdateDoctorDto } from '../dto/doctor.dto';
 import { DoctorService } from '../services/doctor.service';
+import { uploadAvatarToCloudinary } from '../../../infrastructure/storage/cloudinary-uploader';
 
 @UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
 @Roles('ADMIN')
@@ -18,13 +21,35 @@ import { DoctorService } from '../services/doctor.service';
 export class DoctorController {
   constructor(private readonly service: DoctorService) { }
 
+  @Post('upload-avatar')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_req, file, callback) => {
+        const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+        callback(null, allowed.includes(file.mimetype));
+      },
+    }),
+  )
+  @ApiOperation({ summary: 'Upload doctor/staff avatar to Cloudinary' })
+  async uploadAvatar(@UploadedFile() file: any) {
+    if (!file) {
+      throw new BadRequestException('Vui lòng chọn ảnh hợp lệ (PNG, JPG, WEBP).');
+    }
+    const url = await uploadAvatarToCloudinary(file);
+    return { url };
+  }
+
   @Post()
+  @RequireStepUpSession()
   @ApiOperation({ summary: 'Create a doctor profile for a staff profile with DOCTOR role' })
   create(@Body() dto: CreateDoctorDto) {
     return this.service.create(dto);
   }
 
   @Post('full')
+  @RequireStepUpSession()
   @ApiOperation({ summary: 'Create doctor user, staff profile, doctor profile, and optional room assignment in one transaction' })
   createFull(@Body() dto: CreateDoctorWithStaffDto) {
     return this.service.createWithStaff(dto);
@@ -68,7 +93,7 @@ export class DoctorController {
   }
 
   @Patch(':id')
-  @RequireFaceStepUp('UPDATE_DOCTOR')
+  @RequireStepUpSession()
   @ApiOperation({ summary: 'Update doctor specialty, license, qualification, or experience' })
   update(@Param('id') id: string, @Body() dto: UpdateDoctorDto, @CurrentUser() user: AuthUser) {
     return this.service.update(id, dto, user?.sub);

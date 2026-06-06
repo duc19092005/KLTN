@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthService } from '../services/auth.service';
 import { AuthRateLimiterService } from '../services/auth-rate-limiter.service';
@@ -16,14 +16,21 @@ import {
   StaffLoginDto,
   ChangePasswordDto,
   StepUpFaceDto,
+  OpenStepUpSessionDto,
+  UpdateAutoLockDto,
+  ForgotPasswordChallengeDto,
+  ForgotPasswordVerifyFaceDto,
+  ForgotPasswordResetDto,
 } from '../dto/auth.dto';
 import { getAuthCookieOptions, getClearAuthCookieOptions } from '../constants/auth-security';
+import { StepUpService } from '../../../common/stepup/stepup.service';
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private authService: AuthService,
     private rateLimiter: AuthRateLimiterService,
+    private stepUpService: StepUpService,
   ) {}
 
   @Post('bootstrap')
@@ -198,6 +205,53 @@ export class AuthController {
     }
   }
 
+  /**
+   * Open a step-up SESSION ("sudo mode") with one face scan. Authorizes many Tier-B sensitive
+   * writes within its idle/absolute window so users are not forced to re-scan per record.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('stepup-session')
+  async openStepUpSession(@CurrentUser() user: AuthUser, @Body() body: OpenStepUpSessionDto, @Req() request) {
+    const key = this.rateLimitKey(request, 'stepup-session', user.sub);
+    this.rateLimiter.assertAllowed(key, 5, 10 * 60 * 1000);
+    try {
+      const session = await this.authService.openStepUpSession(
+        user.sub,
+        body.embedding as number[],
+        body.challenge,
+        body.scope,
+        this.clientIp(request),
+      );
+      this.rateLimiter.reset(key);
+      return session;
+    } catch (error) {
+      this.rateLimiter.recordFailure(key, 10 * 60 * 1000);
+      throw error;
+    }
+  }
+
+  /** Report the caller's active step-up session deadlines (for the countdown badge), or none. */
+  @UseGuards(JwtAuthGuard)
+  @Get('stepup-session')
+  async getStepUpSession(@CurrentUser() user: AuthUser) {
+    return this.stepUpService.getActiveSession(user.sub);
+  }
+
+  /** Lock (revoke) the caller's active step-up sessions early — important on shared workstations. */
+  @UseGuards(JwtAuthGuard)
+  @Delete('stepup-session')
+  async revokeStepUpSession(@CurrentUser() user: AuthUser) {
+    await this.stepUpService.revokeSessions(user.sub);
+    return { success: true };
+  }
+
+  /** Save the caller's screen auto-lock preference (idle minutes). Server clamps to policy range. */
+  @UseGuards(JwtAuthGuard)
+  @Patch('auto-lock')
+  async updateAutoLock(@CurrentUser() user: AuthUser, @Body() body: UpdateAutoLockDto) {
+    return this.authService.updateAutoLock(user.sub, body.minutes);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post('generate-secret')
   async generateMfaSecret(@CurrentUser() user: AuthUser, @Res({ passthrough: true }) res: Response) {
@@ -210,6 +264,12 @@ export class AuthController {
   @Get('me')
   async getMe(@CurrentUser() user: AuthUser) {
     return this.authService.getMe(user.sub, Boolean(user.verified));
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('profile')
+  async getProfile(@CurrentUser() user: AuthUser) {
+    return this.authService.getMyProfile(user.sub);
   }
 
   @Post('logout')
@@ -233,6 +293,57 @@ export class AuthController {
   private rateLimitKey(req: any, action: string, subject: string) {
     const ip = this.clientIp(req);
     return `${action}:${ip}:${subject}`;
+  }
+
+  @Post('forgot-password/challenge')
+  async forgotPasswordChallenge(@Body() body: ForgotPasswordChallengeDto, @Req() req) {
+    const key = this.rateLimitKey(req, 'forgot-challenge', body.username.toLowerCase());
+    this.rateLimiter.assertAllowed(key, 5, 5 * 60 * 1000);
+    try {
+      const result = await this.authService.forgotPasswordChallenge(body.username);
+      this.rateLimiter.reset(key);
+      return result;
+    } catch (error) {
+      this.rateLimiter.recordFailure(key, 5 * 60 * 1000);
+      throw error;
+    }
+  }
+
+  @Post('forgot-password/verify-face')
+  async forgotPasswordVerifyFace(@Body() body: ForgotPasswordVerifyFaceDto, @Req() req) {
+    const key = this.rateLimitKey(req, 'forgot-verify', body.userId);
+    this.rateLimiter.assertAllowed(key, 5, 5 * 60 * 1000);
+    try {
+      const result = await this.authService.forgotPasswordVerifyFace(
+        body.userId,
+        body.embedding,
+        body.challenge,
+        this.clientIp(req),
+      );
+      this.rateLimiter.reset(key);
+      return result;
+    } catch (error) {
+      this.rateLimiter.recordFailure(key, 5 * 60 * 1000);
+      throw error;
+    }
+  }
+
+  @Post('forgot-password/reset')
+  async forgotPasswordReset(@Body() body: ForgotPasswordResetDto, @Req() req) {
+    const key = this.rateLimitKey(req, 'forgot-reset', 'global');
+    this.rateLimiter.assertAllowed(key, 10, 5 * 60 * 1000);
+    try {
+      const result = await this.authService.forgotPasswordReset(
+        body.resetToken,
+        body.newPassword,
+        this.clientIp(req),
+      );
+      this.rateLimiter.reset(key);
+      return result;
+    } catch (error) {
+      this.rateLimiter.recordFailure(key, 5 * 60 * 1000);
+      throw error;
+    }
   }
 
   private clientIp(req: any): string {

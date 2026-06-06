@@ -4,8 +4,10 @@ export const ADMIN_NAV_ITEMS = [
   { id: 'staff', label: 'Nhân sự', icon: 'users' },
   { id: 'doctors', label: 'Bác sĩ', icon: 'stethoscope' },
   { id: 'clinicalRooms', label: 'Phòng khám', icon: 'building' },
-  { id: 'aiModels', label: 'Model AI', icon: 'activity' },
+  { id: 'aiModels', label: 'Mô hình AI', icon: 'activity' },
   { id: 'audit', label: 'Nhật ký', icon: 'shield' },
+  { id: 'backup', label: 'Sao lưu', icon: 'database' },
+  { id: 'profile', label: 'Thông tin cá nhân', icon: 'user' },
 ];
 
 export const ADMIN_ROUTES = {
@@ -16,6 +18,8 @@ export const ADMIN_ROUTES = {
   clinicalRooms: '/admin/clinical-rooms',
   aiModels: '/admin/ai-models',
   audit: '/admin/audit',
+  backup: '/admin/backup',
+  profile: '/profile',
 };
 
 export function navigateAdmin(navigate, id) {

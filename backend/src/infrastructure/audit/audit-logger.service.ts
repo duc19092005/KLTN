@@ -7,6 +7,7 @@ import {
   computeEntryHash,
   GENESIS_PREV_HASH,
 } from './audit-hash.util';
+import { AuditAnchorService } from './audit-anchor.service';
 
 export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'ACCESS' | 'SECURITY';
 
@@ -23,6 +24,8 @@ const FK_FIELD: Record<string, string> = {
   AiModelRegistry: 'aiModelRegistryId',
   MedicalConclusion: 'medicalConclusionId',
   AiQuality: 'aiQualityId',
+  ParaclinicalShift: 'paraclinicalShiftId',
+  HandoverLog: 'handoverLogId',
 };
 
 /**
@@ -44,7 +47,10 @@ export class AuditLoggerService {
   // Serializes chain writes so seq/prevHash are assigned without races (single-instance scope).
   private chainMutex: Promise<unknown> = Promise.resolve();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly anchor: AuditAnchorService,
+  ) {}
 
   /** Compute a fresh salt + integrity hash for a snapshot. */
   hashSnapshot(snapshot: unknown): { salt: string; hash: string } {
@@ -180,10 +186,14 @@ export class AuditLoggerService {
     let expectedSeq = 1;
     for (const row of rows) {
       if (row.seq !== expectedSeq) {
-        return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason: `Sequence gap: expected ${expectedSeq}, got ${row.seq}` };
+        const reason = `Đứt quãng số thứ tự: mong đợi ${expectedSeq}, nhận được ${row.seq}`;
+        await this.anchor.sendTelegramAlert('Phát hiện đứt gãy chuỗi nhật ký (kiểm tra chuỗi)', reason, row.seq);
+        return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason };
       }
       if (row.prevHash !== expectedPrev) {
-        return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason: 'prevHash does not match previous entryHash (row inserted/removed/reordered)' };
+        const reason = 'prevHash không khớp entryHash liền trước; bản ghi có thể đã bị chèn, xóa hoặc sắp xếp lại';
+        await this.anchor.sendTelegramAlert('Phát hiện đứt gãy chuỗi nhật ký (kiểm tra chuỗi)', reason, row.seq);
+        return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason };
       }
       const recomputed = computeEntryHash(
         {
@@ -198,12 +208,30 @@ export class AuditLoggerService {
         row.prevHash ?? GENESIS_PREV_HASH,
       );
       if (recomputed !== row.entryHash) {
-        return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason: 'entryHash mismatch (row content was altered)' };
+        const reason = 'entryHash không khớp; nội dung bản ghi có thể đã bị sửa';
+        await this.anchor.sendTelegramAlert('Phát hiện đứt gãy chuỗi nhật ký (kiểm tra chuỗi)', reason, row.seq);
+        return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason };
       }
       expectedPrev = row.entryHash!;
       expectedSeq += 1;
     }
 
     return { ok: true, total: rows.length, brokenAtSeq: null, reason: null };
+  }
+
+  verifyEntry(row: any): boolean {
+    const recomputed = computeEntryHash(
+      {
+        seq: row.seq,
+        actorId: row.actorId,
+        action: row.action,
+        entity: row.entity,
+        entityId: row.entityId,
+        dataHash: row.dataHash,
+        createdAtIso: row.createdAt instanceof Date ? row.createdAt.toISOString() : new Date(row.createdAt).toISOString(),
+      },
+      row.prevHash ?? GENESIS_PREV_HASH,
+    );
+    return recomputed === row.entryHash;
   }
 }

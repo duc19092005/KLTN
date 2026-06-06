@@ -11,18 +11,18 @@ export class AuthUserLookupService {
 
   async getAuthUser(userId: string): Promise<UserWithProfile> {
     const user = await this.repo.findUserWithProfile(userId);
-    if (!user) throw new UnauthorizedException('User not found');
-    if (user.status === 'INACTIVE') throw new UnauthorizedException('Account suspended');
+    if (!user) throw new UnauthorizedException('Không tìm thấy tài khoản.');
+    if (user.status === 'INACTIVE') throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa.');
     return user;
   }
 
   async getAdminUser(userId: string): Promise<UserWithProfile> {
     const user = await this.repo.findUserWithProfile(userId);
     if (!user || user.role !== 'ADMIN' || !user.adminProfile) {
-      throw new UnauthorizedException('Admin not found');
+      throw new UnauthorizedException('Không tìm thấy tài khoản quản trị.');
     }
     if (user.status === 'INACTIVE') {
-      throw new UnauthorizedException('Account suspended');
+      throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa.');
     }
     return user;
   }

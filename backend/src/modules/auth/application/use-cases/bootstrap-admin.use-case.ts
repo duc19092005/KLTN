@@ -15,16 +15,16 @@ export class BootstrapAdminUseCase {
   async execute(username: string, email: string, superAdminSecret: string) {
     const bootstrapSecret = process.env.BOOTSTRAP_ADMIN_SECRET || process.env.SUPER_ADMIN_PRIVATE_KEY;
     if (!bootstrapSecret || bootstrapSecret === 'your_super_admin_private_key_here') {
-      throw new ForbiddenException('BOOTSTRAP_ADMIN_SECRET or SUPER_ADMIN_PRIVATE_KEY is not configured');
+      throw new ForbiddenException('Chưa cấu hình khóa khởi tạo quản trị viên.');
     }
 
     if (!timingSafeEquals(superAdminSecret, bootstrapSecret)) {
-      throw new ForbiddenException('Invalid bootstrap secret');
+      throw new ForbiddenException('Khóa khởi tạo quản trị viên không hợp lệ.');
     }
 
     const existingAdmin = await this.repo.findFirstAdmin();
     if (existingAdmin) {
-      throw new ForbiddenException('An Admin account already exists.');
+      throw new ForbiddenException('Tài khoản quản trị đã tồn tại.');
     }
 
     const rawInviteToken = crypto.randomBytes(32).toString('hex');
@@ -38,7 +38,7 @@ export class BootstrapAdminUseCase {
     });
 
     return {
-      message: 'First Admin account created successfully.',
+      message: 'Tạo tài khoản quản trị đầu tiên thành công.',
       user: { id: user.id, username: user.username, email: user.email, role: user.role },
       inviteToken: rawInviteToken,
       inviteTokenExpiresAt: inviteTokenExpiry.toISOString(),

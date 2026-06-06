@@ -11,52 +11,28 @@ async function main() {
   await identityRegistry.waitForDeployment();
   const identityRegistryAddress = await identityRegistry.getAddress();
 
-  // 2. DepartmentRegistry (key-value integrity hashes) -----------------------
-  const DepartmentRegistry = await hre.ethers.getContractFactory('DepartmentRegistry');
-  const departmentRegistry = await DepartmentRegistry.deploy(identityRegistryAddress);
-  await departmentRegistry.waitForDeployment();
-  const departmentRegistryAddress = await departmentRegistry.getAddress();
-
-  // 3. FaceRegistry (face-template integrity hashes) -------------------------
+  // 2. FaceRegistry (face-template integrity hashes) -------------------------
   const FaceRegistry = await hre.ethers.getContractFactory('FaceRegistry');
   const faceRegistry = await FaceRegistry.deploy(identityRegistryAddress);
   await faceRegistry.waitForDeployment();
   const faceRegistryAddress = await faceRegistry.getAddress();
 
-  // 4. AuditAnchor (Merkle root logger, shared by services) ------------------
+  // 3. AuditAnchor (Merkle root logger, shared by services) ------------------
   const AuditAnchor = await hre.ethers.getContractFactory('AuditAnchor');
   const auditAnchor = await AuditAnchor.deploy(identityRegistryAddress);
   await auditAnchor.waitForDeployment();
   const auditAnchorAddress = await auditAnchor.getAddress();
 
-  // 5. StaffRegistry (staff + doctor integrity hashes) -----------------------
-  const StaffRegistry = await hre.ethers.getContractFactory('StaffRegistry');
-  const staffRegistry = await StaffRegistry.deploy(identityRegistryAddress);
-  await staffRegistry.waitForDeployment();
-  const staffRegistryAddress = await staffRegistry.getAddress();
-
-  // 6. AIModelRegistry (AI model integrity hashes) ---------------------------
-  const AIModelRegistryContract = await hre.ethers.getContractFactory('AIModelRegistry');
-  const aiModelRegistry = await AIModelRegistryContract.deploy(identityRegistryAddress);
-  await aiModelRegistry.waitForDeployment();
-  const aiModelRegistryAddress = await aiModelRegistry.getAddress();
-
   console.log('\n========== Deployment Summary ==========');
   console.log(`IdentityRegistry:   ${identityRegistryAddress}`);
-  console.log(`DepartmentRegistry: ${departmentRegistryAddress}`);
   console.log(`FaceRegistry:       ${faceRegistryAddress}`);
   console.log(`AuditAnchor:        ${auditAnchorAddress}`);
-  console.log(`StaffRegistry:      ${staffRegistryAddress}`);
-  console.log(`AIModelRegistry:    ${aiModelRegistryAddress}`);
   console.log(`Admin:              ${deployer.address}`);
   console.log('=========================================');
   console.log('\nAdd these to backend .env:');
   console.log(`IDENTITY_REGISTRY_ADDRESS=${identityRegistryAddress}`);
-  console.log(`DEPARTMENT_REGISTRY_ADDRESS=${departmentRegistryAddress}`);
   console.log(`FACE_REGISTRY_ADDRESS=${faceRegistryAddress}`);
   console.log(`AUDIT_ANCHOR_ADDRESS=${auditAnchorAddress}`);
-  console.log(`STAFF_REGISTRY_ADDRESS=${staffRegistryAddress}`);
-  console.log(`AI_MODEL_REGISTRY_ADDRESS=${aiModelRegistryAddress}`);
 }
 
 main()

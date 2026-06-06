@@ -1,0 +1,46 @@
+import { IsString, IsDateString, IsUUID, IsOptional, Length } from 'class-validator';
+
+export class RegisterShiftDto {
+  @IsUUID()
+  clinicalRoomId: string;
+
+  @IsDateString()
+  startTime: string;
+
+  @IsDateString()
+  endTime: string;
+}
+
+export class ApproveShiftDto {
+  @IsUUID()
+  shiftId: string;
+}
+
+export class RejectShiftDto {
+  @IsUUID()
+  shiftId: string;
+}
+
+export class AssignShiftDto {
+  @IsUUID()
+  staffId: string;
+
+  @IsUUID()
+  clinicalRoomId: string;
+
+  @IsDateString()
+  startTime: string;
+
+  @IsDateString()
+  endTime: string;
+}
+
+export class ListRoomShiftsDto {
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @IsOptional()
+  @IsDateString()
+  to?: string;
+}

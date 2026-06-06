@@ -21,7 +21,7 @@ export class CreateAiModelUseCase {
 
   async execute(dto: CreateAiModelDto, adminUserId: string) {
     if (dto.type === 'API' && !dto.provider) {
-      throw new BadRequestException('Provider is required when adding AI model by API');
+      throw new BadRequestException('Vui lòng chọn nhà cung cấp khi thêm mô hình AI qua API.');
     }
     const apiEndpoint = dto.type === 'API' ? this.connectivity.resolveApiEndpoint(dto.provider || 'other', dto.apiEndpoint, dto.modelVersion) : null;
 

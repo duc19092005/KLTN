@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
+import { PaginationQueryDto } from '../../shared/pagination.dto';
+
 export const AI_MODEL_TYPES = ['API', 'IP'] as const;
 export const AI_API_PROVIDERS = ['chatgpt', 'gemini', 'deepseek', 'qwen', 'anthropic', 'local', 'other'] as const;
 
@@ -54,16 +56,16 @@ export class CreateAiModelDto {
   description?: string;
 }
 
-export class AiModelQueryDto {
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  search?: string;
-
+export class AiModelQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ enum: AI_MODEL_TYPES })
   @IsOptional()
   @IsIn(AI_MODEL_TYPES)
   type?: 'API' | 'IP';
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  provider?: string;
 }
 
 export class TestAiModelApiDto {
@@ -86,4 +88,15 @@ export class TestAiModelApiDto {
   @IsString()
   @MaxLength(500)
   apiEndpoint?: string;
+}
+
+export class RateAiModelDto {
+  @ApiProperty({ example: true, description: 'True nếu hài lòng/mô hình dự đoán đúng, False nếu không' })
+  satisfied!: boolean;
+
+  @ApiPropertyOptional({ example: 'Mô hình dự đoán chưa chính xác về kết quả chụp X-quang phổi', description: 'Ghi chú lý do nếu không hài lòng' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  feedback?: string;
 }

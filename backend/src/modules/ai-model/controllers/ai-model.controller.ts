@@ -5,18 +5,21 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
-import { AiModelQueryDto, CreateAiModelDto, TestAiModelApiDto } from '../dto/ai-model.dto';
+import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
+import { RequireStepUpSession } from '../../../common/stepup/require-stepup-session.decorator';
+import { AiModelQueryDto, CreateAiModelDto, TestAiModelApiDto, RateAiModelDto } from '../dto/ai-model.dto';
 import { AiModelService } from '../services/ai-model.service';
 
 @ApiTags('AI Model Registry')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
 @Controller('ai-models')
 export class AiModelController {
   constructor(private readonly service: AiModelService) {}
 
   @Roles('ADMIN')
   @Post()
+  @RequireStepUpSession()
   create(@Body() dto: CreateAiModelDto, @CurrentUser() user: AuthUser) {
     return this.service.create(dto, user.sub);
   }
@@ -37,6 +40,12 @@ export class AiModelController {
   @Get('audit/verify')
   verifyAll() {
     return this.service.verifyAll();
+  }
+
+  @Roles('ADMIN', 'DOCTOR')
+  @Get('stats/overview')
+  getStats() {
+    return this.service.getStats();
   }
 
   @Roles('ADMIN', 'DOCTOR')
@@ -61,6 +70,13 @@ export class AiModelController {
   @Get()
   findAll(@Query() query: AiModelQueryDto) {
     return this.service.findAll(query);
+  }
+
+  @Roles('DOCTOR')
+  @Post(':id/rate')
+  @RequireStepUpSession()
+  rate(@Param('id') id: string, @Body() dto: RateAiModelDto, @CurrentUser() user: AuthUser) {
+    return this.service.rateModel(id, user.sub, dto.satisfied, dto.feedback);
   }
 }
 

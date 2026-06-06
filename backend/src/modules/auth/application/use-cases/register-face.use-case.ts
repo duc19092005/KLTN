@@ -29,7 +29,7 @@ export class RegisterFaceUseCase {
     const user = await this.lookup.getAuthUser(userId);
 
     if (!user.firstLogin && user.faceEmbedding) {
-      throw new ForbiddenException('Face data is already registered');
+      throw new ForbiddenException('Dữ liệu khuôn mặt đã được đăng ký.');
     }
 
     const faceEmbeddingJson = JSON.stringify(descriptors);

@@ -19,14 +19,14 @@ export class CreateMedicalResultUseCase {
 
   async execute(orderId: string, dto: CreateMedicalResultDto, user: AuthUser): Promise<unknown> {
     const order = await this.repo.findOrderForManage(orderId);
-    if (!order) throw new NotFoundException('Medical order not found');
+    if (!order) throw new NotFoundException('Không tìm thấy phiếu chỉ định.');
 
     await this.accessPolicy.assertCanManageOrder(order, user, () => this.resolveStaff(user.sub));
 
     if (([MedicalOrderStatus.RESULT_READY, MedicalOrderStatus.CANCELLED] as MedicalOrderStatus[]).includes(order.status)) {
-      throw new BadRequestException('Cannot return result for an order that is already ready/completed/cancelled');
+      throw new BadRequestException('Không thể trả kết quả cho phiếu đã sẵn sàng, hoàn tất hoặc đã hủy.');
     }
-    if (!dto.files?.length) throw new BadRequestException('At least one result PDF/image file is required');
+    if (!dto.files?.length) throw new BadRequestException('Vui lòng cung cấp ít nhất một file kết quả PDF hoặc hình ảnh.');
 
     return this.repo.createResultWithTransitions(
       {
@@ -47,7 +47,7 @@ export class CreateMedicalResultUseCase {
 
   private async resolveStaff(userId: string) {
     const staff = await this.repo.findStaffByUserId(userId);
-    if (!staff) throw new ForbiddenException('Current user does not have staff profile');
+    if (!staff) throw new ForbiddenException('Tài khoản hiện tại không có hồ sơ nhân sự.');
     return staff;
   }
 }

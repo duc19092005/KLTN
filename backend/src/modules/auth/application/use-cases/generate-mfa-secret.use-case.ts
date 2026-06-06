@@ -24,16 +24,16 @@ export class GenerateMfaSecretUseCase {
     const user = await this.lookup.getAdminUser(userId);
 
     if (!user.firstLogin) {
-      throw new ForbiddenException('Recovery secret has already been generated');
+      throw new ForbiddenException('Mã khôi phục đã được tạo trước đó.');
     }
     if (!user.faceEmbedding) {
-      throw new UnauthorizedException('Please register face before generating recovery secret');
+      throw new UnauthorizedException('Vui lòng đăng ký khuôn mặt trước khi tạo mã khôi phục.');
     }
     if (!user.adminProfile!.walletAddress) {
-      throw new UnauthorizedException('Please bind wallet before generating recovery secret');
+      throw new UnauthorizedException('Vui lòng liên kết ví trước khi tạo mã khôi phục.');
     }
     if (user.adminProfile!.mfaSecret) {
-      throw new ForbiddenException('Recovery secret has already been generated');
+      throw new ForbiddenException('Mã khôi phục đã được tạo trước đó.');
     }
 
     const secret = this.cipher.generateSecret();

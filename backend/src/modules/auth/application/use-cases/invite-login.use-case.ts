@@ -24,12 +24,12 @@ export class InviteLoginUseCase {
     const tokenHash = hashInviteToken(trimmedToken);
     const user = await this.repo.findUserByInviteTokenCandidates([tokenHash, trimmedToken]);
 
-    if (!user) throw new UnauthorizedException('Invalid invite token');
-    if (user.role !== 'ADMIN') throw new UnauthorizedException('Invite token is not for Admin');
-    if (!user.firstLogin) throw new UnauthorizedException('Invite token already used');
+    if (!user) throw new UnauthorizedException('Mã mời không hợp lệ.');
+    if (user.role !== 'ADMIN') throw new UnauthorizedException('Mã mời này không dành cho tài khoản quản trị.');
+    if (!user.firstLogin) throw new UnauthorizedException('Mã mời đã được sử dụng.');
     // Trace: admin first-login via invite token (success path continues below).
     if (user.inviteTokenExpiry && user.inviteTokenExpiry < new Date()) {
-      throw new UnauthorizedException('Invite token has expired');
+      throw new UnauthorizedException('Mã mời đã hết hạn.');
     }
 
     if (user.inviteToken !== tokenHash) {

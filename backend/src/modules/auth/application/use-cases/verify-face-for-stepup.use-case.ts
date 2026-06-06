@@ -45,7 +45,7 @@ export class VerifyFaceForStepUpUseCase {
 
     // Single-use challenge (anti-replay) consumed before matching.
     const consumed = await this.repo.consumeFaceChallenge(userId, challenge, new Date());
-    if (consumed !== 1) throw new UnauthorizedException('Invalid or expired face challenge');
+    if (consumed !== 1) throw new UnauthorizedException('Yêu cầu xác thực khuôn mặt không hợp lệ hoặc đã hết hạn.');
 
     const storedDescriptors = this.faceMatch.decodeStoredDescriptors(user.faceEmbedding);
 

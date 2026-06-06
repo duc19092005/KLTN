@@ -6,13 +6,19 @@ import { useToast } from '../../../providers/ToastProvider';
 const STATUS_TONE = {
   VERIFIED: { label: 'Khớp blockchain', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
   TAMPERED: { label: 'Đã bị sửa đổi', cls: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500' },
-  UNANCHORED: { label: 'Chưa neo on-chain', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
+  UNANCHORED: { label: 'Chưa neo trên chuỗi', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
 };
 
 const ACTION_TONE = {
   CREATE: 'bg-blue-50 text-blue-700 border-blue-100',
   UPDATE: 'bg-indigo-50 text-indigo-700 border-indigo-100',
   DELETE: 'bg-red-50 text-red-700 border-red-100',
+};
+
+const ACTION_LABEL = {
+  CREATE: 'Tạo mới',
+  UPDATE: 'Cập nhật',
+  DELETE: 'Xóa',
 };
 
 function shortHash(hash) {
@@ -67,7 +73,7 @@ export default function DepartmentAuditModal({ onClose }) {
         <div className="shrink-0 border-b border-slate-100 p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600">Blockchain Audit</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600">Kiểm toán blockchain</p>
               <h3 className="mt-1 text-2xl font-black text-slate-950">Xác thực & Lịch sử thay đổi</h3>
               <p className="mt-1 text-sm text-slate-500">Đối chiếu hash trong CSDL với blockchain để phát hiện dữ liệu bị sửa đổi.</p>
             </div>
@@ -81,7 +87,7 @@ export default function DepartmentAuditModal({ onClose }) {
             <SummaryChip tone="TAMPERED" value={summary.TAMPERED || 0} label="Bị sửa" />
             <SummaryChip tone="UNANCHORED" value={summary.UNANCHORED || 0} label="Chưa neo" />
             <button type="button" onClick={load} disabled={loading} className="ml-auto rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-black text-blue-700 hover:bg-blue-100 disabled:opacity-50">
-              {loading ? 'Đang kiểm tra…' : '↻ Kiểm tra lại'}
+              {loading ? 'Đang kiểm tra…' : 'Kiểm tra lại'}
             </button>
           </div>
 
@@ -127,7 +133,7 @@ function VerifyList({ items }) {
             </div>
             <div className="mt-3 grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-2">
               <HashRow label="Hash tính lại (DB)" value={item.recomputedHash} match={item.dbMatches} />
-              <HashRow label="Hash on-chain" value={item.onChainHash} match={item.chainMatches} />
+              <HashRow label="Hash trên chuỗi" value={item.onChainHash} match={item.chainMatches} />
             </div>
           </div>
         );
@@ -144,14 +150,14 @@ function HistoryList({ items }) {
         <div key={log.id} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <span className={`rounded-lg border px-2 py-1 text-[10px] font-black ${ACTION_TONE[log.action] || 'bg-slate-50 text-slate-600 border-slate-100'}`}>{log.action}</span>
+              <span className={`rounded-lg border px-2 py-1 text-[10px] font-black ${ACTION_TONE[log.action] || 'bg-slate-50 text-slate-600 border-slate-100'}`}>{ACTION_LABEL[log.action] || log.action}</span>
               <span className="text-sm font-black text-slate-900">{log.afterJson?.name || log.beforeJson?.name || log.entityId}</span>
             </div>
             <span className="text-[11px] font-semibold text-slate-400">{formatTime(log.createdAt)}</span>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
             <span className={`rounded-md border px-2 py-0.5 font-black ${log.onChainStatus === 'ANCHORED' ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-amber-100 bg-amber-50 text-amber-700'}`}>
-              {log.onChainStatus === 'ANCHORED' ? 'Đã neo on-chain' : (log.onChainStatus || 'PENDING')}
+              {log.onChainStatus === 'ANCHORED' ? 'Đã neo trên chuỗi' : 'Chờ neo trên chuỗi'}
             </span>
             {log.txHash && <span className="font-mono text-slate-500">tx: {shortHash(log.txHash)}</span>}
             {log.dataHash && <span className="font-mono text-slate-500">hash: {shortHash(log.dataHash)}</span>}

@@ -70,7 +70,7 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
             });
             patientId = patient.id;
           }
-          if (!patientId) throw new BadRequestException('Patient is required');
+          if (!patientId) throw new BadRequestException('Vui lòng chọn bệnh nhân.');
           const visitCode = await this.generateVisitCode(tx);
           return tx.visit.create({
             data: {
@@ -88,7 +88,7 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
       }
     }
 
-    throw new BadRequestException('Cannot generate unique patient/visit code');
+    throw new BadRequestException('Không thể tạo mã bệnh nhân hoặc mã lượt khám duy nhất.');
   }
 
   async findManyPaginated(filter: VisitListFilter, skip: number, take: number) {

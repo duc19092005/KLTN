@@ -20,8 +20,8 @@ export default function ReceptionistQueuePage() {
               <h1 className="mt-1 text-2xl font-black text-slate-950">Lượt khám</h1>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => navigate('/receptionist/intake')} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white shadow-sm hover:bg-cyan-700">+ Tiếp nhận</button>
-              <button onClick={() => setRefreshKey((v) => v + 1)} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 hover:bg-slate-50">↻</button>
+              <button onClick={() => navigate('/receptionist/intake')} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white shadow-sm hover:bg-cyan-700">Tiếp nhận</button>
+              <button onClick={() => setRefreshKey((v) => v + 1)} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 hover:bg-slate-50">Làm mới</button>
             </div>
           </div>
         </section>

@@ -7,4 +7,6 @@ export const STEPUP_TICKET_ISSUER = Symbol('STEPUP_TICKET_ISSUER');
  */
 export interface StepUpTicketIssuerPort {
   issue(userId: string, action: string, resourceId?: string | null, ip?: string): Promise<unknown>;
+  /** Open a reusable, short-lived privilege session ("sudo mode") for Tier-B sensitive writes. */
+  issueSession(userId: string, scope?: string, ip?: string): Promise<unknown>;
 }

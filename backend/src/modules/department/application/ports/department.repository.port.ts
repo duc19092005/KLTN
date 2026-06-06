@@ -1,4 +1,4 @@
-import { DepartmentType, OperationalStatus } from '@prisma/client';
+import { DepartmentType, OperationalStatus, UserRole } from '@prisma/client';
 
 /** DI token for the Department repository port. */
 export const DEPARTMENT_REPOSITORY = Symbol('DEPARTMENT_REPOSITORY');
@@ -35,6 +35,13 @@ export type UpdateDepartmentData = {
   specialty?: string | null;
 };
 
+export type SharedUserData = {
+  username: string;
+  email: string;
+  passwordHash: string;
+  role: UserRole;
+};
+
 export type StaffProfileInfo = { id: string; departmentId: string | null };
 
 /**
@@ -51,14 +58,20 @@ export interface DepartmentRepositoryPort {
   findDepartmentByManagerId(managerId: string): Promise<{ id: string } | null>;
   countStaff(departmentId: string): Promise<number>;
 
-  /** Atomic: create department + (optional) assign manager's departmentId. */
-  createWithManager(data: CreateDepartmentData): Promise<any>;
+  /** Atomic: create department + (optional) assign manager's departmentId + create shared user. */
+  createWithManager(data: CreateDepartmentData, sharedUser?: SharedUserData): Promise<any>;
 
   findManyPaginated(filter: DepartmentListFilter, skip: number, take: number): Promise<{ items: unknown[]; total: number }>;
 
   update(id: string, data: UpdateDepartmentData): Promise<any>;
   assignManager(id: string, managerId: string | null): Promise<any>;
   setStaffDepartment(staffId: string, departmentId: string): Promise<void>;
+
+  /** Update the User role for a given userId. */
+  updateUserRole(userId: string, role: UserRole): Promise<void>;
+
+  /** Find staff with user info for role promotion. */
+  findStaffWithUser(staffId: string): Promise<{ id: string; userId: string; user: { id: string; role: UserRole } } | null>;
 
   /** Detach BlockchainLogger FK rows then delete the department. */
   deleteWithLogDetach(id: string): Promise<void>;

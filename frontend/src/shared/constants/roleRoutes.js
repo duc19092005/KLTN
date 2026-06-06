@@ -3,6 +3,7 @@ export const ROLE_DASHBOARD_ROUTES = {
   RECEPTIONIST: '/receptionist',
   DOCTOR: '/doctor',
   LAB_MANAGER: '/lab-manager',
+  DEPT_SHARED: '/lab-manager',
 };
 
 export function getDashboardRoute(role) {

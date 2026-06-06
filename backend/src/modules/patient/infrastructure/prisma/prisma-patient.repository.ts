@@ -20,6 +20,27 @@ export class PrismaPatientRepository implements PatientRepositoryPort {
     return this.prisma.patient.findUnique({ where: { id }, include: this.includeRelations() });
   }
 
+  async findByPatientCode(patientCode: string): Promise<any | null> {
+    return this.prisma.patient.findUnique({
+      where: { patientCode },
+      include: {
+        visits: {
+          orderBy: { checkInAt: 'desc' as const },
+          include: {
+            clinicalRoom: true,
+            doctor: { include: { staffProfile: true } },
+            finalConclusion: {
+              include: {
+                aiDiagnosis: { include: { aiModel: true } },
+                doctor: { include: { staffProfile: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   async generatePatientCode(): Promise<string> {
     const latest = await this.prisma.patient.findFirst({ where: { patientCode: { startsWith: 'BN-' } }, orderBy: { patientCode: 'desc' }, select: { patientCode: true } });
     const lastNumber = Number(latest?.patientCode?.replace('BN-', '') || '0');

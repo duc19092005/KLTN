@@ -5,6 +5,7 @@ import axios from 'axios';
 import App from './routes/AppRoutes';
 import { AuthProvider } from './providers/AuthProvider';
 import { ToastProvider } from './providers/ToastProvider';
+import { StepUpSessionProvider, ScreenLockProvider } from './features/auth';
 import './index.css';
 
 axios.defaults.withCredentials = true;
@@ -14,7 +15,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
-          <App />
+          <StepUpSessionProvider>
+            <ScreenLockProvider>
+              <App />
+            </ScreenLockProvider>
+          </StepUpSessionProvider>
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>

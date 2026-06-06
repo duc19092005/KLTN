@@ -32,7 +32,27 @@ export const authService = {
   faceStepUp: (embedding, challenge, action, resourceId) =>
     api.post('/auth/face-stepup', { embedding, challenge, action, resourceId }),
 
+  // Step-up SESSION ("sudo mode"): one scan opens a reusable short-lived privilege window.
+  openStepUpSession: (embedding, challenge, scope) =>
+    api.post('/auth/stepup-session', { embedding, challenge, scope }),
+  getStepUpSession: () => api.get('/auth/stepup-session'),
+  revokeStepUpSession: () => api.delete('/auth/stepup-session'),
+
+  // Screen auto-lock preference (idle minutes). Server clamps to the policy range (1..15).
+  updateAutoLock: (minutes) => api.patch('/auth/auto-lock', { minutes }),
+
   getMe: () => api.get('/auth/me'),
 
+  getProfile: () => api.get('/auth/profile'),
+
   logout: () => api.post('/auth/logout'),
+
+  forgotPasswordChallenge: (username) =>
+    api.post('/auth/forgot-password/challenge', { username }),
+
+  forgotPasswordVerifyFace: (userId, embedding, challenge) =>
+    api.post('/auth/forgot-password/verify-face', { userId, embedding, challenge }),
+
+  forgotPasswordReset: (resetToken, newPassword) =>
+    api.post('/auth/forgot-password/reset', { resetToken, newPassword }),
 };

@@ -22,21 +22,9 @@ export class BlockchainService implements OnModuleInit {
   private contractAddress = '';
   private superAdminSigner: ethers.Wallet | null = null;
 
-  // DepartmentRegistry: on-chain key-value store of department integrity hashes.
-  private departmentRegistry: ethers.Contract | null = null;
-  private departmentRegistryAddress = '';
-
   // FaceRegistry: on-chain key-value store of face-template integrity hashes.
   private faceRegistry: ethers.Contract | null = null;
   private faceRegistryAddress = '';
-
-  // StaffRegistry: on-chain key-value store of staff + doctor integrity hashes.
-  private staffRegistry: ethers.Contract | null = null;
-  private staffRegistryAddress = '';
-
-  // AIModelRegistry: on-chain key-value store of AI model integrity hashes.
-  private aiModelRegistry: ethers.Contract | null = null;
-  private aiModelRegistryAddress = '';
 
   // AuditAnchor: append-only Merkle-root logger. The backend commits one Merkle root per batch
   // of audit logs (gas flat regardless of batch size); individual logs are never stored on-chain.
@@ -54,36 +42,11 @@ export class BlockchainService implements OnModuleInit {
     'function recordAction(bytes32 actionHash) external',
   ];
 
-  private readonly departmentRegistryAbi = [
-    'function setHash(bytes32 key, bytes32 value) external',
-    'function removeHash(bytes32 key) external',
-    'function getHash(bytes32 key) external view returns (bytes32)',
-    'function hasHash(bytes32 key) external view returns (bool)',
-    'function owner() external view returns (address)',
-  ];
-
   private readonly faceRegistryAbi = [
     'function setFaceHash(bytes32 key, bytes32 value) external',
     'function removeFaceHash(bytes32 key) external',
     'function getFaceHash(bytes32 key) external view returns (bytes32)',
     'function hasFaceHash(bytes32 key) external view returns (bool)',
-    'function owner() external view returns (address)',
-  ];
-
-  // StaffRegistry and AIModelRegistry share the same ABI shape as DepartmentRegistry.
-  private readonly staffRegistryAbi = [
-    'function setHash(bytes32 key, bytes32 value) external',
-    'function removeHash(bytes32 key) external',
-    'function getHash(bytes32 key) external view returns (bytes32)',
-    'function hasHash(bytes32 key) external view returns (bool)',
-    'function owner() external view returns (address)',
-  ];
-
-  private readonly aiModelRegistryAbi = [
-    'function setHash(bytes32 key, bytes32 value) external',
-    'function removeHash(bytes32 key) external',
-    'function getHash(bytes32 key) external view returns (bytes32)',
-    'function hasHash(bytes32 key) external view returns (bool)',
     'function owner() external view returns (address)',
   ];
 
@@ -117,15 +80,6 @@ export class BlockchainService implements OnModuleInit {
       console.warn('⚠️ IDENTITY_REGISTRY_ADDRESS not set. Blockchain checks disabled.');
     }
 
-    this.departmentRegistryAddress = process.env.DEPARTMENT_REGISTRY_ADDRESS || '';
-    if (this.departmentRegistryAddress) {
-      const runner = this.superAdminSigner || this.provider;
-      this.departmentRegistry = new ethers.Contract(this.departmentRegistryAddress, this.departmentRegistryAbi, runner);
-      console.log(`✅ Connected to DepartmentRegistry at ${this.departmentRegistryAddress}`);
-    } else {
-      console.warn('⚠️ DEPARTMENT_REGISTRY_ADDRESS not set. Department on-chain anchoring disabled.');
-    }
-
     this.faceRegistryAddress = process.env.FACE_REGISTRY_ADDRESS || '';
     if (this.faceRegistryAddress) {
       const runner = this.superAdminSigner || this.provider;
@@ -133,24 +87,6 @@ export class BlockchainService implements OnModuleInit {
       console.log(`✅ Connected to FaceRegistry at ${this.faceRegistryAddress}`);
     } else {
       console.warn('⚠️ FACE_REGISTRY_ADDRESS not set. Face integrity anchoring disabled.');
-    }
-
-    this.staffRegistryAddress = process.env.STAFF_REGISTRY_ADDRESS || '';
-    if (this.staffRegistryAddress) {
-      const runner = this.superAdminSigner || this.provider;
-      this.staffRegistry = new ethers.Contract(this.staffRegistryAddress, this.staffRegistryAbi, runner);
-      console.log(`✅ Connected to StaffRegistry at ${this.staffRegistryAddress}`);
-    } else {
-      console.warn('⚠️ STAFF_REGISTRY_ADDRESS not set. Staff on-chain anchoring disabled.');
-    }
-
-    this.aiModelRegistryAddress = process.env.AI_MODEL_REGISTRY_ADDRESS || '';
-    if (this.aiModelRegistryAddress) {
-      const runner = this.superAdminSigner || this.provider;
-      this.aiModelRegistry = new ethers.Contract(this.aiModelRegistryAddress, this.aiModelRegistryAbi, runner);
-      console.log(`✅ Connected to AIModelRegistry at ${this.aiModelRegistryAddress}`);
-    } else {
-      console.warn('⚠️ AI_MODEL_REGISTRY_ADDRESS not set. AI Model on-chain anchoring disabled.');
     }
 
     this.auditAnchorAddress = process.env.AUDIT_ANCHOR_ADDRESS || '';
@@ -183,7 +119,7 @@ export class BlockchainService implements OnModuleInit {
   async setFaceHash(userId: string, valueBytes32: string) {
     return this.enqueueWrite(async () => {
       if (!this.faceRegistry || !this.superAdminSigner) {
-        return { success: false, error: 'FaceRegistry or Super Admin signer not configured' };
+        return { success: false, error: 'Chưa cấu hình FaceRegistry hoặc khóa ký của Super Admin.' };
       }
       try {
         const key = this.faceKey(userId);
@@ -201,7 +137,7 @@ export class BlockchainService implements OnModuleInit {
   async removeFaceHash(userId: string) {
     return this.enqueueWrite(async () => {
       if (!this.faceRegistry || !this.superAdminSigner) {
-        return { success: false, error: 'FaceRegistry or Super Admin signer not configured' };
+        return { success: false, error: 'Chưa cấu hình FaceRegistry hoặc khóa ký của Super Admin.' };
       }
       try {
         const key = this.faceKey(userId);
@@ -233,211 +169,7 @@ export class BlockchainService implements OnModuleInit {
     }
   }
 
-  /**
-   * Derive the on-chain key for a department from its off-chain UUID.
-   * keccak256(departmentId) maps an arbitrary-length id to a fixed bytes32 slot.
-   */
-  departmentKey(departmentId: string): string {
-    return ethers.keccak256(ethers.toUtf8Bytes(departmentId));
-  }
-
-  /** Whether the DepartmentRegistry contract is available for writes. */
-  isDepartmentRegistryReady(): boolean {
-    return Boolean(this.departmentRegistry && this.superAdminSigner);
-  }
-
-  /**
-   * Mirror a department's integrity hash on-chain.
-   * @param departmentId off-chain UUID
-   * @param valueBytes32 0x-prefixed 32-byte SHA256 hash of the salted canonical data
-   */
-  async setDepartmentHash(departmentId: string, valueBytes32: string) {
-    return this.enqueueWrite(async () => {
-      if (!this.departmentRegistry || !this.superAdminSigner) {
-        return { success: false, error: 'DepartmentRegistry or Super Admin signer not configured' };
-      }
-      try {
-        const key = this.departmentKey(departmentId);
-        const writable = this.departmentRegistry.connect(this.superAdminSigner) as ethers.Contract;
-        const tx = await writable.setHash(key, valueBytes32);
-        const receipt = await tx.wait();
-        return { success: true, key, txHash: tx.hash, blockNumber: receipt.blockNumber };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to set department hash' };
-      }
-    });
-  }
-
-  /** Remove a department's hash on-chain (used on delete). */
-  async removeDepartmentHash(departmentId: string) {
-    return this.enqueueWrite(async () => {
-      if (!this.departmentRegistry || !this.superAdminSigner) {
-        return { success: false, error: 'DepartmentRegistry or Super Admin signer not configured' };
-      }
-      try {
-        const key = this.departmentKey(departmentId);
-        // Tolerate removing a key that was never anchored (e.g. created before the feature).
-        const exists = await this.departmentRegistry.hasHash(key);
-        if (!exists) return { success: true, alreadyAbsent: true, key };
-        const writable = this.departmentRegistry.connect(this.superAdminSigner) as ethers.Contract;
-        const tx = await writable.removeHash(key);
-        const receipt = await tx.wait();
-        return { success: true, key, txHash: tx.hash, blockNumber: receipt.blockNumber };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to remove department hash' };
-      }
-    });
-  }
-
-  /**
-   * Read the on-chain hash for a department. Returns null if the registry is unavailable
-   * or no hash is set (so verification can flag a missing anchor).
-   */
-  async getDepartmentHash(departmentId: string): Promise<string | null> {
-    if (!this.departmentRegistry) return null;
-    try {
-      const key = this.departmentKey(departmentId);
-      const value: string = await this.departmentRegistry.getHash(key);
-      if (!value || value === ethers.ZeroHash) return null;
-      return value;
-    } catch {
-      return null;
-    }
-  }
-
-  // ---- StaffRegistry: staff + doctor integrity anchoring ----------------------
-
-  /** Derive the on-chain key for a staff/doctor record from its UUID. */
-  staffKey(entityId: string): string {
-    return ethers.keccak256(ethers.toUtf8Bytes(entityId));
-  }
-
-  /** Whether the StaffRegistry contract is available for writes. */
-  isStaffRegistryReady(): boolean {
-    return Boolean(this.staffRegistry && this.superAdminSigner);
-  }
-
-  /**
-   * Mirror a staff/doctor integrity hash on-chain.
-   * @param entityId off-chain UUID (staffProfileId or doctorProfileId)
-   * @param valueBytes32 0x-prefixed 32-byte SHA256 hash
-   */
-  async setStaffHash(entityId: string, valueBytes32: string) {
-    return this.enqueueWrite(async () => {
-      if (!this.staffRegistry || !this.superAdminSigner) {
-        return { success: false, error: 'StaffRegistry or Super Admin signer not configured' };
-      }
-      try {
-        const key = this.staffKey(entityId);
-        const writable = this.staffRegistry.connect(this.superAdminSigner) as ethers.Contract;
-        const tx = await writable.setHash(key, valueBytes32);
-        const receipt = await tx.wait();
-        return { success: true, key, txHash: tx.hash, blockNumber: receipt.blockNumber };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to set staff hash' };
-      }
-    });
-  }
-
-  /** Remove a staff/doctor hash on-chain. */
-  async removeStaffHash(entityId: string) {
-    return this.enqueueWrite(async () => {
-      if (!this.staffRegistry || !this.superAdminSigner) {
-        return { success: false, error: 'StaffRegistry or Super Admin signer not configured' };
-      }
-      try {
-        const key = this.staffKey(entityId);
-        const exists = await this.staffRegistry.hasHash(key);
-        if (!exists) return { success: true, alreadyAbsent: true, key };
-        const writable = this.staffRegistry.connect(this.superAdminSigner) as ethers.Contract;
-        const tx = await writable.removeHash(key);
-        const receipt = await tx.wait();
-        return { success: true, key, txHash: tx.hash, blockNumber: receipt.blockNumber };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to remove staff hash' };
-      }
-    });
-  }
-
-  /** Read the on-chain hash for a staff/doctor record. */
-  async getStaffHash(entityId: string): Promise<string | null> {
-    if (!this.staffRegistry) return null;
-    try {
-      const key = this.staffKey(entityId);
-      const value: string = await this.staffRegistry.getHash(key);
-      if (!value || value === ethers.ZeroHash) return null;
-      return value;
-    } catch {
-      return null;
-    }
-  }
-
-  // ---- AIModelRegistry: AI model integrity anchoring --------------------------
-
-  /** Derive the on-chain key for an AI model record from its UUID. */
-  aiModelKey(modelId: string): string {
-    return ethers.keccak256(ethers.toUtf8Bytes(modelId));
-  }
-
-  /** Whether the AIModelRegistry contract is available for writes. */
-  isAiModelRegistryReady(): boolean {
-    return Boolean(this.aiModelRegistry && this.superAdminSigner);
-  }
-
-  /**
-   * Mirror an AI model's integrity hash on-chain.
-   * @param modelId off-chain UUID
-   * @param valueBytes32 0x-prefixed 32-byte SHA256 hash
-   */
-  async setAiModelHash(modelId: string, valueBytes32: string) {
-    return this.enqueueWrite(async () => {
-      if (!this.aiModelRegistry || !this.superAdminSigner) {
-        return { success: false, error: 'AIModelRegistry or Super Admin signer not configured' };
-      }
-      try {
-        const key = this.aiModelKey(modelId);
-        const writable = this.aiModelRegistry.connect(this.superAdminSigner) as ethers.Contract;
-        const tx = await writable.setHash(key, valueBytes32);
-        const receipt = await tx.wait();
-        return { success: true, key, txHash: tx.hash, blockNumber: receipt.blockNumber };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to set AI model hash' };
-      }
-    });
-  }
-
-  /** Remove an AI model's hash on-chain. */
-  async removeAiModelHash(modelId: string) {
-    return this.enqueueWrite(async () => {
-      if (!this.aiModelRegistry || !this.superAdminSigner) {
-        return { success: false, error: 'AIModelRegistry or Super Admin signer not configured' };
-      }
-      try {
-        const key = this.aiModelKey(modelId);
-        const exists = await this.aiModelRegistry.hasHash(key);
-        if (!exists) return { success: true, alreadyAbsent: true, key };
-        const writable = this.aiModelRegistry.connect(this.superAdminSigner) as ethers.Contract;
-        const tx = await writable.removeHash(key);
-        const receipt = await tx.wait();
-        return { success: true, key, txHash: tx.hash, blockNumber: receipt.blockNumber };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to remove AI model hash' };
-      }
-    });
-  }
-
-  /** Read the on-chain hash for an AI model record. */
-  async getAiModelHash(modelId: string): Promise<string | null> {
-    if (!this.aiModelRegistry) return null;
-    try {
-      const key = this.aiModelKey(modelId);
-      const value: string = await this.aiModelRegistry.getHash(key);
-      if (!value || value === ethers.ZeroHash) return null;
-      return value;
-    } catch {
-      return null;
-    }
-  }
+  // ---- IdentityRegistry: admin authorization ----------------------------------
 
   async isAuthorized(walletAddress: string): Promise<boolean> {
     if (!this.contract) return false;
@@ -451,7 +183,7 @@ export class BlockchainService implements OnModuleInit {
   async authorizeAdmin(walletAddress: string) {
     return this.enqueueWrite(async () => {
       if (!this.contract || !this.superAdminSigner) {
-        return { success: false, error: 'IdentityRegistry or Super Admin signer not configured' };
+        return { success: false, error: 'Chưa cấu hình IdentityRegistry hoặc khóa ký của Super Admin.' };
       }
       try {
         const normalizedWalletAddress = ethers.getAddress(walletAddress);
@@ -475,7 +207,7 @@ export class BlockchainService implements OnModuleInit {
   async revokeAdmin(walletAddress: string) {
     return this.enqueueWrite(async () => {
       if (!this.contract || !this.superAdminSigner) {
-        return { success: false, error: 'IdentityRegistry or Super Admin signer not configured' };
+        return { success: false, error: 'Chưa cấu hình IdentityRegistry hoặc khóa ký của Super Admin.' };
       }
       try {
         const normalizedWalletAddress = ethers.getAddress(walletAddress);
@@ -499,7 +231,7 @@ export class BlockchainService implements OnModuleInit {
   async recordActionAsSuperAdmin(actionPayload: unknown) {
     return this.enqueueWrite(async () => {
       if (!this.contract || !this.superAdminSigner) {
-        return { success: false, error: 'IdentityRegistry or Super Admin signer not configured' };
+        return { success: false, error: 'Chưa cấu hình IdentityRegistry hoặc khóa ký của Super Admin.' };
       }
       try {
         const canonicalPayload = JSON.stringify(actionPayload);
@@ -536,7 +268,7 @@ export class BlockchainService implements OnModuleInit {
   async commitAuditRoot(batchId: number, rootBytes32: string, leafCount: number) {
     return this.enqueueWrite(async () => {
       if (!this.auditAnchor || !this.superAdminSigner) {
-        return { success: false, error: 'AuditAnchor or Super Admin signer not configured' };
+        return { success: false, error: 'Chưa cấu hình AuditAnchor hoặc khóa ký của Super Admin.' };
       }
       try {
         const writable = this.auditAnchor.connect(this.superAdminSigner) as ethers.Contract;

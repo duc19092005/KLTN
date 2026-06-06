@@ -12,31 +12,31 @@ export class StaffValidator {
 
   async ensureStaff(id: string): Promise<any> {
     const staff = await this.repo.findByIdWithUserDoctor(id);
-    if (!staff) throw new NotFoundException('Staff profile not found');
+    if (!staff) throw new NotFoundException('Không tìm thấy hồ sơ nhân sự.');
     return staff;
   }
 
   async ensureDepartment(id: string): Promise<void> {
-    if (!(await this.repo.departmentExists(id))) throw new NotFoundException('Department not found');
+    if (!(await this.repo.departmentExists(id))) throw new NotFoundException('Không tìm thấy phòng ban.');
   }
 
   async assertUserUnique(username?: string, email?: string, excludeUserId?: string): Promise<void> {
     if (!username && !email) return;
     const existing = await this.repo.findUserByUsernameOrEmail(username, email);
     if (existing && existing.id !== excludeUserId) {
-      throw new ConflictException('Username or email already exists');
+      throw new ConflictException('Tên đăng nhập hoặc email đã tồn tại.');
     }
   }
 
   async assertCitizenIdUnique(citizenId: string, excludeStaffId?: string): Promise<void> {
     const existing = await this.repo.findStaffByCitizenId(citizenId);
     if (existing && existing.id !== excludeStaffId) {
-      throw new ConflictException('Citizen ID already exists');
+      throw new ConflictException('CCCD/CMND đã tồn tại.');
     }
   }
 
   async assertEmployeeCodeUnique(employeeCode: string): Promise<void> {
     const existing = await this.repo.findStaffByEmployeeCode(employeeCode);
-    if (existing) throw new ConflictException('Employee code already exists');
+    if (existing) throw new ConflictException('Mã nhân viên đã tồn tại.');
   }
 }

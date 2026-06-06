@@ -11,5 +11,13 @@ export const doctorService = {
   verifyAll: () => api.get('/doctors/audit/verify'),
   verifyOne: (id) => api.get(`/doctors/${id}/audit/verify`),
   history: (id = null) => api.get(id ? `/doctors/${id}/audit/history` : '/doctors/audit/history'),
-
+  uploadAvatar: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/doctors/upload-avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
 };

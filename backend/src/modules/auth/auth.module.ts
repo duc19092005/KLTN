@@ -27,9 +27,15 @@ import { WalletLoginUseCase } from './application/use-cases/wallet-login.use-cas
 import { CreateFaceChallengeUseCase } from './application/use-cases/create-face-challenge.use-case';
 import { VerifyFaceUseCase } from './application/use-cases/verify-face.use-case';
 import { VerifyFaceForStepUpUseCase } from './application/use-cases/verify-face-for-stepup.use-case';
+import { OpenStepUpSessionUseCase } from './application/use-cases/open-stepup-session.use-case';
+import { UpdateAutoLockUseCase } from './application/use-cases/update-auto-lock.use-case';
 import { GenerateMfaSecretUseCase } from './application/use-cases/generate-mfa-secret.use-case';
 import { GetMeUseCase } from './application/use-cases/get-me.use-case';
+import { GetMyProfileUseCase } from './application/use-cases/get-my-profile.use-case';
 import { LogoutUseCase } from './application/use-cases/logout.use-case';
+import { ForgotPasswordChallengeUseCase } from './application/use-cases/forgot-password-challenge.use-case';
+import { ForgotPasswordVerifyFaceUseCase } from './application/use-cases/forgot-password-verify-face.use-case';
+import { ForgotPasswordResetUseCase } from './application/use-cases/forgot-password-reset.use-case';
 
 // Ports + adapters
 import { AUTH_REPOSITORY } from './application/ports/auth.repository.port';
@@ -81,9 +87,15 @@ import { StepUpTicketIssuerAdapter } from './infrastructure/adapters/stepup-tick
     CreateFaceChallengeUseCase,
     VerifyFaceUseCase,
     VerifyFaceForStepUpUseCase,
+    OpenStepUpSessionUseCase,
+    UpdateAutoLockUseCase,
     GenerateMfaSecretUseCase,
     GetMeUseCase,
+    GetMyProfileUseCase,
     LogoutUseCase,
+    ForgotPasswordChallengeUseCase,
+    ForgotPasswordVerifyFaceUseCase,
+    ForgotPasswordResetUseCase,
 
     // Ports -> adapters
     { provide: AUTH_REPOSITORY, useClass: PrismaAuthRepository },
@@ -93,6 +105,6 @@ import { StepUpTicketIssuerAdapter } from './infrastructure/adapters/stepup-tick
     { provide: ENCRYPTION_PORT, useClass: EncryptionAdapter },
     { provide: STEPUP_TICKET_ISSUER, useClass: StepUpTicketIssuerAdapter },
   ],
-  exports: [AuthService, JwtModule],
+  exports: [AuthService, JwtModule, FaceMatchService, AUTH_REPOSITORY, SECURITY_EVENT_LOGGER],
 })
 export class AuthModule {}

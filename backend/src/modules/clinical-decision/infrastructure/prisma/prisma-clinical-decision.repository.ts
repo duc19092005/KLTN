@@ -112,7 +112,7 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
           doctorNote: data.doctorNote ?? null,
           concludedAt: new Date(),
         },
-        include: { aiDiagnosis: { include: { aiModel: true } }, doctor: { include: { staffProfile: true } } },
+        include: { aiDiagnosis: { include: { aiModel: true } }, doctor: { include: { staffProfile: true } }, visit: { include: { patient: { select: { patientCode: true } } } } },
       });
 
       await tx.visit.update({

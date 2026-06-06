@@ -24,7 +24,7 @@ export class UpdateDepartmentUseCase {
     if (dto.type && dto.type !== 'CLINICAL') {
       const hasDoctors = existing.staffs?.some((staff: any) => staff.doctorProfile !== null);
       if (hasDoctors) {
-        throw new BadRequestException('Cannot change department type to non-CLINICAL because it has doctors assigned to it');
+        throw new BadRequestException('Không thể đổi phòng ban sang loại không lâm sàng vì đang có bác sĩ được gán.');
       }
     }
     const before = buildDepartmentSnapshot(existing);

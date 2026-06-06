@@ -14,19 +14,19 @@ export class CreateMedicalOrderUseCase {
 
   async execute(dto: CreateMedicalOrderDto, doctorUserId: string): Promise<unknown> {
     const visit = await this.repo.findVisitForOrder(dto.visitId);
-    if (!visit) throw new NotFoundException('Visit not found');
+    if (!visit) throw new NotFoundException('Không tìm thấy lượt khám.');
 
     const currentDoctorId = await this.repo.findDoctorIdByUserId(doctorUserId);
-    if (!currentDoctorId) throw new BadRequestException('Current user does not have doctor profile');
-    if (visit.doctorId !== currentDoctorId) throw new BadRequestException('Doctor can only order tests for own visit');
+    if (!currentDoctorId) throw new BadRequestException('Tài khoản hiện tại không có hồ sơ bác sĩ.');
+    if (visit.doctorId !== currentDoctorId) throw new BadRequestException('Bác sĩ chỉ được tạo chỉ định cho lượt khám do mình phụ trách.');
 
     if (([VisitStatus.COMPLETED, VisitStatus.CANCELLED] as string[]).includes(visit.status)) {
-      throw new BadRequestException('Cannot create additional medical orders for a completed/cancelled visit');
+      throw new BadRequestException('Không thể tạo thêm chỉ định cho lượt khám đã hoàn tất hoặc đã hủy.');
     }
 
     if (dto.targetDepartmentId) {
       const exists = await this.repo.departmentExists(dto.targetDepartmentId);
-      if (!exists) throw new NotFoundException('Target department not found');
+      if (!exists) throw new NotFoundException('Không tìm thấy phòng ban nhận chỉ định.');
     }
 
     return this.repo.createOrderWithVisitTransition({

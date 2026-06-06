@@ -22,17 +22,17 @@ export class WalletLoginChallengeUseCase {
     const normalizedWalletAddress = normalizeWalletAddress(walletAddress);
     const adminProfile = await this.repo.findAdminByWallet(normalizedWalletAddress);
 
-    if (!adminProfile) throw new UnauthorizedException('Wallet address not registered');
+    if (!adminProfile) throw new UnauthorizedException('Địa chỉ ví chưa được đăng ký.');
     if (adminProfile.user.status !== 'ACTIVE' || adminProfile.user.firstLogin) {
-      throw new UnauthorizedException('Admin setup is not complete');
+      throw new UnauthorizedException('Tài khoản quản trị chưa hoàn tất thiết lập.');
     }
     if (!adminProfile.user.faceEmbedding) {
-      throw new UnauthorizedException('Face data is not registered');
+      throw new UnauthorizedException('Tài khoản chưa đăng ký dữ liệu khuôn mặt.');
     }
 
     const isOnChainAuthorized = await this.chain.isAuthorized(normalizedWalletAddress);
     if (!isOnChainAuthorized) {
-      throw new UnauthorizedException('Wallet not authorized on blockchain.');
+      throw new UnauthorizedException('Ví chưa được cấp quyền trên blockchain.');
     }
 
     return this.walletChallenge.create(adminProfile.id, normalizedWalletAddress, WALLET_PURPOSE_LOGIN);

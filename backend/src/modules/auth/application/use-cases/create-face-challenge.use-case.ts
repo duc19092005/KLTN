@@ -20,7 +20,7 @@ export class CreateFaceChallengeUseCase {
     const user = await this.lookup.getAuthUser(userId);
 
     if (!user.faceEmbedding) {
-      throw new UnauthorizedException('Face data is not registered');
+      throw new UnauthorizedException('Tài khoản chưa đăng ký dữ liệu khuôn mặt.');
     }
 
     assertNotFaceLocked(user);

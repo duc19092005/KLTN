@@ -33,13 +33,13 @@ export class ListMedicalOrdersUseCase {
 
   private async resolveDoctorId(userId: string) {
     const doctorId = await this.repo.findDoctorIdByUserId(userId);
-    if (!doctorId) throw new ForbiddenException('Current user does not have doctor profile');
+    if (!doctorId) throw new ForbiddenException('Tài khoản hiện tại không có hồ sơ bác sĩ.');
     return doctorId;
   }
 
   private async resolveStaff(userId: string) {
     const staff = await this.repo.findStaffByUserId(userId);
-    if (!staff) throw new ForbiddenException('Current user does not have staff profile');
+    if (!staff) throw new ForbiddenException('Tài khoản hiện tại không có hồ sơ nhân sự.');
     return staff;
   }
 }

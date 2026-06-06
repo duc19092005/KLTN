@@ -9,13 +9,13 @@ import * as crypto from 'crypto';
 
 export function validateFaceDescriptor(embedding: unknown): number[] {
   if (!Array.isArray(embedding) || embedding.length !== 128) {
-    throw new BadRequestException('Invalid face descriptor. Expected 128D face-api descriptor.');
+    throw new BadRequestException('Dữ liệu khuôn mặt không hợp lệ. Hệ thống cần descriptor 128 chiều.');
   }
 
   return embedding.map((value) => {
     const numberValue = Number(value);
     if (!Number.isFinite(numberValue) || numberValue < -2 || numberValue > 2) {
-      throw new BadRequestException('Invalid face descriptor value');
+      throw new BadRequestException('Giá trị dữ liệu khuôn mặt không hợp lệ.');
     }
     return Number(numberValue.toFixed(6));
   });
@@ -23,12 +23,12 @@ export function validateFaceDescriptor(embedding: unknown): number[] {
 
 export function validateFaceDescriptorSet(embedding: unknown): number[][] {
   if (!Array.isArray(embedding)) {
-    throw new BadRequestException('Invalid face descriptor payload.');
+    throw new BadRequestException('Dữ liệu khuôn mặt gửi lên không hợp lệ.');
   }
 
   const candidates = Array.isArray(embedding[0]) ? embedding : [embedding];
   if (candidates.length < 3 || candidates.length > 15) {
-    throw new BadRequestException('Expected 3 to 15 face descriptors for reliable enrollment.');
+    throw new BadRequestException('Cần từ 3 đến 15 mẫu khuôn mặt để đăng ký tin cậy.');
   }
 
   return candidates.map((candidate) => validateFaceDescriptor(candidate));
@@ -70,7 +70,7 @@ export function assertNotFaceLocked(user: { faceLockedUntil?: Date | null }) {
   if (user.faceLockedUntil && user.faceLockedUntil > new Date()) {
     const remainingMin = Math.ceil((user.faceLockedUntil.getTime() - Date.now()) / 60000);
     throw new UnauthorizedException(
-      `Face verification is temporarily locked. Try again in ${remainingMin} minute(s).`,
+      `Xác thực khuôn mặt đang bị khóa tạm thời. Vui lòng thử lại sau ${remainingMin} phút.`,
     );
   }
 }

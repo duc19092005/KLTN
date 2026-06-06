@@ -12,6 +12,7 @@ enum UserRole {
   RECEPTIONIST
   DOCTOR
   LAB_MANAGER
+  DEPT_SHARED
 }
 
 enum UserStatus {
@@ -32,6 +33,12 @@ enum DepartmentType {
 enum OperationalStatus {
   ACTIVE
   INACTIVE
+}
+
+enum ShiftStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model User {
@@ -62,6 +69,9 @@ model User {
   failedFaceAttempts Int       @default(0)
   faceLockedUntil    DateTime?
 
+  // User preference: idle minutes before the screen auto-locks (clamped 1..15 in code; default 5).
+  autoLockMinutes    Int       @default(5)
+
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 
@@ -69,6 +79,9 @@ model User {
   adminProfile      AdminProfile?
   performedResults  MedicalResult[]
   stepUpTickets     StepUpTicket[]
+  stepUpSessions    StepUpSession[]
+  approvedShifts    ParaclinicalShift[] @relation("ApprovedShifts")
+  sharedDepartment  Department?         @relation("DeptSharedUser")
 
   @@index([role])
   @@index([status])
@@ -85,8 +98,10 @@ model Department {
   description      String?
   specialty        String?
   managerId        String?        @unique
+  sharedUserId     String?        @unique
 
   manager        StaffProfile?  @relation("DepartmentManager", fields: [managerId], references: [id])
+  sharedUser     User?          @relation("DeptSharedUser", fields: [sharedUserId], references: [id])
   staffs         StaffProfile[] @relation("DepartmentStaffs")
   medicalOrders  MedicalOrder[]
   blockchainLogs BlockchainLogger[]
@@ -129,6 +144,9 @@ model StaffProfile {
   managedDepartment Department? @relation("DepartmentManager")
   doctorProfile     DoctorProfile?
   blockchainLogs    BlockchainLogger[]
+  paraclinicalShifts ParaclinicalShift[]
+  handoversFrom     HandoverLog[] @relation("HandoverFrom")
+  handoversTo       HandoverLog[] @relation("HandoverTo")
 
   // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
   hash256        String?
@@ -244,6 +262,8 @@ model ClinicalRoom {
   doctorId          String?         @unique
   doctor            DoctorProfile?  @relation("RoomDoctor", fields: [doctorId], references: [id])
   visits            Visit[]
+  paraclinicalShifts ParaclinicalShift[]
+  handoverLogs      HandoverLog[]
 
   floor             String?
   description       String?
@@ -535,6 +555,12 @@ model BlockchainLogger {
   aiQualityId         String?
   aiQuality           AiQuality?         @relation(fields: [aiQualityId], references: [id])
 
+  paraclinicalShiftId String?
+  paraclinicalShift   ParaclinicalShift? @relation(fields: [paraclinicalShiftId], references: [id])
+
+  handoverLogId       String?
+  handoverLog         HandoverLog?       @relation(fields: [handoverLogId], references: [id])
+
   createdAt DateTime @default(now())
 
   @@index([actorId])
@@ -547,6 +573,8 @@ model BlockchainLogger {
   @@index([aiModelRegistryId])
   @@index([medicalConclusionId])
   @@index([aiQualityId])
+  @@index([paraclinicalShiftId])
+  @@index([handoverLogId])
   @@index([batchId])
   @@index([onChainStatus])
 }
@@ -570,6 +598,42 @@ model AuditBatch {
   error       String?
   createdAt   DateTime  @default(now())
   anchoredAt  DateTime?
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// One database backup, self-verifying via the blockchain audit trail.
+/// This is the queryable DB mirror of the authoritative append-only JSONL ledger written offsite
+/// (so it survives even when the DB is destroyed/encrypted). Each backup records:
+///  - sha256: SHA256 of the produced dump file, so we can later prove the file was not altered.
+///  - maxSeq: the largest BlockchainLogger.seq the dump is known to contain, so we know how "fresh"
+///    (and up to which audited change) the backup is — key to diagnosing a poisoned backup.
+///  - anchorSeq/anchorTxHash: the BlockchainLogger seq + on-chain tx that anchored this manifest,
+///    sealing the (sha256, maxSeq, createdAt) tuple immutably at creation time (Tier-A: anchored now).
+///  - prevHash/entryHash: hash-chain over the backup ledger itself, mirroring the JSONL chain, so
+///    silently deleting a backup record is provable.
+model BackupRecord {
+  id          String   @id @default(uuid())
+  backupCode  String   @unique // human-readable id, e.g. BK-20260606-0001
+  fileName    String           // dump file name on disk / object store
+  storagePath String?          // absolute path or object key
+  sha256      String           // SHA256(dump file) at creation
+  sizeBytes   Int      @default(0)
+  maxSeq      Int?             // largest BlockchainLogger.seq contained in the dump
+
+  // Hash-chain over the backup ledger (mirrors the offsite JSONL chain)
+  prevHash    String?          // entryHash of the previous BackupRecord; genesis = 64 zeros
+  entryHash   String?          // SHA256(pepper | backupCode | sha256 | maxSeq | createdAtIso | prevHash)
+
+  // On-chain anchoring of THIS backup manifest (via the shared AuditAnchor / BlockchainLogger)
+  anchorSeq   Int?             // BlockchainLogger.seq of the SystemBackup manifest entry
+  anchorTxHash String?         // tx that committed the Merkle batch containing the manifest
+
+  status      String   @default("CREATED") // CREATED | ANCHORED | VERIFIED | CORRUPT | FAILED
+  error       String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
 
   @@index([status])
   @@index([createdAt])
@@ -601,4 +665,84 @@ model StepUpTicket {
   @@index([userId])
   @@index([action])
   @@index([expiresAt])
+}
+
+/// A short-lived "sudo mode" privilege session opened by a single face scan. Unlike StepUpTicket
+/// (single-use, bound to one record), a session authorizes many Tier-B sensitive writes within a
+/// time window so users are not forced to re-scan for every action. It slides on use (idleExpiresAt)
+/// up to a hard ceiling (absoluteExpiresAt), can be revoked early, and only the SHA256 of the raw
+/// session token is stored. Every individual action is still audit-logged with its own actorId.
+model StepUpSession {
+  id                String   @id @default(uuid())
+  tokenHash         String   @unique // SHA256(raw session token); raw token returned to client once
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  scope             String            // e.g. "SENSITIVE_WRITE"
+  ip                String?
+  createdAt         DateTime @default(now())
+  lastUsedAt        DateTime @default(now())
+  idleExpiresAt     DateTime          // sliding: extended on each use
+  absoluteExpiresAt DateTime          // hard cap regardless of activity
+  revokedAt         DateTime?         // set when user locks the session early
+
+  @@index([userId])
+  @@index([scope])
+  @@index([idleExpiresAt])
+}
+
+/// A scheduled paraclinical shift. Staff register for open slots (PENDING); a department head
+/// or admin approves/rejects. Approved shifts are batch-anchored on-chain via Merkle roots.
+/// Direct assignment by admin creates an APPROVED shift immediately.
+model ParaclinicalShift {
+  id             String            @id @default(uuid())
+  staffId        String
+  staff          StaffProfile      @relation(fields: [staffId], references: [id])
+  clinicalRoomId String
+  clinicalRoom   ClinicalRoom      @relation(fields: [clinicalRoomId], references: [id])
+  startTime      DateTime
+  endTime        DateTime
+  status         ShiftStatus       @default(PENDING)
+  approvedById   String?
+  approvedBy     User?             @relation("ApprovedShifts", fields: [approvedById], references: [id])
+  isActive       Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
+  hash256        String?
+  dataSalt       String?
+
+  blockchainLogs BlockchainLogger[]
+
+  @@index([staffId])
+  @@index([clinicalRoomId])
+  @@index([status])
+  @@index([startTime, endTime])
+  @@index([isActive])
+}
+
+/// Records one completed handover ceremony between two staff members.
+/// Both parties must pass biometric face verification before the handover is finalized.
+/// The completed handover is IMMEDIATELY anchored on-chain (Tier-A event) because it
+/// demarcates a legal responsibility boundary in clinical operations.
+model HandoverLog {
+  id             String       @id @default(uuid())
+  clinicalRoomId String
+  clinicalRoom   ClinicalRoom @relation(fields: [clinicalRoomId], references: [id])
+  fromStaffId    String
+  fromStaff      StaffProfile @relation("HandoverFrom", fields: [fromStaffId], references: [id])
+  toStaffId      String
+  toStaff        StaffProfile @relation("HandoverTo", fields: [toStaffId], references: [id])
+  reason         String?
+  timestamp      DateTime     @default(now())
+  faceVerifiedA  Boolean      @default(false)
+  faceVerifiedB  Boolean      @default(false)
+  isCompleted    Boolean      @default(false)
+
+  blockchainLogs BlockchainLogger[]
+
+  @@index([clinicalRoomId])
+  @@index([fromStaffId])
+  @@index([toStaffId])
+  @@index([isCompleted])
 }

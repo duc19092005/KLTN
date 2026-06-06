@@ -19,6 +19,7 @@ export type CreateAiModelData = {
 export type AiModelListFilter = {
   type?: string;
   search?: string;
+  provider?: string;
 };
 
 /**
@@ -28,6 +29,7 @@ export type AiModelListFilter = {
 export interface AiModelRepositoryPort {
   create(data: CreateAiModelData): Promise<any>;
   findAll(filter: AiModelListFilter): Promise<any[]>;
+  findManyPaginated(filter: AiModelListFilter, skip: number, take: number): Promise<{ items: any[]; total: number }>;
   findByIdOrThrow(id: string): Promise<any>;
   findById(id: string): Promise<any | null>;
   findAllOrdered(): Promise<any[]>;
@@ -37,6 +39,11 @@ export interface AiModelRepositoryPort {
 export function buildAiModelWhere(filter: AiModelListFilter): Prisma.AiModelRegistryWhereInput {
   return {
     ...(filter.type ? { type: filter.type } : {}),
+    ...(filter.provider
+      ? filter.provider === 'cloud'
+        ? { provider: { notIn: ['local', 'ip'] } }
+        : { provider: filter.provider }
+      : {}),
     ...(filter.search
       ? {
         OR: [

@@ -22,7 +22,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: any) {
     if (!payload?.sub || typeof payload.tokenVersion !== 'number') {
-      throw new UnauthorizedException('Invalid token payload');
+      throw new UnauthorizedException('Phiên đăng nhập không hợp lệ.');
     }
 
     const user = await this.prisma.user.findUnique({
@@ -31,7 +31,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
 
     if (!user || user.status === 'INACTIVE' || user.tokenVersion !== payload.tokenVersion) {
-      throw new UnauthorizedException('Invalid session');
+      throw new UnauthorizedException('Phiên đăng nhập không hợp lệ hoặc đã hết hạn.');
     }
 
     return {

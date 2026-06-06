@@ -4,9 +4,15 @@ import { doctorService } from '../apis/doctorService';
 import { useToast } from '../../../providers/ToastProvider';
 
 const STATUS_TONE = {
-  VERIFIED: { label: 'Xác thực khớp với Blockchain', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
+  VERIFIED: { label: 'Xác thực khớp với blockchain', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
   TAMPERED: { label: 'CẢNH BÁO: Dữ liệu đã bị sửa đổi!', cls: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500' },
-  UNANCHORED: { label: 'Chưa được neo trên Blockchain', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
+  UNANCHORED: { label: 'Chưa được neo trên blockchain', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
+};
+
+const ACTION_LABEL = {
+  CREATE: 'Tạo mới',
+  UPDATE: 'Cập nhật',
+  DELETE: 'Xóa',
 };
 
 function shortHash(hash) {
@@ -17,6 +23,13 @@ function shortHash(hash) {
 
 function formatTime(value) {
   return value ? new Date(value).toLocaleString('vi-VN') : 'N/A';
+}
+
+function genderLabel(value) {
+  if (value === 'MALE' || value === 'Nam') return 'Nam';
+  if (value === 'FEMALE' || value === 'Nữ') return 'Nữ';
+  if (value === 'OTHER' || value === 'Khác') return 'Khác';
+  return value || 'Chưa cập nhật';
 }
 
 export default function DoctorDetailModal({ doctorId, onClose }) {
@@ -62,7 +75,7 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
               <img src={staff.avatarUrl} alt={staff.fullName} className="w-16 h-16 rounded-2xl object-cover border border-indigo-100" />
             ) : (
               <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-xl font-black text-indigo-500">
-                DR
+                BS
               </div>
             )}
             <div>
@@ -72,7 +85,7 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={load} className="rounded-xl border border-slate-200 p-2.5 text-xs font-black text-slate-600 hover:bg-slate-50">↻</button>
+            <button type="button" onClick={load} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50">Làm mới</button>
             <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50">Đóng</button>
           </div>
         </div>
@@ -80,7 +93,7 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
         {/* Tab switcher */}
         <div className="shrink-0 px-6 py-2 border-b border-slate-100 flex gap-2">
           <button onClick={() => setActiveTab('info')} className={`px-4 py-2 text-xs font-black rounded-xl border transition-all ${activeTab === 'info' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
-            Hồ sơ & Xác thực Blockchain
+            Hồ sơ & Xác thực blockchain
           </button>
           <button onClick={() => setActiveTab('history')} className={`px-4 py-2 text-xs font-black rounded-xl border transition-all ${activeTab === 'history' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
             Lịch sử cập nhật ({history.length})
@@ -101,16 +114,16 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
                     Trạng thái: {tone.label}
                   </span>
                   <span className="text-[11px] font-black uppercase text-indigo-700 tracking-wider">
-                    Powered by Solidity Smart Contract
+                    Xác thực bằng hợp đồng thông minh Solidity
                   </span>
                 </div>
 
                 <div className="bg-white p-4 rounded-xl border border-slate-100 space-y-2 mt-3">
                   <strong className="block text-slate-900 font-bold border-b pb-1 text-sm">Xác thực toàn vẹn dữ liệu (Danh tính + Chuyên môn)</strong>
                   <div className="space-y-1.5 text-xs">
-                    <HashRow label="Trạng thái" value={audit.chainMatches ? 'Khớp với Blockchain' : audit.onChainHash ? 'Mâu thuẫn' : 'Chưa neo'} match={audit.chainMatches} />
+                    <HashRow label="Trạng thái" value={audit.chainMatches ? 'Khớp với blockchain' : audit.onChainHash ? 'Mâu thuẫn' : 'Chưa neo'} match={audit.chainMatches} />
                     <HashRow label="Hash trong CSDL" value={audit.storedHash} match={audit.dbMatches} />
-                    <HashRow label="Hash trên Blockchain" value={audit.onChainHash} match={audit.chainMatches} />
+                    <HashRow label="Hash trên chuỗi" value={audit.onChainHash} match={audit.chainMatches} />
                     <HashRow label="Hash tính lại" value={audit.recomputedHash} match={audit.dbMatches && audit.chainMatches} />
                   </div>
                 </div>
@@ -126,7 +139,7 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
                     <Field label="Vai trò" value={staff.position || 'Bác sĩ'} />
                     <Field label="Số điện thoại" value={staff.phone} />
                     <Field label="CCCD/CMND" value={staff.citizenId} />
-                    <Field label="Giới tính" value={staff.gender} />
+                    <Field label="Giới tính" value={genderLabel(staff.gender)} />
                     <Field label="Ngày sinh" value={formatTime(staff.birthDate)?.split(' ')[1] || formatTime(staff.birthDate)} />
                     <Field label="Địa chỉ" value={staff.address} colSpan={2} />
                     <Field label="Phòng ban" value={staff.department ? `${staff.department.departmentCode} - ${staff.department.name}` : 'Chưa gán'} colSpan={2} />
@@ -156,12 +169,12 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <span className={`rounded-lg border px-2 py-0.5 text-[10px] font-black ${log.action === 'CREATE' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-indigo-50 text-indigo-700 border-indigo-100'}`}>
-                        {log.action}
+                        {ACTION_LABEL[log.action] || log.action}
                       </span>
                       <span className="text-xs font-semibold text-slate-400">{formatTime(log.createdAt)}</span>
                     </div>
                     <span className={`rounded-md border px-2 py-0.5 text-[10px] font-black ${log.onChainStatus === 'ANCHORED' ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-amber-100 bg-amber-50 text-amber-700'}`}>
-                      {log.onChainStatus === 'ANCHORED' ? 'Đã neo on-chain' : 'Pending'}
+                      {log.onChainStatus === 'ANCHORED' ? 'Đã neo trên chuỗi' : 'Chờ neo'}
                     </span>
                   </div>
                   {log.txHash && (
@@ -181,7 +194,7 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
               {!history.length && (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center">
                   <strong className="text-slate-700">Chưa có lịch sử thay đổi</strong>
-                  <p className="mt-1 text-sm text-slate-500">Mọi chỉnh sửa dữ liệu của bác sĩ này sẽ được ghi lại và neo lên Blockchain.</p>
+                  <p className="mt-1 text-sm text-slate-500">Mọi chỉnh sửa dữ liệu của bác sĩ này sẽ được ghi lại và neo lên blockchain.</p>
                 </div>
               )}
             </div>

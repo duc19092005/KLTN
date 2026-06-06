@@ -1,18 +1,20 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { STEPUP_ACTION_KEY } from './require-face-stepup.decorator';
+import { STEPUP_SESSION_SCOPE_KEY } from './require-stepup-session.decorator';
 import { StepUpService } from './stepup.service';
 
 /**
- * Guard that enforces @RequireFaceStepUp(action) on a route. Runs AFTER JwtAuthGuard (so req.user
- * is populated) and consumes the single-use ticket supplied in the `x-stepup-ticket` header.
+ * Guard enforcing either step-up mode on a route, runs AFTER JwtAuthGuard (so req.user is set):
  *
- * If the route has no @RequireFaceStepUp metadata, the guard is a no-op (returns true), so it is
- * safe to register globally or per-controller without affecting non-sensitive endpoints.
+ *  - @RequireFaceStepUp(action)   -> consumes a single-use ticket from `x-stepup-ticket`, bound to
+ *                                    the route's :id/:seq param. For Tier-A (delete/restore/anchor).
+ *  - @RequireStepUpSession(scope) -> validates a reusable session from `x-stepup-session` and slides
+ *                                    its idle window. For Tier-B (repeated create/update). On a
+ *                                    missing/expired session it throws 403 STEPUP_SESSION_REQUIRED.
  *
- * The ticket is bound to the route's resource id (`:id` or `:seq` param) when present, so a ticket
- * minted for one record cannot be replayed against another. consume() throws ForbiddenException on
- * any mismatch / expiry / reuse, which surfaces as HTTP 403.
+ * If a route has neither decorator, the guard is a no-op (returns true), so it is safe to register
+ * per-controller without affecting non-sensitive endpoints.
  */
 @Injectable()
 export class FaceStepUpGuard implements CanActivate {
@@ -26,15 +28,27 @@ export class FaceStepUpGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (!action) return true; // route is not step-up protected
+    const sessionScope = this.reflector.getAllAndOverride<string | undefined>(STEPUP_SESSION_SCOPE_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (!action && !sessionScope) return true; // route is not step-up protected
 
     const req = context.switchToHttp().getRequest();
     const userId = req.user?.sub;
+
+    // Session mode (Tier-B): reusable privilege window.
+    if (sessionScope) {
+      const token = req.headers?.['x-stepup-session'] as string | undefined;
+      await this.stepUp.consumeSession({ userId, scope: sessionScope, token });
+      return true;
+    }
+
+    // Single-use mode (Tier-A): fresh face scan bound to this record.
     const token = req.headers?.['x-stepup-ticket'] as string | undefined;
     const resourceId = req.params?.id ?? req.params?.seq ?? null;
     const ip = String(req.headers?.['x-forwarded-for'] || '').split(',')[0].trim() || req.ip;
-
-    await this.stepUp.consume({ userId, action, token, resourceId, ip });
+    await this.stepUp.consume({ userId, action: action as string, token, resourceId, ip });
     return true;
   }
 }

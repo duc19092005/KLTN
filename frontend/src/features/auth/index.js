@@ -4,4 +4,7 @@ export { default as LivenessCheck } from './components/LivenessCheck';
 export { default as LoginPage } from './pages/LoginPage';
 export { default as AuthenticatePage } from './pages/AuthenticatePage';
 export { default as ChangePasswordPage } from './pages/ChangePasswordPage';
+export { default as ForgotPasswordPage } from './pages/ForgotPasswordPage';
 export { authService } from './apis/authService';
+export { default as StepUpSessionProvider, useStepUpSession } from './providers/StepUpSessionProvider';
+export { default as ScreenLockProvider, useScreenLock } from './providers/ScreenLockProvider';

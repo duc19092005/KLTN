@@ -30,7 +30,7 @@ export class FaceMatchService {
       const parsed = JSON.parse(plaintext);
       return validateFaceDescriptorSet(parsed);
     } catch {
-      throw new UnauthorizedException('Stored face descriptor is invalid');
+      throw new UnauthorizedException('Dữ liệu khuôn mặt đã lưu không hợp lệ.');
     }
   }
 

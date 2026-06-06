@@ -14,9 +14,9 @@ export class ChangePasswordUseCase {
 
   async execute(userId: string, currentPassword: string, newPassword: string) {
     const user = await this.repo.findUserWithProfile(userId);
-    if (!user) throw new UnauthorizedException('User not found');
+    if (!user) throw new UnauthorizedException('Không tìm thấy tài khoản.');
     if (!user.passwordHash || !verifyPassword(currentPassword, user.passwordHash)) {
-      throw new UnauthorizedException('Current password is incorrect');
+      throw new UnauthorizedException('Mật khẩu hiện tại không đúng.');
     }
     const updated = await this.repo.updatePasswordChange(
       userId,

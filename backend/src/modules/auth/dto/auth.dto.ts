@@ -65,6 +65,25 @@ export class StepUpFaceDto {
   resourceId?: string;
 }
 
+export class OpenStepUpSessionDto {
+  @IsArray()
+  embedding: number[];
+
+  @IsString()
+  @Length(32, 128)
+  challenge: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(2, 64)
+  scope?: string;
+}
+
+export class UpdateAutoLockDto {
+  @IsNumber()
+  minutes: number;
+}
+
 export class WalletChallengeDto {
   @IsEthereumAddress()
   address: string;
@@ -110,6 +129,33 @@ export class ChangePasswordDto {
   @IsString()
   @Length(6, 256)
   currentPassword: string;
+
+  @IsString()
+  @Length(8, 256)
+  newPassword: string;
+}
+
+export class ForgotPasswordChallengeDto {
+  @IsString()
+  @Length(3, 128)
+  username: string;
+}
+
+export class ForgotPasswordVerifyFaceDto {
+  @IsString()
+  userId: string;
+
+  @IsArray()
+  embedding: number[];
+
+  @IsString()
+  @Length(32, 128)
+  challenge: string;
+}
+
+export class ForgotPasswordResetDto {
+  @IsString()
+  resetToken: string;
 
   @IsString()
   @Length(8, 256)

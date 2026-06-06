@@ -1,7 +1,8 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, OnApplicationBootstrap } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { computeMerkleRoot, buildMerkleProof, rootToBytes32, verifyMerkleProof } from './merkle.util';
+import { computeEntryHash, GENESIS_PREV_HASH } from './audit-hash.util';
 
 /**
  * AuditAnchorService periodically seals a batch of not-yet-anchored audit logs, builds a Merkle
@@ -21,7 +22,7 @@ import { computeMerkleRoot, buildMerkleProof, rootToBytes32, verifyMerkleProof }
  * cycle). Only anchoring metadata is mutated on log rows, which the append-only trigger permits.
  */
 @Injectable()
-export class AuditAnchorService implements OnModuleInit, OnModuleDestroy {
+export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnApplicationBootstrap {
   private readonly logger = new Logger(AuditAnchorService.name);
   private timer: NodeJS.Timeout | null = null;
   private running = false;
@@ -50,6 +51,36 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy {
       this.runCycle().catch((err) => this.logger.error('Audit batch cycle failed', err));
     }, this.intervalMs);
     this.logger.log(`Audit batch anchoring scheduled every ${this.intervalMs}ms (max ${this.maxLeaves} leaves/batch).`);
+  }
+
+  async onApplicationBootstrap() {
+    // Automatically trigger Genesis Anchor if the blockchain has zero batches.
+    try {
+      if (process.env.AUDIT_BATCH_DISABLED === 'true') return;
+
+      const onChainLatest = await this.blockchain.getLatestAuditBatchId();
+      if (onChainLatest === 0 || onChainLatest === null) {
+        this.logger.log('🚀 [Genesis Anchor] Detected empty blockchain state. Checking for seed/initial logs...');
+        
+        const pendingCount = await this.prisma.blockchainLogger.count({
+          where: { batchId: null, seq: { not: null }, entryHash: { not: null } },
+        });
+
+        if (pendingCount > 0) {
+          this.logger.log(`🚀 [Genesis Anchor] Found ${pendingCount} unanchored logs. Committing Batch 1 immediately...`);
+          const res = await this.anchorNow();
+          if (res.committed) {
+            this.logger.log(`✅ [Genesis Anchor] Genesis Batch 1 anchored successfully!`);
+          } else {
+            this.logger.warn(`⚠️ [Genesis Anchor] Genesis Batch 1 anchor failed: ${res.reason}`);
+          }
+        } else {
+          this.logger.log('🚀 [Genesis Anchor] No pending logs to anchor.');
+        }
+      }
+    } catch (err) {
+      this.logger.error('Failed to execute Genesis Anchor on bootstrap:', err);
+    }
   }
 
   onModuleDestroy() {
@@ -116,11 +147,11 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy {
    * timer always attempts to drain whatever is pending.
    */
   private async runCycle(force = false): Promise<{ committed: boolean; batchId?: number; leafCount?: number; reason?: string }> {
-    if (this.running) return { committed: false, reason: 'cycle already running' };
+    if (this.running) return { committed: false, reason: 'Chu trình neo đang chạy.' };
     this.running = true;
     try {
       if (!this.blockchain.isAuditAnchorReady()) {
-        return { committed: false, reason: 'AuditAnchor not configured' };
+        return { committed: false, reason: 'Chưa cấu hình AuditAnchor.' };
       }
 
       // Pull unanchored, chained logs in seq order, capped at maxLeaves per batch.
@@ -128,11 +159,33 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy {
         where: { batchId: null, seq: { not: null }, entryHash: { not: null } },
         orderBy: { seq: 'asc' },
         take: this.maxLeaves,
-        select: { id: true, seq: true, entryHash: true },
+        select: {
+          id: true,
+          seq: true,
+          prevHash: true,
+          entryHash: true,
+          actorId: true,
+          action: true,
+          entity: true,
+          entityId: true,
+          dataHash: true,
+          createdAt: true,
+        },
       });
 
-      if (pending.length === 0) return { committed: false, reason: 'nothing to anchor' };
+      if (pending.length === 0) return { committed: false, reason: 'Không có bản ghi nào cần neo.' };
       void force; // size gating is advisory; we always drain when invoked
+
+      // Validate the chain of pending logs before building Merkle root
+      try {
+        await this.validatePendingChain(pending);
+      } catch (valErr: any) {
+        const brokenSeq = pending[0]?.seq ?? 0;
+        const reason = valErr.message || 'Không xác định được lỗi toàn vẹn chuỗi.';
+        this.logger.error(`🚨 CHAIN INTEGRITY FAILURE DETECTED: ${reason}. Aborting commit.`);
+        await this.sendTelegramAlert('Cảnh báo giả mạo Blockchain Logger (Pre-Commit)', reason, brokenSeq);
+        return { committed: false, reason: `Kiểm tra chuỗi thất bại: ${reason}` };
+      }
 
       // Allocate a monotonic batchId, reconciling local state with the on-chain counter so we
       // never reuse an id the contract already has (it rejects duplicates).
@@ -155,7 +208,7 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy {
       if (!res.success) {
         await this.prisma.auditBatch.update({
           where: { batchId },
-          data: { status: 'FAILED', error: (res as any).error ?? 'commit failed' },
+          data: { status: 'FAILED', error: (res as any).error ?? 'Ghi lô lên blockchain thất bại.' },
         });
         this.logger.error(`Batch ${batchId} commit failed: ${(res as any).error}`);
         return { committed: false, batchId, reason: (res as any).error };
@@ -220,5 +273,78 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy {
       rootToBytes32(merkleRoot).toLowerCase() === onChainRoot.toLowerCase();
 
     return { seq, batchId: log.batchId, entryHash: log.entryHash, proof, merkleRoot, onChainRoot, verified };
+  }
+
+  private async validatePendingChain(pending: any[]): Promise<void> {
+    if (pending.length === 0) return;
+
+    let expectedPrevHash = GENESIS_PREV_HASH;
+    if (pending[0].seq > 1) {
+      const precedingLog = await this.prisma.blockchainLogger.findFirst({
+        where: { seq: pending[0].seq - 1 },
+        select: { entryHash: true },
+      });
+      if (!precedingLog) {
+        throw new Error(`Đứt quãng số thứ tự: không tìm thấy bản ghi liền trước seq ${pending[0].seq}`);
+      }
+      expectedPrevHash = precedingLog.entryHash!;
+    }
+
+    let expectedSeq = pending[0].seq!;
+    for (const log of pending) {
+      if (log.seq !== expectedSeq) {
+        throw new Error(`Đứt quãng số thứ tự: mong đợi ${expectedSeq}, nhận được ${log.seq}`);
+      }
+      if (log.prevHash !== expectedPrevHash) {
+        throw new Error(`prevHash không khớp: mong đợi ${expectedPrevHash}, nhận được ${log.prevHash}`);
+      }
+      const recomputed = computeEntryHash(
+        {
+          seq: log.seq!,
+          actorId: log.actorId,
+          action: log.action,
+          entity: log.entity,
+          entityId: log.entityId,
+          dataHash: log.dataHash,
+          createdAtIso: log.createdAt.toISOString(),
+        },
+        log.prevHash ?? GENESIS_PREV_HASH,
+      );
+      if (recomputed !== log.entryHash) {
+        throw new Error(`entryHash không khớp: tính lại ${recomputed}, nhận được ${log.entryHash}`);
+      }
+      expectedPrevHash = log.entryHash!;
+      expectedSeq += 1;
+    }
+  }
+
+  async sendTelegramAlert(title: string, details: string, brokenSeq?: number): Promise<void> {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+    const phone = process.env.ADMIN_PHONE_NUMBER ?? 'N/A';
+    if (!token || !chatId || token === 'your_telegram_bot_token_here') {
+      this.logger.warn('Telegram alerts are not configured or still have default placeholders. Skipping alert.');
+      return;
+    }
+    const message = `🚨 [CẢNH BÁO BẢO MẬT] ${title.toUpperCase()}\n\n` +
+      `${details}\n\n` +
+      `• SĐT Admin: ${phone}\n` +
+      (brokenSeq !== undefined ? `• Sequence bị lỗi: ${brokenSeq}\n` : '') +
+      `• Thời gian: ${new Date().toLocaleString('vi-VN')}\n\n` +
+      `⚠️ Yêu cầu Quản trị viên kiểm tra tính toàn vẹn hệ thống ngay lập tức!`;
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: message }),
+      });
+      if (!res.ok) {
+        this.logger.error(`Failed to send Telegram alert: ${res.statusText}`);
+      } else {
+        this.logger.log('Telegram security alert sent successfully.');
+      }
+    } catch (err) {
+      this.logger.error('Failed to send Telegram alert via fetch', err);
+    }
   }
 }

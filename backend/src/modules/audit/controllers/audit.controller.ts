@@ -31,14 +31,40 @@ export class AuditController {
   ) {}
 
   @Get('logs')
-  @ApiOperation({ summary: 'List audit log entries (hash-chained), newest first' })
-  async logs(@Query('entity') entity?: string, @Query('take') take = '100') {
-    const limit = Math.min(Number(take) || 100, 500);
-    return this.prisma.blockchainLogger.findMany({
-      where: entity ? { entity } : {},
-      orderBy: { seq: 'desc' },
-      take: limit,
-    });
+  @ApiOperation({ summary: 'List audit log entries (hash-chained) with pagination' })
+  async logs(
+    @Query('entity') entity?: string,
+    @Query('page') pageRaw?: string,
+    @Query('limit') limitRaw?: string,
+  ) {
+    const page = Math.max(Number(pageRaw) || 1, 1);
+    const limit = Math.max(Number(limitRaw) || 10, 1);
+    const skip = (page - 1) * limit;
+
+    const where = entity ? { entity } : {};
+
+    const [items, total] = await Promise.all([
+      this.prisma.blockchainLogger.findMany({
+        where,
+        orderBy: { seq: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.blockchainLogger.count({ where }),
+    ]);
+
+    const itemsWithStatus = items.map((row) => ({
+      ...row,
+      blockchainStatus: this.audit.verifyEntry(row) ? 'VERIFIED' : 'TAMPERED',
+    }));
+
+    return {
+      items: itemsWithStatus,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   @Get('verify-chain')
@@ -48,10 +74,31 @@ export class AuditController {
   }
 
   @Get('batches')
-  @ApiOperation({ summary: 'List on-chain Merkle anchor checkpoints' })
-  batches(@Query('take') take = '50') {
-    const limit = Math.min(Number(take) || 50, 200);
-    return this.prisma.auditBatch.findMany({ orderBy: { batchId: 'desc' }, take: limit });
+  @ApiOperation({ summary: 'List on-chain Merkle anchor checkpoints with pagination' })
+  async batches(
+    @Query('page') pageRaw?: string,
+    @Query('limit') limitRaw?: string,
+  ) {
+    const page = Math.max(Number(pageRaw) || 1, 1);
+    const limit = Math.max(Number(limitRaw) || 10, 1);
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      this.prisma.auditBatch.findMany({
+        orderBy: { batchId: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.auditBatch.count(),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   @Get('logs/:seq/proof')

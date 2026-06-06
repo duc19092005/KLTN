@@ -20,10 +20,10 @@ export class HttpAiModelConnectivityAdapter implements AiModelConnectivityPort {
     try {
       if (provider === 'gemini') await this.testGemini(endpoint, input.secretOrIpHash || '', input.modelVersion);
       else await this.testOpenAiCompatible(endpoint, input.secretOrIpHash || '', input.modelVersion);
-      return { ok: true, provider: input.provider, endpoint, latencyMs: Date.now() - startedAt, message: 'API provider hoạt động.' };
+      return { ok: true, provider: input.provider, endpoint, latencyMs: Date.now() - startedAt, message: 'Nhà cung cấp API hoạt động.' };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown API test error';
-      throw new BadRequestException(`API test failed: ${message}`);
+      const message = error instanceof Error ? error.message : 'Lỗi kiểm tra API không xác định';
+      throw new BadRequestException(`Kiểm tra kết nối API thất bại: ${message}`);
     }
   }
 

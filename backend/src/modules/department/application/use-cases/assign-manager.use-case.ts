@@ -21,7 +21,7 @@ export class AssignManagerUseCase {
       const staff = await this.validator.assertStaffExists(dto.managerId);
       await this.validator.assertManagerAvailable(dto.managerId, id);
       if (staff.departmentId && staff.departmentId !== id) {
-        throw new BadRequestException('Manager must belong to this department or be unassigned');
+        throw new BadRequestException('Trưởng phòng ban phải thuộc phòng ban này hoặc chưa được gán phòng ban.');
       }
       if (!staff.departmentId) await this.repo.setStaffDepartment(staff.id, id);
     }

@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
-import { BlockchainService } from '../../../../infrastructure/blockchain/blockchain.service';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
-import { hashToBytes32 } from '../../../../infrastructure/audit/audit-hash.util';
+import { AuditAnchorService } from '../../../../infrastructure/audit/audit-anchor.service';
 import {
   DoctorAnchorAction,
   DoctorIntegrityAnchorPort,
@@ -11,47 +10,33 @@ import {
 import { buildUnifiedDoctorSnapshot } from '../../domain/doctor-snapshot';
 
 /**
- * Tamper-evidence adapter for doctors. Logic copied verbatim from the former
- * DoctorService (anchorDoctorChange, evaluateIntegrity, getHistory): unified
- * staff+doctor hash, on-chain mirror via StaffRegistry under doctor.id,
- * hash256/dataSalt persistence on DoctorProfile, and the BlockchainLogger audit
- * entry. Only the salted hash goes on-chain.
+ * Tamper-evidence adapter for doctors. Uses the centralized AuditAnchor
+ * (Merkle batch) for on-chain integrity verification instead of a dedicated
+ * StaffRegistry contract. Unified staff+doctor snapshot is hashed, persisted
+ * on DoctorProfile, and recorded in BlockchainLogger.
  */
 @Injectable()
 export class BlockchainDoctorIntegrityAnchor implements DoctorIntegrityAnchorPort {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly blockchain: BlockchainService,
     private readonly audit: AuditLoggerService,
+    private readonly auditAnchor: AuditAnchorService,
   ) {}
 
   async anchorChange(doctor: any, action: DoctorAnchorAction, actorId?: string, before?: unknown): Promise<void> {
     const snapshot = buildUnifiedDoctorSnapshot(doctor);
     let dataHash: string | null = null;
     let dataSalt: string | null = null;
-    let onChainStatus = 'PENDING';
-    let txHash: string | null = null;
-    let blockNumber: number | null = null;
 
     try {
-      if (action === 'DELETE') {
-        const res = await this.blockchain.removeStaffHash(doctor.id);
-        onChainStatus = res.success ? 'ANCHORED' : 'UNANCHORED';
-        txHash = (res as any).txHash ?? null;
-        blockNumber = (res as any).blockNumber ?? null;
-      } else {
+      if (action !== 'DELETE') {
         const { salt, hash } = this.audit.hashSnapshot(snapshot);
         dataHash = hash;
         dataSalt = salt;
         await this.prisma.doctorProfile.update({ where: { id: doctor.id }, data: { hash256: hash, dataSalt: salt } });
-        const res = await this.blockchain.setStaffHash(doctor.id, hashToBytes32(hash));
-        onChainStatus = res.success ? 'ANCHORED' : 'UNANCHORED';
-        txHash = (res as any).txHash ?? null;
-        blockNumber = (res as any).blockNumber ?? null;
       }
     } catch (err) {
-      console.error('Error anchoring doctor change:', err);
-      onChainStatus = 'UNANCHORED';
+      console.error('Error computing doctor hash:', err);
     }
 
     await this.audit.record({
@@ -63,9 +48,7 @@ export class BlockchainDoctorIntegrityAnchor implements DoctorIntegrityAnchorPor
       dataSalt,
       before: before ?? null,
       after: action === 'DELETE' ? null : snapshot,
-      onChainStatus,
-      txHash,
-      blockNumber,
+      onChainStatus: 'PENDING',
     });
   }
 
@@ -73,17 +56,39 @@ export class BlockchainDoctorIntegrityAnchor implements DoctorIntegrityAnchorPor
     const snapshot = buildUnifiedDoctorSnapshot(doctor);
     const recomputed = doctor.dataSalt ? this.audit.recompute(snapshot, doctor.dataSalt) : null;
     const dbHash = doctor.hash256 || null;
-    const onChain = await this.blockchain.getStaffHash(doctor.id);
-    const onChainNormalized = onChain ? onChain.toLowerCase() : null;
-    const recomputedBytes32 = recomputed ? hashToBytes32(recomputed).toLowerCase() : null;
-
     const dbMatches = recomputed !== null && recomputed === dbHash;
-    const chainMatches = recomputedBytes32 !== null && recomputedBytes32 === onChainNormalized;
+
+    const latestLog = await this.prisma.blockchainLogger.findFirst({
+      where: { entity: 'DoctorProfile', entityId: doctor.id, batchId: { not: null } },
+      orderBy: { seq: 'desc' },
+      select: { seq: true, dataHash: true, batchId: true },
+    });
+
+    let chainMatches = false;
+    if (latestLog?.seq) {
+      try {
+        const proof = await this.auditAnchor.getInclusionProof(latestLog.seq);
+        if (proof && proof.verified) {
+          chainMatches = latestLog.dataHash === recomputed;
+        }
+      } catch { /* proof verification failed */ }
+    }
 
     let status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED';
-    if (!onChainNormalized) status = 'UNANCHORED';
-    else if (chainMatches) status = 'VERIFIED';
+    if (!latestLog || !latestLog.batchId) status = 'UNANCHORED';
+    else if (dbMatches && chainMatches) status = 'VERIFIED';
     else status = 'TAMPERED';
+
+    if (status === 'TAMPERED') {
+      await this.auditAnchor.sendTelegramAlert(
+        'Phát hiện giả mạo thông tin bác sĩ',
+        `Bác sĩ ID: ${doctor.id} (Chuyên khoa: ${doctor.specialty}, Số CCHN: ${doctor.licenseNumber})\n` +
+        `• Hash CSDL: ${dbHash}\n` +
+        `• Hash On-Chain: ${latestLog?.dataHash}\n` +
+        `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}\n` +
+        `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`
+      );
+    }
 
     return {
       id: doctor.id,
@@ -95,7 +100,7 @@ export class BlockchainDoctorIntegrityAnchor implements DoctorIntegrityAnchorPor
       chainMatches,
       recomputedHash: recomputed,
       storedHash: dbHash,
-      onChainHash: onChain,
+      onChainHash: latestLog?.dataHash ?? null,
     };
   }
 

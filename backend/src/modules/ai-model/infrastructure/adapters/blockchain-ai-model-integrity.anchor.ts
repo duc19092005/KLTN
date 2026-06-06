@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
-import { BlockchainService } from '../../../../infrastructure/blockchain/blockchain.service';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
-import { hashToBytes32 } from '../../../../infrastructure/audit/audit-hash.util';
+import { AuditAnchorService } from '../../../../infrastructure/audit/audit-anchor.service';
 import {
   AiModelAnchorAction,
   AiModelIntegrityAnchorPort,
@@ -11,45 +10,32 @@ import {
 import { buildAiModelSnapshot } from '../../domain/ai-model-snapshot';
 
 /**
- * Tamper-evidence adapter for AI models. Logic copied verbatim from the former
- * AiModelService (anchorAiModelChange, evaluateIntegrity, getHistory): salted
- * hash, on-chain mirror via AIModelRegistry, hash256/dataSalt persistence, and
- * the BlockchainLogger audit entry. Only the salted hash goes on-chain.
+ * Tamper-evidence adapter for AI models. Uses the centralized AuditAnchor
+ * (Merkle batch) for on-chain integrity verification instead of a dedicated
+ * AIModelRegistry contract.
  */
 @Injectable()
 export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorPort {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly blockchain: BlockchainService,
     private readonly audit: AuditLoggerService,
+    private readonly auditAnchor: AuditAnchorService,
   ) {}
 
   async anchorChange(model: any, action: AiModelAnchorAction, actorId?: string, before?: unknown): Promise<void> {
     const snapshot = buildAiModelSnapshot(model);
     let dataHash: string | null = null;
     let dataSalt: string | null = null;
-    let onChainStatus = 'PENDING';
-    let txHash: string | null = null;
-    let blockNumber: number | null = null;
 
     try {
-      if (action === 'DELETE') {
-        const res = await this.blockchain.removeAiModelHash(model.id);
-        onChainStatus = res.success ? 'ANCHORED' : 'UNANCHORED';
-        txHash = (res as any).txHash ?? null;
-        blockNumber = (res as any).blockNumber ?? null;
-      } else {
+      if (action !== 'DELETE') {
         const { salt, hash } = this.audit.hashSnapshot(snapshot);
         dataHash = hash;
         dataSalt = salt;
         await this.prisma.aiModelRegistry.update({ where: { id: model.id }, data: { hash256: hash, dataSalt: salt } });
-        const res = await this.blockchain.setAiModelHash(model.id, hashToBytes32(hash));
-        onChainStatus = res.success ? 'ANCHORED' : 'UNANCHORED';
-        txHash = (res as any).txHash ?? null;
-        blockNumber = (res as any).blockNumber ?? null;
       }
     } catch {
-      onChainStatus = 'UNANCHORED';
+      // Hash computation failed; log entry will still be created below with null hashes.
     }
 
     await this.audit.record({
@@ -61,9 +47,7 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
       dataSalt,
       before: before ?? null,
       after: action === 'DELETE' ? null : snapshot,
-      onChainStatus,
-      txHash,
-      blockNumber,
+      onChainStatus: 'PENDING',
     });
   }
 
@@ -71,17 +55,39 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
     const snapshot = buildAiModelSnapshot(model);
     const recomputed = model.dataSalt ? this.audit.recompute(snapshot, model.dataSalt) : null;
     const dbHash = model.hash256 || null;
-    const onChain = await this.blockchain.getAiModelHash(model.id);
-    const onChainNormalized = onChain ? onChain.toLowerCase() : null;
-    const recomputedBytes32 = recomputed ? hashToBytes32(recomputed).toLowerCase() : null;
-
     const dbMatches = recomputed !== null && recomputed === dbHash;
-    const chainMatches = recomputedBytes32 !== null && recomputedBytes32 === onChainNormalized;
+
+    const latestLog = await this.prisma.blockchainLogger.findFirst({
+      where: { entity: 'AiModelRegistry', entityId: model.id, batchId: { not: null } },
+      orderBy: { seq: 'desc' },
+      select: { seq: true, dataHash: true, batchId: true },
+    });
+
+    let chainMatches = false;
+    if (latestLog?.seq) {
+      try {
+        const proof = await this.auditAnchor.getInclusionProof(latestLog.seq);
+        if (proof && proof.verified) {
+          chainMatches = latestLog.dataHash === recomputed;
+        }
+      } catch { /* proof verification failed */ }
+    }
 
     let status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED';
-    if (!onChainNormalized) status = 'UNANCHORED';
-    else if (chainMatches) status = 'VERIFIED';
+    if (!latestLog || !latestLog.batchId) status = 'UNANCHORED';
+    else if (dbMatches && chainMatches) status = 'VERIFIED';
     else status = 'TAMPERED';
+
+    if (status === 'TAMPERED') {
+      await this.auditAnchor.sendTelegramAlert(
+        'Phát hiện giả mạo mô hình AI',
+        `Mô hình: ${model.modelName} (Phiên bản: ${model.modelVersion}, ID: ${model.id})\n` +
+        `• Hash CSDL: ${dbHash}\n` +
+        `• Hash On-Chain: ${latestLog?.dataHash}\n` +
+        `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}\n` +
+        `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`
+      );
+    }
 
     return {
       id: model.id,
@@ -92,7 +98,7 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
       chainMatches,
       recomputedHash: recomputed,
       storedHash: dbHash,
-      onChainHash: onChain,
+      onChainHash: latestLog?.dataHash ?? null,
     };
   }
 

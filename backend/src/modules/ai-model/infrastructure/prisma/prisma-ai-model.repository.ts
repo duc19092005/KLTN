@@ -41,6 +41,21 @@ export class PrismaAiModelRepository implements AiModelRepositoryPort {
     });
   }
 
+  async findManyPaginated(filter: AiModelListFilter, skip: number, take: number): Promise<{ items: any[]; total: number }> {
+    const where = buildAiModelWhere(filter);
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.aiModelRegistry.findMany({
+        where,
+        include: this.includeRelations(),
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.aiModelRegistry.count({ where }),
+    ]);
+    return { items, total };
+  }
+
   async findByIdOrThrow(id: string): Promise<any> {
     return this.prisma.aiModelRegistry.findUniqueOrThrow({ where: { id }, include: this.includeRelations() });
   }
@@ -55,6 +70,11 @@ export class PrismaAiModelRepository implements AiModelRepositoryPort {
 
   private includeRelations() {
     return {
+      aiQualities: {
+        select: {
+          trustablePercent: true,
+        },
+      },
       _count: { select: { diagnoses: true, aiQualities: true } },
     } as const;
   }

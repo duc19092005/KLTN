@@ -32,26 +32,25 @@ services:
     restart: unless-stopped
     ports:
       - "3001:3001"
+    # Pull every variable from root .env automatically. Adding a new var to
+    # .env is then enough — no need to also list it in `environment:` below.
+    env_file:
+      - ./.env
+    # Required-vars guard + docker-network overrides. Anything declared here
+    # wins over `env_file` (so DATABASE_URL / BLOCKCHAIN_RPC_URL correctly
+    # point at the in-network service names instead of localhost).
     environment:
-      NODE_ENV: development
-      PORT: 3001
+      # --- required (fail fast if missing) ---
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set in .env}
+      AUDIT_PEPPER: ${AUDIT_PEPPER:?AUDIT_PEPPER must be set in .env}
+      # --- docker-network overrides ---
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-change-me-local-only}@db:5432/${POSTGRES_DB:-zkp_identity}?schema=public
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
-      SUPER_ADMIN_PRIVATE_KEY: ${SUPER_ADMIN_PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
-      IDENTITY_REGISTRY_ADDRESS: ${IDENTITY_REGISTRY_ADDRESS:-0x5FbDB2315678afecb367f032d93F642f64180aa3}
-      DEPARTMENT_REGISTRY_ADDRESS: ${DEPARTMENT_REGISTRY_ADDRESS:-0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512}
-      FACE_REGISTRY_ADDRESS: ${FACE_REGISTRY_ADDRESS:-0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0}
-      AUDIT_ANCHOR_ADDRESS: ${AUDIT_ANCHOR_ADDRESS:-0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9}
-      STAFF_REGISTRY_ADDRESS: ${STAFF_REGISTRY_ADDRESS:-0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9}
-      AI_MODEL_REGISTRY_ADDRESS: ${AI_MODEL_REGISTRY_ADDRESS:-0x5FC8d32690cc91D4c39d9d3abcBD16989F875707}
-      AUDIT_PEPPER: ${AUDIT_PEPPER:-}
       BLOCKCHAIN_RPC_URL: http://blockchain:8545
       FRONTEND_ORIGIN: http://localhost:5173
-      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
-      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
-      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
-      CLOUDINARY_UPLOAD_PRESET: ${CLOUDINARY_UPLOAD_PRESET:-}
+      # --- server config ---
+      NODE_ENV: development
+      PORT: 3001
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -66,6 +65,7 @@ services:
     build:
       context: ./frontend
       args:
+        # Vite reads VITE_* at build time; pass through .env values.
         VITE_API_URL: http://localhost:3001/api
         VITE_IDENTITY_REGISTRY_ADDRESS: ${IDENTITY_REGISTRY_ADDRESS:-0x5FbDB2315678afecb367f032d93F642f64180aa3}
         VITE_NETWORK_RPC_URL: http://localhost:8545

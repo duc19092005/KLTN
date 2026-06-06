@@ -26,6 +26,7 @@ export type PatientWriteData = {
  */
 export interface PatientRepositoryPort {
   findByIdWithRelations(id: string): Promise<any | null>;
+  findByPatientCode(patientCode: string): Promise<any | null>;
   generatePatientCode(): Promise<string>;
   create(data: PatientWriteData, patientCode: string): Promise<any>;
   findManyPaginated(filter: PatientListFilter, skip: number, take: number): Promise<{ items: unknown[]; total: number }>;

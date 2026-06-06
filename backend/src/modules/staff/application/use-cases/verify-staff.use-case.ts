@@ -16,7 +16,7 @@ export class VerifyStaffUseCase {
 
   async findOne(id: string) {
     const staff = await this.repo.findByIdWithStaffRelations(id);
-    if (!staff) throw new NotFoundException('Staff profile not found');
+    if (!staff) throw new NotFoundException('Không tìm thấy hồ sơ nhân sự.');
     const integrity = await this.integrity.evaluate(staff);
     return {
       ...staff,
@@ -33,7 +33,7 @@ export class VerifyStaffUseCase {
 
   async verifyOne(id: string) {
     const staff = await this.repo.findByIdWithStaffRelations(id);
-    if (!staff) throw new NotFoundException('Staff profile not found');
+    if (!staff) throw new NotFoundException('Không tìm thấy hồ sơ nhân sự.');
     return this.integrity.evaluate(staff);
   }
 

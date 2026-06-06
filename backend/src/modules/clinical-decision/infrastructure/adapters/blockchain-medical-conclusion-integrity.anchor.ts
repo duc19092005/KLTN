@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { AuditAnchorService } from '../../../../infrastructure/audit/audit-anchor.service';
 import {
   MedicalConclusionAnchorAction,
   MedicalConclusionIntegrityAnchorPort,
@@ -11,12 +12,14 @@ import { buildMedicalConclusionSnapshot } from '../../domain/medical-conclusion-
  * Adapter implementing tamper-evidence for medical conclusions.
  * Calculates salted hashes of conclusions, updates the DB columns (hash256/dataSalt),
  * and creates corresponding BlockchainLogger audit log records.
+ * Initiates immediate anchoring on-chain (Tier-A event).
  */
 @Injectable()
 export class BlockchainMedicalConclusionIntegrityAnchor implements MedicalConclusionIntegrityAnchorPort {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditLoggerService,
+    private readonly auditAnchor: AuditAnchorService,
   ) {}
 
   async anchorChange(
@@ -48,8 +51,7 @@ export class BlockchainMedicalConclusionIntegrityAnchor implements MedicalConclu
       onChainStatus = 'UNANCHORED';
     }
 
-    // 3. Record audit entry in BlockchainLogger. Note: batch-anchoring is handled automatically
-    // by AuditAnchorService, which gathers pending logs, builds Merkle trees, and anchors them.
+    // 3. Record audit entry in BlockchainLogger.
     try {
       await this.audit.record({
         entity: 'MedicalConclusion',
@@ -64,6 +66,15 @@ export class BlockchainMedicalConclusionIntegrityAnchor implements MedicalConclu
       });
     } catch (err) {
       console.error('Error writing audit trail for medical conclusion:', err);
+    }
+
+    // 4. Trigger immediate Merkle root commit (Tier-A event) to protect the conclusion instantly
+    if (onChainStatus === 'PENDING') {
+      try {
+        await this.auditAnchor.anchorNow();
+      } catch (err) {
+        console.error('[MedicalConclusion] Immediate anchoring failed, will retry in batch cycle:', err);
+      }
     }
   }
 }

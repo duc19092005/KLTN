@@ -8,4 +8,13 @@ export const staffService = {
   unlock: (id) => api.patch(`/staff/${id}/unlock`),
   remove: (id, stepUpTicket) =>
     api.delete(`/staff/${id}`, stepUpTicket ? { headers: { 'x-stepup-ticket': stepUpTicket } } : undefined),
+  uploadAvatar: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/doctors/upload-avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
 };

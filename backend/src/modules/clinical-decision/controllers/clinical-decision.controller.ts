@@ -5,12 +5,14 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
+import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
+import { RequireStepUpSession } from '../../../common/stepup/require-stepup-session.decorator';
 import { CreateMedicalConclusionDto, GenerateAiAnalysisDto, ReviewAiDiagnosisDto } from '../dto/clinical-decision.dto';
 import { ClinicalDecisionService } from '../services/clinical-decision.service';
 
 @ApiTags('Clinical Decision')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
 @Controller('clinical-decisions')
 export class ClinicalDecisionController {
   constructor(private readonly service: ClinicalDecisionService) {}
@@ -35,6 +37,7 @@ export class ClinicalDecisionController {
 
   @Roles('DOCTOR')
   @Post('conclusions')
+  @RequireStepUpSession()
   createConclusion(@Body() dto: CreateMedicalConclusionDto, @CurrentUser() user: AuthUser) {
     return this.service.createConclusion(dto, user.sub);
   }

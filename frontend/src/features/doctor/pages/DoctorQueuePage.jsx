@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Download, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
@@ -58,6 +59,15 @@ export default function DoctorQueuePage() {
   const [conclusionForm, setConclusionForm] = useState(emptyConclusion);
   const [selectedAiId, setSelectedAiId] = useState('');
   const [selectedAiModelId, setSelectedAiModelId] = useState('');
+
+  // States for AI Model Rating Optional Countdown Popup
+  const [showRatingPopup, setShowRatingPopup] = useState(false);
+  const [ratingModelId, setRatingModelId] = useState('');
+  const [ratingModelName, setRatingModelName] = useState('');
+  const [countdown, setCountdown] = useState(10);
+  const [ratingFeedback, setRatingFeedback] = useState('');
+  const [ratingSelected, setRatingSelected] = useState(null);
+  const [pauseCountdown, setPauseCountdown] = useState(false);
 
   const loadVisits = async () => {
     setLoading(true);
@@ -166,6 +176,9 @@ export default function DoctorQueuePage() {
     finally { setBusy(false); }
   };
 
+  // Finalizing a conclusion anchors it on-chain. The endpoint requires a step-up SESSION; if none
+  // is active the axios interceptor transparently prompts one face scan and replays this request,
+  // so the doctor scans once per session rather than once per conclusion.
   const submitConclusion = async (event) => {
     event.preventDefault();
     if (!activeVisit) return;
@@ -174,9 +187,62 @@ export default function DoctorQueuePage() {
       await clinicalDecisionService.createConclusion({ ...conclusionForm, visitId: activeVisit.id, aiDiagnosisId: selectedAiId || undefined });
       toast.success('Đã đóng hồ sơ bệnh án và hoàn tất lượt khám của bệnh nhân.');
       setShowWorkflowModal(false);
+
+      // Check if AI Model was used and can be rated
+      const activeDiag = decision?.aiDiagnoses?.find((d) => d.id === selectedAiId);
+      if (activeDiag?.aiModel) {
+        setRatingModelId(activeDiag.aiModel.id);
+        setRatingModelName(activeDiag.aiModel.modelName);
+        setShowRatingPopup(true);
+        setCountdown(10);
+        setRatingSelected(null);
+        setRatingFeedback('');
+        setPauseCountdown(false);
+      } else {
+        await loadVisits();
+      }
+    } catch (err) { 
+      toast.error(err.response?.data?.message || 'Không lưu được kết luận cuối'); 
       await loadVisits();
-    } catch (err) { toast.error(err.response?.data?.message || 'Không lưu được kết luận cuối'); }
-    finally { setBusy(false); }
+    } finally { 
+      setBusy(false); 
+    }
+  };
+
+  useEffect(() => {
+    if (!showRatingPopup || pauseCountdown) return;
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setShowRatingPopup(false);
+          loadVisits();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [showRatingPopup, pauseCountdown]);
+
+  const handleRateModel = async (satisfied) => {
+    try {
+      setBusy(true);
+      await aiModelService.rate(ratingModelId, {
+        satisfied,
+        feedback: satisfied ? undefined : ratingFeedback,
+      });
+      toast.success('Cảm ơn bác sĩ đã đánh giá mô hình AI!');
+    } catch (err) {
+      toast.error('Không gửi được đánh giá.');
+    } finally {
+      setBusy(false);
+      setShowRatingPopup(false);
+      setRatingSelected(null);
+      setRatingFeedback('');
+      setPauseCountdown(false);
+      await loadVisits();
+    }
   };
 
   return (
@@ -213,6 +279,103 @@ export default function DoctorQueuePage() {
             aiProps={{ diagnoses: decision?.aiDiagnoses || [], aiModels, selectedAiModelId, setSelectedAiModelId, selectedAiId, setSelectedAiId, onGenerate: generateAi, busy }}
             conclusionProps={{ form: conclusionForm, setForm: setConclusionForm, onSubmit: submitConclusion, busy, completed: Boolean(decision?.finalConclusion) }}
           />
+        )}
+
+        {/* Optional Countdown Rating Popup */}
+        {showRatingPopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-md animate-fadeIn p-4">
+            <div className="w-full max-w-md rounded-3xl border border-slate-100 bg-white p-6 shadow-2xl space-y-6">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-[0.2em] font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md">Đánh giá Mô hình AI</span>
+                {!pauseCountdown && (
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-100">
+                    <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+                    Tự động đóng trong {countdown}s
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-base font-black text-slate-950">Bác sĩ có hài lòng với kết quả của mô hình?</h3>
+                <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+                  Mô hình: <span className="text-slate-800 font-bold">{ratingModelName}</span>
+                </p>
+              </div>
+
+              {ratingSelected === null ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => handleRateModel(true)}
+                    className="flex flex-col items-center justify-center py-4 px-3 rounded-2xl border border-emerald-100 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-800 font-bold transition-all text-xs gap-1.5 active:scale-95"
+                  >
+                    Hài lòng (Có)
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      setRatingSelected('NO');
+                      setPauseCountdown(true);
+                    }}
+                    className="flex flex-col items-center justify-center py-4 px-3 rounded-2xl border border-rose-100 bg-rose-50/50 hover:bg-rose-50 text-rose-800 font-bold transition-all text-xs gap-1.5 active:scale-95"
+                  >
+                    Không chính xác
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4 animate-slideUp">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">Lý do mô hình đánh giá chưa chuẩn xác <span className="text-red-500">*</span></label>
+                    <textarea
+                      value={ratingFeedback}
+                      onChange={(e) => setRatingFeedback(e.target.value)}
+                      placeholder="VD: Mô hình bỏ sót bóng mờ ở đáy phổi trái..."
+                      rows={3}
+                      className="w-full rounded-xl border border-slate-200 p-3 text-xs outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all font-medium"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRatingSelected(null);
+                        setPauseCountdown(false);
+                      }}
+                      className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                    >
+                      Quay lại
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy || !ratingFeedback.trim()}
+                      onClick={() => handleRateModel(false)}
+                      className="flex-1 rounded-xl bg-slate-900 py-2.5 text-xs font-black text-white hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      Gửi phản hồi
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="border-t border-slate-100 pt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRatingPopup(false);
+                    setRatingSelected(null);
+                    setRatingFeedback('');
+                    setPauseCountdown(false);
+                    loadVisits();
+                  }}
+                  className="text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  Bỏ qua đánh giá (Đóng)
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </DashboardLayout>
@@ -402,7 +565,7 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
       step: 2,
       eyebrow: 'Bước 02',
       title: 'Đọc kết quả & tham vấn AI',
-      desc: 'Kiểm tra file Lab trả về, sau đó chạy AI nếu cần hỗ trợ phân tích.',
+      desc: 'Kiểm tra tệp kết quả trả về, sau đó chạy AI nếu cần hỗ trợ phân tích.',
       status: pendingOrders.length ? `Còn ${pendingOrders.length} phiếu đang xử lý` : readyOrders.length ? `${readyOrders.length} phiếu có kết quả` : 'Chưa có kết quả',
       tone: 'violet',
       enabled: canReviewResults,
@@ -704,12 +867,12 @@ function ResultsPanel({ orders }) {
                                   const dl = await medicalOrderService.getResultFileDownloadUrl(f.id);
                                   if (dl.data?.url) window.open(dl.data.url, '_blank', 'noopener,noreferrer');
                                 } catch {
-                                  toast.error('Không tải được file kết quả hoặc bạn không có quyền truy cập.');
+	                                  toast.error('Không tải được tệp kết quả hoặc bạn không có quyền truy cập.');
                                 }
                               }}
                               className="flex items-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 px-3 py-2 rounded-lg border border-blue-100 hover:bg-blue-100 transition-colors"
                             >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                              <Download className="w-4 h-4" strokeWidth={2.5} />
                               Xem {f.originalName?.slice(-12) || 'Tệp đính kèm'}
                             </button>
                           ))}
@@ -743,8 +906,8 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
         </div>
         <div className="flex flex-col sm:flex-row gap-2 xl:min-w-[520px]">
           <select value={selectedAiModelId} onChange={(e) => setSelectedAiModelId(e.target.value)} disabled={busy} className="flex-1 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:opacity-50 transition-all">
-            <option value="">-- Chọn AI model --</option>
-            {aiModels.map((model) => <option key={model.id} value={model.id}>{model.modelName || model.name || 'AI Model'} {model.modelVersion ? `(${model.modelVersion})` : ''} - {model.provider || 'other'}</option>)}
+	            <option value="">-- Chọn mô hình AI --</option>
+	            {aiModels.map((model) => <option key={model.id} value={model.id}>{model.modelName || model.name || 'Mô hình AI'} {model.modelVersion ? `(${model.modelVersion})` : ''} - {model.provider || 'khác'}</option>)}
           </select>
           <button type="button" onClick={onGenerate} disabled={busy || !selectedAiModelId} className="rounded-xl bg-indigo-600 px-5 py-3 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-indigo-600/25 hover:bg-indigo-700 disabled:opacity-50 disabled:shadow-none whitespace-nowrap transition-all flex items-center justify-center gap-2">
             {busy ? (<><LoadingIndicator size="sm" /><span>Đang phân tích...</span></>) : (`Chạy ${selectedModel?.provider || 'AI'}`)}
@@ -769,7 +932,7 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
                       <span className="rounded-lg bg-indigo-50 px-2 py-1 text-[10px] font-black uppercase text-indigo-700 border border-indigo-100">{parsed.provider || diagnosis.aiModel?.provider || 'AI'}</span>
                       <span className="text-[10px] font-bold text-slate-400">{formatTime(diagnosis.createdAt)}</span>
                     </div>
-                    <strong className="mt-2 block text-xs font-black text-slate-900">{parsed.modelName || diagnosis.aiModel?.modelName || 'AI Model'}</strong>
+	                    <strong className="mt-2 block text-xs font-black text-slate-900">{parsed.modelName || diagnosis.aiModel?.modelName || 'Mô hình AI'}</strong>
                     <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-relaxed text-slate-500">{parsed.summary || 'Bản phân tích AI đã được lưu.'}</p>
                   </button>
                 );
@@ -781,8 +944,8 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-indigo-100 pb-4">
               <div>
 
-                <h4 className="mt-1 text-lg font-black text-slate-950">{parsedResult.modelName || currentDiagnosis?.aiModel?.modelName || 'AI Model'}</h4>
-                <p className="mt-1 text-[11px] font-semibold text-slate-500">Provider: {parsedResult.provider || currentDiagnosis?.aiModel?.provider || 'other'} · {currentDiagnosis?.createdAt ? new Date(currentDiagnosis.createdAt).toLocaleString('vi-VN') : 'N/A'}</p>
+	                <h4 className="mt-1 text-lg font-black text-slate-950">{parsedResult.modelName || currentDiagnosis?.aiModel?.modelName || 'Mô hình AI'}</h4>
+	                <p className="mt-1 text-[11px] font-semibold text-slate-500">Nền tảng: {parsedResult.provider || currentDiagnosis?.aiModel?.provider || 'khác'} · {currentDiagnosis?.createdAt ? new Date(currentDiagnosis.createdAt).toLocaleString('vi-VN') : 'N/A'}</p>
               </div>
               <span className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-[10px] font-black text-emerald-700">Đã lưu DB</span>
             </div>
@@ -800,7 +963,7 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
             {!parsedResult.summary && currentDiagnosis?.result && <div className="whitespace-pre-wrap rounded-xl border border-white bg-white/80 p-4 text-xs font-medium leading-relaxed text-slate-700">{currentDiagnosis.result}</div>}
           </section>
         </div>
-      ) : (<Empty title="Chưa có phân tích AI" desc="Chọn Gemini, ChatGPT/OpenAI hoặc model khác rồi bấm chạy để lưu bản phân tích đầu tiên." />)}
+      ) : (<Empty title="Chưa có phân tích AI" desc="Chọn Gemini, ChatGPT/OpenAI hoặc mô hình khác rồi bấm chạy để lưu bản phân tích đầu tiên." />)}
     </div>
   );
 }
@@ -990,9 +1153,7 @@ function Empty({ title, desc }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center bg-slate-50/30 rounded-2xl">
       <div className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-sm flex items-center justify-center mb-4 text-slate-300">
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
+        <FileText className="w-6 h-6" strokeWidth={2.5} />
       </div>
       <h3 className="text-sm font-black text-slate-900">{title}</h3>
       <p className="mt-1 text-xs font-semibold text-slate-500 max-w-sm mx-auto">{desc}</p>
