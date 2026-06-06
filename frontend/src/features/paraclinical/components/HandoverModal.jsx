@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { X, Check } from 'lucide-react';
 import { useToast } from '../../../providers/ToastProvider';
 import { handoverService } from '../apis/paraclinicalService';
 import FaceCapture from '../../auth/components/FaceCapture';
@@ -99,7 +100,7 @@ export default function HandoverModal({ isOpen, onClose, currentStaff, clinicalR
               <p className="text-xs font-semibold text-cyan-100 mt-0.5">Xác thực sinh trắc học kép</p>
             </div>
             <button onClick={handleClose} className="rounded-xl bg-white/20 p-2 hover:bg-white/30 transition-colors">
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              <X className="w-4 h-4 text-white" strokeWidth={2} />
             </button>
           </div>
 
@@ -198,7 +199,7 @@ export default function HandoverModal({ isOpen, onClose, currentStaff, clinicalR
           {step === 4 && (
             <div className="text-center py-6 space-y-4">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-100">
-                <svg className="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                <Check className="w-8 h-8 text-emerald-600" strokeWidth={2.5} />
               </div>
               <div>
                 <h3 className="text-lg font-black text-slate-950">Bàn giao thành công!</h3>

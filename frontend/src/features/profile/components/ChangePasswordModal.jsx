@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { X, Eye, EyeOff } from 'lucide-react';
 import { authService } from '../../auth/apis/authService';
 import { useToast } from '../../../providers/ToastProvider';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
@@ -59,9 +60,7 @@ export default function ChangePasswordModal({ onClose }) {
             className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
             aria-label="Đóng"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-5 h-5" strokeWidth={2} />
           </button>
         </div>
 
@@ -112,19 +111,7 @@ function Input({ id, label, value, onChange }) {
           className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-indigo-600"
           aria-label={show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            {show ? (
-              <>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 3l18 18" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.58 10.58a2 2 0 002.83 2.83M9.36 5.18A9.5 9.5 0 0112 5c5 0 9 4 9 7a9.7 9.7 0 01-2.32 3.32M6.1 6.1A9.7 9.7 0 003 12c0 3 4 7 9 7a9.5 9.5 0 003.5-.66" />
-              </>
-            ) : (
-              <>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
-                <circle cx="12" cy="12" r="3" strokeWidth={1.8} />
-              </>
-            )}
-          </svg>
+          {show ? <EyeOff className="w-5 h-5" strokeWidth={1.8} /> : <Eye className="w-5 h-5" strokeWidth={1.8} />}
         </button>
       </div>
     </label>

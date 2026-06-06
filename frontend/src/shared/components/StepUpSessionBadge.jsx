@@ -1,4 +1,5 @@
 import React from 'react';
+import { ShieldCheck } from 'lucide-react';
 import { useStepUpSession } from '../../features/auth';
 
 /**
@@ -28,10 +29,7 @@ export default function StepUpSessionBadge() {
       className={`hidden sm:flex items-center gap-2 rounded-xl border px-2.5 py-1.5 ${tone}`}
       title="Phiên xác thực khuôn mặt đang mở. Trong phiên, bạn không cần quét lại cho mỗi thao tác."
     >
-      <svg className={`h-4 w-4 ${urgent ? 'animate-pulse' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
-        <path d="m9 12 2 2 4-4" />
-      </svg>
+      <ShieldCheck className={`h-4 w-4 ${urgent ? 'animate-pulse' : ''}`} strokeWidth={2} />
       <div className="leading-tight">
         <p className="text-[9px] font-black uppercase tracking-wider opacity-80">Phiên bảo mật</p>
         <p className="text-xs font-black tabular-nums">{formatMs(remainingMs)}</p>

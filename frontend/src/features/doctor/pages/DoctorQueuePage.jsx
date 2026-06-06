@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Download, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
@@ -871,7 +872,7 @@ function ResultsPanel({ orders }) {
                               }}
                               className="flex items-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 px-3 py-2 rounded-lg border border-blue-100 hover:bg-blue-100 transition-colors"
                             >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                              <Download className="w-4 h-4" strokeWidth={2.5} />
                               Xem {f.originalName?.slice(-12) || 'Tệp đính kèm'}
                             </button>
                           ))}
@@ -1152,9 +1153,7 @@ function Empty({ title, desc }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center bg-slate-50/30 rounded-2xl">
       <div className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-sm flex items-center justify-center mb-4 text-slate-300">
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
+        <FileText className="w-6 h-6" strokeWidth={2.5} />
       </div>
       <h3 className="text-sm font-black text-slate-900">{title}</h3>
       <p className="mt-1 text-xs font-semibold text-slate-500 max-w-sm mx-auto">{desc}</p>

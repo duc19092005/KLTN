@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { ArrowRight, Check } from 'lucide-react';
 import {
   initFaceMesh,
   detectLandmarks,
@@ -460,10 +461,11 @@ export default function LivenessCheck({
     const rotationMap = { right: 0, down: 90, left: 180, up: 270 };
     const rotation = rotationMap[direction] ?? 0;
     return (
-      <svg className="w-5 h-5 text-white transition-transform duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: `rotate(${rotation}deg)` }}>
-        <line x1="5" y1="12" x2="19" y2="12" />
-        <polyline points="12 5 19 12 12 19" />
-      </svg>
+      <ArrowRight
+        className="w-5 h-5 text-white transition-transform duration-300"
+        strokeWidth={3.5}
+        style={{ transform: `rotate(${rotation}deg)` }}
+      />
     );
   };
 
@@ -557,9 +559,7 @@ export default function LivenessCheck({
           {allPassedUI && (
             <div className="absolute inset-0 bg-emerald-600/95 backdrop-blur-sm rounded-inherit flex flex-col items-center justify-center z-20 animate-in zoom-in-95 duration-300">
               <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-md mb-2 animate-bounce">
-                <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
+                <Check className="w-5 h-5 text-emerald-600" strokeWidth={4} />
               </div>
               <p className="text-[10px] font-bold text-white uppercase tracking-widest">Hợp Lệ</p>
             </div>

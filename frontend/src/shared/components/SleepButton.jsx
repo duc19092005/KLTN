@@ -1,4 +1,5 @@
 import React from 'react';
+import { Moon } from 'lucide-react';
 import { useScreenLock } from '../../features/auth';
 
 /**
@@ -18,9 +19,7 @@ export default function SleepButton() {
       title="Khóa màn hình (Ngủ)"
       aria-label="Khóa màn hình"
     >
-      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
-      </svg>
+      <Moon className="h-4 w-4" strokeWidth={2} />
     </button>
   );
 }

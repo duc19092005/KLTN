@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { UserCircle } from 'lucide-react';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { useAuth } from '../../../providers/AuthProvider';
@@ -68,7 +69,7 @@ export default function ParaclinicalDashboardPage() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
               <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-cyan-600 text-white">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                <UserCircle className="w-6 h-6" strokeWidth={2} />
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-[0.18em] font-black text-cyan-600">Đang phụ trách</p>
