@@ -185,4 +185,12 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
       data: { failedFaceAttempts: 0, faceLockedUntil: null },
     });
   }
+
+  async updateAutoLockMinutes(userId: string, minutes: number): Promise<UserWithProfile> {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { autoLockMinutes: minutes },
+      include: { adminProfile: true },
+    });
+  }
 }

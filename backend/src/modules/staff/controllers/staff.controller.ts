@@ -1,4 +1,6 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { UserStatus } from '@prisma/client';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -8,8 +10,10 @@ import { AuthUser } from '../../../common/types/auth-user.type';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
 import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
+import { RequireStepUpSession } from '../../../common/stepup/require-stepup-session.decorator';
 import { CreateStaffDto, StaffQueryDto, UpdateStaffDto } from '../dto/staff.dto';
 import { StaffService } from '../services/staff.service';
+import { uploadAvatarToCloudinary } from '../../../infrastructure/storage/cloudinary-uploader';
 
 @UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
 @Roles('ADMIN')
@@ -20,6 +24,7 @@ export class StaffController {
   constructor(private readonly service: StaffService) {}
 
   @Post()
+  @RequireStepUpSession()
   @ApiOperation({ summary: 'Create staff profile and login user account' })
   create(@Body() dto: CreateStaffDto, @CurrentUser() user: AuthUser) {
     return this.service.create(dto, user?.sub);
@@ -63,18 +68,21 @@ export class StaffController {
   }
 
   @Patch(':id')
+  @RequireStepUpSession()
   @ApiOperation({ summary: 'Update staff profile and linked user account' })
   update(@Param('id') id: string, @Body() dto: UpdateStaffDto, @CurrentUser() user: AuthUser) {
     return this.service.update(id, dto, user?.sub);
   }
 
   @Patch(':id/lock')
+  @RequireStepUpSession()
   @ApiOperation({ summary: 'Lock a staff account' })
   lock(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.service.setStatus(id, UserStatus.INACTIVE, user?.sub);
   }
 
   @Patch(':id/unlock')
+  @RequireStepUpSession()
   @ApiOperation({ summary: 'Unlock a staff account' })
   unlock(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.service.setStatus(id, UserStatus.ACTIVE, user?.sub);
@@ -85,6 +93,26 @@ export class StaffController {
   @ApiOperation({ summary: 'Soft-delete staff by marking account inactive (requires face step-up)' })
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.service.remove(id, user?.sub);
+  }
+
+  @Post('upload-avatar')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_req, file, callback) => {
+        const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+        callback(null, allowed.includes(file.mimetype));
+      },
+    }),
+  )
+  @ApiOperation({ summary: 'Upload avatar to Cloudinary' })
+  async uploadAvatar(@UploadedFile() file: any) {
+    if (!file) {
+      throw new BadRequestException('Vui lòng chọn ảnh hợp lệ (PNG, JPG, WEBP).');
+    }
+    const url = await uploadAvatarToCloudinary(file);
+    return { url };
   }
 }
 

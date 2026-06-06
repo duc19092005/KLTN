@@ -17,14 +17,16 @@ import LoadingIndicator from '../../../shared/components/LoadingIndicator';
  *   4. onSuccess(ticket) — caller replays it via the `x-stepup-ticket` header on the real request
  *
  * Props:
- *   action      string  scope, must match the backend @RequireFaceStepUp(action)
- *   resourceId  string? optional target id; binds the ticket to one specific record
+ *   mode        'ticket' (default, single-use) | 'session' (open a reusable privilege window)
+ *   action      string  (ticket mode) scope, must match backend @RequireFaceStepUp(action)
+ *   resourceId  string? (ticket mode) optional target id; binds the ticket to one record
+ *   scope       string? (session mode) session scope, default 'SENSITIVE_WRITE'
  *   title       string? heading text
  *   description string? explanatory copy
- *   onSuccess   (ticket: string) => void
+ *   onSuccess   ticket mode: (ticket: string) => void; session mode: (session: object) => void
  *   onClose     () => void
  */
-export default function FaceStepUpModal({ action, resourceId, title, description, onSuccess, onClose }) {
+export default function FaceStepUpModal({ mode = 'ticket', action, resourceId, scope, title, description, onSuccess, onClose }) {
   const [phase, setPhase] = useState('scan'); // scan | submitting | error
   const [error, setError] = useState('');
 
@@ -36,11 +38,16 @@ export default function FaceStepUpModal({ action, resourceId, title, description
       const challenge = challengeRes.data?.challenge;
       if (!challenge) throw new Error('Không lấy được mã thử thách (challenge).');
 
-      const res = await authService.faceStepUp(embedding, challenge, action, resourceId);
-      const ticket = res.data?.ticket;
-      if (!ticket) throw new Error('Máy chủ không trả về vé xác thực.');
-
-      onSuccess?.(ticket);
+      if (mode === 'session') {
+        const res = await authService.openStepUpSession(embedding, challenge, scope);
+        if (!res.data?.session) throw new Error('Máy chủ không mở được phiên xác thực.');
+        onSuccess?.(res.data);
+      } else {
+        const res = await authService.faceStepUp(embedding, challenge, action, resourceId);
+        const ticket = res.data?.ticket;
+        if (!ticket) throw new Error('Máy chủ không trả về vé xác thực.');
+        onSuccess?.(ticket);
+      }
     } catch (err) {
       setError(err?.response?.data?.message || err.message || 'Xác thực khuôn mặt thất bại.');
       setPhase('error');

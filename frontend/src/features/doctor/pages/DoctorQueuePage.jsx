@@ -175,6 +175,9 @@ export default function DoctorQueuePage() {
     finally { setBusy(false); }
   };
 
+  // Finalizing a conclusion anchors it on-chain. The endpoint requires a step-up SESSION; if none
+  // is active the axios interceptor transparently prompts one face scan and replays this request,
+  // so the doctor scans once per session rather than once per conclusion.
   const submitConclusion = async (event) => {
     event.preventDefault();
     if (!activeVisit) return;

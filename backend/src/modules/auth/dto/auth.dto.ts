@@ -65,6 +65,25 @@ export class StepUpFaceDto {
   resourceId?: string;
 }
 
+export class OpenStepUpSessionDto {
+  @IsArray()
+  embedding: number[];
+
+  @IsString()
+  @Length(32, 128)
+  challenge: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(2, 64)
+  scope?: string;
+}
+
+export class UpdateAutoLockDto {
+  @IsNumber()
+  minutes: number;
+}
+
 export class WalletChallengeDto {
   @IsEthereumAddress()
   address: string;

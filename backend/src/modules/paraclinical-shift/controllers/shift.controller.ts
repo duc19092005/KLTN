@@ -4,6 +4,8 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
+import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
+import { RequireStepUpSession } from '../../../common/stepup/require-stepup-session.decorator';
 import { RegisterShiftUseCase } from '../application/use-cases/register-shift.use-case';
 import { ApproveShiftUseCase } from '../application/use-cases/approve-shift.use-case';
 import { RejectShiftUseCase } from '../application/use-cases/reject-shift.use-case';
@@ -48,8 +50,9 @@ export class ShiftController {
   }
 
   /** Admin/Head-of-dept approves a PENDING shift. */
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
   @Roles('ADMIN', 'LAB_MANAGER')
+  @RequireStepUpSession()
   @Post('approve')
   async approve(@CurrentUser() user: AuthUser, @Body() body: ApproveShiftDto) {
     return this.approveShift.execute(body.shiftId, user.sub);
@@ -64,8 +67,9 @@ export class ShiftController {
   }
 
   /** Admin/Head-of-dept directly assigns a shift (auto-APPROVED). */
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
   @Roles('ADMIN', 'LAB_MANAGER')
+  @RequireStepUpSession()
   @Post('assign')
   async assign(@CurrentUser() user: AuthUser, @Body() body: AssignShiftDto) {
     return this.assignShift.execute(

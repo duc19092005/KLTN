@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import StepUpSessionBadge from './StepUpSessionBadge';
+import SleepButton from './SleepButton';
 
 const defaultNavItems = [
   { id: 'overview', label: 'Tổng quan', icon: 'grid' },
@@ -37,6 +39,7 @@ function SidebarIcon({ name, isActive, compact = false }) {
     settings: <><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" /><circle cx="12" cy="12" r="3" /></>,
     user: <><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
     calendar: <><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4" /><path d="M8 2v4" /><path d="M3 10h18" /></>,
+    database: <><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5" /><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3" /></>,
   };
 
   return <svg {...common}>{icons[name] || icons.grid}</svg>;
@@ -212,6 +215,10 @@ export default function DashboardLayout({
 
             <div className="h-5 w-[1px] bg-slate-200 hidden md:block"></div>
 
+            {/* Step-up privilege session countdown + lock */}
+            <StepUpSessionBadge />
+
+
             {/* Profile Info */}
             <div className="flex items-center gap-2.5">
               <div className="text-right hidden sm:block">
@@ -224,6 +231,9 @@ export default function DashboardLayout({
             </div>
 
             <div className="h-5 w-[1px] bg-slate-200"></div>
+
+            {/* Sleep / lock screen */}
+            <SleepButton />
 
             {/* Logout Button */}
             <button
