@@ -285,10 +285,10 @@ Dùng prompt này khi muốn agent khác làm trực tiếp trong codebase. Prom
 
 ```text
 @AGENTS.md
-@backend/CLEAN_ARCHITECTURE_BACKEND_PROMPT.md
+@docs/architecture/backend.md
 @backend/prisma/schema.prisma
 
-Bạn là coding agent chịu trách nhiệm refactor backend NestJS của KLTN Hospital Management System sang Clean Architecture. Hãy làm trực tiếp trên source code backend, đúng theo file blueprint `backend/CLEAN_ARCHITECTURE_BACKEND_PROMPT.md`.
+Bạn là coding agent chịu trách nhiệm refactor backend NestJS của KLTN Hospital Management System sang Clean Architecture. Hãy làm trực tiếp trên source code backend, đúng theo file blueprint `docs/architecture/backend.md`.
 
 Mục tiêu:
 - Tách kiến trúc backend theo luồng Controller -> Service Facade -> UseCase -> Port/Policy -> Infrastructure Adapter.
@@ -344,7 +344,7 @@ Báo cáo trong quá trình làm:
 - Trước khi sửa mỗi module: ghi checklist file-level ngắn.
 - Sau khi sửa mỗi module: ghi danh sách file đã thay đổi và mục đích từng file.
 - Sau build/test: ghi command đã chạy và kết quả.
-- Cuối cùng cập nhật hoặc tạo section `Completion Report` trong `backend/CLEAN_ARCHITECTURE_BACKEND_PROMPT.md` với:
+- Cuối cùng cập nhật hoặc tạo section `Completion Report` trong `docs/architecture/backend.md` với:
   - Module đã hoàn thành.
   - File đã sửa.
   - Build/test đã chạy.
@@ -366,7 +366,7 @@ Nếu muốn tránh agent ôm quá rộng, dùng prompt ngắn này để bắt 
 
 ```text
 @AGENTS.md
-@backend/CLEAN_ARCHITECTURE_BACKEND_PROMPT.md
+@docs/architecture/backend.md
 @backend/src/modules/visit/visit.module.ts
 @backend/src/modules/visit/controllers/visit.controller.ts
 @backend/src/modules/visit/services/visit.service.ts

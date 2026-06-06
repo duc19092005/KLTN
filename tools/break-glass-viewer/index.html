@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Break-Glass · Trình xác minh sổ Backup (Offline)</title>
+<!--
+  BREAK-GLASS BACKUP LEDGER VIEWER — fully self-contained, offline, zero-dependency.
+
+  Purpose: when the server / database is down or compromised, this single HTML file lets an operator
+  open the offsite JSONL backup ledger (backup-ledger.jsonl) directly from a laptop — no backend,
+  no build step, no internet — and verify its hash-chain integrity.
+
+  It verifies two things:
+    1. Chain linkage: each line's prevHash equals the previous line's entryHash (detects deletion /
+       reordering / insertion). This needs NO secret.
+    2. Full entryHash (optional): if the operator enters the AUDIT_PEPPER, every entryHash is
+       recomputed with the same formula as the backend and compared, proving the line content is
+       authentic. SHA-256 is implemented in pure JS so it works even without window.crypto.subtle.
+
+  Keep a copy of THIS FILE next to the ledger on the offsite/separate volume.
+-->
+<style>
+  :root {
+    --bg: #0b1120; --panel: #111a2e; --panel-2: #16223c; --border: #243352;
+    --text: #e7eefc; --muted: #8aa0c6; --accent: #22d3ee; --accent-2: #0ea5e9;
+    --ok: #34d399; --bad: #f87171; --warn: #fbbf24;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: radial-gradient(1200px 600px at 20% -10%, #14233f 0%, var(--bg) 55%);
+    color: var(--text); font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.5;
+  }
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 40px 24px 80px; }
+  header h1 { font-size: 28px; font-weight: 800; margin: 0; letter-spacing: -0.02em; }
+  header p { color: var(--muted); margin: 8px 0 0; max-width: 760px; font-size: 14px; }
+  .badge { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.16em; color: var(--accent);
+    background: rgba(34,211,238,0.08); border: 1px solid rgba(34,211,238,0.25); padding: 6px 12px; border-radius: 999px; }
+  .grid { display: grid; gap: 16px; }
+  .panel { background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%); border: 1px solid var(--border);
+    border-radius: 18px; padding: 22px; }
+  .drop { border: 1.5px dashed var(--border); border-radius: 16px; padding: 36px; text-align: center; cursor: pointer;
+    transition: all .2s ease; background: rgba(255,255,255,0.01); }
+  .drop:hover, .drop.over { border-color: var(--accent); background: rgba(34,211,238,0.06); }
+  .drop strong { font-size: 16px; }
+  .drop span { color: var(--muted); font-size: 13px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  input[type="password"] { background: #0c1426; border: 1px solid var(--border); color: var(--text); border-radius: 10px;
+    padding: 10px 12px; font-family: var(--mono); font-size: 13px; min-width: 280px; outline: none; }
+  input[type="password"]:focus { border-color: var(--accent); }
+  button { background: linear-gradient(180deg, var(--accent) 0%, var(--accent-2) 100%); color: #04121f; border: 0;
+    font-weight: 800; font-size: 13px; padding: 11px 18px; border-radius: 10px; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .stat { background: #0c1426; border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+  .stat .k { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+  .stat .v { font-size: 26px; font-weight: 800; margin-top: 6px; }
+  .verdict { border-radius: 14px; padding: 16px 18px; font-weight: 800; display: flex; align-items: center; gap: 12px; }
+  .verdict.ok { background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.3); color: var(--ok); }
+  .verdict.bad { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3); color: var(--bad); }
+  .verdict .sub { color: var(--muted); font-weight: 600; font-size: 13px; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  td { padding: 11px 12px; border-bottom: 1px solid rgba(36,51,82,0.5); }
+  tr:hover td { background: rgba(255,255,255,0.015); }
+  .mono { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .pill { display: inline-block; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 6px; }
+  .pill.ok { background: rgba(52,211,153,0.12); color: var(--ok); }
+  .pill.bad { background: rgba(248,113,113,0.12); color: var(--bad); }
+  .pill.warn { background: rgba(251,191,36,0.12); color: var(--warn); }
+  .hide { display: none; }
+  .note { color: var(--muted); font-size: 12px; }
+  h2 { font-size: 16px; margin: 0 0 14px; }
+</style>
+</head>
+<body>
+<div class="wrap grid" style="gap:20px;">
+  <header class="grid" style="gap:12px;">
+    <span class="badge">● Chế độ khẩn cấp · Offline</span>
+    <h1>Trình xác minh sổ Backup (Break-Glass)</h1>
+    <p>
+      Mở tệp <span class="mono">backup-ledger.jsonl</span> để kiểm tra tính toàn vẹn của lịch sử sao lưu mà
+      <strong>không cần máy chủ, không cần internet</strong>. Công cụ kiểm tra chuỗi hash (phát hiện xóa/chèn/đảo dòng).
+      Nhập AUDIT_PEPPER để xác minh đầy đủ từng dòng.
+    </p>
+  </header>
+
+  <div class="panel">
+    <div id="drop" class="drop">
+      <strong>Kéo &amp; thả tệp backup-ledger.jsonl vào đây</strong><br />
+      <span>hoặc bấm để chọn tệp · dữ liệu được xử lý hoàn toàn trên máy bạn</span>
+      <input id="file" type="file" accept=".jsonl,.json,.txt" class="hide" />
+    </div>
+    <div class="row" style="margin-top:16px;">
+      <input id="pepper" type="password" placeholder="AUDIT_PEPPER (tùy chọn — để xác minh đầy đủ entryHash)" />
+      <button id="reverify" disabled>Xác minh lại với pepper</button>
+      <span class="note">Không nhập pepper: vẫn kiểm tra được liên kết chuỗi (prevHash ↔ entryHash).</span>
+    </div>
+  </div>
+
+  <div id="result" class="grid hide" style="gap:18px;">
+    <div id="verdict"></div>
+    <div class="stats" id="stats"></div>
+    <div class="panel">
+      <h2>Danh sách bản sao lưu (<span id="count">0</span>)</h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th><th>Mã backup</th><th>SHA256 tệp dump</th><th>Tới seq</th>
+              <th>Liên kết chuỗi</th><th>entryHash</th><th>Neo on-chain (tx)</th><th>Tạo lúc</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ----------------------------- Pure-JS SHA-256 ----------------------------- */
+/* Works fully offline regardless of window.crypto.subtle (file:// secure-context quirks). */
+function sha256Hex(ascii) {
+  function rotr(n, x) { return (x >>> n) | (x << (32 - n)); }
+  const K = [
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  // UTF-8 encode
+  const utf8 = unescape(encodeURIComponent(ascii));
+  const words = []; const len = utf8.length;
+  for (let i = 0; i < len; i++) words[i >> 2] |= utf8.charCodeAt(i) << ((3 - (i % 4)) * 8);
+  words[len >> 2] |= 0x80 << ((3 - (len % 4)) * 8);
+  words[((len + 8) >> 6) * 16 + 15] = len * 8;
+  let H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const w = new Array(64);
+  for (let j = 0; j < words.length; j += 16) {
+    for (let i = 0; i < 16; i++) w[i] = words[j + i] | 0;
+    for (let i = 16; i < 64; i++) {
+      const s0 = rotr(7, w[i-15]) ^ rotr(18, w[i-15]) ^ (w[i-15] >>> 3);
+      const s1 = rotr(17, w[i-2]) ^ rotr(19, w[i-2]) ^ (w[i-2] >>> 10);
+      w[i] = (w[i-16] + s0 + w[i-7] + s1) | 0;
+    }
+    let [a,b,c,d,e,f,g,h] = H;
+    for (let i = 0; i < 64; i++) {
+      const S1 = rotr(6, e) ^ rotr(11, e) ^ rotr(25, e);
+      const ch = (e & f) ^ (~e & g);
+      const t1 = (h + S1 + ch + K[i] + w[i]) | 0;
+      const S0 = rotr(2, a) ^ rotr(13, a) ^ rotr(22, a);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + maj) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    H = [(H[0]+a)|0,(H[1]+b)|0,(H[2]+c)|0,(H[3]+d)|0,(H[4]+e)|0,(H[5]+f)|0,(H[6]+g)|0,(H[7]+h)|0];
+  }
+  return H.map((x) => (x >>> 0).toString(16).padStart(8, '0')).join('');
+}
+
+/* --- Canonicalization: must match backend audit-hash.util.canonicalize (sorted keys). --- */
+function sortValue(v) {
+  if (v === null || v === undefined) return null;
+  if (Array.isArray(v)) return v.map(sortValue);
+  if (typeof v === 'object') {
+    return Object.keys(v).sort().reduce((acc, k) => { acc[k] = sortValue(v[k]); return acc; }, {});
+  }
+  return v;
+}
+function canonicalize(v) { return JSON.stringify(sortValue(v)); }
+
+/* --- entryHash: must match backend domain/backup-manifest.computeBackupEntryHash. --- */
+const GENESIS = '0'.repeat(64);
+function computeBackupEntryHash(m, prevHash, pepper) {
+  const canonical = canonicalize({
+    backupCode: m.backupCode, fileName: m.fileName, sha256: m.sha256,
+    sizeBytes: m.sizeBytes, maxSeq: (m.maxSeq ?? null), createdAtIso: m.createdAtIso,
+  });
+  return sha256Hex(`${pepper}|${m.backupCode}|${m.sha256}|${m.maxSeq ?? ''}|${m.createdAtIso}|${prevHash}|${canonical}`);
+}
+
+/* ------------------------------- UI wiring -------------------------------- */
+let LEDGER = [];
+const $ = (id) => document.getElementById(id);
+
+function shortHash(h) {
+  if (!h) return '—';
+  const c = h.startsWith('0x') ? h.slice(2) : h;
+  return c.length <= 18 ? c : c.slice(0, 10) + '…' + c.slice(-8);
+}
+function fmtTime(v) { try { return v ? new Date(v).toLocaleString('vi-VN') : '—'; } catch { return v || '—'; } }
+
+function render() {
+  const pepper = $('pepper').value || '';
+  let linkOk = true, hashOk = true, hashChecked = pepper.length > 0;
+  let prev = GENESIS;
+  const rows = LEDGER.map((e, i) => {
+    const linkGood = e.prevHash === prev;
+    if (!linkGood) linkOk = false;
+    let hashGood = null;
+    if (hashChecked) {
+      const recomputed = computeBackupEntryHash(e, e.prevHash ?? GENESIS, pepper);
+      hashGood = recomputed === e.entryHash;
+      if (!hashGood) hashOk = false;
+    }
+    prev = e.entryHash;
+    return { e, i, linkGood, hashGood };
+  });
+
+  // Verdict
+  const v = $('verdict');
+  const allGood = linkOk && (!hashChecked || hashOk);
+  v.className = 'verdict ' + (allGood ? 'ok' : 'bad');
+  v.innerHTML = allGood
+    ? `<span style="font-size:20px;">✓</span><div>Sổ backup TOÀN VẸN
+        <div class="sub">${LEDGER.length} bản ghi · liên kết chuỗi liền mạch${hashChecked ? ' · entryHash khớp với pepper đã nhập' : ' · (chưa nhập pepper để xác minh entryHash đầy đủ)'}</div></div>`
+    : `<span style="font-size:20px;">⚠</span><div>PHÁT HIỆN BẤT THƯỜNG
+        <div class="sub">${!linkOk ? 'Chuỗi bị đứt (có dòng bị xóa/chèn/đảo). ' : ''}${hashChecked && !hashOk ? 'entryHash không khớp (nội dung bị sửa hoặc pepper sai).' : ''}</div></div>`;
+
+  // Stats
+  $('stats').innerHTML = [
+    ['Tổng bản backup', LEDGER.length],
+    ['Liên kết chuỗi', linkOk ? 'Liền mạch' : 'ĐỨT'],
+    ['Xác minh entryHash', hashChecked ? (hashOk ? 'Khớp' : 'LỆCH') : 'Chưa nhập pepper'],
+    ['Đã neo on-chain', LEDGER.filter((e) => e.anchorTxHash).length],
+  ].map(([k, val]) => `<div class="stat"><div class="k">${k}</div><div class="v">${val}</div></div>`).join('');
+
+  // Rows
+  $('count').textContent = LEDGER.length;
+  $('rows').innerHTML = rows.map(({ e, i, linkGood, hashGood }) => `
+    <tr>
+      <td class="mono">${i + 1}</td>
+      <td><strong>${e.backupCode || '—'}</strong></td>
+      <td class="mono">${shortHash(e.sha256)}</td>
+      <td class="mono">${e.maxSeq ?? '—'}</td>
+      <td><span class="pill ${linkGood ? 'ok' : 'bad'}">${linkGood ? 'OK' : 'ĐỨT'}</span></td>
+      <td>${hashGood === null ? '<span class="pill warn">?</span>' : `<span class="pill ${hashGood ? 'ok' : 'bad'}">${hashGood ? 'KHỚP' : 'LỆCH'}</span>`}</td>
+      <td class="mono">${shortHash(e.anchorTxHash)}</td>
+      <td class="mono">${fmtTime(e.createdAtIso || e.createdAt)}</td>
+    </tr>`).join('');
+
+  $('result').classList.remove('hide');
+  $('reverify').disabled = LEDGER.length === 0;
+}
+
+function loadText(text) {
+  try {
+    LEDGER = text.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => JSON.parse(l));
+    render();
+  } catch (err) {
+    alert('Không đọc được tệp JSONL: ' + err.message);
+  }
+}
+
+// File input + drag/drop
+const drop = $('drop'), fileInput = $('file');
+drop.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => { const f = e.target.files[0]; if (f) f.text().then(loadText); });
+['dragover', 'dragenter'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]; if (f) f.text().then(loadText); });
+$('reverify').addEventListener('click', render);
+</script>
+</body>
+</html>
