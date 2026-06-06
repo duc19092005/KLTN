@@ -218,4 +218,20 @@ export class AuditLoggerService {
 
     return { ok: true, total: rows.length, brokenAtSeq: null, reason: null };
   }
+
+  verifyEntry(row: any): boolean {
+    const recomputed = computeEntryHash(
+      {
+        seq: row.seq,
+        actorId: row.actorId,
+        action: row.action,
+        entity: row.entity,
+        entityId: row.entityId,
+        dataHash: row.dataHash,
+        createdAtIso: row.createdAt instanceof Date ? row.createdAt.toISOString() : new Date(row.createdAt).toISOString(),
+      },
+      row.prevHash ?? GENESIS_PREV_HASH,
+    );
+    return recomputed === row.entryHash;
+  }
 }

@@ -70,39 +70,98 @@ export default function AuditLogsPage() {
   const [proof, setProof] = useState(null);
   const [stepUpOpen, setStepUpOpen] = useState(false);
 
-  const load = useCallback(async () => {
+  // Pagination states
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsTotalPages, setLogsTotalPages] = useState(1);
+  const [logsTotal, setLogsTotal] = useState(0);
+
+  const [batchesPage, setBatchesPage] = useState(1);
+  const [batchesTotalPages, setBatchesTotalPages] = useState(1);
+  const [batchesTotal, setBatchesTotal] = useState(0);
+
+  const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const [logsRes, batchesRes, chainRes] = await Promise.all([
-        auditService.logs({ take: 200, ...(entity ? { entity } : {}) }),
-        auditService.batches({ take: 50 }),
-        auditService.verifyChain(),
-      ]);
-      setLogs(Array.isArray(logsRes.data) ? logsRes.data : logsRes.data?.items || []);
-      setBatches(Array.isArray(batchesRes.data) ? batchesRes.data : batchesRes.data?.items || []);
-      setChain(chainRes.data);
+      const res = await auditService.logs({
+        page: logsPage,
+        limit: 10,
+        ...(entity ? { entity } : {}),
+      });
+      const data = res.data || {};
+      setLogs(data.items || []);
+      setLogsTotal(data.total || 0);
+      setLogsTotalPages(data.totalPages || 1);
     } catch (err) {
       toast.error(err?.response?.data?.message || err.message || 'Không tải được nhật ký');
     } finally {
       setLoading(false);
     }
+  }, [logsPage, entity]);
+
+  const loadBatches = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await auditService.batches({
+        page: batchesPage,
+        limit: 10,
+      });
+      const data = res.data || {};
+      setBatches(data.items || []);
+      setBatchesTotal(data.total || 0);
+      setBatchesTotalPages(data.totalPages || 1);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err.message || 'Không tải được lô blockchain');
+    } finally {
+      setLoading(false);
+    }
+  }, [batchesPage]);
+
+  const loadChain = useCallback(async () => {
+    try {
+      const res = await auditService.verifyChain();
+      setChain(res.data);
+    } catch (err) {
+      console.error('Không tải được trạng thái chuỗi', err);
+    }
+  }, []);
+
+  const refreshAll = useCallback(async () => {
+    setLoading(true);
+    if (tab === 'logs') {
+      await loadLogs();
+    } else {
+      await loadBatches();
+    }
+    await loadChain();
+  }, [tab, loadLogs, loadBatches, loadChain]);
+
+  // Fetch data depending on active tab/page/filter
+  useEffect(() => {
+    if (tab === 'logs') {
+      loadLogs();
+    } else {
+      loadBatches();
+    }
+  }, [tab, logsPage, batchesPage, entity, loadLogs, loadBatches]);
+
+  // Load chain status once on mount
+  useEffect(() => {
+    loadChain();
+  }, [loadChain]);
+
+  // Reset page when entity filter changes
+  useEffect(() => {
+    setLogsPage(1);
   }, [entity]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const entities = useMemo(() => {
-    const set = new Set(logs.map((l) => l.entity).filter(Boolean));
-    return Array.from(set).sort();
-  }, [logs]);
-
   const stats = useMemo(() => {
-    const anchored = logs.filter((l) => l.onChainStatus === 'ANCHORED').length;
-    const pending = logs.filter((l) => l.onChainStatus !== 'ANCHORED').length;
-    const logins = logs.filter((l) => String(l.action).startsWith('LOGIN')).length;
-    return { total: logs.length, anchored, pending, logins };
-  }, [logs]);
+    return {
+      total: logsTotal,
+      batches: batchesTotal,
+      isChainOk: chain?.ok ?? true,
+      chainLength: chain?.total ?? 0,
+    };
+  }, [logsTotal, batchesTotal, chain]);
 
   // Step 1: open the face step-up modal. The anchor only commits after a valid ticket is minted.
   const handleAnchorNow = () => {
@@ -121,7 +180,7 @@ export default function AuditLogsPage() {
       } else {
         toast.info(`Không có gì để neo: ${d.reason || 'hàng đợi trống'}.`);
       }
-      await load();
+      await refreshAll();
     } catch (err) {
       toast.error(err?.response?.data?.message || err.message || 'Neo thất bại');
     } finally {
@@ -174,17 +233,17 @@ export default function AuditLogsPage() {
 
         {/* Stats */}
         <section className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          <StatCard label="Tổng bản ghi" value={stats.total} hint="Trong 200 bản ghi gần nhất" />
-          <StatCard label="Đã neo trên chuỗi" value={stats.anchored} hint="Đã đóng băng bất biến" />
-          <StatCard label="Chờ neo" value={stats.pending} hint="Sẽ vào lô kế tiếp" />
-          <StatCard label="Sự kiện đăng nhập" value={stats.logins} hint="Lịch sử truy cập" />
+          <StatCard label="Tổng bản ghi" value={stats.total} hint="Tất cả nhật ký hệ thống" />
+          <StatCard label="Tổng lô blockchain" value={stats.batches} hint="Các lô Merkle đã neo" />
+          <StatCard label="Trạng thái chuỗi" value={stats.isChainOk ? 'Tốt' : 'Lỗi'} hint={stats.isChainOk ? 'Toàn vẹn hoàn toàn' : 'Phát hiện sửa đổi!'} />
+          <StatCard label="Số bản ghi chuỗi" value={stats.chainLength} hint="Đã kiểm tra đầu-cuối" />
         </section>
 
         {/* Tabs */}
         <div className="flex flex-wrap gap-2">
-          <TabButton active={tab === 'logs'} onClick={() => setTab('logs')}>Hoạt động ({logs.length})</TabButton>
-          <TabButton active={tab === 'batches'} onClick={() => setTab('batches')}>Lô blockchain ({batches.length})</TabButton>
-          <button onClick={load} disabled={loading} className="ml-auto rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-black text-blue-700 hover:bg-blue-100 disabled:opacity-50">
+          <TabButton active={tab === 'logs'} onClick={() => setTab('logs')}>Hoạt động ({logsTotal})</TabButton>
+          <TabButton active={tab === 'batches'} onClick={() => setTab('batches')}>Lô blockchain ({batchesTotal})</TabButton>
+          <button onClick={refreshAll} disabled={loading} className="ml-auto rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-black text-blue-700 hover:bg-blue-100 disabled:opacity-50">
             {loading ? 'Đang tải…' : 'Làm mới'}
           </button>
         </div>
@@ -192,9 +251,26 @@ export default function AuditLogsPage() {
         {loading ? (
           <LoadingIndicator size="lg" label="Đang tải nhật ký..." />
         ) : tab === 'logs' ? (
-          <LogsTable logs={logs} entities={entities} entity={entity} setEntity={setEntity} onProof={handleProof} />
+          <LogsTable
+            logs={logs}
+            entity={entity}
+            setEntity={setEntity}
+            onProof={handleProof}
+            page={logsPage}
+            totalPages={logsTotalPages}
+            total={logsTotal}
+            onPrev={() => setLogsPage((v) => Math.max(1, v - 1))}
+            onNext={() => setLogsPage((v) => Math.min(logsTotalPages, v + 1))}
+          />
         ) : (
-          <BatchesTable batches={batches} />
+          <BatchesTable
+            batches={batches}
+            page={batchesPage}
+            totalPages={batchesTotalPages}
+            total={batchesTotal}
+            onPrev={() => setBatchesPage((v) => Math.max(1, v - 1))}
+            onNext={() => setBatchesPage((v) => Math.min(batchesTotalPages, v + 1))}
+          />
         )}
       </div>
 
@@ -246,7 +322,29 @@ function ChainBanner({ chain, loading }) {
 
 // ---- Activity logs table ----------------------------------------------------
 
-function LogsTable({ logs, entities, entity, setEntity, onProof }) {
+const ENTITY_LABELS = {
+  Department: 'Phòng ban',
+  StaffProfile: 'Nhân sự',
+  DoctorProfile: 'Bác sĩ',
+  Patient: 'Bệnh nhân',
+  AiModelRegistry: 'Mô hình AI',
+  MedicalConclusion: 'Kết luận y khoa',
+  AiQuality: 'Chất lượng AI',
+  ParaclinicalShift: 'Ca cận lâm sàng',
+  HandoverLog: 'Bàn giao ca',
+};
+
+function LogsTable({
+  logs,
+  entity,
+  setEntity,
+  onProof,
+  page,
+  totalPages,
+  total,
+  onPrev,
+  onNext,
+}) {
   if (!logs.length) {
     return <Empty title="Chưa có nhật ký" desc="Các hoạt động đăng nhập và thay đổi dữ liệu sẽ xuất hiện ở đây." />;
   }
@@ -255,8 +353,10 @@ function LogsTable({ logs, entities, entity, setEntity, onProof }) {
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-4">
         <span className="text-xs font-black uppercase tracking-wider text-slate-400">Lọc theo đối tượng:</span>
         <FilterChip active={!entity} onClick={() => setEntity('')}>Tất cả</FilterChip>
-        {entities.map((e) => (
-          <FilterChip key={e} active={entity === e} onClick={() => setEntity(e)}>{e}</FilterChip>
+        {Object.entries(ENTITY_LABELS).map(([key, value]) => (
+          <FilterChip key={key} active={entity === key} onClick={() => setEntity(key)}>
+            {value}
+          </FilterChip>
         ))}
       </div>
       <div className="overflow-x-auto">
@@ -269,6 +369,7 @@ function LogsTable({ logs, entities, entity, setEntity, onProof }) {
               <th className="px-4 py-3">Người thực hiện</th>
               <th className="px-4 py-3">Thời gian</th>
               <th className="px-4 py-3">Trên chuỗi</th>
+              <th className="px-4 py-3">Blockchain</th>
               <th className="px-4 py-3 text-right">Bằng chứng</th>
             </tr>
           </thead>
@@ -292,6 +393,19 @@ function LogsTable({ logs, entities, entity, setEntity, onProof }) {
                     {log.onChainStatus === 'ANCHORED' ? `Lô #${log.batchId}` : 'Chờ neo'}
                   </span>
                 </td>
+                <td className="px-4 py-3">
+                  {log.blockchainStatus === 'VERIFIED' ? (
+                    <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700">
+                      <span className="h-1 w-1 rounded-full bg-emerald-500" />
+                      Healthy
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-lg border border-red-100 bg-red-50 px-2 py-0.5 text-[10px] font-black text-red-700 animate-pulse">
+                      <span className="h-1 w-1 rounded-full bg-red-500" />
+                      Unhealthy
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-right">
                   {log.onChainStatus === 'ANCHORED' ? (
                     <button onClick={() => onProof(log.seq)} className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1 text-[11px] font-black text-blue-700 hover:bg-blue-100">
@@ -306,13 +420,28 @@ function LogsTable({ logs, entities, entity, setEntity, onProof }) {
           </tbody>
         </table>
       </div>
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        label="bản ghi"
+        onPrev={onPrev}
+        onNext={onNext}
+      />
     </section>
   );
 }
 
 // ---- On-chain batches table -------------------------------------------------
 
-function BatchesTable({ batches }) {
+function BatchesTable({
+  batches,
+  page,
+  totalPages,
+  total,
+  onPrev,
+  onNext,
+}) {
   if (!batches.length) {
     return <Empty title="Chưa có lô nào được neo" desc="Hệ thống gom bản ghi thành lô và neo Merkle root định kỳ. Bấm 'Neo ngay' để tạo lô đầu tiên." />;
   }
@@ -327,7 +456,8 @@ function BatchesTable({ batches }) {
               <th className="px-4 py-3">Số bản ghi</th>
               <th className="px-4 py-3">Khoảng seq</th>
               <th className="px-4 py-3">Trạng thái</th>
-              <th className="px-4 py-3">Hash giao dịch</th>
+              <th className="px-4 py-3">Blockchain</th>
+              <th className="px-5 py-3">Hash giao dịch</th>
               <th className="px-4 py-3">Neo lúc</th>
             </tr>
           </thead>
@@ -346,6 +476,24 @@ function BatchesTable({ batches }) {
                     {BATCH_STATUS_LABEL[b.status] || b.status}
                   </span>
                 </td>
+                <td className="px-4 py-3">
+                  {b.status === 'ANCHORED' ? (
+                    <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700">
+                      <span className="h-1 w-1 rounded-full bg-emerald-500" />
+                      Healthy
+                    </span>
+                  ) : b.status === 'FAILED' ? (
+                    <span className="inline-flex items-center gap-1 rounded-lg border border-red-100 bg-red-50 px-2 py-0.5 text-[10px] font-black text-red-700 animate-pulse">
+                      <span className="h-1 w-1 rounded-full bg-red-500" />
+                      Unhealthy
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-lg border border-amber-100 bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700">
+                      <span className="h-1 w-1 rounded-full bg-amber-500" />
+                      Pending
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-3 font-mono text-[11px] text-slate-500">{shortHash(b.txHash)}</td>
                 <td className="px-4 py-3 text-[12px] text-slate-500">{formatTime(b.anchoredAt)}</td>
               </tr>
@@ -353,6 +501,14 @@ function BatchesTable({ batches }) {
           </tbody>
         </table>
       </div>
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        label="lô"
+        onPrev={onPrev}
+        onNext={onNext}
+      />
     </section>
   );
 }
@@ -446,6 +602,18 @@ function KV({ label, value, mono }) {
     <div className="rounded-xl border border-slate-100 bg-white px-4 py-3">
       <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">{label}</p>
       <p className={`mt-1 break-all text-sm text-slate-700 ${mono ? 'font-mono text-[12px]' : ''}`}>{value || '—'}</p>
+    </div>
+  );
+}
+
+function Pagination({ page, totalPages, total, label, onPrev, onNext }) {
+  return (
+    <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-xs font-bold text-slate-500">Trang {page}/{totalPages} · {total} {label}</p>
+      <div className="flex gap-2">
+        <button onClick={onPrev} disabled={page <= 1} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-black text-slate-600 disabled:opacity-40">Trước</button>
+        <button onClick={onNext} disabled={page >= totalPages} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-black text-slate-600 disabled:opacity-40">Sau</button>
+      </div>
     </div>
   );
 }

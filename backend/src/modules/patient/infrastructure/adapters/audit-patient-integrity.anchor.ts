@@ -13,6 +13,19 @@ import { buildPatientSnapshot } from '../../domain/patient-snapshot';
  * (Merkle batch) for on-chain integrity verification. No dedicated smart contract
  * is needed — the hash is stored locally (hash256/dataSalt) and recorded in
  * BlockchainLogger, then batch-anchored via AuditAnchor.sol.
+ *
+ * ANCHORING POLICY — INTENTIONALLY BATCH (NOT immediate):
+ *   Patient changes deliberately do NOT call auditAnchor.anchorNow(); they wait for the
+ *   normal ~5 min batch cycle. Rationale: the patient snapshot holds only demographic /
+ *   identity data (name, citizenId, phone, insurance...), none of which is life-critical,
+ *   and the hash-chain in the DB already makes any tamper evidence-bearing within the window.
+ *   Patient records are also created frequently at the reception desk, so per-record on-chain
+ *   commits would waste gas with no safety gain.
+ *
+ *   SWITCH TO IMMEDIATE (add `await this.auditAnchor.anchorNow()` after record()) ONLY IF the
+ *   snapshot is ever extended with life-critical clinical fields (e.g. bloodType, allergies):
+ *   silently editing those within the batch window could be fatal on the next transfusion /
+ *   prescription, which justifies sealing the proof on-chain at the exact moment of change.
  */
 @Injectable()
 export class AuditPatientIntegrityAnchor implements PatientIntegrityAnchorPort {

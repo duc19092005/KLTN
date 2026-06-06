@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
+import BlockchainStatusBadge from '../../../shared/components/BlockchainStatusBadge';
 import { useAuth } from '../../../providers/AuthProvider';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { aiModelService } from '../apis/aiModelService';
@@ -91,8 +92,9 @@ export default function AiModelsPage() {
   const toast = useToast();
   const [models, setModels] = useState([]);
   const [form, setForm] = useState(emptyForm);
-  const [filter, setFilter] = useState(''); // '' | cloud | local (client-side)
+  const [filter, setFilter] = useState(''); // '' | cloud | local
   const [search, setSearch] = useState('');
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -102,15 +104,29 @@ export default function AiModelsPage() {
   const [statsData, setStatsData] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
-  const load = async () => {
+  const load = async (page = pagination.page, currentFilter = filter, currentSearch = search) => {
     setLoading(true);
     setStatsLoading(true);
     try {
       const [res, statsRes] = await Promise.all([
-        aiModelService.list(),
+        aiModelService.list({
+          page,
+          limit: pagination.limit,
+          provider: currentFilter || undefined,
+          search: currentSearch || undefined,
+        }),
         aiModelService.stats(),
       ]);
-      setModels(getItems(res.data));
+      const data = res.data || {};
+      setModels(getItems(data));
+      if (!Array.isArray(data)) {
+        setPagination({
+          page: data.page,
+          limit: data.limit,
+          total: data.total,
+          totalPages: data.totalPages,
+        });
+      }
       setStatsData(statsRes.data);
     } catch (err) { 
       toast.error(err.response?.data?.message || 'Không tải được danh mục mô hình AI'); 
@@ -120,23 +136,26 @@ export default function AiModelsPage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(1); }, []);
 
   const stats = useMemo(() => [
-    { label: 'Tổng số mô hình', value: models.length },
-    { label: 'API đám mây', value: models.filter((m) => m.provider && m.provider !== 'local' && m.provider !== 'ip').length },
-    { label: 'Tự lưu trữ', value: models.filter((m) => m.provider === 'local').length },
+    { label: 'Tổng số mô hình', value: pagination.total },
+    { label: 'API đám mây', value: statsData?.totalCloudCount || models.filter((m) => m.provider && m.provider !== 'local' && m.provider !== 'ip').length },
+    { label: 'Tự lưu trữ', value: statsData?.totalLocalCount || models.filter((m) => m.provider === 'local').length },
     { label: 'Trên chuỗi', value: models.filter((m) => m.isActiveOnChain).length },
-  ], [models]);
+  ], [models, pagination.total, statsData]);
 
-  const visibleModels = useMemo(() => {
-    let list = models;
-    if (filter === 'local') list = list.filter((m) => m.provider === 'local');
-    else if (filter === 'cloud') list = list.filter((m) => m.provider && m.provider !== 'local' && m.provider !== 'ip');
-    const text = search.trim().toLowerCase();
-    if (text) list = list.filter((m) => [m.modelName, m.modelVersion, m.provider, m.recommendedSpecialty].filter(Boolean).some((v) => v.toLowerCase().includes(text)));
-    return list;
-  }, [models, search, filter]);
+  const visibleModels = models;
+
+  const handleFilterChange = (val) => {
+    setFilter(val);
+    load(1, val, search);
+  };
+
+  const handleSearchSubmit = (event) => {
+    event.preventDefault();
+    load(1, filter, search);
+  };
 
   const openCreateModal = () => {
     setForm(emptyForm);
@@ -195,7 +214,7 @@ export default function AiModelsPage() {
       const res = await aiModelService.create(payload);
       toast.success(`Đã thêm mô hình ${res.data.modelName}.`);
       setForm(emptyForm); setTestResult(null); setShowCreateModal(false);
-      await load();
+      await load(1);
     } catch (err) { toast.error(err.response?.data?.message || 'Không thêm được mô hình AI'); }
     finally { setSaving(false); }
   };
@@ -209,7 +228,7 @@ export default function AiModelsPage() {
               <p className="text-[11px] uppercase tracking-[0.28em] font-black text-cyan-600">Danh mục mô hình AI</p>
               <h1 className="mt-2 text-3xl font-black text-slate-950 tracking-tight">Quản lý mô hình AI</h1>
               <p className="mt-3 max-w-3xl text-sm text-slate-600">Một luồng duy nhất cho mọi mô hình. Chọn nền tảng đám mây hoặc mô hình tự lưu trữ (Llama, Ollama, vLLM) - chỉ cần dán điểm cuối API là chạy.</p>
-              <span className="mt-4 inline-flex rounded-full bg-cyan-100 px-3 py-1 text-[11px] font-black text-cyan-700">{models.length} mô hình</span>
+              <span className="mt-4 inline-flex rounded-full bg-cyan-100 px-3 py-1 text-[11px] font-black text-cyan-700">{pagination.total} mô hình</span>
             </div>
             <button type="button" onClick={openCreateModal} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-cyan-100 hover:bg-cyan-700 transition-all">+ Thêm mô hình AI</button>
           </div>
@@ -226,21 +245,23 @@ export default function AiModelsPage() {
                 <h2 className="text-xl font-black text-slate-950">Danh mục hiện tại</h2>
                 <p className="text-sm text-slate-500">Danh sách mô hình đã đăng ký trong hệ thống.</p>
               </div>
-              <select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold outline-none">
+              <select value={filter} onChange={(event) => handleFilterChange(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold outline-none">
                 <option value="">Tất cả</option>
                 <option value="cloud">API đám mây</option>
                 <option value="local">Tự lưu trữ</option>
               </select>
             </div>
-            <div className="mt-4 flex gap-3">
+            <form onSubmit={handleSearchSubmit} className="mt-4 flex gap-3">
               <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm tên mô hình, nền tảng..." className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100" />
-            </div>
+              <button type="submit" className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white hover:bg-cyan-700">Tìm kiếm</button>
+            </form>
           </div>
           <div className="p-5 space-y-3 max-h-[760px] overflow-y-auto">
             {loading && <LoadingIndicator size="lg" label="Đang tải mô hình AI..." />}
             {!loading && visibleModels.map((model) => <ModelCard key={model.id} model={model} />)}
             {!loading && !visibleModels.length && <Empty title="Chưa có mô hình AI" desc="Bấm + Thêm mô hình AI để mở cửa sổ đăng ký mô hình." />}
           </div>
+          <Pagination pagination={pagination} onPageChange={load} />
         </section>
 
         {/* Bảng phân tích & Xác thực toàn vẹn Đánh giá AI */}
@@ -506,9 +527,12 @@ function ModelCard({ model }) {
               </span>
             )}
           </div>
-      <p className="mt-1 text-xs font-semibold text-slate-500">Phiên bản {model.modelVersion} · {model.recommendedSpecialty || 'Chưa gán chuyên khoa'}</p>
+          <p className="mt-1 text-xs font-semibold text-slate-500">Phiên bản {model.modelVersion} · {model.recommendedSpecialty || 'Chưa gán chuyên khoa'}</p>
         </div>
-        <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-emerald-700">AES-256</span>
+        <div className="flex gap-2 items-center">
+          <BlockchainStatusBadge status={model.blockchainStatus} />
+          <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-emerald-700 border border-slate-100 shadow-xs">AES-256</span>
+        </div>
       </div>
       <p className="mt-3 text-sm text-slate-600">{model.description || 'Chưa có mô tả'}</p>
       {model.apiEndpoint && (
@@ -526,3 +550,28 @@ function ModelCard({ model }) {
 }
 function Alert({ tone, message }) { const cls = tone === 'error' ? 'bg-red-50 border-red-100 text-red-700' : 'bg-emerald-50 border-emerald-100 text-emerald-800'; return <div className={`rounded-2xl border p-4 text-sm font-bold ${cls}`}>{message}</div>; }
 function Empty({ title, desc }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><strong className="text-slate-800">{title}</strong><p className="mt-1 text-sm text-slate-500">{desc}</p></div>; }
+function Pagination({ pagination, onPageChange }) {
+  return (
+    <div className="flex items-center justify-between border-t border-slate-100 p-4">
+      <p className="text-sm font-semibold text-slate-500">Trang {pagination.page}/{pagination.totalPages}</p>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={pagination.page <= 1}
+          onClick={() => onPageChange(pagination.page - 1)}
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 disabled:opacity-50"
+        >
+          Trước
+        </button>
+        <button
+          type="button"
+          disabled={pagination.page >= pagination.totalPages}
+          onClick={() => onPageChange(pagination.page + 1)}
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 disabled:opacity-50"
+        >
+          Sau
+        </button>
+      </div>
+    </div>
+  );
+}
