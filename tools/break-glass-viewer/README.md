@@ -1,3 +1,5 @@
+**🌐 Language:** [🇻🇳 Tiếng Việt](./README.md) · [🇬🇧 English](./README.en.md) · [🇷🇺 Русский](./README.ru.md)
+
 # Break-Glass Backup Ledger Viewer
 
 > Đọc + xác minh sổ backup khi server không khả dụng. **Read-only, offline, không cần backend.**

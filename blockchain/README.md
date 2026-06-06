@@ -1,3 +1,5 @@
+**🌐 Language:** [🇻🇳 Tiếng Việt](./README.md) · [🇬🇧 English](./README.en.md) · [🇷🇺 Русский](./README.ru.md)
+
 # KLTN Hospital Management System - Blockchain
 
 This module contains the smart contracts used for the tamper-evident audit trail system. It uses Hardhat for development, testing, and deployment.

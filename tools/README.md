@@ -1,3 +1,5 @@
+**🌐 Language:** [🇻🇳 Tiếng Việt](./README.md) · [🇬🇧 English](./README.en.md) · [🇷🇺 Русский](./README.ru.md)
+
 # Standalone Tools
 
 Hai công cụ HTML tĩnh dùng cho **tình huống khẩn cấp khi không thể tin cậy server / DB**. Cả hai đều chạy hoàn toàn trên trình duyệt, không phụ thuộc backend.

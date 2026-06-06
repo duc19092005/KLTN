@@ -1,3 +1,5 @@
+**🌐 Language:** [🇻🇳 Tiếng Việt](./README.md) · [🇬🇧 English](./README.en.md) · [🇷🇺 Русский](./README.ru.md)
+
 # KLTN Hospital Management System - Backend
 
 A NestJS-based enterprise healthcare platform backend providing APIs for patient management, biometric authentication, PostgreSQL database interactions, and blockchain audit anchoring.

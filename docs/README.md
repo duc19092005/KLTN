@@ -1,3 +1,5 @@
+**🌐 Language:** [🇻🇳 Tiếng Việt](./README.md) · [🇬🇧 English](./README.en.md) · [🇷🇺 Русский](./README.ru.md)
+
 # Documentation Index
 
 Mục lục tài liệu KLTN Hospital Management System, sắp xếp theo chủ đề.
