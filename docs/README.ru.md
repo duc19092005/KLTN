@@ -2,6 +2,9 @@
 
 # Documentation Index
 
+> [!TIP]
+> Нужен быстрый обзор? Прочтите [**SUMMARY.ru.md**](./SUMMARY.ru.md) — одностраничное техническое резюме на русском, охватывающее архитектуру, модель безопасности и backup/recovery.
+
 Документация KLTN Hospital Management System, организованная по темам.
 
 ## 🏗️ [Architecture](./architecture/) — Архитектура
@@ -29,7 +32,7 @@
 | [Emergency Restore (out-of-band)](./backup-recovery/emergency-restore.md) | Backend + Tools | Последний рубеж: SSH + recovery-signer вне сервера |
 
 > [!NOTE]
-> Документы внутри `architecture/`, `security/` и `backup-recovery/` — это углублённые технические справочники, оставленные только на вьетнамском.
+> Документы внутри `architecture/`, `security/` и `backup-recovery/` — это углублённые технические справочники, оставленные только на вьетнамском. Для русскоязычного обзора см. [`SUMMARY.ru.md`](./SUMMARY.ru.md).
 
 ## 🛠️ Автономные инструменты
 

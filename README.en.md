@@ -4,6 +4,9 @@
 
 > A modern, full-stack healthcare platform pursuing the **Triple Aim**: better patient experience, sharper clinical outcomes, and unassailable data integrity.
 
+> [!TIP]
+> **For a fast technical overview** (architecture, security model, backup/recovery on one page), read [`docs/SUMMARY.en.md`](./docs/SUMMARY.en.md).
+
 ## Overview
 
 A hospital management system that combines **biometric authentication**, **AI-assisted diagnosis**, and a **blockchain audit trail** so every medical record can be proven intact — even if the server is compromised.

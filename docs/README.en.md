@@ -2,6 +2,9 @@
 
 # Documentation Index
 
+> [!TIP]
+> Just want a fast overview? Read [**SUMMARY.en.md**](./SUMMARY.en.md) — a one-page technical summary covering architecture, security model, and backup/recovery in English.
+
 Documentation for the KLTN Hospital Management System, organized by topic.
 
 ## 🏗️ [Architecture](./architecture/)
@@ -29,7 +32,7 @@ Documentation for the KLTN Hospital Management System, organized by topic.
 | [Emergency Restore (out-of-band)](./backup-recovery/emergency-restore.md) | Backend + Tools | Last-resort path: SSH + recovery-signer out-of-band |
 
 > [!NOTE]
-> The documents under `architecture/`, `security/`, and `backup-recovery/` are deep technical references kept in Vietnamese only.
+> The documents under `architecture/`, `security/`, and `backup-recovery/` are deep technical references kept in Vietnamese only. For an English overview, read [`SUMMARY.en.md`](./SUMMARY.en.md).
 
 ## 🛠️ Standalone tools
 
