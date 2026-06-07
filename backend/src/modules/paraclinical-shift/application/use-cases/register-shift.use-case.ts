@@ -129,4 +129,24 @@ export class RegisterShiftUseCase {
 
     return newRoom.id;
   }
+
+  /**
+   * Resolve a potential User.id to the corresponding StaffProfile.id.
+   * ParaclinicalShift.staffId references StaffProfile, not User.
+   */
+  async resolveStaffId(userIdOrStaffId: string): Promise<string | null> {
+    // 1. Check if it's already a valid StaffProfile ID
+    const staff = await this.prisma.staffProfile.findUnique({
+      where: { id: userIdOrStaffId },
+      select: { id: true },
+    });
+    if (staff) return staff.id;
+
+    // 2. Look up by userId
+    const staffByUser = await this.prisma.staffProfile.findUnique({
+      where: { userId: userIdOrStaffId },
+      select: { id: true },
+    });
+    return staffByUser?.id ?? null;
+  }
 }

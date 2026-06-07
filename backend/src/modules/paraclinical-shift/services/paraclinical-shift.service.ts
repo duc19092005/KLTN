@@ -32,12 +32,20 @@ export class ParaclinicalShiftService {
     private readonly verifyShiftUC: VerifyParaclinicalShiftUseCase,
   ) {}
 
-  async registerShift(staffId: string, clinicalRoomId: string, startTime: Date, endTime: Date, actorId: string, note?: string, demoMode = false) {
+  async registerShift(staffIdOrUserId: string, clinicalRoomId: string, startTime: Date, endTime: Date, actorId: string, note?: string, demoMode = false) {
     // Auto-resolve: if clinicalRoomId is actually a department ID, find or create a ClinicalRoom
     let resolvedRoomId = clinicalRoomId;
     try {
       resolvedRoomId = await this.registerShiftUC.resolveClinicalRoom(clinicalRoomId);
     } catch { /* keep original, let use-case throw proper error */ }
+
+    // Auto-resolve: if staffIdOrUserId is actually a User.id, find the real StaffProfile.id
+    let staffId = staffIdOrUserId;
+    try {
+      const staff = await this.registerShiftUC.resolveStaffId(staffIdOrUserId);
+      if (staff) staffId = staff;
+    } catch { /* keep original */ }
+
     return this.registerShiftUC.execute(staffId, resolvedRoomId, startTime, endTime, actorId, note, demoMode);
   }
 

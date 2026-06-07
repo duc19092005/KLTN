@@ -45,7 +45,7 @@ export class ShiftController {
     @Query('demo') demoMode?: string,
   ) {
     return this.service.registerShift(
-      (user as any).staffId || user.sub,
+      user.sub,
       body.clinicalRoomId,
       new Date(body.startTime),
       new Date(body.endTime),
