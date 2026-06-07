@@ -81,7 +81,6 @@ model User {
   stepUpTickets     StepUpTicket[]
   stepUpSessions    StepUpSession[]
   approvedShifts    ParaclinicalShift[] @relation("ApprovedShifts")
-  approvedReceptionShifts ReceptionShift[] @relation("ApprovedReceptionShifts")
   sharedDepartment  Department?         @relation("DeptSharedUser")
   notifications     Notification[]
 
@@ -106,7 +105,6 @@ model Department {
   sharedUser     User?          @relation("DeptSharedUser", fields: [sharedUserId], references: [id])
   staffs         StaffProfile[] @relation("DepartmentStaffs")
   medicalOrders  MedicalOrder[]
-  receptionShifts ReceptionShift[] @relation("ReceptionShiftDepartment")
   blockchainLogs BlockchainLogger[]
 
   // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain
@@ -148,7 +146,6 @@ model StaffProfile {
   doctorProfile     DoctorProfile?
   blockchainLogs    BlockchainLogger[]
   paraclinicalShifts ParaclinicalShift[]
-  receptionShifts    ReceptionShift[]
   handoversFrom     HandoverLog[] @relation("HandoverFrom")
   handoversTo       HandoverLog[] @relation("HandoverTo")
 
@@ -759,30 +756,6 @@ model HandoverLog {
 /// to the department, not to a clinical room. Unlike ParaclinicalShift, reception shifts are
 /// NOT anchored on-chain — they are HR data, not medical data, and keeping them off-chain
 /// keeps audit batches focused on patient-facing records.
-model ReceptionShift {
-  id             String       @id @default(uuid())
-  staffId        String
-  staff          StaffProfile @relation(fields: [staffId], references: [id])
-  departmentId   String
-  department     Department   @relation("ReceptionShiftDepartment", fields: [departmentId], references: [id])
-  startTime      DateTime
-  endTime        DateTime
-  status         ShiftStatus  @default(PENDING)
-  note            String?     // Optional message from staff at registration time.
-  approvedById   String?
-  approvedBy     User?        @relation("ApprovedReceptionShifts", fields: [approvedById], references: [id])
-  rejectionReason String?
-  isActive       Boolean      @default(true)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-
-  @@index([staffId])
-  @@index([departmentId])
-  @@index([status])
-  @@index([startTime, endTime])
-  @@index([isActive])
-}
-
 model Notification {
   id        String   @id @default(uuid())
   userId    String

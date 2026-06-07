@@ -1,18 +1,20 @@
-// Personal receptionist account: only manages their own shift roster + profile.
-// Patient intake / visit queue / records moved to the DEPT_SHARED workstation account
-// (shared per administrative department, used at the front desk).
+// Personal receptionist account: patient intake, visit queue, and records.
+// No more shift registration — receptionists log in and start working immediately.
 export const RECEPTIONIST_NAV_ITEMS = [
-  { id: 'shifts', label: 'Lịch trực', icon: 'calendar' },
-  { id: 'approveShifts', label: 'Duyệt lịch trực', icon: 'check-square' },
+  { id: 'patient-intake', label: 'Tiếp nhận', icon: 'users' },
+  { id: 'visit-queue', label: 'Hàng đợi khám', icon: 'activity' },
+  { id: 'patient-records', label: 'Hồ sơ bệnh nhân', icon: 'file' },
   { id: 'profile', label: 'Thông tin cá nhân', icon: 'user' },
 ];
 
 export const RECEPTIONIST_ROUTES = {
-  shifts: '/receptionist/shifts',
-  approveShifts: '/admin/shifts',
+  overview: '/receptionist/intake',
+  'patient-intake': '/receptionist/intake',
+  'visit-queue': '/receptionist/queue',
+  'patient-records': '/receptionist/records',
   profile: '/profile',
 };
 
 export function receptionistRouteFor(id) {
-  return RECEPTIONIST_ROUTES[id] || RECEPTIONIST_ROUTES.shifts;
+  return RECEPTIONIST_ROUTES[id] || RECEPTIONIST_ROUTES.overview;
 }

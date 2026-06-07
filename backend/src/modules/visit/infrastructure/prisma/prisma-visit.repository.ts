@@ -45,6 +45,21 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
   }
 
   async createVisitWithOptionalPatient(command: CreateVisitCommand): Promise<unknown> {
+    // Pre-check citizenId uniqueness so we can return a friendly message instead of
+    // letting the transaction hit a P2002 that retries uselessly (citizenId is a real
+    // duplicate, not a race condition).
+    if (!command.patientId && command.patient?.citizenId) {
+      const existingCitizen = await this.prisma.patient.findUnique({
+        where: { citizenId: command.patient.citizenId.trim() },
+        select: { id: true, fullName: true, patientCode: true },
+      });
+      if (existingCitizen) {
+        throw new BadRequestException(
+          `CCCD/CMND "${command.patient.citizenId}" đã tồn tại trong hệ thống (mã BN: ${existingCitizen.patientCode}, tên: ${existingCitizen.fullName}). Vui lòng chọn bệnh nhân có sẵn.`,
+        );
+      }
+    }
+
     // Retry on unique-code collisions: patientCode/visitCode are generated from the
     // latest row, so concurrent intakes can collide. The whole transaction rolls back
     // and regenerates fresh codes on the next attempt.

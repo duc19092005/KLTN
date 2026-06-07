@@ -4,11 +4,8 @@ import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { useAuth } from '../../../providers/AuthProvider';
 import { useToast } from '../../../providers/ToastProvider';
-import { receptionShiftService } from '../../receptionist/apis/receptionShiftService';
 import { shiftService as paraclinicalShiftService } from '../../paraclinical/apis/paraclinicalService';
-import { departmentService } from '../apis/departmentService';
 import { getRoleNav } from '../../profile/constants/roleNav';
-import { profileService } from '../../profile/apis/profileService';
 import RejectReasonModal from '../../../shared/components/RejectReasonModal';
 
 const STATUS_META = {
@@ -31,15 +28,14 @@ function unwrapList(res) {
 }
 
 /**
- * Unified shift management page for ADMIN / LAB_MANAGER / receptionist department head.
+ * Unified shift management page for ADMIN / LAB_MANAGER (paraclinical shifts only).
+ * Reception shifts have been removed — receptionists no longer register shifts.
  *
  * Visibility rules:
- *  - ADMIN: both tabs (reception + paraclinical)
- *  - LAB_MANAGER: paraclinical tab only (they head a paraclinical department)
- *  - RECEPTIONIST head (StaffProfile.managedDepartment of type ADMINISTRATIVE):
- *      reception tab only — detected by the server returning rows on /reception-shifts/pending-for-me.
+ *  - ADMIN: full access
+ *  - LAB_MANAGER: paraclinical shifts within their department
  *
- * Server-side already enforces who can approve what; this page only filters which UI is shown.
+ * Server-side already enforces who can approve what.
  */
 export default function AdminShiftsPage() {
   const { user, logout } = useAuth();
@@ -48,10 +44,7 @@ export default function AdminShiftsPage() {
 
   const role = user?.role;
   const roleNav = getRoleNav(role);
-  const showReception = role === 'ADMIN' || role === 'RECEPTIONIST';
   const showParaclinical = role === 'ADMIN' || role === 'LAB_MANAGER';
-
-  const [activeTab, setActiveTab] = useState(showReception ? 'reception' : 'paraclinical');
 
   return (
     <DashboardLayout
@@ -67,159 +60,18 @@ export default function AdminShiftsPage() {
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-[10px] uppercase tracking-[0.18em] font-black text-cyan-600">Duyệt và quản lý ca trực</p>
-              <h1 className="mt-1 text-2xl font-black text-slate-950">Phê duyệt ca trực toàn hệ thống</h1>
+              <h1 className="mt-1 text-2xl font-black text-slate-950">Phê duyệt ca trực cận lâm sàng</h1>
               <p className="mt-1 text-xs font-semibold text-slate-500">
-                {role === 'ADMIN' && 'Quản trị viên xem được toàn bộ ca trực của lễ tân và kỹ thuật cận lâm sàng.'}
+                {role === 'ADMIN' && 'Quản trị viên xem được toàn bộ ca trực của kỹ thuật cận lâm sàng.'}
                 {role === 'LAB_MANAGER' && 'Trưởng khoa cận lâm sàng duyệt ca của kỹ thuật viên trong khoa.'}
-                {role === 'RECEPTIONIST' && 'Trưởng phòng lễ tân duyệt ca của lễ tân trong phòng.'}
               </p>
             </div>
           </div>
-
-          {/* Tabs (only render when both visible) */}
-          {showReception && showParaclinical && (
-            <div className="mt-4 flex gap-1 rounded-2xl bg-slate-100 p-1 w-fit">
-              <button
-                onClick={() => setActiveTab('reception')}
-                className={`rounded-xl px-4 py-2 text-xs font-black transition-colors ${
-                  activeTab === 'reception' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Ca lễ tân
-              </button>
-              <button
-                onClick={() => setActiveTab('paraclinical')}
-                className={`rounded-xl px-4 py-2 text-xs font-black transition-colors ${
-                  activeTab === 'paraclinical' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Ca cận lâm sàng
-              </button>
-            </div>
-          )}
         </section>
 
-        {showReception && activeTab === 'reception' && <ReceptionTab user={user} toast={toast} />}
-        {showParaclinical && activeTab === 'paraclinical' && <ParaclinicalTab user={user} toast={toast} />}
+        {showParaclinical && <ParaclinicalTab user={user} toast={toast} />}
       </div>
     </DashboardLayout>
-  );
-}
-
-// ──────────────────────────────────────────────────────────────────
-// Reception shift tab
-// ──────────────────────────────────────────────────────────────────
-function ReceptionTab({ user, toast }) {
-  const [loading, setLoading] = useState(true);
-  const [shifts, setShifts] = useState([]);
-  const [departments, setDepartments] = useState([]);
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterDept, setFilterDept] = useState('');
-  const [managedDeptId, setManagedDeptId] = useState(null);
-  const [rejectTarget, setRejectTarget] = useState(null);
-
-  useEffect(() => {
-    async function fetchManagedDept() {
-      try {
-        const res = await profileService.getProfile();
-        const deptId = res?.data?.profile?.staff?.managedDepartment?.id;
-        if (deptId) {
-          setManagedDeptId(deptId);
-          setFilterDept(deptId);
-        }
-      } catch (err) {
-        console.error('Fetch profile managed dept failed:', err);
-      }
-    }
-    if (user?.role !== 'ADMIN') {
-      fetchManagedDept();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterStatus, filterDept]);
-
-  async function load() {
-    setLoading(true);
-    try {
-      const params = {};
-      if (filterStatus) params.status = filterStatus;
-      if (filterDept) params.departmentId = filterDept;
-
-      const [shiftsRes, depRes] = await Promise.all([
-        receptionShiftService.list(params),
-        departmentService.list({ type: 'ADMINISTRATIVE' }).catch(() => ({ data: [] })),
-      ]);
-
-      setShifts(unwrapList(shiftsRes));
-      setDepartments(unwrapList(depRes).filter((d) => d.type === 'ADMINISTRATIVE'));
-    } catch (err) {
-      console.error('Load reception shifts failed:', err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleApprove(id) {
-    try {
-      await receptionShiftService.approve(id);
-      toast.success('Đã duyệt ca trực.');
-      load();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Duyệt thất bại.');
-    }
-  }
-
-  async function handleReject(id) {
-    const shift = shifts.find((s) => s.id === id);
-    setRejectTarget(shift || { id });
-  }
-
-  async function confirmReject(reason) {
-    if (!rejectTarget) return;
-    try {
-      await receptionShiftService.reject(rejectTarget.id, reason);
-      toast.success('Đã từ chối ca trực.');
-      setRejectTarget(null);
-      load();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Từ chối thất bại.');
-    }
-  }
-
-  const summary = useMemo(() => {
-    const c = { PENDING: 0, APPROVED: 0, REJECTED: 0 };
-    for (const s of shifts) if (c[s.status] !== undefined) c[s.status]++;
-    return c;
-  }, [shifts]);
-
-  const pending = shifts.filter((s) => s.status === 'PENDING');
-
-  return (
-    <>
-      <ShiftPanel
-        kind="Lễ tân"
-        summary={summary}
-        filterStatus={filterStatus} setFilterStatus={setFilterStatus}
-        filterDept={filterDept} setFilterDept={setFilterDept}
-        departments={departments}
-        pending={pending}
-        shifts={shifts}
-        loading={loading}
-        handleApprove={handleApprove}
-        handleReject={handleReject}
-        getDeptLabel={(s) => s.department?.name || s.departmentId?.slice(0, 8)}
-        hideDeptFilter={user?.role !== 'ADMIN'}
-      />
-      <RejectReasonModal
-        open={Boolean(rejectTarget)}
-        subtitle={rejectTarget?.staff?.fullName ? `Nhân viên: ${rejectTarget.staff.fullName}` : undefined}
-        onConfirm={confirmReject}
-        onClose={() => setRejectTarget(null)}
-      />
-    </>
   );
 }
 

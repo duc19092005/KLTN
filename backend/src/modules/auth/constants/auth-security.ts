@@ -20,12 +20,16 @@ export function getAuthCookieOptions(): CookieOptions {
     (process.env.AUTH_COOKIE_SECURE !== 'false' && process.env.NODE_ENV === 'production');
   const sameSite = (process.env.AUTH_COOKIE_SAME_SITE as CookieOptions['sameSite']) || (secure ? 'none' : 'lax');
 
+  // Default 8 hours to cover a typical shift. Override via JWT_COOKIE_MAX_AGE_MS env.
+  // IMPORTANT: this should match the JWT token exp claim (configured in the login use-case)
+  // so the cookie never outlives the token it carries. If token exp is shorter, set
+  // JWT_COOKIE_MAX_AGE_MS to the same value.
   return {
     httpOnly: true,
     secure,
     sameSite,
     path: '/',
-    maxAge: Number(process.env.JWT_COOKIE_MAX_AGE_MS || 60 * 60 * 1000),
+    maxAge: Number(process.env.JWT_COOKIE_MAX_AGE_MS || 8 * 60 * 60 * 1000),
   };
 }
 

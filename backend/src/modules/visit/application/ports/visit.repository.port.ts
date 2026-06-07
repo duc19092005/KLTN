@@ -61,13 +61,14 @@ export interface VisitRepositoryPort {
   suggestRooms(specialty: string): Promise<unknown[]>;
 }
 
-/** Detects a unique-constraint conflict on patientCode/visitCode for retry. */
+/** Detects a unique-constraint conflict on patientCode/visitCode/citizenId for retry. */
 export function isUniqueVisitCodeConflict(error: unknown): boolean {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError &&
     error.code === 'P2002' &&
     Array.isArray(error.meta?.target) &&
     ((error.meta.target as string[]).includes('patientCode') ||
-      (error.meta.target as string[]).includes('visitCode'))
+      (error.meta.target as string[]).includes('visitCode') ||
+      (error.meta.target as string[]).includes('citizenId'))
   );
 }

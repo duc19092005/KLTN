@@ -57,7 +57,7 @@ import { StepUpTicketIssuerAdapter } from './infrastructure/adapters/stepup-tick
     JwtModule.registerAsync({
       useFactory: () => ({
         secret: getJwtSecret(),
-        signOptions: { expiresIn: (process.env.JWT_EXPIRATION || '1h') as any },
+        signOptions: { expiresIn: (process.env.JWT_EXPIRATION || '8h') as any },
       }),
     }),
     EncryptionModule,

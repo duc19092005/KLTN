@@ -6,7 +6,6 @@ import { ReceptionistDashboard, DoctorDashboard, LabManagerDashboard } from '../
 import ReceptionistIntakePage from '../features/receptionist/pages/ReceptionistIntakePage';
 import ReceptionistQueuePage from '../features/receptionist/pages/ReceptionistQueuePage';
 import ReceptionistRecordsPage from '../features/receptionist/pages/ReceptionistRecordsPage';
-import ReceptionShiftPage from '../features/receptionist/pages/ReceptionShiftPage';
 import AdminShiftsPage from '../features/admin/pages/AdminReceptionShiftsPage';
 import LabOrdersPage from '../features/lab-manager/pages/LabOrdersPage';
 import LabResultsPage from '../features/lab-manager/pages/LabResultsPage';
@@ -55,15 +54,13 @@ export default function App() {
         <Route path="/admin/doctors" element={<ProtectedRoute requireVerified roles={['ADMIN']}><DoctorsPage /></ProtectedRoute>} />
         <Route path="/admin/clinical-rooms" element={<ProtectedRoute requireVerified roles={['ADMIN']}><ClinicalRoomsPage /></ProtectedRoute>} />
         <Route path="/admin/shifts" element={<ProtectedRoute requireVerified roles={['ADMIN', 'RECEPTIONIST', 'LAB_MANAGER']} requireManager><AdminShiftsPage /></ProtectedRoute>} />
-        <Route path="/admin/reception-shifts" element={<Navigate to="/admin/shifts" replace />} />
         <Route path="/admin/ai-models" element={<ProtectedRoute requireVerified roles={['ADMIN']}><AiModelsPage /></ProtectedRoute>} />
         <Route path="/admin/audit" element={<ProtectedRoute requireVerified roles={['ADMIN']}><AuditLogsPage /></ProtectedRoute>} />
         <Route path="/admin/backup" element={<ProtectedRoute requireVerified roles={['ADMIN']}><BackupPage /></ProtectedRoute>} />
-        <Route path="/receptionist" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST']}><Navigate to="/receptionist/shifts" replace /></ProtectedRoute>} />
-        <Route path="/receptionist/intake" element={<ProtectedRoute requireVerified roles={['DEPT_SHARED']}><ReceptionistIntakePage /></ProtectedRoute>} />
-        <Route path="/receptionist/queue" element={<ProtectedRoute requireVerified roles={['DEPT_SHARED']}><ReceptionistQueuePage /></ProtectedRoute>} />
-        <Route path="/receptionist/records" element={<ProtectedRoute requireVerified roles={['DEPT_SHARED']}><ReceptionistRecordsPage /></ProtectedRoute>} />
-        <Route path="/receptionist/shifts" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST', 'ADMIN']}><ReceptionShiftPage /></ProtectedRoute>} />
+        <Route path="/receptionist" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST', 'DEPT_SHARED']}><Navigate to="/receptionist/intake" replace /></ProtectedRoute>} />
+        <Route path="/receptionist/intake" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST', 'DEPT_SHARED']}><ReceptionistIntakePage /></ProtectedRoute>} />
+        <Route path="/receptionist/queue" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST', 'DEPT_SHARED']}><ReceptionistQueuePage /></ProtectedRoute>} />
+        <Route path="/receptionist/records" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST', 'DEPT_SHARED']}><ReceptionistRecordsPage /></ProtectedRoute>} />
         <Route path="/doctor" element={<ProtectedRoute requireVerified roles={['DOCTOR']}><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/doctor/queue" element={<ProtectedRoute requireVerified roles={['DOCTOR']}><DoctorQueuePage /></ProtectedRoute>} />
         <Route path="/paraclinical-login" element={<ParaclinicalLoginPage />} />
