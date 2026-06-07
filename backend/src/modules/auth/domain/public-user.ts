@@ -18,5 +18,6 @@ export function toPublicUser(user: UserWithProfile, verified: boolean) {
     hasFace: Boolean(user.faceEmbedding),
     hasWallet: Boolean(user.adminProfile?.walletAddress),
     autoLockMinutes: user.autoLockMinutes ?? 5,
+    isManager: Boolean(user.staffProfile?.managedDepartment),
   };
 }

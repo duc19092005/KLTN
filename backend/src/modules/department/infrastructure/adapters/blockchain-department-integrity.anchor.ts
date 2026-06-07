@@ -58,36 +58,54 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
     const dbHash = dept.hash256 || null;
     const dbMatches = recomputed !== null && recomputed === dbHash;
 
-    // Find the latest anchored log entry for this department
-    const latestLog = await this.prisma.blockchainLogger.findFirst({
+    // Latest anchored log (batchId set ⇒ already in a Merkle batch on-chain).
+    const latestAnchored = await this.prisma.blockchainLogger.findFirst({
       where: { entity: 'Department', entityId: dept.id, batchId: { not: null } },
       orderBy: { seq: 'desc' },
       select: { seq: true, dataHash: true, batchId: true },
     });
 
+    // Latest log entry overall (regardless of anchor status). Used to detect the
+    // window between a write and the next Merkle batch (anchored every 5 min).
+    const latestAny = await this.prisma.blockchainLogger.findFirst({
+      where: { entity: 'Department', entityId: dept.id },
+      orderBy: { seq: 'desc' },
+      select: { seq: true, dataHash: true, batchId: true },
+    });
+
     let chainMatches = false;
-    if (latestLog?.seq) {
+    if (latestAnchored?.seq) {
       try {
-        const proof = await this.auditAnchor.getInclusionProof(latestLog.seq);
+        const proof = await this.auditAnchor.getInclusionProof(latestAnchored.seq);
         if (proof && proof.verified) {
-          chainMatches = latestLog.dataHash === recomputed;
+          chainMatches = latestAnchored.dataHash === recomputed;
         }
       } catch {
         // Proof verification failed; chainMatches stays false
       }
     }
 
-    let status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED';
-    if (!latestLog || !latestLog.batchId) status = 'UNANCHORED';
-    else if (dbMatches && chainMatches) status = 'VERIFIED';
-    else status = 'TAMPERED';
+    let status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR';
+    if (!latestAny) {
+      // No log at all → never been anchored.
+      status = 'UNANCHORED';
+    } else if (!latestAnchored || (latestAny.seq !== latestAnchored.seq && latestAny.dataHash === recomputed)) {
+      // There is a newer log than the last anchored one (or no anchored log yet),
+      // and that newest log's hash matches the current DB hash → write happened
+      // and is just waiting for the next Merkle batch. Not tampering.
+      status = dbMatches ? 'PENDING_ANCHOR' : 'TAMPERED';
+    } else if (dbMatches && chainMatches) {
+      status = 'VERIFIED';
+    } else {
+      status = 'TAMPERED';
+    }
 
     if (status === 'TAMPERED') {
       await this.auditAnchor.sendTelegramAlert(
         'Phát hiện giả mạo phòng ban',
         `Phòng ban: ${dept.name} (Mã: ${dept.departmentCode}, ID: ${dept.id})\n` +
         `• Hash CSDL: ${dbHash}\n` +
-        `• Hash On-Chain: ${latestLog?.dataHash}\n` +
+        `• Hash On-Chain: ${latestAnchored?.dataHash}\n` +
         `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}\n` +
         `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`
       );
@@ -102,7 +120,7 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
       chainMatches,
       recomputedHash: recomputed,
       storedHash: dbHash,
-      onChainHash: latestLog?.dataHash ?? null,
+      onChainHash: latestAnchored?.dataHash ?? null,
     };
   }
 

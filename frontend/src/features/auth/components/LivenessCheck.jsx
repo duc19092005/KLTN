@@ -55,6 +55,15 @@ export default function LivenessCheck({
   const identityAnchorRef = useRef(null); // 128D descriptor captured at blink-verified moment
   const anchorPendingRef = useRef(false);
 
+  // Keep the latest callbacks in refs. The completion effect below arms a 1.5s timer; if it depended
+  // on these callbacks directly, any parent re-render that recreates them (e.g. ScreenLockOverlay's
+  // per-second clock tick) would clear and re-arm the timer before it could fire — hanging forever
+  // on the success screen. Refs let the timer depend only on `allPassedUI`.
+  const onLivenessPassRef = useRef(onLivenessPass);
+  const onErrorRef = useRef(onError);
+  onLivenessPassRef.current = onLivenessPass;
+  onErrorRef.current = onError;
+
   const captureVideoFrame = () => {
     if (!videoRef.current) return null;
     try {
@@ -417,7 +426,9 @@ export default function LivenessCheck({
         };
       }
     }
-    return { ok: true, worstDistance };
+    // Surface the validated anchor so the parent can reuse it (verify mode) instead of
+    // re-detecting on the final frame, which is often a turned/blurred pose.
+    return { ok: true, worstDistance, anchor };
   };
 
   useEffect(() => {
@@ -447,15 +458,19 @@ export default function LivenessCheck({
         setStatus('error');
         setAllPassedUI(false);
         setMessage(continuity.reason);
-        onError?.(continuity.reason);
+        onErrorRef.current?.(continuity.reason);
         return;
       }
 
       console.log(`[Liveness] identity continuity OK, worst distance ${continuity.worstDistance.toFixed(3)}`);
-      onLivenessPass?.(isEnrollMode && poseFrames.length > 0 ? poseFrames : (frame || videoRef.current));
+      const descriptor = Array.isArray(continuity.anchor) ? continuity.anchor : null;
+      onLivenessPassRef.current?.(
+        isEnrollMode && poseFrames.length > 0 ? poseFrames : (frame || videoRef.current),
+        { descriptor },
+      );
     }, 1500);
     return () => clearTimeout(timer);
-  }, [allPassedUI, onLivenessPass, onError, disabled, isEnrollMode]);
+  }, [allPassedUI, disabled, isEnrollMode]);
 
   const renderArrow = (direction) => {
     const rotationMap = { right: 0, down: 90, left: 180, up: 270 };

@@ -10,7 +10,10 @@ import {
 /** DI token for the Auth repository port. */
 export const AUTH_REPOSITORY = Symbol('AUTH_REPOSITORY');
 
-export type UserWithProfile = User & { adminProfile: AdminProfile | null };
+export type UserWithProfile = User & {
+  adminProfile: AdminProfile | null;
+  staffProfile?: (StaffProfile & { managedDepartment: Department | null }) | null;
+};
 export type AdminProfileWithUser = AdminProfile & { user: User };
 
 /**

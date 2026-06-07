@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   LayoutGrid,
   ShieldCheck,
@@ -9,6 +10,8 @@ import {
   User,
   Calendar,
   Database,
+  Stethoscope,
+  Building2,
   Plus,
   ChevronLeft,
   X,
@@ -18,6 +21,7 @@ import {
 } from 'lucide-react';
 import StepUpSessionBadge from './StepUpSessionBadge';
 import SleepButton from './SleepButton';
+import NotificationBell from './NotificationBell';
 
 const defaultNavItems = [
   { id: 'overview', label: 'Tổng quan', icon: 'grid' },
@@ -48,6 +52,8 @@ const ICON_COMPONENTS = {
   user: User,
   calendar: Calendar,
   database: Database,
+  stethoscope: Stethoscope,
+  building: Building2,
 };
 
 function SidebarIcon({ name, isActive, compact = false }) {
@@ -70,13 +76,33 @@ export default function DashboardLayout({
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const navigate = useNavigate();
+
+  // Both the avatar icon and the gear go to the shared user page (/profile) for every role, but to
+  // different tabs: the avatar opens personal info, the gear opens the settings/personalization tab.
+  // Using useNavigate directly keeps it self-contained so callers don't each need to wire it up.
+  const openProfile = () => {
+    setIsSidebarOpen(false);
+    navigate('/profile', { state: { tab: 'profile' } });
+  };
+  const openSettings = () => {
+    setIsSidebarOpen(false);
+    navigate('/profile', { state: { tab: 'personalize' } });
+  };
 
   const handleNavigate = (id) => {
     onNavigate?.(id);
     setIsSidebarOpen(false);
   };
 
-  const activeLabel = navItems.find(item => item.id === activeItem)?.label || 'Tổng quan';
+  const filteredNavItems = navItems.filter((item) => {
+    if (item.id === 'approveShifts') {
+      return user?.role === 'ADMIN' || user?.isManager === true;
+    }
+    return true;
+  });
+
+  const activeLabel = filteredNavItems.find(item => item.id === activeItem)?.label || 'Tổng quan';
   const roleLabel = ROLE_LABELS[user?.role] || user?.role || 'Quản trị viên';
 
   const initials = (user?.username || user?.email || 'A')
@@ -140,7 +166,7 @@ export default function DashboardLayout({
 
           {/* Navigation Items */}
           <nav className={`flex-1 overflow-y-auto py-6 space-y-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:px-4' : 'px-3'}`} aria-label="Điều hướng bảng làm việc">
-            {navItems.map((item) => {
+            {filteredNavItems.map((item) => {
               const isActive = activeItem === item.id;
               return (
                 <button
@@ -166,7 +192,7 @@ export default function DashboardLayout({
           </nav>
 
           {/* Security Status Card (Y tế bảo mật) */}
-          <div className={`p-4 border-t border-slate-100 transition-all duration-200 ${isSidebarCollapsed ? 'lg:hidden' : ''}`}>
+          <div className={`px-4 pt-4 transition-all duration-200 ${isSidebarCollapsed ? 'lg:hidden' : ''}`}>
             <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-3 flex items-center gap-2.5">
               <span className="relative flex h-2 w-2 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -177,6 +203,30 @@ export default function DashboardLayout({
                 <p className="text-xs font-semibold text-emerald-950 truncate">MFA + chuẩn y tế</p>
               </div>
             </div>
+          </div>
+
+          {/* Profile + Settings (đáy sidebar). Avatar mở thông tin cá nhân, bánh răng mở cài đặt. */}
+          <div className={`p-4 border-t border-slate-100 mt-3 flex items-center gap-2 ${isSidebarCollapsed ? 'lg:flex-col lg:justify-center' : 'justify-center'}`}>
+            <button
+              id="sidebar-profile-button"
+              type="button"
+              onClick={openProfile}
+              title="Thông tin cá nhân"
+              aria-label="Thông tin cá nhân"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600 border border-blue-100 text-sm font-bold shadow-sm hover:bg-blue-600 hover:text-white transition-all"
+            >
+              {initials}
+            </button>
+            <button
+              id="sidebar-settings-button"
+              type="button"
+              onClick={openSettings}
+              title="Cài đặt"
+              aria-label="Cài đặt người dùng"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all"
+            >
+              <Settings className="w-5 h-5" strokeWidth={2} />
+            </button>
           </div>
         </div>
       </aside>
@@ -222,6 +272,9 @@ export default function DashboardLayout({
 
             {/* Step-up privilege session countdown + lock */}
             <StepUpSessionBadge />
+
+            {/* Notifications */}
+            <NotificationBell />
 
 
             {/* Profile Info */}

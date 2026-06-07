@@ -2,6 +2,8 @@ import api from '../../../shared/apis/api';
 
 export const staffService = {
   search: (params = {}) => api.get('/staff', { params }),
+  get: (id) => api.get(`/staff/${id}`),
+  history: (id = null) => api.get(id ? `/staff/${id}/audit/history` : '/staff/audit/history'),
   create: (payload) => api.post('/staff', payload),
   update: (id, payload) => api.patch(`/staff/${id}`, payload),
   lock: (id) => api.patch(`/staff/${id}/lock`),

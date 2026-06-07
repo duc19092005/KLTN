@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { useAuth } from '../../../providers/AuthProvider';
@@ -8,9 +8,17 @@ import { profileService } from '../apis/profileService';
 import { authService } from '../../auth';
 import { getRoleNav } from '../constants/roleNav';
 import ChangePasswordModal from '../components/ChangePasswordModal';
+import PreferencesPanel from '../components/PreferencesPanel';
+import { usePreferences } from '../../../providers/PreferencesProvider';
+import { User, SlidersHorizontal } from 'lucide-react';
 
 const AUTO_LOCK_MIN = 1;
 const AUTO_LOCK_MAX = 15;
+
+const TABS = [
+  { id: 'profile', label: 'Hồ sơ', icon: User },
+  { id: 'settings', label: 'Cài đặt', icon: SlidersHorizontal },
+];
 
 const ROLE_LABELS = {
   ADMIN: 'Quản trị viên',
@@ -26,20 +34,10 @@ const STATUS_LABELS = {
   PENDING: { text: 'Chờ kích hoạt', tone: 'bg-amber-50 text-amber-700 border-amber-100' },
 };
 
-function formatDate(value) {
-  return value ? new Date(value).toLocaleDateString('vi-VN') : 'Chưa cập nhật';
-}
-
 function formatDateTime(value) {
   return value
     ? new Date(value).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })
     : 'Chưa cập nhật';
-}
-
-function genderLabel(value) {
-  if (value === 'MALE' || value === 'Nam') return 'Nam';
-  if (value === 'FEMALE' || value === 'Nữ') return 'Nữ';
-  return value || 'Chưa cập nhật';
 }
 
 function shortenWallet(address) {
@@ -49,10 +47,16 @@ function shortenWallet(address) {
 
 export default function ProfilePage() {
   const { user, logout, updateSession } = useAuth();
+  const { accentHex } = usePreferences();
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Open on the tab requested by the navigator (sidebar avatar -> profile info, gear -> settings).
+  // Legacy 'personalize'/'security' both map to the combined 'settings' view.
+  const requestedTab = location.state?.tab === 'profile' ? 'profile' : (location.state?.tab ? 'settings' : 'profile');
+  const [activeTab, setActiveTab] = useState(requestedTab);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [autoLock, setAutoLock] = useState(user?.autoLockMinutes ?? 5);
   const [savingAutoLock, setSavingAutoLock] = useState(false);
@@ -162,6 +166,28 @@ export default function ProfilePage() {
               </div>
             </section>
 
+            {/* Settings tabs */}
+            <div className="flex gap-1 rounded-2xl border border-slate-100 bg-white p-1.5 shadow-sm">
+              {TABS.map((tab) => {
+                const active = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    id={`profile-tab-${tab.id}`}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 ${active ? 'bg-slate-50 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    style={active ? { color: accentHex } : undefined}
+                  >
+                    <tab.icon className="h-4 w-4" strokeWidth={2.25} />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {activeTab === 'profile' && (
+            <div className="space-y-6">
             {/* Account info (common) */}
             <Card title="Thông tin tài khoản">
               <Field label="Tên đăng nhập" value={account.username} />
@@ -171,23 +197,6 @@ export default function ProfilePage() {
               <Field label="Ngày đăng ký khuôn mặt" value={formatDateTime(account.faceEnrolledAt)} />
               <Field label="Ngày tạo tài khoản" value={formatDateTime(account.createdAt)} />
             </Card>
-
-            {/* Personal info (staff / doctor / lab) */}
-            {staff && (
-              <Card title="Thông tin cá nhân">
-                <Field label="Họ và tên" value={staff.fullName} />
-                <Field label="Giới tính" value={genderLabel(staff.gender)} />
-                <Field label="Ngày sinh" value={formatDate(staff.birthDate)} />
-                <Field label="Số điện thoại" value={staff.phone} />
-                <Field label="CCCD/CMND" value={staff.citizenId} />
-                <Field label="Địa chỉ" value={staff.address} />
-                <Field label="Chức vụ" value={staff.position} />
-                <Field label="Phòng ban" value={staff.department?.name} />
-                {staff.managedDepartment && (
-                  <Field label="Phòng ban phụ trách" value={staff.managedDepartment.name} />
-                )}
-              </Card>
-            )}
 
             {/* Clinical credentials (doctor only) */}
             {doctor && (
@@ -210,6 +219,13 @@ export default function ProfilePage() {
                 <Field label="Mã khôi phục (MFA)" value={admin.hasRecoverySecret ? 'Đã thiết lập' : 'Chưa thiết lập'} />
               </Card>
             )}
+            </div>
+            )}
+
+            {activeTab === 'settings' && (
+            <div className="space-y-6">
+            {/* Personalization controls */}
+            <PreferencesPanel />
 
             {/* Security: password change for staff roles only */}
             {canChangePassword && (
@@ -274,6 +290,8 @@ export default function ProfilePage() {
                 </button>
               </div>
             </section>
+            </div>
+            )}
           </>
         )}
       </div>

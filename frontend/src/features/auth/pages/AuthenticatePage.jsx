@@ -6,6 +6,7 @@ import { useAuth } from '../../../providers/AuthProvider';
 import FaceCapture from '../components/FaceCapture';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { getDashboardRoute } from '../../../shared/constants/roleRoutes';
+import { stepUpSession } from '../../../shared/stepup/sessionStore';
 
 export default function AuthenticatePage() {
   const navigate = useNavigate();
@@ -33,9 +34,12 @@ export default function AuthenticatePage() {
     try {
       await authService.registerFace(embedding);
       if (!isAdmin) {
-        // Nhân sự hoàn tất onboarding ngay sau khi đăng ký mặt -> chuyển sang luồng xác thực đăng nhập.
-        updateSession({ registrationStep: 2, hasFace: true, firstLogin: false });
-        setStep(4); showStatus('Đăng ký khuôn mặt thành công. Vui lòng quét lại để xác thực đăng nhập.');
+        // Non-admin first-login order: face registered → set permanent password → face-verify-login.
+        // Keep firstLogin=true locally so the change-password screen is correctly required; backend
+        // will flip it to false once the new password is committed.
+        updateSession({ registrationStep: 2, hasFace: true });
+        showStatus('Đăng ký khuôn mặt thành công. Vui lòng đặt mật khẩu mới để hoàn tất kích hoạt.');
+        navigate('/change-password', { replace: true });
       } else {
         // Onboarding admin còn nhiều bước (liên kết ví -> ZKP). Phải giữ firstLogin=true cho tới khi
         // backend hoàn tất generateMfaSecret, nếu không trang sẽ rơi vào bước xác thực đăng nhập sớm.
@@ -81,6 +85,16 @@ export default function AuthenticatePage() {
       const challenge = challengeRes.data.challenge;
       const result = await authService.verifyFace(embedding, challenge);
       const verifiedUser = result.data.user || { ...user, verified: true };
+      // Login already proved a live face match; the backend opens a step-up privilege session from
+      // that same proof. Seed the in-memory store so the dashboard starts in "sudo mode" and the
+      // user is not asked to scan again for the first sensitive action.
+      const session = result.data.stepUpSession;
+      if (session?.session) {
+        stepUpSession.setSession(session.session, {
+          idleExpiresAt: session.idleExpiresAt,
+          absoluteExpiresAt: session.absoluteExpiresAt,
+        });
+      }
       updateSession(verifiedUser);
       goDashboard(verifiedUser);
     } catch (err) { showStatus(err.response?.data?.message || err.message, true); }

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Download, FileText } from 'lucide-react';
+import { Download, FileText, Printer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
@@ -37,6 +37,106 @@ function getItems(data) { return Array.isArray(data) ? data : data?.items || [];
 function formatDate(value) { return value ? new Date(value).toLocaleDateString('vi-VN') : 'N/A'; }
 function formatTime(value) { return value ? new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--'; }
 function parseAiResult(value) { try { return JSON.parse(value || '{}'); } catch { return { summary: value }; } }
+
+// Function to print doctor's conclusion with QR code
+function printConclusionWithQR(visit, conclusion, qrData) {
+  const printWindow = window.open('', '_blank');
+  // Use a free QR code service to generate the QR from the text data.
+  // This avoids needing extra npm packages and works offline-free in the browser.
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
+  const qrCodeHtml = `<div style="text-align: center; margin-top: 20px; padding: 15px; border: 2px solid #10b981; border-radius: 10px; background: #f0fdf4;">
+    <h3 style="color: #065f46; font-family: Arial, sans-serif; margin-bottom: 15px;">Mã xác minh bệnh án</h3>
+    <img src="${qrUrl}" alt="QR Code" style="width: 150px; height: 150px;" />
+    <p style="color: #065f46; font-size: 11px; margin-top: 10px; font-family: monospace;">${qrData}</p>
+    <p style="color: #065f46; font-size: 12px; margin-top: 10px;">Quét để xác minh tính xác thực của hồ sơ</p>
+  </div>`;
+  
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Bệnh án - ${visit?.visitCode}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #10b981; padding-bottom: 20px; }
+        .header h1 { color: #065f46; margin: 0; }
+        .header h2 { color: #065f46; font-size: 14px; margin-top: 5px; }
+        .section { margin-bottom: 20px; }
+        .section h3 { color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-top: 0; }
+        .label { font-weight: bold; color: #64748b; margin-top: 10px; display: block; font-size: 12px; }
+        .value { color: #1e293b; margin-top: 5px; white-space: pre-wrap; font-size: 13px; }
+        .meta { color: #64748b; font-size: 11px; margin-top: 5px; }
+        @media print {
+          .no-print { display: none; }
+          .print-area { margin: 0; padding: 20px; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="print-area">
+        <div class="header">
+          <h1>PHÒNG KHÁM BỆNH VIỆN KLTN</h1>
+          <h2>Hệ thống quản lý bệnh án điện tử</h2>
+        </div>
+        
+        <div class="section">
+          <h3>THÔNG TIN BỆNH NHÂN</h3>
+          <span class="label">Họ tên:</span>
+          <span class="value">${visit?.patient?.fullName || 'N/A'}</span>
+          <span class="label">Mã bệnh nhân:</span>
+          <span class="value">${visit?.patient?.patientCode || 'N/A'}</span>
+          <span class="label">Ngày sinh:</span>
+          <span class="value">${visit?.patient?.birthDate ? new Date(visit.patient.birthDate).toLocaleDateString('vi-VN') : 'N/A'}</span>
+          <span class="label">Giới tính:</span>
+          <span class="value">${visit?.patient?.gender || 'N/A'}</span>
+          <span class="label">Số điện thoại:</span>
+          <span class="value">${visit?.patient?.phone || 'N/A'}</span>
+          <span class="label">CCCD:</span>
+          <span class="value">${visit?.patient?.citizenId || 'N/A'}</span>
+        </div>
+        
+        <div class="section">
+          <h3>THÔNG TIN LƯỢT KHÁM</h3>
+          <span class="label">Mã lượt khám:</span>
+          <span class="value">${visit?.visitCode || 'N/A'}</span>
+          <span class="label">Ngày khám:</span>
+          <span class="value">${visit?.checkInAt ? new Date(visit.checkInAt).toLocaleDateString('vi-VN') + ' ' + new Date(visit.checkInAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</span>
+          <span class="label">Phòng khám:</span>
+          <span class="value">${visit?.clinicalRoom?.roomName || 'N/A'}</span>
+          <span class="label">Bác sĩ:</span>
+          <span class="value">${visit?.doctor?.fullName || 'N/A'}</span>
+        </div>
+        
+        <div class="section">
+          <h3>KẾT LUẬN BÁC SĨ</h3>
+          <span class="label">Chẩn đoán xác định:</span>
+          <span class="value">${conclusion?.finalDiagnosis || 'Chưa có chẩn đoán'}</span>
+          <span class="label">Hướng điều trị:</span>
+          <span class="value">${conclusion?.treatmentPlan || 'Chưa có hướng điều trị'}</span>
+          <span class="label">Toa thuốc:</span>
+          <span class="value">${conclusion?.prescription || 'Chưa có toa thuốc'}</span>
+          <span class="label">Lời dặn:</span>
+          <span class="value">${conclusion?.followUpNote || 'Chưa có lời dặn'}</span>
+        </div>
+        
+        ${qrCodeHtml}
+        
+        <div class="section no-print" style="text-align: center; margin-top: 30px; padding: 20px;">
+          <button onclick="window.print()" style="background: #10b981; color: white; padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; margin: 0 5px;">
+            🖨️ In hồ sơ
+          </button>
+          <button onclick="window.close()" style="background: #64748b; color: white; padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; margin: 0 5px;">
+            Đóng
+          </button>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+  
+  printWindow.document.write(html);
+  printWindow.document.close();
+}
 
 export default function DoctorQueuePage() {
   const { user, logout } = useAuth();
@@ -277,7 +377,7 @@ export default function DoctorQueuePage() {
             orderProps={{ forms: orderForms, setForms: setOrderForms, departments, existingOrders: decision?.medicalOrders || [], onSubmit: submitOrder, busy }}
             resultProps={{ orders: decision?.medicalOrders || [] }}
             aiProps={{ diagnoses: decision?.aiDiagnoses || [], aiModels, selectedAiModelId, setSelectedAiModelId, selectedAiId, setSelectedAiId, onGenerate: generateAi, busy }}
-            conclusionProps={{ form: conclusionForm, setForm: setConclusionForm, onSubmit: submitConclusion, busy, completed: Boolean(decision?.finalConclusion) }}
+            conclusionProps={{ form: conclusionForm, setForm: setConclusionForm, onSubmit: submitConclusion, busy, completed: Boolean(decision?.finalConclusion), activeVisit, activeConclusion: conclusionForm }}
           />
         )}
 
@@ -1054,7 +1154,7 @@ function AiSection({ title, value, list = false }) {
   return <div><strong className="text-[11px] uppercase tracking-wider font-black text-indigo-900 block mb-1.5">{title}</strong>{list ? <ul className="list-disc pl-5 space-y-1 font-medium text-slate-700 marker:text-indigo-400">{items.map((item, index) => <li key={`${title}-${index}`}>{typeof item === 'object' ? JSON.stringify(item) : String(item)}</li>)}</ul> : <p className="leading-relaxed font-medium text-slate-700">{String(value)}</p>}</div>;
 }
 
-function ConclusionPanel({ form, setForm, onSubmit, busy, completed }) {
+function ConclusionPanel({ form, setForm, onSubmit, busy, completed, activeVisit, activeConclusion }) {
   const updateForm = (patch) => setForm({ ...form, ...patch });
 
   return (
@@ -1133,6 +1233,24 @@ function ConclusionPanel({ form, setForm, onSubmit, busy, completed }) {
             {busy ? 'Đang lưu dữ liệu...' : completed ? 'Hồ sơ đã đóng' : 'Hoàn Tất & Đóng Bệnh Án'}
           </button>
         </div>
+        
+        {completed && (
+          <div className="flex justify-center mt-4">
+            <button
+              type="button"
+              onClick={() => {
+                // Encode the patient code so the public Patient Verification page can
+                // resolve it directly. Fall back to visitCode if patient is missing.
+                const qrData = `KLTN-PATIENT-${activeVisit?.patient?.patientCode || activeVisit?.visitCode || ''}`;
+                printConclusionWithQR(activeVisit, activeConclusion, qrData);
+              }}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl border border-emerald-600 text-emerald-600 font-bold text-xs hover:bg-emerald-50 transition-colors"
+            >
+              <Printer size={16} />
+              In PDF kèm Mã QR
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );

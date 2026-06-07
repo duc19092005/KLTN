@@ -6,18 +6,52 @@
  * exists. React state can't be read directly from the interceptor, so we keep the token here and
  * let the provider register a `requestHandler` that opens the modal.
  *
- * Security: the raw token lives only in memory (never localStorage) to limit XSS exposure; it dies
- * on refresh, forcing a fresh scan. Parallel 403s share a single scan (deduped via `inFlight`).
+ * Persistence: the raw token is mirrored into sessionStorage so a page reload does NOT drop an
+ * active privilege session (the backend keeps it alive until idle/absolute expiry). sessionStorage
+ * is per-tab and cleared on tab close, which keeps exposure narrower than localStorage while still
+ * surviving refresh. The server remains the source of truth and will reject a stale/revoked token,
+ * at which point the interceptor transparently prompts a fresh scan. Parallel 403s share a single
+ * scan (deduped via `inFlight`).
  */
 
-let sessionToken = null;
-let deadlines = null; // { idleExpiresAt, absoluteExpiresAt }
+const STORAGE_KEY = 'stepup_session';
+
+function readPersisted() {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.token || !parsed?.deadlines) return null;
+    // Drop anything already past its absolute ceiling client-side (server still re-checks).
+    const abs = new Date(parsed.deadlines.absoluteExpiresAt).getTime();
+    if (Number.isFinite(abs) && abs <= Date.now()) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+const persisted = readPersisted();
+let sessionToken = persisted?.token ?? null;
+let deadlines = persisted?.deadlines ?? null; // { idleExpiresAt, absoluteExpiresAt }
 let requestHandler = null; // () => Promise<{ session, idleExpiresAt, absoluteExpiresAt }>
 let inFlight = null; // Promise dedupe for concurrent 403s
 const listeners = new Set();
 
 function emit() {
   for (const fn of listeners) fn(deadlines);
+}
+
+function persist() {
+  try {
+    if (sessionToken && deadlines) {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ token: sessionToken, deadlines }));
+    } else {
+      sessionStorage.removeItem(STORAGE_KEY);
+    }
+  } catch {
+    /* storage unavailable (private mode / quota) — in-memory state still works for this tab */
+  }
 }
 
 export const stepUpSession = {
@@ -27,12 +61,14 @@ export const stepUpSession = {
   setSession(token, nextDeadlines) {
     sessionToken = token || null;
     deadlines = nextDeadlines || null;
+    persist();
     emit();
   },
 
   clear() {
     sessionToken = null;
     deadlines = null;
+    persist();
     emit();
   },
 

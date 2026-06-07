@@ -38,6 +38,19 @@ export default function StepUpSessionProvider({ children }) {
   // Keep local deadlines in sync with the shared store.
   useEffect(() => stepUpSession.subscribe(setDeadlines), []);
 
+  // Listen for custom step-up session events (e.g., from change password page)
+  useEffect(() => {
+    const handleStepUpSession = (event) => {
+      const { session, idleExpiresAt, absoluteExpiresAt } = event.detail;
+      stepUpSession.setSession(session, { idleExpiresAt, absoluteExpiresAt });
+      // Also update local state to reflect the new session
+      setDeadlines(stepUpSession.getDeadlines());
+      setRemainingMs(computeRemaining(stepUpSession.getDeadlines()));
+    };
+    window.addEventListener('hms-stepup-session', handleStepUpSession);
+    return () => window.removeEventListener('hms-stepup-session', handleStepUpSession);
+  }, []);
+
   // Register how the interceptor opens a scan: show the modal and hand back a promise that
   // resolves with the session payload once the scan succeeds (or rejects on cancel).
   useEffect(() => {
@@ -87,10 +100,17 @@ export default function StepUpSessionProvider({ children }) {
     try { await authService.revokeStepUpSession(); } catch { /* best-effort server revoke */ }
   }, []);
 
+  // Proactively open a privilege session (e.g. from a header button) instead of waiting for a
+  // sensitive request to 403. Reuses the same scan modal + dedupe path as the interceptor.
+  const open = useCallback(async () => {
+    try { await stepUpSession.ensure(); } catch { /* user cancelled the scan */ }
+  }, []);
+
   const value = {
     active: remainingMs > 0,
     remainingMs,
     lock,
+    open,
   };
 
   return (

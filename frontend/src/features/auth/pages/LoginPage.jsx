@@ -37,6 +37,10 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
       const signature = await signer.signMessage(challenge.data.message);
       const result = await loginWithWallet(address, signature, challenge.data.message);
       if (!result.success) throw new Error(result.error);
+      // First-login order: scan face FIRST so the user is biometrically known to the system
+      // before they set a permanent password. Otherwise a leaked invite/temp credential alone
+      // would let an attacker fully take over the account.
+      if (!result.user?.hasFace) return navigate('/authenticate', { replace: true });
       if (result.requirePasswordChange) return navigate('/change-password', { replace: true });
       if (result.requireVerification || result.requireFaceRegistration || result.requireFaceVerification) {
         return navigate('/authenticate', { replace: true });
@@ -69,6 +73,10 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
       setBusy(true);
       const result = await loginWithPassword(credentials.username.trim(), credentials.password);
       if (!result.success) throw new Error(result.error);
+      // First-login order: scan face FIRST so the user is biometrically known to the system
+      // before they set a permanent password. Otherwise a leaked invite/temp credential alone
+      // would let an attacker fully take over the account.
+      if (!result.user?.hasFace) return navigate('/authenticate', { replace: true });
       if (result.requirePasswordChange) return navigate('/change-password', { replace: true });
       if (result.requireFaceRegistration || result.requireFaceVerification) {
         return navigate('/authenticate', { replace: true });

@@ -85,8 +85,21 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('change-password')
-  async changePassword(@CurrentUser() user: AuthUser, @Body() body: ChangePasswordDto) {
-    return this.authService.changePassword(user.sub, body.currentPassword, body.newPassword);
+  async changePassword(
+    @CurrentUser() user: AuthUser,
+    @Body() body: ChangePasswordDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.changePassword(user.sub, body.currentPassword, body.newPassword);
+    // Activation path: the use case mints a verified access_token + step-up session
+    // because the user just enrolled their face moments ago. Persist the new JWT as
+    // an HttpOnly cookie so subsequent requests (auth/me, ProtectedRoute, etc.) see
+    // verified=true and firstLogin=false. Without this, the stale cookie keeps
+    // bouncing the user back to /change-password.
+    if ('access_token' in result && result.access_token) {
+      this.setAuthCookie(res, result.access_token);
+    }
+    return this.stripToken(result as any);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { OperationalStatus, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { CreateDepartmentDto } from '../../dto/department.dto';
@@ -25,6 +25,30 @@ export class CreateDepartmentUseCase {
       const manager = await this.validator.assertStaffExists(dto.managerId);
       await this.validator.assertManagerAvailable(dto.managerId);
       this.validator.assertManagerUnassignedForCreate(manager);
+
+      // Role-department compatibility (same rule as AssignManagerUseCase). Done in code rather
+      // than in the validator so we can swap in the type the user is creating, since the dept
+      // hasn't been persisted yet.
+      const role = manager.userRole;
+      const allowedByType: Record<string, string[]> = {
+        ADMINISTRATIVE: ['RECEPTIONIST'],
+        CLINICAL: ['DOCTOR'],
+        LABORATORY: ['LAB_MANAGER'],
+        IMAGING: ['LAB_MANAGER'],
+        PHARMACY: ['LAB_MANAGER'],
+      };
+      const wantedType = (dto.type as unknown as string) || 'CLINICAL';
+      const allowed = allowedByType[wantedType] || [];
+      if (allowed.length > 0 && role && !allowed.includes(role)) {
+        const human: Record<string, string> = {
+          ADMINISTRATIVE: 'Phòng hành chính chỉ có thể giao cho lễ tân làm trưởng phòng.',
+          CLINICAL: 'Phòng khám lâm sàng chỉ có thể giao cho bác sĩ làm trưởng phòng.',
+          LABORATORY: 'Khoa xét nghiệm chỉ có thể giao cho kỹ thuật viên cận lâm sàng làm trưởng khoa.',
+          IMAGING: 'Khoa chẩn đoán hình ảnh chỉ có thể giao cho kỹ thuật viên cận lâm sàng làm trưởng khoa.',
+          PHARMACY: 'Khoa dược chỉ có thể giao cho kỹ thuật viên dược/cận lâm sàng làm trưởng khoa.',
+        };
+        throw new BadRequestException(human[wantedType] || 'Vai trò không phù hợp với loại phòng ban.');
+      }
     }
 
     // Build shared user data for the department

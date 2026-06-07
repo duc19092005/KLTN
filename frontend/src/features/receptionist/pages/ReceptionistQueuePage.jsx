@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import { useAuth } from '../../../providers/AuthProvider';
 import VisitQueue from '../components/VisitQueue';
-import { RECEPTIONIST_NAV_ITEMS, receptionistRouteFor } from '../constants/navigation';
+import { FRONTDESK_NAV_ITEMS, frontdeskRouteFor } from '../constants/frontdeskNavigation';
 
 export default function ReceptionistQueuePage() {
   const { user, logout } = useAuth();
@@ -11,7 +11,7 @@ export default function ReceptionistQueuePage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   return (
-    <DashboardLayout user={user} navItems={RECEPTIONIST_NAV_ITEMS} activeItem="visit-queue" onNavigate={(id) => navigate(receptionistRouteFor(id))} onLogout={logout}>
+    <DashboardLayout user={user} navItems={FRONTDESK_NAV_ITEMS} activeItem="visit-queue" onNavigate={(id) => navigate(frontdeskRouteFor(id))} onLogout={logout}>
       <div className="max-w-7xl mx-auto space-y-5">
         <section className="rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

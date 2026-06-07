@@ -36,7 +36,12 @@ export class PrismaDepartmentRepository implements DepartmentRepositoryPort {
   }
 
   async findStaffById(id: string): Promise<StaffProfileInfo | null> {
-    return this.prisma.staffProfile.findUnique({ where: { id }, select: { id: true, departmentId: true } });
+    const row = await this.prisma.staffProfile.findUnique({
+      where: { id },
+      select: { id: true, departmentId: true, user: { select: { role: true } } },
+    });
+    if (!row) return null;
+    return { id: row.id, departmentId: row.departmentId, userRole: row.user?.role };
   }
 
   async findDepartmentByManagerId(managerId: string) {

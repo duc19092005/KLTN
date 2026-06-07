@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../providers/AuthProvider';
+import { usePreferences } from '../../../providers/PreferencesProvider';
 import { stepUpSession } from '../../../shared/stepup/sessionStore';
 import ScreenLockOverlay from '../components/ScreenLockOverlay';
 
@@ -25,9 +26,26 @@ export function useScreenLock() {
 
 const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'touchstart', 'scroll'];
 
+// Persist the lock flag so a page reload while locked does NOT bypass the face-scan unlock
+// (otherwise an attacker could walk up to a locked workstation and just hit refresh). sessionStorage
+// is per-tab and cleared on tab close, which is the correct scope for a workstation lock.
+const LOCK_STORAGE_KEY = 'screen_locked';
+const readPersistedLock = () => {
+  try { return sessionStorage.getItem(LOCK_STORAGE_KEY) === '1'; } catch { return false; }
+};
+const writePersistedLock = (value) => {
+  try {
+    if (value) sessionStorage.setItem(LOCK_STORAGE_KEY, '1');
+    else sessionStorage.removeItem(LOCK_STORAGE_KEY);
+  } catch { /* storage unavailable */ }
+};
+
 export default function ScreenLockProvider({ children }) {
   const { user, token, logout } = useAuth();
-  const [locked, setLocked] = useState(false);
+  const { prefs } = usePreferences();
+  // Hydrate from sessionStorage so a reload while locked stays locked. Initial-state callback runs
+  // once and synchronously, so the overlay renders on the very first paint after reload.
+  const [locked, setLocked] = useState(() => readPersistedLock());
   const lastActivityRef = useRef(Date.now());
 
   // Lock is only meaningful for an authenticated, past-first-login user.
@@ -36,11 +54,13 @@ export default function ScreenLockProvider({ children }) {
 
   const lockNow = useCallback(() => {
     stepUpSession.clear(); // never leave write access open behind a lock
+    writePersistedLock(true);
     setLocked(true);
   }, []);
 
   const unlock = useCallback(() => {
     lastActivityRef.current = Date.now();
+    writePersistedLock(false);
     setLocked(false);
   }, []);
 
@@ -61,9 +81,22 @@ export default function ScreenLockProvider({ children }) {
     };
   }, [eligible, locked, autoLockMs, lockNow]);
 
-  // If the user logs out while locked, drop the overlay.
+  // Privacy: optionally lock the instant the tab/window is hidden (user switches app, locks the
+  // OS, etc.) — a stronger walk-away guarantee than the idle timer alone for shared workstations.
   useEffect(() => {
-    if (!eligible && locked) setLocked(false);
+    if (!eligible || locked || !prefs.lockOnHidden) return undefined;
+    const onHidden = () => { if (document.hidden) lockNow(); };
+    document.addEventListener('visibilitychange', onHidden);
+    return () => document.removeEventListener('visibilitychange', onHidden);
+  }, [eligible, locked, prefs.lockOnHidden, lockNow]);
+
+  // If the user logs out while locked, drop the overlay (and clear the persisted flag so the next
+  // login on this tab starts unlocked).
+  useEffect(() => {
+    if (!eligible && locked) {
+      writePersistedLock(false);
+      setLocked(false);
+    }
   }, [eligible, locked]);
 
   return (

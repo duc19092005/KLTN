@@ -29,6 +29,7 @@ import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 export default function FaceStepUpModal({ mode = 'ticket', action, resourceId, scope, title, description, onSuccess, onClose }) {
   const [phase, setPhase] = useState('scan'); // scan | submitting | error
   const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0); // bump to force a fresh FaceCapture mount on retry
 
   const handleCapture = async (embedding) => {
     setPhase('submitting');
@@ -82,6 +83,7 @@ export default function FaceStepUpModal({ mode = 'ticket', action, resourceId, s
             </div>
           ) : (
             <FaceCapture
+              key={attempt}
               captureMode="verify"
               onCapture={handleCapture}
               onError={(msg) => { setError(msg); setPhase('error'); }}
@@ -91,7 +93,7 @@ export default function FaceStepUpModal({ mode = 'ticket', action, resourceId, s
 
           {phase === 'error' && (
             <button
-              onClick={() => { setError(''); setPhase('scan'); }}
+              onClick={() => { setError(''); setAttempt((n) => n + 1); setPhase('scan'); }}
               className="mt-4 w-full rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-100 hover:bg-blue-700"
             >
               Thử lại

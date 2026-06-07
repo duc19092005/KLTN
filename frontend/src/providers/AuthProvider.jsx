@@ -45,6 +45,19 @@ export function AuthProvider({ children }) {
     };
   }, [clearSession, persistSession]);
 
+  // Listen for custom auth events (e.g., from change password page)
+  useEffect(() => {
+    const handleAuthEvent = (event) => {
+      if (event.detail?.type === 'token' && event.detail.token) {
+        // The token will be handled by the axios interceptor
+        // We just need to refresh the user data
+        refreshSession();
+      }
+    };
+    window.addEventListener('hms-auth', handleAuthEvent);
+    return () => window.removeEventListener('hms-auth', handleAuthEvent);
+  }, [refreshSession]);
+
   const loginWithWallet = async (walletAddress, signature, message) => {
     setLoading(true);
     try {

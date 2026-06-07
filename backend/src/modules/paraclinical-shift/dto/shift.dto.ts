@@ -1,4 +1,4 @@
-import { IsString, IsDateString, IsUUID, IsOptional, Length } from 'class-validator';
+import { IsString, IsDateString, IsUUID, IsOptional, Length, MaxLength } from 'class-validator';
 
 export class RegisterShiftDto {
   @IsUUID()
@@ -9,6 +9,11 @@ export class RegisterShiftDto {
 
   @IsDateString()
   endTime: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
 }
 
 export class ApproveShiftDto {
@@ -19,6 +24,11 @@ export class ApproveShiftDto {
 export class RejectShiftDto {
   @IsUUID()
   shiftId: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
 }
 
 export class AssignShiftDto {

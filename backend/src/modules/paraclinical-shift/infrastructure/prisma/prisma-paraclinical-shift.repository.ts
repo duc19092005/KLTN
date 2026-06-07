@@ -47,6 +47,7 @@ export class PrismaParaclinicalShiftRepository implements ParaclinicalShiftRepos
         clinicalRoomId: data.clinicalRoomId,
         startTime: data.startTime,
         endTime: data.endTime,
+        note: data.note ?? null,
         status: 'PENDING',
       },
       include: SHIFT_INCLUDE,
@@ -87,12 +88,31 @@ export class PrismaParaclinicalShiftRepository implements ParaclinicalShiftRepos
     }) as any;
   }
 
-  async rejectShift(id: string, approvedById: string): Promise<ShiftWithStaff> {
+  async rejectShift(id: string, approvedById: string, reason?: string | null): Promise<ShiftWithStaff> {
     return this.prisma.paraclinicalShift.update({
       where: { id },
-      data: { status: 'REJECTED', approvedById, isActive: false },
+      data: { status: 'REJECTED', approvedById, rejectionReason: reason ?? null, isActive: false },
       include: SHIFT_INCLUDE,
     }) as any;
+  }
+
+  async setShiftHash(id: string, hash256: string, dataSalt: string): Promise<ShiftWithStaff> {
+    return this.prisma.paraclinicalShift.update({
+      where: { id },
+      data: { hash256, dataSalt },
+      include: SHIFT_INCLUDE,
+    }) as any;
+  }
+
+  async hardDeleteShift(id: string): Promise<void> {
+    await this.prisma.paraclinicalShift.delete({ where: { id } });
+  }
+
+  async revertToPending(id: string): Promise<void> {
+    await this.prisma.paraclinicalShift.update({
+      where: { id },
+      data: { status: 'PENDING', approvedById: null, hash256: null, dataSalt: null },
+    });
   }
 
   async findShiftsByRoom(roomId: string, from?: Date, to?: Date): Promise<ShiftWithStaff[]> {

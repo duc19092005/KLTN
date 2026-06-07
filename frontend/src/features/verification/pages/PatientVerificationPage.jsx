@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
+import jsQR from 'jsqr';
 import { API_URL } from '../../../utils/constants';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { LoginPage } from '../../auth';
@@ -21,12 +22,24 @@ export default function PatientVerificationPage() {
   const [data, setData] = useState(null);
   const [expandedProof, setExpandedProof] = useState(null); // stores seq of expanded proof
 
+  // QR scanner state: a single modal handles both image upload and camera scan.
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrError, setQrError] = useState(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  const fileInputRef = useRef(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const scanRafRef = useRef(0);
+
   const showLogin = searchParams.get('login') === 'true';
   const initialMode = searchParams.get('tab') || 'staff';
 
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    if (!patientCode.trim()) return;
+  const handleVerify = async (e, overrideCode) => {
+    if (e?.preventDefault) e.preventDefault();
+    const code = (overrideCode ?? patientCode).trim();
+    if (!code) return;
+    setPatientCode(code.toUpperCase());
 
     setLoading(true);
     setError(null);
@@ -34,7 +47,7 @@ export default function PatientVerificationPage() {
     setExpandedProof(null);
 
     try {
-      const response = await axios.get(`${API_URL}/patient-verify/${patientCode.trim().toUpperCase()}`);
+      const response = await axios.get(`${API_URL}/patient-verify/${code.toUpperCase()}`);
       const resData = response.data.success !== undefined ? response.data.data : response.data;
       
       if (!resData || !resData.patient) {
@@ -56,6 +69,139 @@ export default function PatientVerificationPage() {
   const toggleProof = (seq) => {
     setExpandedProof(expandedProof === seq ? null : seq);
   };
+
+  // Normalize whatever the QR encodes into a patient code we can look up.
+  // Doctor-side QR encodes `KLTN-Visit-<visitCode>`; receptionist-side may encode `KLTN-Patient-<code>`.
+  const normalizeQrToPatientCode = (raw) => {
+    if (!raw) return '';
+    const upper = String(raw).trim().toUpperCase();
+    if (upper.startsWith('KLTN-PATIENT-')) return upper.slice('KLTN-PATIENT-'.length);
+    if (upper.startsWith('KLTN-VISIT-')) return upper.slice('KLTN-VISIT-'.length);
+    return upper;
+  };
+
+  const stopCamera = () => {
+    if (scanRafRef.current) {
+      cancelAnimationFrame(scanRafRef.current);
+      scanRafRef.current = 0;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraActive(false);
+  };
+
+  const closeQrModal = () => {
+    stopCamera();
+    setQrError(null);
+    setQrModalOpen(false);
+  };
+
+  // Decode a QR code from an uploaded image (JPG/PNG). PDFs are flagged with a hint
+  // because rendering them client-side requires pdf.js, which is overkill for a demo.
+  const handleQrFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setQrError(null);
+
+    if (file.type === 'application/pdf') {
+      setQrError('Đối với tệp PDF, vui lòng chụp ảnh trang chứa mã QR rồi tải ảnh lên.');
+      event.target.value = '';
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      setQrError('Vui lòng chọn tệp ảnh (JPG, PNG) chứa mã QR.');
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const img = await new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error('Không đọc được ảnh.'));
+        image.src = dataUrl;
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      if (!code?.data) {
+        setQrError('Không tìm thấy mã QR trong ảnh. Hãy chụp lại rõ nét hơn.');
+        return;
+      }
+      const normalized = normalizeQrToPatientCode(code.data);
+      setPatientCode(normalized);
+      closeQrModal();
+      setTimeout(() => handleVerify({ preventDefault: () => {} }, normalized), 0);
+    } catch (err) {
+      setQrError(err?.message || 'Không xử lý được tệp ảnh.');
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  // Continuously scan video frames; stop as soon as a QR is decoded.
+  const startCameraScan = async () => {
+    setQrError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setCameraActive(true);
+
+      const tick = () => {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
+          scanRafRef.current = requestAnimationFrame(tick);
+          return;
+        }
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+        if (code?.data) {
+          const normalized = normalizeQrToPatientCode(code.data);
+          setPatientCode(normalized);
+          stopCamera();
+          setQrModalOpen(false);
+          setTimeout(() => handleVerify({ preventDefault: () => {} }, normalized), 0);
+          return;
+        }
+        scanRafRef.current = requestAnimationFrame(tick);
+      };
+      scanRafRef.current = requestAnimationFrame(tick);
+    } catch (err) {
+      setQrError(err?.name === 'NotAllowedError'
+        ? 'Bạn đã từ chối quyền truy cập camera. Vui lòng cấp quyền và thử lại.'
+        : (err?.message || 'Không mở được camera.'));
+      setCameraActive(false);
+    }
+  };
+
+  // Always release the camera when this page unmounts.
+  useEffect(() => () => stopCamera(), []);
 
   return (
     <div className="min-h-screen flex flex-col relative hero-bg text-[#171b2b] antialiased">
@@ -146,7 +292,12 @@ export default function PatientVerificationPage() {
               placeholder="Nhập mã bệnh nhân hoặc mã hash (VD: BN-0001)..." 
               type="text"
             />
-            <button type="button" className="p-3 bg-surface-container-low text-primary rounded-lg hover:bg-primary-fixed transition-colors" title="Quét mã QR">
+            <button
+              type="button"
+              onClick={() => { setQrError(null); setQrModalOpen(true); }}
+              className="p-3 bg-surface-container-low text-primary rounded-lg hover:bg-primary-fixed transition-colors"
+              title="Quét hoặc tải ảnh mã QR"
+            >
               <span className="material-symbols-outlined">qr_code_scanner</span>
             </button>
             <button 
@@ -423,6 +574,99 @@ export default function PatientVerificationPage() {
           </div>
         </div>
       </footer>
+
+      {/* QR Scanner Modal: upload an image or scan via camera */}
+      {qrModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 backdrop-blur-sm p-4 animate-fade-in-up">
+          <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Cổng kiểm chứng</p>
+                <h3 className="mt-0.5 text-lg font-black text-slate-900">Quét mã QR bệnh án</h3>
+              </div>
+              <button
+                type="button"
+                onClick={closeQrModal}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-600 hover:bg-slate-50"
+                aria-label="Đóng"
+              >
+                Đóng
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <p className="text-xs font-semibold text-slate-500 leading-relaxed">
+                Bạn có thể tải ảnh QR (JPG/PNG) đã chụp từ tờ bệnh án in, hoặc dùng camera để quét trực tiếp. Sau khi giải mã thành công, hệ thống sẽ tự động kiểm chứng hồ sơ.
+              </p>
+
+              {/* Camera area */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                <div className="relative aspect-square w-full rounded-xl bg-slate-900 overflow-hidden">
+                  <video ref={videoRef} className="h-full w-full object-cover" playsInline muted />
+                  <canvas ref={canvasRef} className="hidden" />
+                  {!cameraActive && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-300 text-xs font-semibold gap-2">
+                      <span className="material-symbols-outlined text-[40px]">photo_camera</span>
+                      Camera chưa bật
+                    </div>
+                  )}
+                  {cameraActive && (
+                    <div className="absolute inset-6 border-2 border-emerald-400/80 rounded-xl pointer-events-none" />
+                  )}
+                </div>
+                <div className="mt-3 flex gap-2">
+                  {!cameraActive ? (
+                    <button
+                      type="button"
+                      onClick={startCameraScan}
+                      className="flex-1 rounded-xl bg-primary text-on-primary font-bold text-xs py-2.5 hover:translate-y-[-1px] transition-transform shadow-[0px_4px_10px_rgba(70,86,162,0.2)]"
+                    >
+                      Bật camera & quét
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={stopCamera}
+                      className="flex-1 rounded-xl border border-slate-200 bg-white text-xs font-black text-slate-700 py-2.5 hover:bg-slate-50"
+                    >
+                      Dừng camera
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Upload area */}
+              <div className="rounded-2xl border-2 border-dashed border-primary-fixed/60 bg-surface-container-low/40 p-5 text-center">
+                <span className="material-symbols-outlined text-primary text-[28px]">upload_file</span>
+                <p className="mt-2 text-xs font-bold text-slate-700">Tải ảnh chứa mã QR</p>
+                <p className="mt-0.5 text-[11px] font-semibold text-slate-500">JPG, PNG · Đối với PDF, hãy chụp ảnh trang QR</p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={handleQrFile}
+                  className="hidden"
+                  id="qr-file-input"
+                />
+                <label
+                  htmlFor="qr-file-input"
+                  className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white border border-primary-fixed text-primary font-bold text-xs px-4 py-2 cursor-pointer hover:bg-surface-container-low transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px]">attach_file</span>
+                  Chọn tệp ảnh
+                </label>
+              </div>
+
+              {qrError && (
+                <div className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-[11px] font-bold text-rose-700 flex items-start gap-1.5">
+                  <span className="material-symbols-outlined text-[16px] shrink-0">error</span>
+                  <span>{qrError}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Login Modal Overlay */}
       {showLogin && (

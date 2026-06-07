@@ -94,8 +94,15 @@ export class PrismaStaffRepository implements StaffRepositoryPort {
       ...(filter.employeeCode ? { employeeCode: { contains: filter.employeeCode, mode: 'insensitive' } } : {}),
       ...(filter.fullName ? { fullName: { contains: filter.fullName, mode: 'insensitive' } } : {}),
       ...(filter.citizenId ? { citizenId: { contains: filter.citizenId, mode: 'insensitive' } } : {}),
-      ...(filter.department ? { department: { name: { contains: filter.department, mode: 'insensitive' } } } : {}),
+      // Exact department UUID takes precedence over the name-contains filter.
+      ...(filter.departmentId
+        ? { departmentId: filter.departmentId }
+        : filter.department
+          ? { department: { name: { contains: filter.department, mode: 'insensitive' } } }
+          : {}),
       ...(filter.role ? { user: { role: filter.role } } : {}),
+      // "Is a department head" → the inverse relation managedDepartment is set.
+      ...(filter.isManager ? { managedDepartment: { isNot: null } } : {}),
       ...(filter.search
         ? {
           OR: [

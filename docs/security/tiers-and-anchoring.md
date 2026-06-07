@@ -60,11 +60,15 @@ Hai chính sách dùng cùng tên "Tier A/B" vì đi đôi với nhau, nhưng l�
 
 ### Lớp bổ sung — Khóa màn hình tự động
 
-Để giảm rủi ro "phiên Tier B đang mở mà bác sĩ rời máy":
+> **Phạm vi:** áp dụng cho **mọi vai trò đăng nhập** (Bác sĩ, Lễ tân, Quản lý xét nghiệm, Admin, tài khoản phòng máy), không riêng bác sĩ. Đặc biệt quan trọng với các vai trò làm việc theo ca trên máy trạm dùng chung — bất kỳ ai rời máy giữa ca đều được bảo vệ như nhau.
+
+Để giảm rủi ro "phiên Tier B đang mở mà người dùng rời máy":
 - Tự khóa sau N phút không hoạt động (mặc định 5, người dùng tự chỉnh trong Hồ sơ, **hệ thống kẹp 1–15 phút**).
 - Nút "Ngủ" trên header để khóa thủ công ngay.
 - Mở khóa = quét mặt 1 lần (đồng thời mở luôn phiên Tier B mới — một phát ăn hai).
 - Khóa = xóa phiên Tier B hiện tại để không ai có thể ghi blockchain thay.
+
+**Cài đặt kỹ thuật (đã global sẵn):** `ScreenLockProvider` bọc toàn bộ app ở `main.jsx`; điều kiện kích hoạt chỉ là `token && user && !firstLogin` — **không lọc theo role**. Nút "Ngủ" (`SleepButton`) nằm trong `DashboardLayout` mà mọi role dùng chung, nên không cần thay đổi gì để bật cho vai trò khác.
 
 ---
 

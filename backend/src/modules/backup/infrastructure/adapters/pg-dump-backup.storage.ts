@@ -26,10 +26,39 @@ export class PgDumpBackupStorage implements BackupStoragePort {
     const fileName = `${backupCode}.dump`;
     const storagePath = path.join(this.backupDir, fileName);
 
-    await this.runPgDump(databaseUrl, storagePath);
+    await this.runPgDump(this.toLibpqUri(databaseUrl), storagePath);
 
     const buffer = await fs.readFile(storagePath);
     return { fileName, storagePath, buffer, sizeBytes: buffer.length };
+  }
+
+  /**
+   * Prisma's DATABASE_URL carries ORM-only query params (notably `?schema=public`, also
+   * `connection_limit`, `pgbouncer`, etc.) that pg_dump's libpq URI parser rejects with
+   * "invalid URI query parameter". Keep only params libpq understands and drop the rest.
+   *
+   * We intentionally drop `schema`: pg_dump dumps ALL schemas by default (exactly what a full
+   * backup wants), and `public` is the default search_path regardless. We avoid forwarding it via
+   * `options=-c search_path=...` because URLSearchParams encodes the required space as '+', which
+   * libpq misparses as a bogus config parameter ("+search_path").
+   */
+  private toLibpqUri(databaseUrl: string): string {
+    try {
+      const url = new URL(databaseUrl);
+      const LIBPQ_ALLOWED = new Set([
+        'host', 'port', 'dbname', 'user', 'password', 'sslmode', 'connect_timeout',
+        'application_name', 'target_session_attrs',
+      ]);
+      const kept = new URLSearchParams();
+      for (const [key, value] of url.searchParams.entries()) {
+        if (LIBPQ_ALLOWED.has(key)) kept.set(key, value);
+      }
+      url.search = kept.toString();
+      return url.toString();
+    } catch {
+      // If it isn't a parseable URI (e.g. key=value DSN), pass it through unchanged.
+      return databaseUrl;
+    }
   }
 
   async readDump(storagePath: string): Promise<Buffer | null> {

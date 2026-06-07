@@ -64,7 +64,7 @@ export default function ReceptionistDashboard() {
             <StatCard label="Hồ sơ" value={analytics.totals.patients} />
           </section>
           <section className="grid grid-cols-1 xl:grid-cols-[1.05fr_0.95fr] gap-5"><ChartCard title="Trạng thái"><StatusChart rows={analytics.statusRows} /></ChartCard><ChartCard title="7 ngày"><DailyChart rows={analytics.dayRows} /></ChartCard></section>
-          <section className="grid grid-cols-1 xl:grid-cols-[0.95fr_1.05fr] gap-5"><ChartCard title="Top phòng"><RoomChart rows={analytics.roomRows} /></ChartCard><ChartCard title="Lối tắt"><div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Shortcut title="Tiếp nhận" onClick={() => navigate('/receptionist/intake')} /><Shortcut title="Hàng đợi" onClick={() => navigate('/receptionist/queue')} /><Shortcut title="Hồ sơ" onClick={() => navigate('/receptionist/records')} /></div></ChartCard></section>
+          <section className="grid grid-cols-1 xl:grid-cols-[0.95fr_1.05fr] gap-5"><ChartCard title="Top phòng"><RoomChart rows={analytics.roomRows} /></ChartCard><ChartCard title="Lối tắt"><div className="grid grid-cols-2 md:grid-cols-4 gap-3"><Shortcut title="Tiếp nhận" onClick={() => navigate('/receptionist/intake')} /><Shortcut title="Hàng đợi" onClick={() => navigate('/receptionist/queue')} /><Shortcut title="Hồ sơ" onClick={() => navigate('/receptionist/records')} /><Shortcut title="Lịch trực" onClick={() => navigate('/receptionist/shifts')} /></div></ChartCard></section>
         </>}
       </div>
     </DashboardLayout>

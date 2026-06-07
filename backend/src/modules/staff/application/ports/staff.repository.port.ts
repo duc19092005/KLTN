@@ -8,7 +8,11 @@ export type StaffListFilter = {
   fullName?: string;
   citizenId?: string;
   department?: string;
+  /** Exact department UUID; preferred over the name-contains `department` filter when both are set. */
+  departmentId?: string;
   role?: UserRole;
+  /** When true, only include staff that head a department (StaffProfile.managedDepartment != null). */
+  isManager?: boolean;
   search?: string;
 };
 

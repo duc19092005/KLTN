@@ -7,7 +7,7 @@ export type DepartmentIntegrityEvaluation = {
   id: string;
   departmentCode: string;
   name: string;
-  status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED';
+  status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR';
   dbMatches: boolean;
   chainMatches: boolean;
   recomputedHash: string | null;

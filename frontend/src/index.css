@@ -554,6 +554,17 @@ h2 { font-size: 30px; letter-spacing: -0.04em; }
   .dashboard-grid-two { grid-template-columns: 1fr; }
 }
 
+/* Personalization: "calm UI" — when the user opts into reduced motion, neutralize all non-essential
+   animation + transition globally (respects the same intent as prefers-reduced-motion). */
+html[data-reduce-motion='true'] *,
+html[data-reduce-motion='true'] *::before,
+html[data-reduce-motion='true'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
 @media (max-width: 760px) {
   .dashboard-layout { display: block; }
   .dashboard-sidebar {
@@ -572,4 +583,19 @@ h2 { font-size: 30px; letter-spacing: -0.04em; }
   .hero-dashboard-card { padding: 22px; }
   .stats-grid,
   .module-grid { grid-template-columns: 1fr; }
+}
+
+/* Bell swing animation */
+@keyframes bell-swing {
+  0% { transform: rotate(0); }
+  15% { transform: rotate(15deg); }
+  30% { transform: rotate(-10deg); }
+  45% { transform: rotate(10deg); }
+  60% { transform: rotate(-5deg); }
+  75% { transform: rotate(5deg); }
+  100% { transform: rotate(0); }
+}
+.animate-swing {
+  animation: bell-swing 1.2s ease-in-out infinite;
+  transform-origin: top center;
 }

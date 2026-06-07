@@ -31,32 +31,71 @@ export class AuditController {
   ) {}
 
   @Get('logs')
-  @ApiOperation({ summary: 'List audit log entries (hash-chained) with pagination' })
+  @ApiOperation({ summary: 'List audit log entries (hash-chained) with pagination, sort & batch filter' })
   async logs(
     @Query('entity') entity?: string,
+    @Query('batch') batchRaw?: string,
+    @Query('sort') sortRaw?: string,
     @Query('page') pageRaw?: string,
     @Query('limit') limitRaw?: string,
   ) {
     const page = Math.max(Number(pageRaw) || 1, 1);
     const limit = Math.max(Number(limitRaw) || 10, 1);
     const skip = (page - 1) * limit;
+    // Display order only — the tamper-evident chain itself is always keyed by the monotonic seq.
+    const sort: 'asc' | 'desc' = sortRaw === 'asc' ? 'asc' : 'desc';
 
-    const where = entity ? { entity } : {};
+    const where: { entity?: string; batchId?: number } = {};
+    if (entity) where.entity = entity;
+    if (batchRaw !== undefined && batchRaw !== '' && Number.isFinite(Number(batchRaw))) {
+      where.batchId = Number(batchRaw);
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.blockchainLogger.findMany({
         where,
-        orderBy: { seq: 'desc' },
+        orderBy: { seq: sort },
         skip,
         take: limit,
       }),
       this.prisma.blockchainLogger.count({ where }),
     ]);
 
-    const itemsWithStatus = items.map((row) => ({
-      ...row,
-      blockchainStatus: this.audit.verifyEntry(row) ? 'VERIFIED' : 'TAMPERED',
-    }));
+    // Enrich each row with the actor's identity (username + role + display name). The logger only
+    // stores actorId, so we resolve the distinct ids in ONE batched query (no N+1) and map them
+    // back. Admins display their admin username; staff roles display their full name.
+    const actorIds = [...new Set(items.map((r) => r.actorId).filter((id): id is string => Boolean(id)))];
+    const actors = actorIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: actorIds } },
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            role: true,
+            staffProfile: { select: { fullName: true } },
+            adminProfile: { select: { adminUserName: true } },
+          },
+        })
+      : [];
+    const actorMap = new Map(actors.map((a) => [a.id, a]));
+
+    const itemsWithStatus = items.map((row) => {
+      const actor = row.actorId ? actorMap.get(row.actorId) : null;
+      return {
+        ...row,
+        blockchainStatus: this.audit.verifyEntry(row) ? 'VERIFIED' : 'TAMPERED',
+        actor: actor
+          ? {
+              id: actor.id,
+              username: actor.username,
+              email: actor.email,
+              role: actor.role,
+              displayName: actor.staffProfile?.fullName || actor.adminProfile?.adminUserName || actor.username,
+            }
+          : null,
+      };
+    });
 
     return {
       items: itemsWithStatus,

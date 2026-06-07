@@ -4,11 +4,13 @@ import { authService } from '../apis/authService';
 import { useAuth } from '../../../providers/AuthProvider';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { useToast } from '../../../providers/ToastProvider';
+import { getDashboardRoute } from '../../../shared/constants/roleRoutes';
 
 export default function ChangePasswordPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const { updateSession } = useAuth();
+
   const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [busy, setBusy] = useState(false);
   const [showCurrent, setShowCurrent] = useState(false);
@@ -24,9 +26,27 @@ export default function ChangePasswordPage() {
     setBusy(true);
     try {
       const result = await authService.changePassword(form.currentPassword, form.newPassword);
-      updateSession(result.data.user || { firstLogin: false });
-      toast.success('Đổi mật khẩu thành công!');
-      navigate('/authenticate', { replace: true });
+      
+      // Activation flow: backend sets the verified JWT as an HttpOnly cookie and returns
+      // a step-up session in the body. Detect that flow via stepUpSession (access_token
+      // is stripped server-side for safety). Persist the user state synchronously so
+      // ProtectedRoute does not bounce us back here on the next render.
+      if (result.data.stepUpSession?.session) {
+        if (result.data.user) updateSession(result.data.user);
+        window.dispatchEvent(new CustomEvent('hms-stepup-session', { detail: {
+          session: result.data.stepUpSession.session,
+          idleExpiresAt: result.data.stepUpSession.idleExpiresAt,
+          absoluteExpiresAt: result.data.stepUpSession.absoluteExpiresAt,
+        } }));
+        toast.success('Đổi mật khẩu thành công! Chào mừng trở lại.');
+        navigate(getDashboardRoute(result.data.user?.role || 'RECEPTIONIST'), { replace: true });
+        return;
+      }
+
+      // Non-activation path (e.g. routine password rotation): just inform the user.
+      // The existing session/token is unchanged, so we stay on the dashboard.
+      toast.success('Đổi mật khẩu thành công.');
+      navigate(getDashboardRoute(result.data.user?.role || 'RECEPTIONIST'), { replace: true });
     } catch (err) {
       toast.error(err.response?.data?.message || err.message || 'Không đổi được mật khẩu.');
     } finally {

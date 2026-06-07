@@ -33,6 +33,15 @@ const STATUS_MAP = {
     Icon: Clock3,
     pulse: false,
   },
+  // Just-edited rows: a new BlockchainLogger entry exists with the matching hash,
+  // but the next Merkle batch (every 5 minutes) hasn't fired yet. Different from UNANCHORED
+  // because integrity IS provable end-to-end the moment the next batch is mined.
+  PENDING_ANCHOR: {
+    label: 'Đang chờ neo on-chain',
+    cls: 'border-cyan-100 bg-cyan-50 text-cyan-700',
+    Icon: Clock3,
+    pulse: false,
+  },
 };
 
 export default function BlockchainStatusBadge({ status, prefix = '', size = 'sm' }) {

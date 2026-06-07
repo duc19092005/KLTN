@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { UserRole, UserStatus } from '@prisma/client';
 import { PaginationQueryDto } from '../../shared/pagination.dto';
 
@@ -98,6 +99,12 @@ export class StaffQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ example: 'Cardiology' })
   @IsOptional() @IsString() department?: string;
 
+  @ApiPropertyOptional({ example: '0d82b56f-5d0a-4501-bd18-bb9af91e90d7', description: 'Exact department UUID filter' })
+  @IsOptional() @IsString() @IsUUID() departmentId?: string;
+
   @ApiPropertyOptional({ enum: UserRole })
   @IsOptional() @IsEnum(UserRole) role?: UserRole;
+
+  @ApiPropertyOptional({ example: true, description: 'When true, only staff heading a department' })
+  @IsOptional() @Transform(({ value }) => value === true || value === 'true') @IsBoolean() isManager?: boolean;
 }

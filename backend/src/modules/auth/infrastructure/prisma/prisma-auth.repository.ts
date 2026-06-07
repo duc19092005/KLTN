@@ -58,7 +58,17 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
   }
 
   async findUserWithProfile(userId: string): Promise<UserWithProfile | null> {
-    return this.prisma.user.findUnique({ where: { id: userId }, include: { adminProfile: true } });
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        adminProfile: true,
+        staffProfile: {
+          include: {
+            managedDepartment: true,
+          },
+        },
+      },
+    });
   }
 
   async findUserFullProfile(userId: string): Promise<UserWithFullProfile | null> {

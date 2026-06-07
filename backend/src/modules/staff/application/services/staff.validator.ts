@@ -1,10 +1,13 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { STAFF_REPOSITORY, StaffRepositoryPort } from '../ports/staff.repository.port';
 
 /**
  * Shared staff validation rules, extracted verbatim from the former
  * StaffService private helpers (assertUserUnique, assertCitizenIdUnique,
- * assertEmployeeCodeUnique, ensureDepartment, ensureStaff).
+ * assertEmployeeCodeUnique, ensureDepartment, ensureStaff), plus a
+ * department-role compatibility check so a receptionist cannot be filed
+ * under a clinical room (and vice versa).
  */
 @Injectable()
 export class StaffValidator {
@@ -18,6 +21,41 @@ export class StaffValidator {
 
   async ensureDepartment(id: string): Promise<void> {
     if (!(await this.repo.departmentExists(id))) throw new NotFoundException('Không tìm thấy phòng ban.');
+  }
+
+  /**
+   * Cross-check that the staff's role is compatible with the department type:
+   *  - RECEPTIONIST  → ADMINISTRATIVE only
+   *  - DOCTOR        → CLINICAL only
+   *  - LAB_MANAGER   → LABORATORY | IMAGING | PHARMACY
+   *  - DEPT_SHARED   → CLINICAL | LABORATORY | IMAGING (any patient-facing dept)
+   *  - ADMIN         → no department restriction
+   * Throws BadRequestException with a Vietnamese message that the UI surfaces directly.
+   */
+  async assertDepartmentRoleCompatible(role: UserRole, departmentId: string | null | undefined): Promise<void> {
+    if (!departmentId) return; // departmentId is optional
+    const dept = await this.repo.findDepartment(departmentId);
+    if (!dept) throw new NotFoundException('Không tìm thấy phòng ban.');
+
+    const map: Record<string, string[]> = {
+      RECEPTIONIST: ['ADMINISTRATIVE'],
+      DOCTOR: ['CLINICAL'],
+      LAB_MANAGER: ['LABORATORY', 'IMAGING', 'PHARMACY'],
+      DEPT_SHARED: ['CLINICAL', 'LABORATORY', 'IMAGING', 'PHARMACY'],
+      ADMIN: [],
+    };
+    const allowed = map[role] || [];
+    if (allowed.length === 0) return; // ADMIN: skip
+    if (!allowed.includes(dept.type)) {
+      const human: Record<UserRole, string> = {
+        RECEPTIONIST: 'Lễ tân chỉ thuộc phòng ban hành chính.',
+        DOCTOR: 'Bác sĩ chỉ thuộc phòng khám lâm sàng.',
+        LAB_MANAGER: 'Kỹ thuật viên cận lâm sàng chỉ thuộc khoa xét nghiệm, chẩn đoán hình ảnh hoặc dược.',
+        DEPT_SHARED: 'Tài khoản chia sẻ chỉ áp dụng cho phòng ban tiếp nhận bệnh nhân.',
+        ADMIN: '',
+      } as Record<UserRole, string>;
+      throw new BadRequestException(human[role] || 'Vai trò không phù hợp với loại phòng ban.');
+    }
   }
 
   async assertUserUnique(username?: string, email?: string, excludeUserId?: string): Promise<void> {

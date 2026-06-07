@@ -7,7 +7,7 @@ export type StaffIntegrityEvaluation = {
   id: string;
   employeeCode: string;
   fullName: string;
-  status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED';
+  status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR';
   dbMatches: boolean;
   chainMatches: boolean;
   recomputedHash: string | null;

@@ -46,6 +46,7 @@ export class ShiftController {
       new Date(body.startTime),
       new Date(body.endTime),
       user.sub,
+      body.note,
     );
   }
 
@@ -55,7 +56,7 @@ export class ShiftController {
   @RequireStepUpSession()
   @Post('approve')
   async approve(@CurrentUser() user: AuthUser, @Body() body: ApproveShiftDto) {
-    return this.approveShift.execute(body.shiftId, user.sub);
+    return this.approveShift.execute(body.shiftId, user.sub, user.role);
   }
 
   /** Admin/Head-of-dept rejects a PENDING shift. */
@@ -63,7 +64,7 @@ export class ShiftController {
   @Roles('ADMIN', 'LAB_MANAGER')
   @Post('reject')
   async reject(@CurrentUser() user: AuthUser, @Body() body: RejectShiftDto) {
-    return this.rejectShift.execute(body.shiftId, user.sub);
+    return this.rejectShift.execute(body.shiftId, user.sub, user.role, body.reason);
   }
 
   /** Admin/Head-of-dept directly assigns a shift (auto-APPROVED). */
@@ -96,8 +97,8 @@ export class ShiftController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'LAB_MANAGER')
   @Get('pending')
-  async pending(@Query('departmentId') departmentId?: string) {
-    return this.listPendingShifts.execute(departmentId);
+  async pending(@CurrentUser() user: AuthUser, @Query('departmentId') departmentId?: string) {
+    return this.listPendingShifts.execute(user.sub, user.role, departmentId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

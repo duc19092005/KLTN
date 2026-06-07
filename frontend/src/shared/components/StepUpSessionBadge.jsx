@@ -1,11 +1,15 @@
 import React from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, ScanFace } from 'lucide-react';
 import { useStepUpSession } from '../../features/auth';
 
 /**
- * Live "sudo mode" indicator for the dashboard header. Visible only while a step-up privilege
- * session is active: shows a shield + a mm:ss countdown to the session's next deadline, and a
- * lock button to end it early (vital on shared workstations). Pulses amber in the final minute.
+ * "Sudo mode" indicator + control for the dashboard header.
+ *
+ *  - While a step-up session is active: shows a shield + mm:ss countdown to the next deadline and a
+ *    lock button to end it early (vital on shared workstations). Pulses amber in the final minute.
+ *  - While no session is active: shows a subtle "open session" button so the user can proactively
+ *    scan their face once up front, instead of only discovering the requirement when a sensitive
+ *    action is blocked. Better UX than a dead-end warning.
  */
 function formatMs(ms) {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -15,8 +19,26 @@ function formatMs(ms) {
 }
 
 export default function StepUpSessionBadge() {
-  const { active, remainingMs, lock } = useStepUpSession();
-  if (!active) return null;
+  const { active, remainingMs, lock, open } = useStepUpSession();
+
+  // No active session → offer a proactive "open privilege session" button.
+  if (!active) {
+    return (
+      <button
+        id="stepup-session-open"
+        type="button"
+        onClick={open}
+        className="hidden sm:flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-slate-500 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+        title="Mở phiên xác thực khuôn mặt để thực hiện các thao tác bảo mật mà không cần quét lại từng lần."
+      >
+        <ScanFace className="h-4 w-4" strokeWidth={2} />
+        <div className="leading-tight text-left">
+          <p className="text-[9px] font-black uppercase tracking-wider opacity-80">Phiên bảo mật</p>
+          <p className="text-xs font-black">Mở phiên</p>
+        </div>
+      </button>
+    );
+  }
 
   const urgent = remainingMs <= 60 * 1000;
   const tone = urgent

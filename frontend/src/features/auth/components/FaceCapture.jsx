@@ -29,9 +29,17 @@ export default function FaceCapture({
   }, []);
 
   // Liveness passed → extract face descriptor(s) from the captured frame(s).
-  const handleLivenessPass = async (source) => {
+  // `meta.descriptor` (verify/session mode) is the identity-anchor descriptor LivenessCheck already
+  // validated during the continuity check; reuse it directly so we don't re-detect on the final
+  // frame, which is often a turned/blurred pose that face-api can't read.
+  const handleLivenessPass = async (source, meta = {}) => {
     setExtractingEmbedding(true);
     try {
+      if (captureMode !== 'enroll' && Array.isArray(meta.descriptor) && meta.descriptor.length === 128) {
+        onCapture?.(meta.descriptor);
+        return;
+      }
+
       await loadModels();
       if (!mountedRef.current) return;
 

@@ -30,7 +30,10 @@ export class CreateStaffUseCase {
     if (dto.role === UserRole.DOCTOR) {
       throw new BadRequestException('Vui lòng tạo bác sĩ tại module bác sĩ để có đầy đủ hồ sơ chuyên môn.');
     }
-    if (dto.departmentId) await this.validator.ensureDepartment(dto.departmentId);
+    if (dto.departmentId) {
+      await this.validator.ensureDepartment(dto.departmentId);
+      await this.validator.assertDepartmentRoleCompatible(dto.role, dto.departmentId);
+    }
     await this.validator.assertUserUnique(dto.username, dto.email);
     await this.validator.assertCitizenIdUnique(dto.citizenId);
     const employeeCode = dto.employeeCode || (await this.repo.generateEmployeeCode(dto.role));

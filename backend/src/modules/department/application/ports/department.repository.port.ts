@@ -42,7 +42,7 @@ export type SharedUserData = {
   role: UserRole;
 };
 
-export type StaffProfileInfo = { id: string; departmentId: string | null };
+export type StaffProfileInfo = { id: string; departmentId: string | null; userRole?: UserRole };
 
 /**
  * Persistence boundary for the Department aggregate. The Prisma implementation

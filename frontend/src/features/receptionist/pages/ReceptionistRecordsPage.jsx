@@ -5,7 +5,7 @@ import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { useAuth } from '../../../providers/AuthProvider';
 import { visitService } from '../apis/visitService';
 import { patientService } from '../apis/patientService';
-import { RECEPTIONIST_NAV_ITEMS, receptionistRouteFor } from '../constants/navigation';
+import { FRONTDESK_NAV_ITEMS, frontdeskRouteFor } from '../constants/frontdeskNavigation';
 import { getVisitStatus } from '../constants/visitStatus';
 import { useToast } from '../../../providers/ToastProvider';
 
@@ -53,7 +53,7 @@ export default function ReceptionistRecordsPage() {
   const visitsOf = (patient) => visits.filter((visit) => visit.patientId === patient.id || visit.patient?.id === patient.id);
 
   return (
-    <DashboardLayout user={user} navItems={RECEPTIONIST_NAV_ITEMS} activeItem="patient-records" onNavigate={(id) => navigate(receptionistRouteFor(id))} onLogout={logout}>
+    <DashboardLayout user={user} navItems={FRONTDESK_NAV_ITEMS} activeItem="patient-records" onNavigate={(id) => navigate(frontdeskRouteFor(id))} onLogout={logout}>
       <div className="mx-auto max-w-7xl space-y-4">
         <section className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

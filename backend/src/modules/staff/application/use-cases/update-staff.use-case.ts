@@ -34,6 +34,11 @@ export class UpdateStaffUseCase {
         if (dept.specialty && dept.specialty !== staff.doctorProfile.specialty) {
           throw new BadRequestException(`Bác sĩ chuyên khoa "${staff.doctorProfile.specialty}" không thể được xếp vào phòng ban chuyên khoa "${dept.specialty}"`);
         }
+      } else {
+        // Non-doctor: enforce the same role/department compatibility as create-staff.
+        // Effective role after update is dto.role (if provided) or the current user role.
+        const effectiveRole = (dto.role as UserRole) || (staff.user.role as UserRole);
+        await this.validator.assertDepartmentRoleCompatible(effectiveRole, dto.departmentId);
       }
     }
     if (dto.role === UserRole.ADMIN) {

@@ -8,6 +8,7 @@ export type CreateShiftData = {
   clinicalRoomId: string;
   startTime: Date;
   endTime: Date;
+  note?: string | null;
 };
 
 export type AssignShiftData = CreateShiftData & {
@@ -21,6 +22,8 @@ export type ShiftWithStaff = {
   startTime: Date;
   endTime: Date;
   status: ShiftStatus;
+  note: string | null;
+  rejectionReason: string | null;
   approvedById: string | null;
   isActive: boolean;
   hash256: string | null;
@@ -73,7 +76,14 @@ export interface ParaclinicalShiftRepositoryPort {
   assignShift(data: AssignShiftData): Promise<ShiftWithStaff>;
   findShiftById(id: string): Promise<ShiftWithStaff | null>;
   approveShift(id: string, approvedById: string, hash256: string, dataSalt: string): Promise<ShiftWithStaff>;
-  rejectShift(id: string, approvedById: string): Promise<ShiftWithStaff>;
+  rejectShift(id: string, approvedById: string, reason?: string | null): Promise<ShiftWithStaff>;
+
+  /** Persist integrity hash for a freshly-registered (PENDING) shift. */
+  setShiftHash(id: string, hash256: string, dataSalt: string): Promise<ShiftWithStaff>;
+  /** Compensation: hard-delete a shift (used when post-create anchoring fails). */
+  hardDeleteShift(id: string): Promise<void>;
+  /** Compensation: revert an approved shift back to PENDING (used when anchoring fails). */
+  revertToPending(id: string): Promise<void>;
   findShiftsByRoom(roomId: string, from?: Date, to?: Date): Promise<ShiftWithStaff[]>;
   findPendingShifts(departmentId?: string): Promise<ShiftWithStaff[]>;
 

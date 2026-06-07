@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
+import RejectReasonModal from '../../../shared/components/RejectReasonModal';
 import { useAuth } from '../../../providers/AuthProvider';
 import { useToast } from '../../../providers/ToastProvider';
 import { shiftService } from '../apis/paraclinicalService';
@@ -41,9 +42,10 @@ export default function ShiftManagementPage() {
   const [loading, setLoading] = useState(true);
   const [weekOffset, setWeekOffset] = useState(0);
   const [showRegister, setShowRegister] = useState(false);
-  const [registerForm, setRegisterForm] = useState({ roomId: '', startTime: '', endTime: '' });
+  const [registerForm, setRegisterForm] = useState({ roomId: '', startTime: '', endTime: '', note: '' });
   const [rooms, setRooms] = useState([]);
   const [pendingShifts, setPendingShifts] = useState([]);
+  const [rejectTarget, setRejectTarget] = useState(null);
   // Only ADMIN and LAB_MANAGER (department heads) can approve/reject shifts.
   // DEPT_SHARED (shared accounts) should NOT see the approval queue.
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'LAB_MANAGER';
@@ -87,10 +89,10 @@ export default function ShiftManagementPage() {
   async function handleRegister(e) {
     e.preventDefault();
     try {
-      await shiftService.register(registerForm.roomId, registerForm.startTime, registerForm.endTime);
+      await shiftService.register(registerForm.roomId, registerForm.startTime, registerForm.endTime, registerForm.note);
       toast.success('Đăng ký ca trực thành công!');
       setShowRegister(false);
-      setRegisterForm({ roomId: '', startTime: '', endTime: '' });
+      setRegisterForm({ roomId: '', startTime: '', endTime: '', note: '' });
       loadShifts();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Đăng ký thất bại');
@@ -108,21 +110,31 @@ export default function ShiftManagementPage() {
     }
   }
 
-  async function handleReject(shiftId) {
+  function handleReject(shiftId) {
+    const shift = pendingShifts.find((s) => s.id === shiftId) || shifts.find((s) => s.id === shiftId);
+    setRejectTarget(shift || { id: shiftId });
+  }
+
+  async function confirmReject(reason) {
+    if (!rejectTarget) return;
     try {
-      await shiftService.reject(shiftId);
+      await shiftService.reject(rejectTarget.id, reason);
       toast.success('Đã từ chối ca trực');
+      setRejectTarget(null);
       loadPendingShifts();
+      loadShifts();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Từ chối thất bại');
     }
   }
 
   const shiftsForDay = (day) =>
-    shifts.filter((s) => {
-      const start = new Date(s.startTime);
-      return start.toDateString() === day.toDateString();
-    });
+    shifts
+      .filter((s) => {
+        const start = new Date(s.startTime);
+        return start.toDateString() === day.toDateString();
+      })
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
   return (
     <DashboardLayout user={user} navItems={PARACLINICAL_NAV_ITEMS} activeItem="shifts" onNavigate={(id) => navigate(paraclinicalRouteFor(id))} onLogout={logout}>
@@ -167,19 +179,30 @@ export default function ShiftManagementPage() {
                     {dayShifts.length === 0 && (
                       <p className="text-[10px] text-slate-300 text-center mt-8">Trống</p>
                     )}
-                    {dayShifts.map((s) => {
-                      const meta = STATUS_META[s.status] || STATUS_META.PENDING;
-                      return (
-                        <div key={s.id} className={`rounded-xl border p-2 text-[11px] ${meta.bg}`}>
-                          <p className="font-black truncate">{s.staff?.fullName || 'N/A'}</p>
-                          <p className="font-bold opacity-70">{formatTime(s.startTime)} - {formatTime(s.endTime)}</p>
-                          <span className="inline-flex items-center gap-1 mt-1">
-                            <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
-                            <span className="font-bold">{meta.label}</span>
-                          </span>
-                        </div>
-                      );
-                    })}
+                     {dayShifts.map((s) => {
+                       const meta = STATUS_META[s.status] || STATUS_META.PENDING;
+                       const startHour = new Date(s.startTime).getHours();
+                       let colorClass = 'bg-gradient-to-br from-slate-50 to-slate-100/50 border-slate-200 text-slate-900';
+                       if (startHour >= 6 && startHour < 12) {
+                         colorClass = 'bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-200 text-amber-900';
+                       } else if (startHour >= 12 && startHour < 18) {
+                         colorClass = 'bg-gradient-to-br from-cyan-50 to-cyan-100/50 border-cyan-200 text-cyan-900';
+                       } else if (startHour >= 18 && startHour < 22) {
+                         colorClass = 'bg-gradient-to-br from-violet-50 to-violet-100/50 border-violet-200 text-violet-900';
+                       } else if (startHour >= 22 || startHour < 6) {
+                         colorClass = 'bg-gradient-to-br from-slate-700 to-slate-800 border-slate-900 text-slate-100';
+                       }
+                       return (
+                         <div key={s.id} className={`rounded-xl border p-2 text-[11px] ${colorClass}`}>
+                           <p className="font-black truncate">{s.staff?.fullName || 'N/A'}</p>
+                           <p className="font-bold opacity-70">{formatTime(s.startTime)} - {formatTime(s.endTime)}</p>
+                           <span className="inline-flex items-center gap-1 mt-1 rounded-full bg-white/70 px-2 py-0.5 shadow-sm">
+                             <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
+                             <span className="font-bold text-[9px] text-slate-800">{meta.label}</span>
+                           </span>
+                         </div>
+                       );
+                     })}
                   </div>
                 );
               })}
@@ -230,6 +253,10 @@ export default function ShiftManagementPage() {
                     <input type="datetime-local" value={registerForm.endTime} onChange={(e) => setRegisterForm((f) => ({ ...f, endTime: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none" required />
                   </div>
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Lời nhắn <span className="font-semibold text-slate-400">(tùy chọn)</span></label>
+                  <textarea value={registerForm.note} onChange={(e) => setRegisterForm((f) => ({ ...f, note: e.target.value }))} rows={3} maxLength={500} placeholder="Ghi chú cho người duyệt (nếu có)..." className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none" />
+                </div>
                 <div className="flex gap-2 pt-2">
                   <button type="button" onClick={() => setShowRegister(false)} className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50">Hủy</button>
                   <button type="submit" className="flex-1 rounded-xl bg-cyan-600 py-2.5 text-xs font-black text-white hover:bg-cyan-700">Đăng ký</button>
@@ -238,6 +265,14 @@ export default function ShiftManagementPage() {
             </div>
           </div>
         )}
+
+        {/* Rejection reason modal */}
+        <RejectReasonModal
+          open={Boolean(rejectTarget)}
+          subtitle={rejectTarget?.staff?.fullName ? `Nhân viên: ${rejectTarget.staff.fullName}` : undefined}
+          onConfirm={confirmReject}
+          onClose={() => setRejectTarget(null)}
+        />
       </div>
     </DashboardLayout>
   );

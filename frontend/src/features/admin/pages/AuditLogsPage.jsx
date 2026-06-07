@@ -7,6 +7,7 @@ import { auditService } from '../apis/auditService';
 import { FaceStepUpModal } from '../../auth';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
+import { ArrowUp, ArrowDown, Eye, X, Layers, User as UserIcon } from 'lucide-react';
 
 // ---- Display helpers --------------------------------------------------------
 
@@ -42,6 +43,22 @@ const BATCH_STATUS_LABEL = {
   PENDING: 'Chờ neo',
 };
 
+const ROLE_LABELS = {
+  ADMIN: 'Quản trị viên',
+  RECEPTIONIST: 'Lễ tân',
+  DOCTOR: 'Bác sĩ',
+  LAB_MANAGER: 'Quản lý xét nghiệm',
+  DEPT_SHARED: 'Tài khoản phòng máy',
+};
+
+const ROLE_TONE = {
+  ADMIN: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+  RECEPTIONIST: 'bg-sky-50 text-sky-700 border-sky-100',
+  DOCTOR: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+  LAB_MANAGER: 'bg-amber-50 text-amber-700 border-amber-100',
+  DEPT_SHARED: 'bg-slate-50 text-slate-600 border-slate-100',
+};
+
 function shortHash(hash) {
   if (!hash) return '—';
   const clean = hash.startsWith('0x') ? hash.slice(2) : hash;
@@ -66,6 +83,8 @@ export default function AuditLogsPage() {
   const [batches, setBatches] = useState([]);
   const [chain, setChain] = useState(null);
   const [entity, setEntity] = useState('');
+  const [sortOrder, setSortOrder] = useState('desc'); // seq display order: desc (newest) | asc (oldest)
+  const [batchFilter, setBatchFilter] = useState(''); // '' = all; otherwise a batchId number
   const [anchoring, setAnchoring] = useState(false);
   const [proof, setProof] = useState(null);
   const [stepUpOpen, setStepUpOpen] = useState(false);
@@ -85,7 +104,9 @@ export default function AuditLogsPage() {
       const res = await auditService.logs({
         page: logsPage,
         limit: 10,
+        sort: sortOrder,
         ...(entity ? { entity } : {}),
+        ...(batchFilter !== '' ? { batch: batchFilter } : {}),
       });
       const data = res.data || {};
       setLogs(data.items || []);
@@ -96,7 +117,7 @@ export default function AuditLogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [logsPage, entity]);
+  }, [logsPage, entity, sortOrder, batchFilter]);
 
   const loadBatches = useCallback(async () => {
     setLoading(true);
@@ -142,17 +163,17 @@ export default function AuditLogsPage() {
     } else {
       loadBatches();
     }
-  }, [tab, logsPage, batchesPage, entity, loadLogs, loadBatches]);
+  }, [tab, logsPage, batchesPage, entity, sortOrder, batchFilter, loadLogs, loadBatches]);
 
   // Load chain status once on mount
   useEffect(() => {
     loadChain();
   }, [loadChain]);
 
-  // Reset page when entity filter changes
+  // Reset page when any filter/sort changes
   useEffect(() => {
     setLogsPage(1);
-  }, [entity]);
+  }, [entity, sortOrder, batchFilter]);
 
   const stats = useMemo(() => {
     return {
@@ -255,6 +276,10 @@ export default function AuditLogsPage() {
             logs={logs}
             entity={entity}
             setEntity={setEntity}
+            sortOrder={sortOrder}
+            setSortOrder={setSortOrder}
+            batchFilter={batchFilter}
+            setBatchFilter={setBatchFilter}
             onProof={handleProof}
             page={logsPage}
             totalPages={logsTotalPages}
@@ -338,6 +363,10 @@ function LogsTable({
   logs,
   entity,
   setEntity,
+  sortOrder,
+  setSortOrder,
+  batchFilter,
+  setBatchFilter,
   onProof,
   page,
   totalPages,
@@ -345,94 +374,277 @@ function LogsTable({
   onPrev,
   onNext,
 }) {
-  if (!logs.length) {
-    return <Empty title="Chưa có nhật ký" desc="Các hoạt động đăng nhập và thay đổi dữ liệu sẽ xuất hiện ở đây." />;
-  }
+  const [detail, setDetail] = useState(null); // the log row currently shown in the detail modal
+  const [batchInput, setBatchInput] = useState(batchFilter ?? '');
+
+  // Keep the local input in sync if the filter is cleared elsewhere.
+  useEffect(() => { setBatchInput(batchFilter ?? ''); }, [batchFilter]);
+
+  const applyBatch = () => {
+    const trimmed = String(batchInput).trim();
+    setBatchFilter(trimmed === '' ? '' : trimmed.replace(/[^0-9]/g, ''));
+  };
+
   return (
     <section className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-4">
-        <span className="text-xs font-black uppercase tracking-wider text-slate-400">Lọc theo đối tượng:</span>
-        <FilterChip active={!entity} onClick={() => setEntity('')}>Tất cả</FilterChip>
-        {Object.entries(ENTITY_LABELS).map(([key, value]) => (
-          <FilterChip key={key} active={entity === key} onClick={() => setEntity(key)}>
-            {value}
-          </FilterChip>
-        ))}
+      {/* Toolbar: entity filter + sort + batch filter (kept mounted even when empty) */}
+      <div className="flex flex-col gap-3 border-b border-slate-100 p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-black uppercase tracking-wider text-slate-400">Lọc theo đối tượng:</span>
+          <FilterChip active={!entity} onClick={() => setEntity('')}>Tất cả</FilterChip>
+          {Object.entries(ENTITY_LABELS).map(([key, value]) => (
+            <FilterChip key={key} active={entity === key} onClick={() => setEntity(key)}>
+              {value}
+            </FilterChip>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Seq sort toggle */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Sắp xếp Seq:</span>
+            <button
+              type="button"
+              onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-black text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+              title={sortOrder === 'desc' ? 'Mới nhất trước (giảm dần)' : 'Cũ nhất trước (tăng dần)'}
+            >
+              {sortOrder === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />}
+              {sortOrder === 'desc' ? 'Giảm dần' : 'Tăng dần'}
+            </button>
+          </div>
+
+          {/* Batch filter */}
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-wider text-slate-400">
+              <Layers className="h-3.5 w-3.5" /> Lọc theo lô:
+            </span>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] font-black text-slate-400">#</span>
+              <input
+                type="number"
+                min={1}
+                value={batchInput}
+                onChange={(e) => setBatchInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') applyBatch(); }}
+                placeholder="Tất cả"
+                className="w-28 rounded-lg border border-slate-200 bg-white py-1.5 pl-6 pr-2 text-[12px] font-bold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={applyBatch}
+              className="rounded-lg bg-blue-600 px-3 py-1.5 text-[12px] font-black text-white hover:bg-blue-700"
+            >
+              Lọc
+            </button>
+            {batchFilter !== '' && (
+              <button
+                type="button"
+                onClick={() => { setBatchInput(''); setBatchFilter(''); }}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-black text-slate-500 hover:bg-slate-50"
+              >
+                Xóa lọc
+              </button>
+            )}
+          </div>
+        </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500">
-            <tr>
-              <th className="px-4 py-3">Seq</th>
-              <th className="px-4 py-3">Hành động</th>
-              <th className="px-4 py-3">Đối tượng</th>
-              <th className="px-4 py-3">Người thực hiện</th>
-              <th className="px-4 py-3">Thời gian</th>
-              <th className="px-4 py-3">Trên chuỗi</th>
-              <th className="px-4 py-3">Blockchain</th>
-              <th className="px-4 py-3 text-right">Bằng chứng</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {logs.map((log) => (
-              <tr key={log.id} className="hover:bg-slate-50/60">
-                <td className="px-4 py-3 font-mono font-black text-slate-400">{log.seq ?? '—'}</td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex rounded-lg border px-2 py-1 text-[10px] font-black ${ACTION_TONE[log.action] || 'bg-slate-50 text-slate-600 border-slate-100'}`}>
-                    {ACTION_LABEL[log.action] || log.action}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <span className="font-black text-slate-900">{log.entity}</span>
-                  <span className="block font-mono text-[11px] text-slate-400">{shortHash(log.entityId)}</span>
-                </td>
-                <td className="px-4 py-3 font-mono text-[11px] text-slate-500">{log.actorId ? shortHash(log.actorId) : 'Hệ thống'}</td>
-                <td className="px-4 py-3 text-[12px] text-slate-500">{formatTime(log.createdAt)}</td>
-                <td className="px-4 py-3">
-                  <span className={`rounded-md border px-2 py-0.5 text-[10px] font-black ${log.onChainStatus === 'ANCHORED' ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-amber-100 bg-amber-50 text-amber-700'}`}>
-                    {log.onChainStatus === 'ANCHORED' ? `Lô #${log.batchId}` : 'Chờ neo'}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  {log.blockchainStatus === 'VERIFIED' ? (
-                    <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700">
-                      <span className="h-1 w-1 rounded-full bg-emerald-500" />
-                      Healthy
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-lg border border-red-100 bg-red-50 px-2 py-0.5 text-[10px] font-black text-red-700 animate-pulse">
-                      <span className="h-1 w-1 rounded-full bg-red-500" />
-                      Unhealthy
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  {log.onChainStatus === 'ANCHORED' ? (
-                    <button onClick={() => onProof(log.seq)} className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1 text-[11px] font-black text-blue-700 hover:bg-blue-100">
-                      Xem bằng chứng
-                    </button>
-                  ) : (
-                    <span className="text-[11px] text-slate-300">—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        total={total}
-        label="bản ghi"
-        onPrev={onPrev}
-        onNext={onNext}
-      />
+
+      {!logs.length ? (
+        <Empty
+          title="Không có nhật ký phù hợp"
+          desc={entity || batchFilter !== '' ? 'Không có bản ghi nào cho bộ lọc hiện tại. Thử đổi bộ lọc hoặc chọn “Tất cả”.' : 'Các hoạt động đăng nhập và thay đổi dữ liệu sẽ xuất hiện ở đây.'}
+        />
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Seq</th>
+                  <th className="px-4 py-3">Hành động</th>
+                  <th className="px-4 py-3">Đối tượng</th>
+                  <th className="px-4 py-3">Người thực hiện</th>
+                  <th className="px-4 py-3">Thời gian</th>
+                  <th className="px-4 py-3">Trên chuỗi</th>
+                  <th className="px-4 py-3">Blockchain</th>
+                  <th className="px-4 py-3 text-right">Bằng chứng</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {logs.map((log) => (
+                  <tr
+                    key={log.id}
+                    onClick={() => setDetail(log)}
+                    className="cursor-pointer hover:bg-blue-50/40"
+                    title="Bấm để xem chi tiết"
+                  >
+                    <td className="px-4 py-3 font-mono font-black text-slate-400">{log.seq ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex rounded-lg border px-2 py-1 text-[10px] font-black ${ACTION_TONE[log.action] || 'bg-slate-50 text-slate-600 border-slate-100'}`}>
+                        {ACTION_LABEL[log.action] || log.action}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="font-black text-slate-900">{log.entity}</span>
+                      <span className="block font-mono text-[11px] text-slate-400">{shortHash(log.entityId)}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <ActorCell log={log} />
+                    </td>
+                    <td className="px-4 py-3 text-[12px] text-slate-500">{formatTime(log.createdAt)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`rounded-md border px-2 py-0.5 text-[10px] font-black ${log.onChainStatus === 'ANCHORED' ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-amber-100 bg-amber-50 text-amber-700'}`}>
+                        {log.onChainStatus === 'ANCHORED' ? `Lô #${log.batchId}` : 'Chờ neo'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {log.blockchainStatus === 'VERIFIED' ? (
+                        <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700">
+                          <span className="h-1 w-1 rounded-full bg-emerald-500" />
+                          Healthy
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-lg border border-red-100 bg-red-50 px-2 py-0.5 text-[10px] font-black text-red-700 animate-pulse">
+                          <span className="h-1 w-1 rounded-full bg-red-500" />
+                          Unhealthy
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      {log.onChainStatus === 'ANCHORED' ? (
+                        <button onClick={() => onProof(log.seq)} className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1 text-[11px] font-black text-blue-700 hover:bg-blue-100">
+                          Xem bằng chứng
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-slate-300">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            label="bản ghi"
+            onPrev={onPrev}
+            onNext={onNext}
+          />
+        </>
+      )}
+
+      {detail && <LogDetailModal log={detail} onClose={() => setDetail(null)} onProof={onProof} />}
     </section>
   );
 }
 
+// Compact actor identity for the table cell: display name + role chip, with a short id underneath.
+function ActorCell({ log }) {
+  if (!log.actorId) return <span className="text-[12px] font-bold text-slate-400">Hệ thống</span>;
+  const actor = log.actor;
+  if (!actor) {
+    return <span className="font-mono text-[11px] text-slate-500">{shortHash(log.actorId)}</span>;
+  }
+  return (
+    <div className="min-w-0">
+      <span className="block truncate text-[12px] font-black text-slate-800">{actor.displayName}</span>
+      <span className={`mt-0.5 inline-flex rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide ${ROLE_TONE[actor.role] || 'bg-slate-50 text-slate-600 border-slate-100'}`}>
+        {ROLE_LABELS[actor.role] || actor.role}
+      </span>
+    </div>
+  );
+}
+
+// Full-detail modal shown when an admin clicks an audit row. Surfaces exactly who did what.
+function LogDetailModal({ log, onClose, onProof }) {
+  const actor = log.actor;
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm font-black text-slate-400">#{log.seq ?? '—'}</span>
+            <span className={`inline-flex rounded-lg border px-2 py-1 text-[10px] font-black ${ACTION_TONE[log.action] || 'bg-slate-50 text-slate-600 border-slate-100'}`}>
+              {ACTION_LABEL[log.action] || log.action}
+            </span>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-5 px-6 py-5">
+          {/* Actor */}
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+            <p className="mb-2 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
+              <UserIcon className="h-3.5 w-3.5" /> Người thực hiện
+            </p>
+            {log.actorId ? (
+              actor ? (
+                <div className="space-y-1.5">
+                  <p className="text-sm font-black text-slate-900">{actor.displayName}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-black uppercase ${ROLE_TONE[actor.role] || 'bg-slate-50 text-slate-600 border-slate-100'}`}>
+                      {ROLE_LABELS[actor.role] || actor.role}
+                    </span>
+                    <span className="text-[12px] font-semibold text-slate-500">@{actor.username}</span>
+                  </div>
+                  {actor.email && <p className="text-[12px] text-slate-500">{actor.email}</p>}
+                  <p className="font-mono text-[11px] text-slate-400 break-all">ID: {log.actorId}</p>
+                </div>
+              ) : (
+                <p className="font-mono text-[12px] text-slate-500 break-all">ID: {log.actorId} <span className="text-slate-400">(không còn trong hệ thống)</span></p>
+              )
+            ) : (
+              <p className="text-sm font-bold text-slate-500">Hệ thống (tự động)</p>
+            )}
+          </div>
+
+          {/* Target + meta */}
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
+            <DetailField label="Đối tượng" value={log.entity} />
+            <DetailField label="ID đối tượng" value={shortHash(log.entityId)} mono />
+            <DetailField label="Thời gian" value={formatTime(log.createdAt)} />
+            <DetailField
+              label="Trạng thái neo"
+              value={log.onChainStatus === 'ANCHORED' ? `Đã neo · Lô #${log.batchId}` : 'Chờ neo'}
+            />
+            <DetailField
+              label="Toàn vẹn"
+              value={log.blockchainStatus === 'VERIFIED' ? 'Healthy (khớp chuỗi)' : 'Unhealthy (nghi bị sửa)'}
+            />
+            <DetailField label="Hash chuỗi" value={shortHash(log.entryHash)} mono />
+          </dl>
+
+          {log.onChainStatus === 'ANCHORED' && (
+            <button
+              onClick={() => { onProof(log.seq); onClose(); }}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white hover:bg-blue-700"
+            >
+              <Eye className="h-4 w-4" /> Xem bằng chứng Merkle
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailField({ label, value, mono = false }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</dt>
+      <dd className={`mt-0.5 break-words text-[13px] font-bold text-slate-800 ${mono ? 'font-mono text-[12px]' : ''}`}>{value || '—'}</dd>
+    </div>
+  );
+}
+
 // ---- On-chain batches table -------------------------------------------------
+
 
 function BatchesTable({
   batches,
