@@ -94,7 +94,6 @@ export default function ParaclinicalDashboardPage() {
               <h1 className="mt-1 text-2xl font-black text-slate-950">Tổng quan cận lâm sàng</h1>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => navigate('/lab-manager/shifts')} className="rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-2.5 text-xs font-black text-cyan-700 hover:bg-cyan-100">Lịch trực</button>
               <button onClick={() => navigate('/lab-manager/orders')} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-700">Xử lý phiếu</button>
             </div>
           </div>
@@ -108,8 +107,7 @@ export default function ParaclinicalDashboardPage() {
           <section className="grid grid-cols-1 xl:grid-cols-2 gap-5">
             <ChartCard title="Trạng thái phiếu"><StatusChart rows={analytics.statuses} /></ChartCard>
           </section>
-          <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Shortcut title="Lịch trực" desc="Xem và đăng ký ca trực." onClick={() => navigate('/lab-manager/shifts')} />
+          <section className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Shortcut title="Phiếu CLS" desc="Nhận xử lý, tải lên kết quả." onClick={() => navigate('/lab-manager/orders')} />
             <Shortcut title="Kết quả" desc="Tra cứu tệp đã trả." onClick={() => navigate('/lab-manager/results')} />
           </section>

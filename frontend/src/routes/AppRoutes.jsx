@@ -65,9 +65,10 @@ export default function App() {
         <Route path="/doctor/queue" element={<ProtectedRoute requireVerified roles={['DOCTOR']}><DoctorQueuePage /></ProtectedRoute>} />
         <Route path="/paraclinical-login" element={<ParaclinicalLoginPage />} />
         <Route path="/lab-manager" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER', 'DEPT_SHARED']}><ParaclinicalDashboardPage /></ProtectedRoute>} />
-        <Route path="/lab-manager/shifts" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER', 'DEPT_SHARED']}><ShiftManagementPage /></ProtectedRoute>} />
-        <Route path="/lab-manager/orders" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER', 'DEPT_SHARED']}><LabOrdersPage /></ProtectedRoute>} />
-        <Route path="/lab-manager/results" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER', 'DEPT_SHARED']}><LabResultsPage /></ProtectedRoute>} />
+        <Route path="/lab-manager/shifts" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><ShiftManagementPage /></ProtectedRoute>} />
+        <Route path="/lab-manager/history" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><ShiftManagementPage /></ProtectedRoute>} />
+        <Route path="/lab-manager/orders" element={<ProtectedRoute requireVerified roles={['DEPT_SHARED']}><LabOrdersPage /></ProtectedRoute>} />
+        <Route path="/lab-manager/results" element={<ProtectedRoute requireVerified roles={['DEPT_SHARED']}><LabResultsPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute requireVerified roles={['ADMIN', 'RECEPTIONIST', 'DOCTOR', 'LAB_MANAGER', 'DEPT_SHARED']}><ProfilePage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to={isAuthenticated ? (user?.firstLogin ? firstLoginRoute(user) : dashboardRoute) : '/'} replace />} />
       </Routes>

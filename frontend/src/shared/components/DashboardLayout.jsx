@@ -12,6 +12,7 @@ import {
   Database,
   Stethoscope,
   Building2,
+  Clock,
   Plus,
   ChevronLeft,
   X,
@@ -22,6 +23,8 @@ import {
 import StepUpSessionBadge from './StepUpSessionBadge';
 import SleepButton from './SleepButton';
 import NotificationBell from './NotificationBell';
+import LiveClock from './LiveClock';
+import DemoModeToggle from './DemoModeToggle';
 
 const defaultNavItems = [
   { id: 'overview', label: 'Tổng quan', icon: 'grid' },
@@ -51,6 +54,7 @@ const ICON_COMPONENTS = {
   settings: Settings,
   user: User,
   calendar: Calendar,
+  clock: Clock,
   database: Database,
   stethoscope: Stethoscope,
   building: Building2,
@@ -268,7 +272,18 @@ export default function DashboardLayout({
               />
             </div>
 
+
             <div className="h-5 w-[1px] bg-slate-200 hidden md:block"></div>
+
+            {/* Live clock */}
+            <div className="hidden sm:flex">
+              <LiveClock />
+            </div>
+
+            {/* Demo mode toggle */}
+            <div className="hidden sm:flex">
+              <DemoModeToggle />
+            </div>
 
             {/* Step-up privilege session countdown + lock */}
             <StepUpSessionBadge />

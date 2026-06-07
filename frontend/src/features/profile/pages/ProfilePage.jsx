@@ -153,6 +153,11 @@ export default function ProfilePage() {
                     <span className="inline-flex items-center rounded-full border border-indigo-100 bg-white px-3 py-1 text-xs font-black text-indigo-700">
                       {roleLabel}
                     </span>
+                    {staff?.managedDepartment && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
+                        👑 Trưởng khoa {staff.managedDepartment.name}
+                      </span>
+                    )}
                     <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-black ${status.tone}`}>
                       {status.text}
                     </span>

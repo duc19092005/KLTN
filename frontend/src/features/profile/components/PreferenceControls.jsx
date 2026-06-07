@@ -121,3 +121,30 @@ export function SettingsCard({ icon: Icon, title, description, accent = '#4f46e5
     </section>
   );
 }
+
+// Radio-style picker for clock face selection
+export function RadioPicker({ value, onChange, options, accent = '#4f46e5' }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((opt) => {
+        const active = opt.value === value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-[13px] font-bold transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${
+              active
+                ? 'border-transparent text-white shadow-sm'
+                : 'border-slate-200 text-slate-600 bg-white hover:border-slate-300 hover:bg-slate-50'
+            }`}
+            style={active ? { backgroundColor: accent, borderColor: accent } : undefined}
+          >
+            {opt.icon && <opt.icon className="h-3.5 w-3.5" strokeWidth={2.5} />}
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}

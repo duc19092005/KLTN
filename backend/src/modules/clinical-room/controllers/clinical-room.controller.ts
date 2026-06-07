@@ -9,7 +9,6 @@ import { AssignRoomDoctorDto, ClinicalRoomQueryDto, CreateClinicalRoomDto, Updat
 import { ClinicalRoomService } from '../services/clinical-room.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN')
 @ApiTags('Clinical Rooms')
 @ApiBearerAuth()
 @Controller('clinical-rooms')
@@ -17,30 +16,35 @@ export class ClinicalRoomController {
   constructor(private readonly service: ClinicalRoomService) {}
 
   @Post()
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Create a clinical room' })
   create(@Body() dto: CreateClinicalRoomDto, @CurrentUser() user: AuthUser) {
     return this.service.create(dto, user?.sub);
   }
 
   @Get()
+  @Roles('ADMIN', 'LAB_MANAGER', 'DEPT_SHARED', 'DOCTOR', 'RECEPTIONIST')
   @ApiOperation({ summary: 'List clinical rooms with pagination, filters, and search' })
   findAll(@Query() query: ClinicalRoomQueryDto) {
     return this.service.findAll(query);
   }
 
   @Patch(':id')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Update a clinical room' })
   update(@Param('id') id: string, @Body() dto: UpdateClinicalRoomDto, @CurrentUser() user: AuthUser) {
     return this.service.update(id, dto, user?.sub);
   }
 
   @Patch(':id/doctor')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Assign, move, or clear the doctor responsible for a room' })
   assignDoctor(@Param('id') id: string, @Body() dto: AssignRoomDoctorDto, @CurrentUser() user: AuthUser) {
     return this.service.assignDoctor(id, dto, user?.sub);
   }
 
   @Delete(':id')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Delete a clinical room' })
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.service.remove(id, user?.sub);
