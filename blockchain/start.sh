@@ -1,4 +1,4 @@
-#!/bin/sh
+﻿#!/bin/sh
 set -e
 
 npx hardhat node --hostname 0.0.0.0 &

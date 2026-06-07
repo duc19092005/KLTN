@@ -23,8 +23,8 @@ describe('AppController (e2e)', () => {
       .expect(({ body }) => {
         expect(body).toEqual({
           success: true,
-          message: 'resource retrieved successfully',
-          data: 'Hello World!',
+          message: 'Lấy dữ liệu thành công.',
+          data: 'Hệ thống bệnh viện đang hoạt động.',
         });
       });
   });

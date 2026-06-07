@@ -7,7 +7,7 @@ export type IntegrityEvaluation = {
   id: string;
   modelName: string;
   modelVersion: string;
-  status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED';
+  status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR';
   dbMatches: boolean;
   chainMatches: boolean;
   recomputedHash: string | null;

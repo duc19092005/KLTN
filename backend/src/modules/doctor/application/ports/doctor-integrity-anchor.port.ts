@@ -8,7 +8,7 @@ export type DoctorIntegrityEvaluation = {
   staffProfileId: string;
   specialty: string;
   licenseNumber: string;
-  status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED';
+  status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR';
   dbMatches: boolean;
   chainMatches: boolean;
   recomputedHash: string | null;
