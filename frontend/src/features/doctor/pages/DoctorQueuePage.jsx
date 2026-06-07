@@ -213,15 +213,30 @@ export default function DoctorQueuePage() {
   useEffect(() => { loadVisits(); }, [filter]);
   useEffect(() => { if (activeVisit?.id) { loadDecision(activeVisit.id); setShowWorkflowModal(false); } }, [activeVisit?.id]);
   useEffect(() => { 
-    departmentService.list({ canReceiveOrders: true, status: 'ACTIVE', limit: 100 })
-      .then((res) => {
+    (async () => {
+      try {
+        // Ưu tiên load các phòng có thể nhận chỉ định
+        const res = await departmentService.list({ canReceiveOrders: true, status: 'ACTIVE', limit: 100 });
         const items = getItems(res.data);
-        console.log('[DoctorQueue] departments loaded:', items.length, items.map(d => d.name));
-        setDepartments(items);
-      })
-      .catch((err) => {
+        console.log('[DoctorQueue] departments loaded (canReceiveOrders=true):', items.length, items.map(d => d.name));
+        
+        if (items.length > 0) {
+          setDepartments(items);
+          return;
+        }
+        
+        // Fallback: không có phòng nào bật "Nhận phiếu chỉ định" → load tất cả ACTIVE
+        console.warn('[DoctorQueue] Không có phòng ban nào bật "Nhận phiếu chỉ định". Đang load tất cả phòng ACTIVE...');
+        toast.info('Chưa có phòng ban nào được bật "Nhận phiếu chỉ định". Vui lòng vào Admin → Phòng ban để cấu hình.', 8000);
+        const fallbackRes = await departmentService.list({ status: 'ACTIVE', limit: 100 });
+        const fallbackItems = getItems(fallbackRes.data);
+        console.log('[DoctorQueue] departments loaded (fallback ALL ACTIVE):', fallbackItems.length, fallbackItems.map(d => d.name));
+        setDepartments(fallbackItems);
+      } catch (err) {
         console.error('[DoctorQueue] Lỗi tải danh sách khoa/phòng:', err?.response?.status, err?.response?.data || err.message);
-      }); 
+        toast.error('Không thể tải danh sách khoa/phòng. Vui lòng thử lại.');
+      }
+    })();
   }, []);
   useEffect(() => { aiModelService.list({ type: 'API' }).then((res) => { const items = getItems(res.data); setAiModels(items); setSelectedAiModelId((current) => current || items[0]?.id || ''); }).catch(() => { }); }, []);
 
