@@ -287,7 +287,7 @@ export default function ShiftManagementPage() {
   const handleRegister = async (e) => {
     e.preventDefault();
     try {
-      await shiftService.register(registerForm.roomId, registerForm.startTime, registerForm.endTime, registerForm.note);
+      await shiftService.register(registerForm.roomId, registerForm.startTime, registerForm.endTime, registerForm.note, demoMode);
       toast.success('Đăng ký ca trực thành công!');
       setShowRegister(false);
       setRegisterForm({ roomId: user?.clinicalRoomId || '', startTime: '', endTime: '', note: '' });

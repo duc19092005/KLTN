@@ -32,8 +32,13 @@ export class ParaclinicalShiftService {
     private readonly verifyShiftUC: VerifyParaclinicalShiftUseCase,
   ) {}
 
-  registerShift(staffId: string, clinicalRoomId: string, startTime: Date, endTime: Date, actorId: string) {
-    return this.registerShiftUC.execute(staffId, clinicalRoomId, startTime, endTime, actorId);
+  async registerShift(staffId: string, clinicalRoomId: string, startTime: Date, endTime: Date, actorId: string, note?: string, demoMode = false) {
+    // Auto-resolve: if clinicalRoomId is actually a department ID, find or create a ClinicalRoom
+    let resolvedRoomId = clinicalRoomId;
+    try {
+      resolvedRoomId = await this.registerShiftUC.resolveClinicalRoom(clinicalRoomId);
+    } catch { /* keep original, let use-case throw proper error */ }
+    return this.registerShiftUC.execute(staffId, resolvedRoomId, startTime, endTime, actorId, note, demoMode);
   }
 
   approveShift(shiftId: string, approvedById: string) {
@@ -44,12 +49,22 @@ export class ParaclinicalShiftService {
     return this.rejectShiftUC.execute(shiftId, rejectedById);
   }
 
-  assignShift(staffId: string, clinicalRoomId: string, startTime: Date, endTime: Date, approvedById: string) {
-    return this.assignShiftUC.execute(staffId, clinicalRoomId, startTime, endTime, approvedById);
+  async assignShift(staffId: string, clinicalRoomId: string, startTime: Date, endTime: Date, approvedById: string) {
+    // Auto-resolve if clinicalRoomId is actually a department ID
+    let resolvedRoomId = clinicalRoomId;
+    try {
+      resolvedRoomId = await this.registerShiftUC.resolveClinicalRoom(clinicalRoomId);
+    } catch { /* keep original */ }
+    return this.assignShiftUC.execute(staffId, resolvedRoomId, startTime, endTime, approvedById);
   }
 
-  listRoomShifts(roomId: string, from?: Date, to?: Date) {
-    return this.listRoomShiftsUC.execute(roomId, from, to);
+  async listRoomShifts(roomId: string, from?: Date, to?: Date) {
+    // Auto-resolve if roomId is actually a department ID
+    let resolvedRoomId = roomId;
+    try {
+      resolvedRoomId = await this.registerShiftUC.resolveClinicalRoom(roomId);
+    } catch { /* keep original */ }
+    return this.listRoomShiftsUC.execute(resolvedRoomId, from, to);
   }
 
   listPendingShifts(departmentId?: string) {

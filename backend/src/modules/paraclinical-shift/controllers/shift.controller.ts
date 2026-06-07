@@ -13,6 +13,7 @@ import { AssignShiftUseCase } from '../application/use-cases/assign-shift.use-ca
 import { ListRoomShiftsUseCase } from '../application/use-cases/list-room-shifts.use-case';
 import { ListPendingShiftsUseCase } from '../application/use-cases/list-pending-shifts.use-case';
 import { VerifyParaclinicalShiftUseCase } from '../application/use-cases/verify-paraclinical-shift.use-case';
+import { ParaclinicalShiftService } from '../services/paraclinical-shift.service';
 import {
   RegisterShiftDto,
   ApproveShiftDto,
@@ -31,27 +32,26 @@ export class ShiftController {
     private readonly listRoomShifts: ListRoomShiftsUseCase,
     private readonly listPendingShifts: ListPendingShiftsUseCase,
     private readonly verifyShift: VerifyParaclinicalShiftUseCase,
+    private readonly service: ParaclinicalShiftService,
   ) {}
 
   /** Staff self-registers a shift (PENDING). */
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('LAB_MANAGER', 'DOCTOR')
   @Post('register')
-  async register(@CurrentUser() user: AuthUser, @Body() body: RegisterShiftDto) {
-    // Use staff profile id from JWT if available, otherwise find it
-    const staffId = (user as any).staffId || user.sub;
-    // Auto-resolve: if clinicalRoomId is actually a department ID, find or create a ClinicalRoom
-    let clinicalRoomId = body.clinicalRoomId;
-    try {
-      clinicalRoomId = await this.registerShift.resolveClinicalRoom(body.clinicalRoomId);
-    } catch (e) { /* keep original ID, let use-case throw proper error */ }
-    return this.registerShift.execute(
-      staffId,
-      clinicalRoomId,
+  async register(
+    @CurrentUser() user: AuthUser,
+    @Body() body: RegisterShiftDto,
+    @Query('demo') demoMode?: string,
+  ) {
+    return this.service.registerShift(
+      (user as any).staffId || user.sub,
+      body.clinicalRoomId,
       new Date(body.startTime),
       new Date(body.endTime),
       user.sub,
       body.note,
+      demoMode === '1' || demoMode === 'true',
     );
   }
 
@@ -91,11 +91,8 @@ export class ShiftController {
   @UseGuards(JwtAuthGuard)
   @Get('room/:roomId')
   async roomShifts(@Param('roomId') roomId: string, @Query() query: ListRoomShiftsDto) {
-    // Resolve: roomId could be a department ID
-    let resolvedRoomId = roomId;
-    try { resolvedRoomId = await this.registerShift.resolveClinicalRoom(roomId); } catch { /* keep original */ }
-    return this.listRoomShifts.execute(
-      resolvedRoomId,
+    return this.service.listRoomShifts(
+      roomId,
       query.from ? new Date(query.from) : undefined,
       query.to ? new Date(query.to) : undefined,
     );

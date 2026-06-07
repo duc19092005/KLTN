@@ -2,8 +2,8 @@ import api from '../../../shared/apis/api';
 
 export const shiftService = {
   /** Staff self-registers a shift. */
-  register: (clinicalRoomId, startTime, endTime, note) =>
-    api.post('/paraclinical/shifts/register', { clinicalRoomId, startTime, endTime, note }),
+  register: (clinicalRoomId, startTime, endTime, note, demoMode = false) =>
+    api.post('/paraclinical/shifts/register', { clinicalRoomId, startTime, endTime, note }, { params: { demo: demoMode ? '1' : '0' } }),
 
   /** Admin/Head approves a PENDING shift. */
   approve: (shiftId) => api.post('/paraclinical/shifts/approve', { shiftId }),

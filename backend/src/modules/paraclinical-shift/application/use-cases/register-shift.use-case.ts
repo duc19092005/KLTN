@@ -32,12 +32,13 @@ export class RegisterShiftUseCase {
     endTime: Date,
     actorId: string,
     note?: string,
+    demoMode = false,
   ) {
     // Validate time range
     if (startTime >= endTime) {
       throw new BadRequestException('Thời gian bắt đầu phải trước thời gian kết thúc.');
     }
-    if (startTime < new Date()) {
+    if (!demoMode && startTime < new Date()) {
       throw new BadRequestException('Không thể đăng ký ca trực trong quá khứ.');
     }
 
