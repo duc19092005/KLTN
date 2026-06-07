@@ -19,7 +19,7 @@ const STATUS_META = {
 
 const DAYS_OF_WEEK = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
-const HOUR_HEIGHT = 40; // px per hour for the timeline
+const HOUR_HEIGHT = 20; // px per hour for the timeline (compact)
 
 /* ── Helpers ────────────────────────────────────────────────────── */
 function toLocalISODate(d) {
@@ -116,8 +116,20 @@ export default function ShiftManagementPage() {
     let mounted = true;
     async function load() {
       try {
+        // Load all clinical rooms
         const res = await api.get('/clinical-rooms');
-        const list = Array.isArray(res.data) ? (Array.isArray(res.data?.data) ? res.data.data : res.data) : (res.data?.items || []);
+        let list = Array.isArray(res.data) ? (Array.isArray(res.data?.data) ? res.data.data : res.data) : (res.data?.items || []);
+
+        // Filter: only show rooms belonging to LABORATORY or IMAGING departments
+        // (exclude doctor exam rooms and reception rooms)
+        list = list.filter(room => {
+          const deptType = room.doctor?.staffProfile?.department?.type;
+          // Include rooms whose doctor belongs to LAB/IMAGING, or rooms with no doctor (unassigned)
+          return !deptType || deptType === 'LABORATORY' || deptType === 'IMAGING';
+        });
+
+        console.log('[ShiftManagement] clinical rooms filtered (LAB/IMAGING only):', list.length, list.map(r => `${r.roomName} (dept: ${r.doctor?.staffProfile?.department?.type || 'none'})`));
+
         if (mounted) {
           setRooms(list);
           if (!selectedRoomId && list.length > 0) {
@@ -183,8 +195,8 @@ export default function ShiftManagementPage() {
 
   const handleMouseDown = (day, e) => {
     const dayDate = toLocalISODate(day.date);
-    // Don't allow past days
-    if (dayDate < toLocalISODate(new Date())) return;
+    // Respect demo mode: if demo is ON, allow past days
+    if (!demoMode && dayDate < toLocalISODate(new Date())) return;
     setIsDragging(true);
     setDragDay(day);
     const y = getYFromEvent(e);
@@ -206,7 +218,7 @@ export default function ShiftManagementPage() {
     const duration = endHour - startHour;
 
     if (duration < 1) {
-      toast.warn('Ca trực phải kéo dài ít nhất 1 giờ.');
+      toast.info('Ca trực phải kéo dài ít nhất 1 giờ.', 4000);
       setIsDragging(false);
       return;
     }
@@ -351,9 +363,9 @@ export default function ShiftManagementPage() {
         {loading ? (
           <LoadingIndicator size="lg" label="Đang tải lịch trực..." />
         ) : (
-          <section className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden" ref={calendarRef}>
+          <section className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden" ref={calendarRef} style={{ maxHeight: '70vh' }}>
             {/* Day headers */}
-            <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/80">
+            <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/80 sticky top-0 z-10">
               {DAYS_OF_WEEK.map((day, idx) => (
                 <div key={idx} className="py-2.5 text-center border-r border-slate-100 last:border-r-0">
                   <span className="text-[11px] font-black uppercase text-slate-400">{day}</span>
@@ -361,8 +373,8 @@ export default function ShiftManagementPage() {
               ))}
             </div>
 
-            {/* Calendar body - week rows */}
-            <div className="grid grid-cols-7">
+            {/* Calendar body - week rows with scroll */}
+            <div className="grid grid-cols-7 overflow-y-auto" style={{ maxHeight: 'calc(70vh - 36px)' }}>
               {monthDays.map((day, idx) => {
                 const dateStr = toLocalISODate(day.date);
                 const isToday = dateStr === toLocalISODate(today);
@@ -420,15 +432,16 @@ export default function ShiftManagementPage() {
 function CalendarCell({ day, isToday, isPast, shifts, isDragging, dragDay, dragStartY, dragEndY, onMouseDown, renderShift }) {
   const dateStr = toLocalISODate(day.date);
   const isDragTarget = isDragging && dragDay?.date && toLocalISODate(dragDay.date) === dateStr;
+  const cellHeight = HOUR_HEIGHT * 24;
 
   return (
     <div
       className={`relative border-r border-b border-slate-100 last:border-r-0 ${day.isOtherMonth ? 'bg-slate-50/50' : isToday ? 'bg-cyan-50/30' : 'bg-white'} ${isPast && !day.isOtherMonth ? 'bg-slate-50/70' : ''} ${isDragTarget ? 'ring-2 ring-cyan-400 ring-inset z-10' : ''}`}
-      style={{ minHeight: `${HOUR_HEIGHT * 24}px` }}
-      onMouseDown={(day.isOtherMonth || isPast) ? undefined : onMouseDown}
+      style={{ minHeight: `${cellHeight}px` }}
+      onMouseDown={(day.isOtherMonth || (!isDragTarget && isPast)) ? undefined : onMouseDown}
     >
       {/* Date label */}
-      <div className={`sticky top-0 z-10 flex items-center justify-between px-1.5 py-1 bg-white/80 backdrop-blur border-b border-slate-100 ${day.isOtherMonth ? 'text-slate-300' : isToday ? 'text-cyan-700 font-black' : 'text-slate-600 font-bold'} text-[10px]`}>
+      <div className={`sticky top-0 z-10 flex items-center justify-between px-1.5 py-0.5 bg-white/80 backdrop-blur border-b border-slate-100 ${day.isOtherMonth ? 'text-slate-300' : isToday ? 'text-cyan-700 font-black' : 'text-slate-600 font-bold'} text-[10px]`}>
         <span>{day.date.getDate()}</span>
         {!day.isOtherMonth && !isPast && (
           <span className="text-[8px] text-slate-300 select-none" title="Kéo để chọn giờ">⏱</span>
@@ -436,21 +449,16 @@ function CalendarCell({ day, isToday, isPast, shifts, isDragging, dragDay, dragS
       </div>
 
       {/* Hour grid lines */}
-      <div className="relative">
-        {HOURS.map(h => (
+      <div className="relative" style={{ height: `${cellHeight - 20}px` }}>
+        {/* Only show even hours to reduce visual noise */}
+        {HOURS.filter(h => h % 3 === 0).map(h => (
           <div
             key={h}
-            className="absolute left-0 right-0 border-t border-slate-50 pointer-events-none"
+            className="absolute left-0 right-0 border-t border-slate-100 pointer-events-none"
             style={{ top: `${h * HOUR_HEIGHT}px` }}
-          />
-        ))}
-        {/* Half-hour marks */}
-        {HOURS.map(h => (
-          <div
-            key={`half-${h}`}
-            className="absolute left-4 right-0 border-t border-dotted border-slate-100 pointer-events-none"
-            style={{ top: `${h * HOUR_HEIGHT + HOUR_HEIGHT / 2}px` }}
-          />
+          >
+            <span className="absolute left-0.5 top-0 text-[7px] text-slate-300 leading-none">{h}h</span>
+          </div>
         ))}
 
         {/* Drag preview */}
@@ -462,7 +470,7 @@ function CalendarCell({ day, isToday, isPast, shifts, isDragging, dragDay, dragS
               height: `${Math.abs(dragEndY - dragStartY)}px`,
             }}
           >
-            <span className="text-[10px] font-black text-cyan-700">
+            <span className="text-[9px] font-black text-cyan-700 bg-white/80 rounded px-1">
               {Math.round(Math.abs(dragEndY - dragStartY) / HOUR_HEIGHT * 2) / 2}h
             </span>
           </div>

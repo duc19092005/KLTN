@@ -24,8 +24,16 @@ export default function LabManagerDashboardPage() {
     let mounted = true;
     async function loadRooms() {
       try {
+        // Load all clinical rooms, then filter to LABORATORY/IMAGING only
         const res = await api.get('/clinical-rooms');
-        const list = Array.isArray(res.data) ? (Array.isArray(res.data?.data) ? res.data.data : res.data) : (res.data?.items || []);
+        let list = Array.isArray(res.data) ? (Array.isArray(res.data?.data) ? res.data.data : res.data) : (res.data?.items || []);
+
+        // Filter: only rooms for LAB/IMAGING departments
+        list = list.filter(room => {
+          const deptType = room.doctor?.staffProfile?.department?.type;
+          return !deptType || deptType === 'LABORATORY' || deptType === 'IMAGING';
+        });
+
         if (mounted && list.length > 0) {
           setRooms(list);
           setSelectedRoomId(list[0].id);
@@ -95,6 +103,7 @@ export default function LabManagerDashboardPage() {
                 </select>
               )}
               <button onClick={() => navigate('/lab-manager/shifts')} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white hover:bg-cyan-700 shadow-sm">Đăng ký ca</button>
+              <button onClick={() => window.location.href = '/paraclinical-login'} className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-700 px-4 py-2.5 text-xs font-black text-white hover:from-emerald-600 hover:to-emerald-800 shadow-sm">🔬 Vào phòng xét nghiệm</button>
               {isManager && (
                 <button onClick={() => navigate('/admin/shifts')} className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs font-black text-amber-700 hover:bg-amber-100">Duyệt ca</button>
               )}
@@ -109,7 +118,7 @@ export default function LabManagerDashboardPage() {
                 <Kpi key={row.key} label={row.label} value={row.count} percent={row.percent} tone={row.key === 'approved' ? 'emerald' : row.key === 'pending' ? 'amber' : 'red'} />
               ))}
             </section>
-            <section className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Shortcut title="Đăng ký lịch trực" desc="Xem lịch tháng, kéo thả chọn giờ làm việc." onClick={() => navigate('/lab-manager/shifts')} />
               <Shortcut title="Lịch sử ca trực" desc="Xem tất cả ca đã đăng ký, trạng thái duyệt." onClick={() => {
                 navigate('/lab-manager/shifts');
@@ -118,6 +127,7 @@ export default function LabManagerDashboardPage() {
                   if (btn) btn.click();
                 }, 300);
               }} />
+              <Shortcut title="Vào phòng xét nghiệm" desc="Đăng nhập tài khoản chung để nhận và xử lý phiếu chỉ định." onClick={() => window.location.href = '/paraclinical-login'} />
             </section>
           </>
         )}

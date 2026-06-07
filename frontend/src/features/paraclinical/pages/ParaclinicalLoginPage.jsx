@@ -56,6 +56,10 @@ export default function ParaclinicalLoginPage() {
       const res = await paraclinicalAuthService.verifyShiftFace(tempToken, embedding);
       toast.success(`Xin chào ${res.data.user?.staffName || 'KTV'}! Đăng nhập thành công.`);
       updateSession(res.data.user);
+      // Redirect to DEPT_SHARED dashboard
+      setTimeout(() => {
+        window.location.href = '/lab-manager/work';
+      }, 500);
     } catch (err) {
       setError(err.response?.data?.message || 'Xác thực khuôn mặt thất bại');
       setLoading(false);

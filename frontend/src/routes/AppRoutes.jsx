@@ -13,6 +13,7 @@ import DoctorQueuePage from '../features/doctor/pages/DoctorQueuePage';
 import ParaclinicalLoginPage from '../features/paraclinical/pages/ParaclinicalLoginPage';
 import ParaclinicalDashboardPage from '../features/paraclinical/pages/ParaclinicalDashboardPage';
 import ShiftManagementPage from '../features/paraclinical/pages/ShiftManagementPage';
+import LabManagerDashboardPage from '../features/lab-manager/pages/LabManagerDashboard';
 import LoadingIndicator from '../shared/components/LoadingIndicator';
 import { getDashboardRoute } from '../shared/constants/roleRoutes';
 import { PatientVerificationPage } from '../features/verification';
@@ -64,7 +65,8 @@ export default function App() {
         <Route path="/doctor" element={<ProtectedRoute requireVerified roles={['DOCTOR']}><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/doctor/queue" element={<ProtectedRoute requireVerified roles={['DOCTOR']}><DoctorQueuePage /></ProtectedRoute>} />
         <Route path="/paraclinical-login" element={<ParaclinicalLoginPage />} />
-        <Route path="/lab-manager" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER', 'DEPT_SHARED']}><ParaclinicalDashboardPage /></ProtectedRoute>} />
+        <Route path="/lab-manager" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><LabManagerDashboardPage /></ProtectedRoute>} />
+        <Route path="/lab-manager/work" element={<ProtectedRoute requireVerified roles={['DEPT_SHARED']}><ParaclinicalDashboardPage /></ProtectedRoute>} />
         <Route path="/lab-manager/shifts" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><ShiftManagementPage /></ProtectedRoute>} />
         <Route path="/lab-manager/history" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><ShiftManagementPage /></ProtectedRoute>} />
         <Route path="/lab-manager/orders" element={<ProtectedRoute requireVerified roles={['DEPT_SHARED']}><LabOrdersPage /></ProtectedRoute>} />

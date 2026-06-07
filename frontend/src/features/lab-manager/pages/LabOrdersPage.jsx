@@ -4,7 +4,7 @@ import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { useAuth } from '../../../providers/AuthProvider';
 import { medicalOrderService } from '../../medical-order/apis/medicalOrderService';
-import { LAB_MANAGER_NAV_ITEMS, labManagerRouteFor } from '../constants/navigation';
+import { PARACLINICAL_NAV_ITEMS, paraclinicalRouteFor } from '../../paraclinical/constants/navigation';
 import { getMedicalOrderStatus } from '../constants/medicalOrderStatus';
 import { useToast } from '../../../providers/ToastProvider';
 
@@ -77,7 +77,7 @@ export default function LabOrdersPage() {
   };
 
   return (
-    <DashboardLayout user={user} navItems={LAB_MANAGER_NAV_ITEMS} activeItem="orders" onNavigate={(id) => navigate(labManagerRouteFor(id))} onLogout={logout}>
+    <DashboardLayout user={user} navItems={PARACLINICAL_NAV_ITEMS} activeItem="orders" onNavigate={(id) => navigate(paraclinicalRouteFor(id))} onLogout={logout}>
       <div className="max-w-7xl mx-auto space-y-4 pb-10">
         <section className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
