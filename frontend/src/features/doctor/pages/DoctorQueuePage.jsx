@@ -212,7 +212,17 @@ export default function DoctorQueuePage() {
 
   useEffect(() => { loadVisits(); }, [filter]);
   useEffect(() => { if (activeVisit?.id) { loadDecision(activeVisit.id); setShowWorkflowModal(false); } }, [activeVisit?.id]);
-  useEffect(() => { departmentService.list({ canReceiveOrders: true, status: 'ACTIVE', limit: 100 }).then((res) => setDepartments(getItems(res.data))).catch(() => { }); }, []);
+  useEffect(() => { 
+    departmentService.list({ canReceiveOrders: true, status: 'ACTIVE', limit: 100 })
+      .then((res) => {
+        const items = getItems(res.data);
+        console.log('[DoctorQueue] departments loaded:', items.length, items.map(d => d.name));
+        setDepartments(items);
+      })
+      .catch((err) => {
+        console.error('[DoctorQueue] Lỗi tải danh sách khoa/phòng:', err?.response?.status, err?.response?.data || err.message);
+      }); 
+  }, []);
   useEffect(() => { aiModelService.list({ type: 'API' }).then((res) => { const items = getItems(res.data); setAiModels(items); setSelectedAiModelId((current) => current || items[0]?.id || ''); }).catch(() => { }); }, []);
 
   const filteredVisits = useMemo(() => {
