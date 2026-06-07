@@ -30,7 +30,7 @@ export default function LabManagerDashboardPage() {
         const labDepts = allDepts.filter(d => d.type === 'LABORATORY' || d.type === 'IMAGING');
 
         // 2. Load all clinical rooms
-        const roomRes = await api.get('/clinical-rooms', { params: { limit: 200 } });
+        const roomRes = await api.get('/clinical-rooms', { params: { limit: 100 } });
         let allRooms = roomRes.data?.data?.items || roomRes.data?.items || roomRes.data?.data || roomRes.data || [];
         if (!Array.isArray(allRooms)) allRooms = [];
 
