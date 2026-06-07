@@ -40,9 +40,14 @@ export class ShiftController {
   async register(@CurrentUser() user: AuthUser, @Body() body: RegisterShiftDto) {
     // Use staff profile id from JWT if available, otherwise find it
     const staffId = (user as any).staffId || user.sub;
+    // Auto-resolve: if clinicalRoomId is actually a department ID, find or create a ClinicalRoom
+    let clinicalRoomId = body.clinicalRoomId;
+    try {
+      clinicalRoomId = await this.registerShift.resolveClinicalRoom(body.clinicalRoomId);
+    } catch (e) { /* keep original ID, let use-case throw proper error */ }
     return this.registerShift.execute(
       staffId,
-      body.clinicalRoomId,
+      clinicalRoomId,
       new Date(body.startTime),
       new Date(body.endTime),
       user.sub,
@@ -86,8 +91,11 @@ export class ShiftController {
   @UseGuards(JwtAuthGuard)
   @Get('room/:roomId')
   async roomShifts(@Param('roomId') roomId: string, @Query() query: ListRoomShiftsDto) {
+    // Resolve: roomId could be a department ID
+    let resolvedRoomId = roomId;
+    try { resolvedRoomId = await this.registerShift.resolveClinicalRoom(roomId); } catch { /* keep original */ }
     return this.listRoomShifts.execute(
-      roomId,
+      resolvedRoomId,
       query.from ? new Date(query.from) : undefined,
       query.to ? new Date(query.to) : undefined,
     );

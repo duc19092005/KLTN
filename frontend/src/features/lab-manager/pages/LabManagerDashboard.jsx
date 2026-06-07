@@ -24,15 +24,37 @@ export default function LabManagerDashboardPage() {
     let mounted = true;
     async function loadRooms() {
       try {
-        // Load all clinical rooms, then filter to LABORATORY/IMAGING only
-        const res = await api.get('/clinical-rooms');
-        let list = Array.isArray(res.data) ? (Array.isArray(res.data?.data) ? res.data.data : res.data) : (res.data?.items || []);
+        // 1. Load departments (LABORATORY + IMAGING only)
+        const deptRes = await api.get('/departments', { params: { limit: 100 } });
+        const allDepts = deptRes.data?.data?.items || deptRes.data?.items || deptRes.data?.data || [];
+        const labDepts = allDepts.filter(d => d.type === 'LABORATORY' || d.type === 'IMAGING');
 
-        // Filter: only rooms for LAB/IMAGING departments
-        list = list.filter(room => {
-          const deptType = room.doctor?.staffProfile?.department?.type;
-          return !deptType || deptType === 'LABORATORY' || deptType === 'IMAGING';
-        });
+        // 2. Load all clinical rooms
+        const roomRes = await api.get('/clinical-rooms', { params: { limit: 200 } });
+        let allRooms = roomRes.data?.data?.items || roomRes.data?.items || roomRes.data?.data || roomRes.data || [];
+        if (!Array.isArray(allRooms)) allRooms = [];
+
+        // 3. Match rooms to departments via doctor.staffProfile.departmentId (narrow filter)
+        const matchedRooms = [];
+        const usedRoomIds = new Set();
+        for (const dept of labDepts) {
+          const room = allRooms.find(r => {
+            const deptId = r.doctor?.staffProfile?.departmentId;
+            return deptId === dept.id && !usedRoomIds.has(r.id);
+          });
+          if (room) {
+            usedRoomIds.add(room.id);
+            matchedRooms.push({ ...room, _deptName: dept.name, _deptId: dept.id });
+          }
+        }
+
+        // 4. Fallback: if no room matched, synthesize from departments
+        const list = matchedRooms.length > 0 ? matchedRooms : labDepts.map(d => ({
+          id: d.id,
+          roomName: `[${d.type === 'LABORATORY' ? 'XN' : 'CĐHA'}] ${d.name}`,
+          roomCode: d.departmentCode,
+          _deptId: d.id,
+        }));
 
         if (mounted && list.length > 0) {
           setRooms(list);

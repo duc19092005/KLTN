@@ -112,31 +112,64 @@ export default function ShiftManagementPage() {
   }, [shifts]);
 
   /* ── Fetch rooms ─────────────────────────────────────────────── */
+  // Paraclinical shifts need rooms tied to LABORATORY / IMAGING departments.
+  // Strategy: load departments first, then find/create clinical rooms for them.
   useEffect(() => {
     let mounted = true;
     async function load() {
       try {
-        // Load all clinical rooms
-        const res = await api.get('/clinical-rooms');
-        let list = Array.isArray(res.data) ? (Array.isArray(res.data?.data) ? res.data.data : res.data) : (res.data?.items || []);
+        // 1. Load departments (LABORATORY + IMAGING only)
+        const deptRes = await api.get('/departments', { params: { limit: 100 } });
+        const allDepts = deptRes.data?.data?.items || deptRes.data?.items || deptRes.data?.data || [];
+        const labDepts = allDepts.filter(d => d.type === 'LABORATORY' || d.type === 'IMAGING');
 
-        // Filter: only show rooms belonging to LABORATORY or IMAGING departments
-        // (exclude doctor exam rooms and reception rooms)
-        list = list.filter(room => {
-          const deptType = room.doctor?.staffProfile?.department?.type;
-          // Include rooms whose doctor belongs to LAB/IMAGING, or rooms with no doctor (unassigned)
-          return !deptType || deptType === 'LABORATORY' || deptType === 'IMAGING';
-        });
+        // 2. Load all clinical rooms
+        const roomRes = await api.get('/clinical-rooms', { params: { limit: 200 } });
+        let allRooms = roomRes.data?.data?.items || roomRes.data?.items || roomRes.data?.data || roomRes.data || [];
+        if (!Array.isArray(allRooms)) allRooms = [];
 
-        console.log('[ShiftManagement] clinical rooms filtered (LAB/IMAGING only):', list.length, list.map(r => `${r.roomName} (dept: ${r.doctor?.staffProfile?.department?.type || 'none'})`));
+        // 3. Match rooms to departments via doctor.staffProfile.departmentId
+        const matchedRooms = [];
+        const usedRoomIds = new Set();
+
+        for (const dept of labDepts) {
+          // Find a room whose doctor belongs to this department
+          const room = allRooms.find(r => {
+            const deptId = r.doctor?.staffProfile?.departmentId;
+            return deptId === dept.id && !usedRoomIds.has(r.id);
+          });
+          if (room) {
+            usedRoomIds.add(room.id);
+            matchedRooms.push({ ...room, _deptName: dept.name, _deptId: dept.id });
+          }
+        }
+
+        // 4. Also include rooms with no doctor (unassigned) as fallback
+        for (const room of allRooms) {
+          if (!usedRoomIds.has(room.id) && !room.doctorId) {
+            matchedRooms.push(room);
+          }
+        }
+
+        console.log('[ShiftManagement] departments (LAB/IMAGING):', labDepts.length, 'matched rooms:', matchedRooms.length,
+          matchedRooms.map(r => `${r.roomName || r._deptName} (deptId: ${r._deptId || 'none'})`));
 
         if (mounted) {
+          const list = matchedRooms.length > 0 ? matchedRooms : labDepts.map(d => ({
+            id: d.id,  // use department ID as fallback
+            roomName: `[${d.type === 'LABORATORY' ? 'XN' : 'CĐHA'}] ${d.name}`,
+            roomCode: d.departmentCode,
+            _deptId: d.id,
+            _isDeptFallback: true,
+          }));
           setRooms(list);
           if (!selectedRoomId && list.length > 0) {
             setSelectedRoomId(list[0].id);
           }
         }
-      } catch { /* ignore */ }
+      } catch (err) {
+        console.error('[ShiftManagement] Failed to load rooms:', err);
+      }
     }
     load();
     return () => { mounted = false; };
@@ -225,7 +258,7 @@ export default function ShiftManagementPage() {
 
     const dayDate = toLocalISODate(dragDay.date);
     setRegisterForm({
-      roomId: user?.clinicalRoomId || '',
+      roomId: selectedRoomId || user?.clinicalRoomId || '',
       startTime: `${dayDate}T${pad(startHour)}:00`,
       endTime: `${dayDate}T${pad(endHour)}:00`,
       note: '',

@@ -4,6 +4,7 @@ import {
   ParaclinicalShiftRepositoryPort,
 } from '../ports/paraclinical-shift.repository.port';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 
 /**
  * Register a shift for the current staff member.
@@ -21,6 +22,7 @@ export class RegisterShiftUseCase {
   constructor(
     @Inject(PARACLINICAL_SHIFT_REPOSITORY) private readonly repo: ParaclinicalShiftRepositoryPort,
     private readonly auditLogger: AuditLoggerService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async execute(
@@ -78,5 +80,52 @@ export class RegisterShiftUseCase {
     }
 
     return { ...shift, hash256: hash, dataSalt: salt };
+  }
+
+  /**
+   * Resolve a potential department ID to a ClinicalRoom ID.
+   * Lab staff register shifts against their department (Lab/Imaging), but
+   * ParaclinicalShift requires a ClinicalRoom. This method finds or creates
+   * a ClinicalRoom auto-mapped to the department so shifts work seamlessly.
+   */
+  async resolveClinicalRoom(roomOrDeptId: string): Promise<string> {
+    // 1. Check if it's already a ClinicalRoom
+    const existingRoom = await this.prisma.clinicalRoom.findUnique({
+      where: { id: roomOrDeptId },
+      select: { id: true },
+    });
+    if (existingRoom) return existingRoom.id;
+
+    // 2. Check if it's a Department (LABORATORY / IMAGING)
+    const department = await this.prisma.department.findUnique({
+      where: { id: roomOrDeptId },
+      select: { id: true, name: true, departmentCode: true, type: true },
+    });
+
+    if (!department || (department.type !== 'LABORATORY' && department.type !== 'IMAGING')) {
+      // Not a valid department for paraclinical shifts — let the original flow error out
+      throw new BadRequestException('Invalid clinical room or department for paraclinical shift');
+    }
+
+    // 3. Check if a ClinicalRoom already exists for this department (by roomCode = dept.departmentCode)
+    const autoRoom = await this.prisma.clinicalRoom.findFirst({
+      where: { roomCode: department.departmentCode },
+      select: { id: true },
+    });
+    if (autoRoom) return autoRoom.id;
+
+    // 4. Auto-create a ClinicalRoom for this department
+    const newRoom = await this.prisma.clinicalRoom.create({
+      data: {
+        roomCode: department.departmentCode,
+        roomName: `${department.name}`,
+        floor: '01',
+        description: `Auto-generated room for ${department.type === 'LABORATORY' ? 'Laboratory' : 'Imaging'} department: ${department.name}`,
+        status: 'ACTIVE',
+      },
+      select: { id: true },
+    });
+
+    return newRoom.id;
   }
 }
