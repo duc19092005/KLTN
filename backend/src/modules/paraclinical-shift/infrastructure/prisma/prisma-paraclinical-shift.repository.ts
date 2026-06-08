@@ -20,6 +20,7 @@ const SHIFT_INCLUDE = {
           faceHash: true,
           failedFaceAttempts: true,
           faceLockedUntil: true,
+          tokenVersion: true,
         },
       },
       department: { select: { id: true, name: true, type: true } },

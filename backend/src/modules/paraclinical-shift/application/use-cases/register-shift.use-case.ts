@@ -43,6 +43,7 @@ export class RegisterShiftUseCase {
     }
 
     const trimmedNote = note?.trim() || null;
+    await this.assertStaffCanWorkInRoom(staffId, clinicalRoomId);
     const shift = await this.repo.createShift({ staffId, clinicalRoomId, startTime, endTime, note: trimmedNote });
 
     // Compute tamper-evidence hash for the PENDING registration and anchor it on-chain.
@@ -148,5 +149,36 @@ export class RegisterShiftUseCase {
       select: { id: true },
     });
     return staffByUser?.id ?? null;
+  }
+
+  private async assertStaffCanWorkInRoom(staffId: string, clinicalRoomId: string) {
+    const [staff, room] = await Promise.all([
+      this.prisma.staffProfile.findUnique({
+        where: { id: staffId },
+        select: { labSpecialty: true, user: { select: { role: true } } },
+      }),
+      this.prisma.clinicalRoom.findUnique({
+        where: { id: clinicalRoomId },
+        select: { roomCode: true },
+      }),
+    ]);
+
+    if (!staff || staff.user.role !== 'LAB_MANAGER' || !room) return;
+
+    const department = await this.prisma.department.findFirst({
+      where: {
+        departmentCode: room.roomCode,
+        type: { in: ['LABORATORY', 'IMAGING'] },
+      },
+      select: { type: true, name: true },
+    });
+
+    if (!department) return;
+
+    const specialty = staff.labSpecialty;
+    const canWork = !specialty || specialty === 'BOTH' || specialty === department.type;
+    if (!canWork) {
+      throw new BadRequestException(`Chuyên môn của nhân viên không phù hợp với phòng ${department.name}.`);
+    }
   }
 }

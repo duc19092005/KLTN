@@ -7,7 +7,6 @@ import { usePreferences } from '../../../providers/PreferencesProvider';
 import { useToast } from '../../../providers/ToastProvider';
 import { shiftService } from '../apis/paraclinicalService';
 import { LAB_MANAGER_NAV_ITEMS, labManagerRouteFor } from '../../lab-manager/constants/navigation';
-import api from '../../../shared/apis/api';
 
 /* ── Constants ──────────────────────────────────────────────────── */
 const STATUS_META = {
@@ -87,8 +86,8 @@ export default function ShiftManagementPage() {
   const [isDragging, setIsDragging] = useState(false);
   const calendarRef = useRef(null);
 
-  // Register form
   const [registerForm, setRegisterForm] = useState({ roomId: '', startTime: '', endTime: '', note: '' });
+  const [registering, setRegistering] = useState(false);
 
   const isManager = user?.isManager || false;
   const { prefs } = usePreferences();
@@ -118,57 +117,15 @@ export default function ShiftManagementPage() {
     let mounted = true;
     async function load() {
       try {
-        // 1. Load departments (LABORATORY + IMAGING only)
-        const deptRes = await api.get('/departments', { params: { limit: 100 } });
-        const allDepts = deptRes.data?.data?.items || deptRes.data?.items || deptRes.data?.data || [];
-        const labDepts = allDepts.filter(d => d.type === 'LABORATORY' || d.type === 'IMAGING');
-
-        // 2. Load all clinical rooms
-        const roomRes = await api.get('/clinical-rooms', { params: { limit: 100 } });
-        let allRooms = roomRes.data?.data?.items || roomRes.data?.items || roomRes.data?.data || roomRes.data || [];
-        if (!Array.isArray(allRooms)) allRooms = [];
-
-        // 3. Match rooms to departments via doctor.staffProfile.departmentId
-        const matchedRooms = [];
-        const usedRoomIds = new Set();
-
-        for (const dept of labDepts) {
-          // Find a room whose doctor belongs to this department
-          const room = allRooms.find(r => {
-            const deptId = r.doctor?.staffProfile?.departmentId;
-            return deptId === dept.id && !usedRoomIds.has(r.id);
-          });
-          if (room) {
-            usedRoomIds.add(room.id);
-            matchedRooms.push({ ...room, _deptName: dept.name, _deptId: dept.id });
-          }
-        }
-
-        // 4. Also include rooms with no doctor (unassigned) as fallback
-        for (const room of allRooms) {
-          if (!usedRoomIds.has(room.id) && !room.doctorId) {
-            matchedRooms.push(room);
-          }
-        }
-
-        console.log('[ShiftManagement] departments (LAB/IMAGING):', labDepts.length, 'matched rooms:', matchedRooms.length,
-          matchedRooms.map(r => `${r.roomName || r._deptName} (deptId: ${r._deptId || 'none'})`));
-
+        const res = await shiftService.availableRooms();
+        const list = Array.isArray(res.data) ? res.data : [];
         if (mounted) {
-          const list = matchedRooms.length > 0 ? matchedRooms : labDepts.map(d => ({
-            id: d.id,  // use department ID as fallback
-            roomName: `[${d.type === 'LABORATORY' ? 'XN' : 'CĐHA'}] ${d.name}`,
-            roomCode: d.departmentCode,
-            _deptId: d.id,
-            _isDeptFallback: true,
-          }));
           setRooms(list);
-          if (!selectedRoomId && list.length > 0) {
-            setSelectedRoomId(list[0].id);
-          }
+          if (!selectedRoomId && list.length > 0) setSelectedRoomId(list[0].id);
         }
       } catch (err) {
-        console.error('[ShiftManagement] Failed to load rooms:', err);
+        console.error('[ShiftManagement] Failed to load specialty-filtered rooms:', err);
+        toast.error('Không tải được danh sách phòng phù hợp chuyên môn.');
       }
     }
     load();
@@ -194,11 +151,11 @@ export default function ShiftManagementPage() {
   const loadMyShifts = useCallback(async () => {
     setHistoryLoading(true);
     try {
-      const roomId = selectedRoomId;
-      if (!roomId) return;
       const from = new Date();
       from.setFullYear(from.getFullYear() - 1);
-      const res = await shiftService.listByRoom(roomId, from.toISOString(), new Date().toISOString());
+      const to = new Date();
+      to.setFullYear(to.getFullYear() + 1);
+      const res = await shiftService.myShifts(from.toISOString(), to.toISOString());
       const all = Array.isArray(res.data) ? res.data : [];
       setMyShifts(all.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()));
     } catch { /* ignore */ } finally { setHistoryLoading(false); }
@@ -286,14 +243,17 @@ export default function ShiftManagementPage() {
   /* ── Register ────────────────────────────────────────────────── */
   const handleRegister = async (e) => {
     e.preventDefault();
+    setRegistering(true);
     try {
       await shiftService.register(registerForm.roomId, registerForm.startTime, registerForm.endTime, registerForm.note, demoMode);
-      toast.success('Đăng ký ca trực thành công!');
+      toast.success('Đã gửi đăng ký ca trực. Bạn chỉ đăng nhập được bằng quét khuôn mặt sau khi trưởng phòng duyệt ca.');
       setShowRegister(false);
-      setRegisterForm({ roomId: user?.clinicalRoomId || '', startTime: '', endTime: '', note: '' });
-      loadShifts();
+      setRegisterForm({ roomId: selectedRoomId || user?.clinicalRoomId || '', startTime: '', endTime: '', note: '' });
+      await Promise.all([loadShifts(), loadMyShifts()]);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Đăng ký thất bại');
+    } finally {
+      setRegistering(false);
     }
   };
 
@@ -443,6 +403,7 @@ export default function ShiftManagementPage() {
             onClose={() => setShowRegister(false)}
             rooms={rooms}
             demoMode={demoMode}
+            submitting={registering}
           />
         )}
 
@@ -526,7 +487,7 @@ function CalendarCell({ day, isToday, isPast, shifts, isDragging, dragDay, dragS
 /* ==================================================================
    RegisterModal
    ================================================================== */
-function RegisterModal({ form, setForm, onSubmit, onClose, rooms, demoMode = false }) {
+function RegisterModal({ form, setForm, onSubmit, onClose, rooms, demoMode = false, submitting = false }) {
   const today = new Date();
   const minDate = demoMode ? '2020-01-01' : toLocalISODate(today);
   const maxDate = demoMode ? '2030-12-31' : toLocalISODate(new Date(today.getFullYear(), today.getMonth() + 2, 0));
@@ -546,20 +507,29 @@ function RegisterModal({ form, setForm, onSubmit, onClose, rooms, demoMode = fal
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="rounded-3xl bg-white shadow-2xl w-full max-w-lg mx-4 overflow-hidden animate-slideUp">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 p-5">
-          <h3 className="text-lg font-black text-white">Đăng ký ca trực mới</h3>
-          <p className="text-xs text-cyan-100 mt-1">Chọn ngày giờ bạn muốn đăng ký làm việc.</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 backdrop-blur-md p-4">
+      <div className="rounded-[2rem] bg-white shadow-2xl w-full max-w-xl mx-4 overflow-hidden animate-slideUp border border-white/70">
+        <div className="relative overflow-hidden bg-gradient-to-br from-cyan-600 via-blue-600 to-indigo-700 p-6">
+          <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+          <div className="absolute -bottom-12 left-10 h-28 w-28 rounded-full bg-cyan-200/20 blur-2xl" />
+          <div className="relative">
+            <span className="inline-flex rounded-full bg-white/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-50 ring-1 ring-white/20">Đăng ký · Chờ duyệt</span>
+            <h3 className="mt-3 text-xl font-black text-white">Đăng ký ca trực mới</h3>
+            <p className="mt-1 text-xs font-semibold leading-relaxed text-cyan-50">Sau khi gửi, ca sẽ ở trạng thái <b>Chờ duyệt</b>. Nhân viên chỉ quét mặt đăng nhập tài khoản phòng khi ca đã <b>Được duyệt</b> và đang trong giờ làm.</p>
+          </div>
         </div>
         <form onSubmit={onSubmit} className="p-5 space-y-4">
+          <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-3 text-xs font-semibold text-amber-800">
+            <p className="font-black">Ràng buộc đăng nhập bằng khuôn mặt</p>
+            <p className="mt-1 leading-relaxed">Ca mới tạo sẽ không cho đăng nhập ngay. Hệ thống chỉ cho qua bước scan khi ca có trạng thái <b>Đã duyệt</b>, còn hiệu lực và chưa hết giờ.</p>
+          </div>
           <div>
             <label className="block text-[11px] font-black text-slate-600 mb-1.5 uppercase tracking-wider">Phòng làm việc</label>
             {rooms.length > 0 ? (
               <select
                 value={form.roomId}
                 onChange={(e) => setForm({ ...form, roomId: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 bg-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-3 text-sm font-bold text-slate-700 outline-none transition-all focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100"
               >
                 {rooms.map((r) => (
                   <option key={r.id} value={r.id}>{r.roomName || r.roomCode} - {r.roomCode}</option>
@@ -570,8 +540,8 @@ function RegisterModal({ form, setForm, onSubmit, onClose, rooms, demoMode = fal
                 type="text"
                 value={form.roomId}
                 readOnly
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-500 outline-none cursor-not-allowed"
-                placeholder="Đang tải danh sách phòng..."
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-500 outline-none cursor-not-allowed"
+                placeholder="Đang tải danh sách phòng phù hợp chuyên môn..."
               />
             )}
           </div>
@@ -615,8 +585,10 @@ function RegisterModal({ form, setForm, onSubmit, onClose, rooms, demoMode = fal
             />
           </div>
           <div className="flex gap-2 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50 transition-all">Hủy</button>
-            <button type="submit" className="flex-1 rounded-xl bg-cyan-600 py-2.5 text-xs font-black text-white hover:bg-cyan-700 shadow-lg shadow-cyan-600/25 transition-all">Đăng ký</button>
+            <button type="button" disabled={submitting} onClick={onClose} className="flex-1 rounded-xl border border-slate-200 py-3 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-all">Hủy</button>
+            <button type="submit" disabled={submitting || !form.roomId || !form.startTime || !form.endTime} className="flex-1 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 py-3 text-xs font-black text-white shadow-lg shadow-cyan-600/25 transition-all hover:from-cyan-700 hover:to-blue-700 disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none">
+              {submitting ? 'Đang gửi...' : 'Gửi đăng ký chờ duyệt'}
+            </button>
           </div>
         </form>
       </div>
@@ -672,10 +644,10 @@ function HistoryModal({ shifts, loading, onClose }) {
                   <div className="min-w-0">
                     <p className="text-xs font-black">{dateStr}</p>
                     <p className="text-[11px] font-bold mt-0.5">{formatTimeLocal(shift.startTime)} - {formatTimeLocal(shift.endTime)}</p>
-                    {shift.note && <p className="text-[10px] text-slate-500 mt-0.5 truncate max-w-[300px]">{shift.note}</p>}
-                    {shift.status === 'REJECTED' && shift.rejectionReason && (
-                      <p className="text-[10px] text-red-600 mt-0.5">Lý do từ chối: {shift.rejectionReason}</p>
-                    )}
+                    <p className="text-[10px] text-slate-500 mt-0.5 truncate max-w-[300px]">Ghi chú: {shift.note || 'Không có ghi chú'}</p>
+                    <p className={`text-[10px] mt-0.5 ${shift.status === 'REJECTED' ? 'text-red-600' : 'text-slate-400'}`}>
+                      Lý do từ chối: {shift.rejectionReason || 'Không có'}
+                    </p>
                   </div>
                   <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-black shrink-0 ${meta.bg}`}>
                     <span className={`mr-1 h-1.5 w-1.5 rounded-full ${meta.dot}`} /> {meta.label}

@@ -36,6 +36,11 @@ export class CreateMedicalConclusionUseCase {
     this.policy.assertDoctorOwnsVisit(visit, doctor.id);
     this.policy.assertReadyForClinicalDecision(visit!.status);
 
+    const pendingOrders = await this.repo.countPendingMedicalOrders(visit!.id);
+    if (pendingOrders > 0) {
+      throw new BadRequestException(`Còn ${pendingOrders} phiếu chỉ định chưa có kết quả. Bác sĩ chỉ được kết luận khi tất cả phòng đã trả kết quả.`);
+    }
+
     if (dto.aiDiagnosisId) {
       const aiDiagnosis = await this.repo.findAiDiagnosisById(dto.aiDiagnosisId);
       if (!aiDiagnosis || aiDiagnosis.visitId !== visit!.id) {

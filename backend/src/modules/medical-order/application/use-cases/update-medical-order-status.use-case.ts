@@ -19,7 +19,8 @@ export class UpdateMedicalOrderStatusUseCase {
     const order = await this.repo.findOrderForManage(id);
     if (!order) throw new NotFoundException('Không tìm thấy phiếu chỉ định.');
 
-    await this.accessPolicy.assertCanManageOrder(order, user, () => this.resolveStaff(user.sub));
+    await this.accessPolicy.assertCanManageOrder(order, user, () => this.resolveStaff(this.getActualStaffUserId(user)));
+    await this.assertActiveApprovedShiftForOrder(order.targetDepartmentId, user);
 
     const completedAt =
       status === MedicalOrderStatus.RESULT_READY || status === MedicalOrderStatus.CANCELLED ? new Date() : undefined;
@@ -30,5 +31,28 @@ export class UpdateMedicalOrderStatusUseCase {
     const staff = await this.repo.findStaffByUserId(userId);
     if (!staff) throw new ForbiddenException('Tài khoản hiện tại không có hồ sơ nhân sự.');
     return staff;
+  }
+
+  private async assertActiveApprovedShiftForOrder(targetDepartmentId: string | null, user: AuthUser) {
+    if (user.role === 'ADMIN') return;
+    if (!user.verified || !user.shiftId || !user.staffId) {
+      throw new ForbiddenException('Chỉ nhân viên đã quét khuôn mặt trong ca trực được duyệt mới được cập nhật phiếu chỉ định.');
+    }
+
+    const shift = await this.repo.findActiveApprovedShift(user.shiftId, new Date(), this.isDemoMode());
+    if (!shift || shift.staffId !== user.staffId || shift.staff.userId !== this.getActualStaffUserId(user)) {
+      throw new ForbiddenException('Ca trực đã hết hiệu lực hoặc không khớp với nhân viên đang đăng nhập.');
+    }
+    if (!targetDepartmentId || shift.staff.departmentId !== targetDepartmentId) {
+      throw new ForbiddenException('Ca trực hiện tại không thuộc phòng ban nhận phiếu chỉ định này.');
+    }
+  }
+
+  private isDemoMode() {
+    return process.env.DEMO_MODE === 'true';
+  }
+
+  private getActualStaffUserId(user: AuthUser) {
+    return user.actualStaffId || user.sub;
   }
 }

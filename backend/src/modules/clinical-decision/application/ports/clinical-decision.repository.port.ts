@@ -48,6 +48,7 @@ export interface ClinicalDecisionRepositoryPort {
   updateAiDiagnosisReview(id: string, reviewedByDoctorId: string, doctorFeedback: string | null): Promise<unknown>;
 
   findAiDiagnosisById(id: string): Promise<{ id: string; visitId: string } | null>;
+  countPendingMedicalOrders(visitId: string): Promise<number>;
 
   findConclusionByVisitId(visitId: string): Promise<any | null>;
 

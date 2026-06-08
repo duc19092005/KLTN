@@ -17,4 +17,10 @@ export type AuthUser = {
   walletAddress?: string;
   firstLogin?: boolean;
   tokenVersion?: number;
+  staffId?: string;
+  shiftId?: string;
+  clinicalRoomId?: string;
+  staffName?: string;
+  sharedAccountId?: string;
+  actualStaffId?: string;
 };

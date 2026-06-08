@@ -62,7 +62,7 @@ export class VerifyShiftFaceUseCase {
 
     const rooms = await this.repo.findRoomsByDepartmentStaff(departmentId);
     if (rooms.length === 0) {
-      throw new ForbiddenException('Không tìm thấy phòng nào có ca trực hoạt động.');
+      throw new ForbiddenException('Chỉ nhân viên có ca trực đã được duyệt và đang trong giờ làm mới được quét khuôn mặt để đăng nhập.');
     }
 
     // 4. Gather all active shifts across all rooms in the department
@@ -127,6 +127,9 @@ export class VerifyShiftFaceUseCase {
       clinicalRoomId: matchedShift.clinicalRoomId,
       verified: true,
       isFirstLogin: false,
+      tokenVersion: matchedUser.tokenVersion,
+      sharedAccountId: payload.sub,
+      actualStaffId: matchedUser.id,
     });
 
     await this.logger.write(matchedUser.id, 'PARACLINICAL_LOGIN_SUCCESS', 'User', matchedUser.id, {

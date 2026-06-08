@@ -11,6 +11,7 @@ import { InitiateHandoverUseCase } from '../application/use-cases/initiate-hando
 import { VerifyHandoverFaceAUseCase } from '../application/use-cases/verify-handover-face-a.use-case';
 import { VerifyHandoverFaceBUseCase } from '../application/use-cases/verify-handover-face-b.use-case';
 import { VerifyParaclinicalShiftUseCase } from '../application/use-cases/verify-paraclinical-shift.use-case';
+import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 
 /**
  * Facade preserving a stable API surface. Each method delegates to a single use case.
@@ -30,6 +31,7 @@ export class ParaclinicalShiftService {
     private readonly verifyHandoverFaceAUC: VerifyHandoverFaceAUseCase,
     private readonly verifyHandoverFaceBUC: VerifyHandoverFaceBUseCase,
     private readonly verifyShiftUC: VerifyParaclinicalShiftUseCase,
+    private readonly prisma: PrismaService,
   ) {}
 
   async registerShift(staffIdOrUserId: string, clinicalRoomId: string, startTime: Date, endTime: Date, actorId: string, note?: string, demoMode = false) {
@@ -101,6 +103,63 @@ export class ParaclinicalShiftService {
 
   verifyShift(id: string) {
     return this.verifyShiftUC.verifyOne(id);
+  }
+
+  async getAvailableRoomsForUser(userId: string) {
+    const staff = await this.prisma.staffProfile.findUnique({
+      where: { userId },
+      select: { labSpecialty: true },
+    });
+    const specialty = staff?.labSpecialty;
+    const allowedTypes = specialty === 'LABORATORY'
+      ? ['LABORATORY' as const]
+      : specialty === 'IMAGING'
+        ? ['IMAGING' as const]
+        : ['LABORATORY' as const, 'IMAGING' as const];
+
+    const departments = await this.prisma.department.findMany({
+      where: {
+        status: 'ACTIVE',
+        type: { in: allowedTypes },
+        canReceiveOrders: true,
+      },
+      orderBy: [{ type: 'asc' }, { name: 'asc' }],
+      select: { id: true, departmentCode: true, name: true, type: true, floor: true, specialty: true },
+    });
+
+    return Promise.all(departments.map(async (department) => {
+      const roomId = await this.registerShiftUC.resolveClinicalRoom(department.id);
+      return {
+        id: roomId,
+        departmentId: department.id,
+        roomCode: department.departmentCode,
+        roomName: `[${department.type === 'LABORATORY' ? 'XN' : 'CĐHA'}] ${department.name}`,
+        departmentType: department.type,
+        specialty: department.specialty,
+        floor: department.floor,
+      };
+    }));
+  }
+
+  async getMyShifts(userId: string, from?: Date, to?: Date) {
+    const staff = await this.registerShiftUC.resolveStaffId(userId);
+    if (!staff) return [];
+    return this.prisma.paraclinicalShift.findMany({
+      where: {
+        staffId: staff,
+        ...(from || to ? {
+          startTime: {
+            ...(from ? { gte: from } : {}),
+            ...(to ? { lte: to } : {}),
+          },
+        } : {}),
+      },
+      include: {
+        staff: { select: { id: true, fullName: true, userId: true } },
+        clinicalRoom: { select: { id: true, roomCode: true, roomName: true } },
+      },
+      orderBy: { startTime: 'desc' },
+    });
   }
 
   verifyAllShifts() {

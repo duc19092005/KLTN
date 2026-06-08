@@ -14,9 +14,11 @@ import ParaclinicalLoginPage from '../features/paraclinical/pages/ParaclinicalLo
 import ParaclinicalDashboardPage from '../features/paraclinical/pages/ParaclinicalDashboardPage';
 import ShiftManagementPage from '../features/paraclinical/pages/ShiftManagementPage';
 import LabManagerDashboardPage from '../features/lab-manager/pages/LabManagerDashboard';
+import ShiftApprovalPage from '../features/lab-manager/pages/ShiftApprovalPage';
 import LoadingIndicator from '../shared/components/LoadingIndicator';
 import { getDashboardRoute } from '../shared/constants/roleRoutes';
 import { PatientVerificationPage } from '../features/verification';
+import PatientHomePage from '../features/patient/pages/PatientHomePage';
 import { ProfilePage } from '../features/profile';
 
 // Where a first-login user belongs: face FIRST so the user is biometrically known before being
@@ -45,6 +47,7 @@ export default function App() {
     <div className="app">
       <Routes>
         <Route path="/" element={<PatientVerificationPage />} />
+        <Route path="/patient-home" element={<PatientHomePage />} />
         <Route path="/login" element={!isAuthenticated || loading ? <Navigate to="/?login=true" replace /> : <Navigate to={user?.firstLogin ? firstLoginRoute(user) : dashboardRoute} replace />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/change-password" element={<ProtectedRoute allowFirstLogin><ChangePasswordPage /></ProtectedRoute>} />
@@ -69,6 +72,7 @@ export default function App() {
         <Route path="/lab-manager/work" element={<ProtectedRoute requireVerified roles={['DEPT_SHARED']}><ParaclinicalDashboardPage /></ProtectedRoute>} />
         <Route path="/lab-manager/shifts" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><ShiftManagementPage /></ProtectedRoute>} />
         <Route path="/lab-manager/history" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><ShiftManagementPage /></ProtectedRoute>} />
+        <Route path="/lab-manager/approvals" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']} requireManager><ShiftApprovalPage /></ProtectedRoute>} />
         <Route path="/lab-manager/orders" element={<ProtectedRoute requireVerified roles={['DEPT_SHARED']}><LabOrdersPage /></ProtectedRoute>} />
         <Route path="/lab-manager/results" element={<ProtectedRoute requireVerified roles={['DEPT_SHARED']}><LabResultsPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute requireVerified roles={['ADMIN', 'RECEPTIONIST', 'DOCTOR', 'LAB_MANAGER', 'DEPT_SHARED']}><ProfilePage /></ProtectedRoute>} />

@@ -34,7 +34,34 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
   }
 
   async findStaffByUserId(userId: string): Promise<StaffIdentity | null> {
-    return this.prisma.staffProfile.findUnique({ where: { userId }, select: { id: true, departmentId: true } });
+    return this.prisma.staffProfile.findUnique({ where: { userId }, select: { id: true, userId: true, departmentId: true } });
+  }
+
+  async findOrderDepartment(id: string) {
+    return this.prisma.department.findUnique({
+      where: { id },
+      select: { id: true, type: true, status: true, canReceiveOrders: true },
+    });
+  }
+
+  async findActiveApprovedShift(shiftId: string, now: Date, includeOutOfWindow = false) {
+    return this.prisma.paraclinicalShift.findFirst({
+      where: {
+        id: shiftId,
+        status: 'APPROVED',
+        isActive: true,
+        ...(includeOutOfWindow ? {} : {
+          startTime: { lte: now },
+          endTime: { gte: now },
+        }),
+      },
+      select: {
+        id: true,
+        staffId: true,
+        clinicalRoomId: true,
+        staff: { select: { userId: true, departmentId: true } },
+      },
+    });
   }
 
   async departmentExists(id: string): Promise<boolean> {

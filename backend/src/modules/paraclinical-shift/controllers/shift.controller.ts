@@ -87,6 +87,30 @@ export class ShiftController {
     );
   }
 
+  /** Rooms/departments the current LAB_MANAGER can register for, filtered by specialty. */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('LAB_MANAGER')
+  @Get('available-rooms')
+  async availableRooms(@CurrentUser() user: AuthUser) {
+    return this.service.getAvailableRoomsForUser(user.sub);
+  }
+
+  /** Current LAB_MANAGER's own shift registration log. */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('LAB_MANAGER')
+  @Get('my-shifts')
+  async myShifts(
+    @CurrentUser() user: AuthUser,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.service.getMyShifts(
+      user.sub,
+      from ? new Date(from) : undefined,
+      to ? new Date(to) : undefined,
+    );
+  }
+
   /** List shifts for a specific room with optional date range. */
   @UseGuards(JwtAuthGuard)
   @Get('room/:roomId')

@@ -25,8 +25,12 @@ export class CreateMedicalOrderUseCase {
     }
 
     if (dto.targetDepartmentId) {
-      const exists = await this.repo.departmentExists(dto.targetDepartmentId);
-      if (!exists) throw new NotFoundException('Không tìm thấy phòng ban nhận chỉ định.');
+      const department = await this.repo.findOrderDepartment(dto.targetDepartmentId);
+      if (!department) throw new NotFoundException('Không tìm thấy phòng ban nhận chỉ định.');
+      const isParaclinicalDepartment = ['LABORATORY', 'IMAGING'].includes(department.type);
+      if (department.status !== 'ACTIVE' || !department.canReceiveOrders || !isParaclinicalDepartment) {
+        throw new BadRequestException('Chỉ được chỉ định tới phòng xét nghiệm hoặc chẩn đoán hình ảnh đang nhận chỉ định.');
+      }
     }
 
     return this.repo.createOrderWithVisitTransition({

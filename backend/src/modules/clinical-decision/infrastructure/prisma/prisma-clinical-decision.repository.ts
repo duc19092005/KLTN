@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AiModelRegistry, VisitStatus } from '@prisma/client';
+import { AiModelRegistry, MedicalOrderStatus, VisitStatus } from '@prisma/client';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import {
   ClinicalDecisionRepositoryPort,
@@ -83,6 +83,15 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
 
   async findAiDiagnosisById(id: string) {
     return this.prisma.aiDiagnosis.findUnique({ where: { id }, select: { id: true, visitId: true } });
+  }
+
+  async countPendingMedicalOrders(visitId: string): Promise<number> {
+    return this.prisma.medicalOrder.count({
+      where: {
+        visitId,
+        status: { notIn: [MedicalOrderStatus.CANCELLED, MedicalOrderStatus.RESULT_READY] },
+      },
+    });
   }
 
   async findConclusionByVisitId(visitId: string): Promise<any | null> {

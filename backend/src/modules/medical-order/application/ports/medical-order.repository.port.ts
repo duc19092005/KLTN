@@ -55,7 +55,21 @@ export type ResultFileWithOrder = {
   order: { id: string; doctorId: string; targetDepartmentId: string | null };
 } | null;
 
-export type StaffIdentity = { id: string; departmentId: string | null };
+export type StaffIdentity = { id: string; userId?: string; departmentId: string | null };
+
+export type OrderDepartmentInfo = {
+  id: string;
+  type: string;
+  status: string;
+  canReceiveOrders: boolean;
+};
+
+export type ActiveShiftInfo = {
+  id: string;
+  staffId: string;
+  clinicalRoomId: string;
+  staff: { userId: string; departmentId: string | null };
+};
 
 /**
  * Persistence boundary for the MedicalOrder aggregate. The Prisma implementation
@@ -66,6 +80,8 @@ export interface MedicalOrderRepositoryPort {
   findVisitForOrder(visitId: string): Promise<OrderVisitInfo | null>;
   findDoctorIdByUserId(userId: string): Promise<string | null>;
   findStaffByUserId(userId: string): Promise<StaffIdentity | null>;
+  findOrderDepartment(id: string): Promise<OrderDepartmentInfo | null>;
+  findActiveApprovedShift(shiftId: string, now: Date, includeOutOfWindow?: boolean): Promise<ActiveShiftInfo | null>;
   departmentExists(id: string): Promise<boolean>;
 
   /** Atomic: generate unique order code, create order, transition visit to WAITING_TEST_RESULT (with retry). */

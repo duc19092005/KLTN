@@ -42,6 +42,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       walletAddress: payload.walletAddress || user.adminProfile?.walletAddress,
       firstLogin: user.firstLogin,
       tokenVersion: user.tokenVersion,
+      staffId: payload.staffId,
+      staffName: payload.staffName,
+      shiftId: payload.shiftId,
+      clinicalRoomId: payload.clinicalRoomId,
+      sharedAccountId: payload.sharedAccountId,
+      actualStaffId: payload.actualStaffId,
     };
   }
 }

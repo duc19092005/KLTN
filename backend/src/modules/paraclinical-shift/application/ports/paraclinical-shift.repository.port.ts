@@ -42,6 +42,7 @@ export type ShiftWithStaff = {
       faceHash: string | null;
       failedFaceAttempts: number;
       faceLockedUntil: Date | null;
+      tokenVersion: number;
     };
     department: { id: string; name: string; type: string } | null;
     doctorProfile: { id: string } | null;

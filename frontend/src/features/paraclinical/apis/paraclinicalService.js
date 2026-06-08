@@ -19,6 +19,12 @@ export const shiftService = {
   listByRoom: (roomId, from, to) =>
     api.get(`/paraclinical/shifts/room/${roomId}`, { params: { from, to } }),
 
+  /** Rooms available for the current LAB_MANAGER, filtered by specialty. */
+  availableRooms: () => api.get('/paraclinical/shifts/available-rooms'),
+
+  /** Current LAB_MANAGER's own shift history. */
+  myShifts: (from, to) => api.get('/paraclinical/shifts/my-shifts', { params: { from, to } }),
+
   /** List all PENDING shifts for approval. */
   listPending: (departmentId) =>
     api.get('/paraclinical/shifts/pending', { params: { departmentId } }),

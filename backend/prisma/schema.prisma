@@ -41,6 +41,12 @@ enum ShiftStatus {
   REJECTED
 }
 
+enum LabSpecialty {
+  LABORATORY
+  IMAGING
+  BOTH
+}
+
 model User {
   id                String     @id @default(uuid())
   username          String     @unique
@@ -138,6 +144,7 @@ model StaffProfile {
   avatarUrl      String
   employeeCode   String  @unique
   position       String?
+  labSpecialty   LabSpecialty?
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -155,6 +162,7 @@ model StaffProfile {
 
   @@index([departmentId])
   @@index([fullName])
+  @@index([labSpecialty])
 }
 
 model DoctorProfile {

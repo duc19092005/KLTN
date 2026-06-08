@@ -21,7 +21,8 @@ export class CreateMedicalResultUseCase {
     const order = await this.repo.findOrderForManage(orderId);
     if (!order) throw new NotFoundException('Không tìm thấy phiếu chỉ định.');
 
-    await this.accessPolicy.assertCanManageOrder(order, user, () => this.resolveStaff(user.sub));
+    await this.accessPolicy.assertCanManageOrder(order, user, () => this.resolveStaff(this.getActualStaffUserId(user)));
+    await this.assertActiveApprovedShiftForOrder(order.targetDepartmentId, user);
 
     if (([MedicalOrderStatus.RESULT_READY, MedicalOrderStatus.CANCELLED] as MedicalOrderStatus[]).includes(order.status)) {
       throw new BadRequestException('Không thể trả kết quả cho phiếu đã sẵn sàng, hoàn tất hoặc đã hủy.');
@@ -31,7 +32,7 @@ export class CreateMedicalResultUseCase {
     return this.repo.createResultWithTransitions(
       {
         orderId,
-        performedById: user.sub,
+        performedById: this.getActualStaffUserId(user),
         note: dto.note?.trim() || undefined,
         files: dto.files.map((file) => ({
           fileName: file.fileName,
@@ -49,5 +50,28 @@ export class CreateMedicalResultUseCase {
     const staff = await this.repo.findStaffByUserId(userId);
     if (!staff) throw new ForbiddenException('Tài khoản hiện tại không có hồ sơ nhân sự.');
     return staff;
+  }
+
+  private async assertActiveApprovedShiftForOrder(targetDepartmentId: string | null, user: AuthUser) {
+    if (user.role === 'ADMIN') return;
+    if (!user.verified || !user.shiftId || !user.staffId) {
+      throw new ForbiddenException('Chỉ nhân viên đã quét khuôn mặt trong ca trực được duyệt mới được trả kết quả.');
+    }
+
+    const shift = await this.repo.findActiveApprovedShift(user.shiftId, new Date(), this.isDemoMode());
+    if (!shift || shift.staffId !== user.staffId || shift.staff.userId !== this.getActualStaffUserId(user)) {
+      throw new ForbiddenException('Ca trực đã hết hiệu lực hoặc không khớp với nhân viên đang đăng nhập.');
+    }
+    if (!targetDepartmentId || shift.staff.departmentId !== targetDepartmentId) {
+      throw new ForbiddenException('Ca trực hiện tại không thuộc phòng ban nhận phiếu chỉ định này.');
+    }
+  }
+
+  private isDemoMode() {
+    return process.env.DEMO_MODE === 'true';
+  }
+
+  private getActualStaffUserId(user: AuthUser) {
+    return user.actualStaffId || user.sub;
   }
 }
