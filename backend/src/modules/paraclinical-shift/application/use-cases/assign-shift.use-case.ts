@@ -1,9 +1,11 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { ShiftCode } from '@prisma/client';
 import {
   PARACLINICAL_SHIFT_REPOSITORY,
   ParaclinicalShiftRepositoryPort,
 } from '../ports/paraclinical-shift.repository.port';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { resolveParaclinicalShiftWindow } from '../utils/shift-schedule.util';
 
 /**
  * Admin/Head-of-department directly assigns a shift (auto-APPROVED).
@@ -15,26 +17,34 @@ export class AssignShiftUseCase {
     private readonly auditLogger: AuditLoggerService,
   ) {}
 
-  async execute(staffId: string, departmentId: string, startTime: Date, endTime: Date, approvedById: string) {
-    if (startTime >= endTime) {
-      throw new BadRequestException('Thời gian bắt đầu phải trước thời gian kết thúc.');
-    }
+  async execute(staffId: string, departmentId: string, workDateInput: Date, shiftCode: ShiftCode, approvedById: string) {
+    const schedule = resolveParaclinicalShiftWindow(workDateInput, shiftCode);
 
-    const hasOverlap = await this.repo.hasOverlappingShift(departmentId, startTime, endTime);
-    if (hasOverlap) {
-      throw new BadRequestException('Ca trực trùng lặp với ca trực đã duyệt khác trong cùng phòng ban.');
+    const duplicated = await this.repo.hasStaffShiftOnDateCode(staffId, schedule.workDate, schedule.shiftCode);
+    if (duplicated) {
+      throw new BadRequestException('Nhân viên đã có lịch trực hoặc đăng ký cho ca này trong ngày.');
     }
 
     const snapshot = {
       staffId,
       departmentId,
-      startTime: startTime.toISOString(),
-      endTime: endTime.toISOString(),
+      workDate: schedule.workDate.toISOString(),
+      shiftCode: schedule.shiftCode,
+      startTime: schedule.startTime.toISOString(),
+      endTime: schedule.endTime.toISOString(),
       status: 'APPROVED',
     };
     const { salt, hash } = this.auditLogger.hashSnapshot(snapshot);
 
-    const shift = await this.repo.assignShift({ staffId, departmentId, startTime, endTime, approvedById });
+    const shift = await this.repo.assignShift({
+      staffId,
+      departmentId,
+      workDate: schedule.workDate,
+      shiftCode: schedule.shiftCode,
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+      approvedById,
+    });
     await this.repo.approveShift(shift.id, approvedById, hash, salt);
 
     await this.auditLogger.record({
@@ -49,8 +59,11 @@ export class AssignShiftUseCase {
       metadata: {
         staffName: shift.staff.fullName,
         department: shift.department.name,
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
+        workDate: schedule.workDate.toISOString(),
+        shiftCode: schedule.shiftCode,
+        shiftLabel: schedule.label,
+        startTime: schedule.startTime.toISOString(),
+        endTime: schedule.endTime.toISOString(),
         directAssignment: true,
       },
     });

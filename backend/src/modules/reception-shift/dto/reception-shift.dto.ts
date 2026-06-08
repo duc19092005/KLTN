@@ -1,7 +1,7 @@
 import { ShiftCode } from '@prisma/client';
 import { IsDateString, IsEnum, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
-export class RegisterShiftDto {
+export class RegisterReceptionShiftDto {
   @IsUUID()
   departmentId: string;
 
@@ -17,12 +17,17 @@ export class RegisterShiftDto {
   note?: string;
 }
 
-export class ApproveShiftDto {
+export class AssignReceptionShiftDto extends RegisterReceptionShiftDto {
+  @IsUUID()
+  staffId: string;
+}
+
+export class ApproveReceptionShiftDto {
   @IsUUID()
   shiftId: string;
 }
 
-export class RejectShiftDto {
+export class RejectReceptionShiftDto {
   @IsUUID()
   shiftId: string;
 
@@ -30,28 +35,4 @@ export class RejectShiftDto {
   @IsString()
   @MaxLength(500)
   reason?: string;
-}
-
-export class AssignShiftDto {
-  @IsUUID()
-  staffId: string;
-
-  @IsUUID()
-  departmentId: string;
-
-  @IsDateString()
-  workDate: string;
-
-  @IsEnum(ShiftCode)
-  shiftCode: ShiftCode;
-}
-
-export class ListRoomShiftsDto {
-  @IsOptional()
-  @IsDateString()
-  from?: string;
-
-  @IsOptional()
-  @IsDateString()
-  to?: string;
 }

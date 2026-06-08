@@ -18,6 +18,7 @@ import { MedicalOrderModule } from './modules/medical-order/medical-order.module
 import { ClinicalDecisionModule } from './modules/clinical-decision/clinical-decision.module';
 import { AuditApiModule } from './modules/audit/audit-api.module';
 import { ParaclinicalShiftModule } from './modules/paraclinical-shift/paraclinical-shift.module';
+import { ReceptionShiftModule } from './modules/reception-shift/reception-shift.module';
 import { BackupModule } from './modules/backup/backup.module';
 import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -42,6 +43,7 @@ import { NotificationModule } from './modules/notification/notification.module';
     ClinicalDecisionModule,
     AuditApiModule,
     ParaclinicalShiftModule,
+    ReceptionShiftModule,
     BackupModule,
     NotificationModule,
   ],

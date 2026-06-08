@@ -40,27 +40,33 @@ export class PrismaParaclinicalShiftRepository implements ParaclinicalShiftRepos
   constructor(private readonly prisma: PrismaService) {}
 
   async createShift(data: CreateShiftData): Promise<ShiftWithStaff> {
-    return this.prisma.paraclinicalShift.create({
+    return this.prisma.staffShift.create({
       data: {
         staffId: data.staffId,
         departmentId: data.departmentId,
+        workDate: data.workDate,
+        shiftCode: data.shiftCode,
         startTime: data.startTime,
         endTime: data.endTime,
         note: data.note ?? null,
         status: 'PENDING',
+        shiftType: 'PARACLINICAL',
       },
       include: SHIFT_INCLUDE,
     }) as any;
   }
 
   async assignShift(data: AssignShiftData): Promise<ShiftWithStaff> {
-    return this.prisma.paraclinicalShift.create({
+    return this.prisma.staffShift.create({
       data: {
         staffId: data.staffId,
         departmentId: data.departmentId,
+        workDate: data.workDate,
+        shiftCode: data.shiftCode,
         startTime: data.startTime,
         endTime: data.endTime,
         status: 'APPROVED',
+        shiftType: 'PARACLINICAL',
         approvedById: data.approvedById,
       },
       include: SHIFT_INCLUDE,
@@ -68,11 +74,11 @@ export class PrismaParaclinicalShiftRepository implements ParaclinicalShiftRepos
   }
 
   async findShiftById(id: string): Promise<ShiftWithStaff | null> {
-    return this.prisma.paraclinicalShift.findUnique({ where: { id }, include: SHIFT_INCLUDE }) as any;
+    return this.prisma.staffShift.findUnique({ where: { id }, include: SHIFT_INCLUDE }) as any;
   }
 
   async approveShift(id: string, approvedById: string, hash256: string, dataSalt: string): Promise<ShiftWithStaff> {
-    return this.prisma.paraclinicalShift.update({
+    return this.prisma.staffShift.update({
       where: { id },
       data: { status: 'APPROVED', approvedById, hash256, dataSalt },
       include: SHIFT_INCLUDE,
@@ -80,7 +86,7 @@ export class PrismaParaclinicalShiftRepository implements ParaclinicalShiftRepos
   }
 
   async rejectShift(id: string, approvedById: string, reason?: string | null): Promise<ShiftWithStaff> {
-    return this.prisma.paraclinicalShift.update({
+    return this.prisma.staffShift.update({
       where: { id },
       data: { status: 'REJECTED', approvedById, rejectionReason: reason ?? null, isActive: false },
       include: SHIFT_INCLUDE,
@@ -88,7 +94,7 @@ export class PrismaParaclinicalShiftRepository implements ParaclinicalShiftRepos
   }
 
   async setShiftHash(id: string, hash256: string, dataSalt: string): Promise<ShiftWithStaff> {
-    return this.prisma.paraclinicalShift.update({
+    return this.prisma.staffShift.update({
       where: { id },
       data: { hash256, dataSalt },
       include: SHIFT_INCLUDE,
@@ -96,19 +102,20 @@ export class PrismaParaclinicalShiftRepository implements ParaclinicalShiftRepos
   }
 
   async hardDeleteShift(id: string): Promise<void> {
-    await this.prisma.paraclinicalShift.delete({ where: { id } });
+    await this.prisma.staffShift.delete({ where: { id } });
   }
 
   async revertToPending(id: string): Promise<void> {
-    await this.prisma.paraclinicalShift.update({
+    await this.prisma.staffShift.update({
       where: { id },
       data: { status: 'PENDING', approvedById: null, hash256: null, dataSalt: null },
     });
   }
 
   async findShiftsByDepartment(departmentId: string, from?: Date, to?: Date): Promise<ShiftWithStaff[]> {
-    return this.prisma.paraclinicalShift.findMany({
+    return this.prisma.staffShift.findMany({
       where: {
+        shiftType: 'PARACLINICAL',
         departmentId,
         isActive: true,
         ...(from && to
@@ -127,8 +134,9 @@ export class PrismaParaclinicalShiftRepository implements ParaclinicalShiftRepos
   }
 
   async findPendingShifts(departmentId?: string): Promise<ShiftWithStaff[]> {
-    return this.prisma.paraclinicalShift.findMany({
+    return this.prisma.staffShift.findMany({
       where: {
+        shiftType: 'PARACLINICAL',
         status: 'PENDING',
         isActive: true,
         ...(departmentId ? { staff: { departmentId } } : {}),
@@ -139,23 +147,24 @@ export class PrismaParaclinicalShiftRepository implements ParaclinicalShiftRepos
   }
 
   async findActiveShiftForDepartment(departmentId: string, now: Date): Promise<ShiftWithStaff | null> {
-    return this.prisma.paraclinicalShift.findFirst({
-      where: { departmentId, status: 'APPROVED', isActive: true, startTime: { lte: now }, endTime: { gte: now } },
+    return this.prisma.staffShift.findFirst({
+      where: { shiftType: 'PARACLINICAL', departmentId, status: 'APPROVED', isActive: true, startTime: { lte: now }, endTime: { gte: now } },
       include: SHIFT_INCLUDE,
     }) as any;
   }
 
   async findActiveShiftsForDepartment(departmentId: string, now: Date): Promise<ShiftWithStaff[]> {
-    return this.prisma.paraclinicalShift.findMany({
-      where: { departmentId, status: 'APPROVED', isActive: true, startTime: { lte: now }, endTime: { gte: now } },
+    return this.prisma.staffShift.findMany({
+      where: { shiftType: 'PARACLINICAL', departmentId, status: 'APPROVED', isActive: true, startTime: { lte: now }, endTime: { gte: now } },
       include: SHIFT_INCLUDE,
       orderBy: { startTime: 'asc' },
     }) as any;
   }
 
   async findActiveShiftForStaffDepartment(staffId: string, departmentId: string, now: Date, includeOutOfWindow = false): Promise<ShiftWithStaff | null> {
-    return this.prisma.paraclinicalShift.findFirst({
+    return this.prisma.staffShift.findFirst({
       where: {
+        shiftType: 'PARACLINICAL',
         staffId,
         departmentId,
         status: 'APPROVED',
@@ -167,9 +176,24 @@ export class PrismaParaclinicalShiftRepository implements ParaclinicalShiftRepos
     }) as any;
   }
 
-  async hasOverlappingShift(departmentId: string, startTime: Date, endTime: Date, excludeId?: string): Promise<boolean> {
-    const count = await this.prisma.paraclinicalShift.count({
+  async hasStaffShiftOnDateCode(staffId: string, workDate: Date, shiftCode: import('@prisma/client').ShiftCode, excludeId?: string): Promise<boolean> {
+    const count = await this.prisma.staffShift.count({
       where: {
+        staffId,
+        workDate,
+        shiftCode,
+        isActive: true,
+        status: { in: ['PENDING', 'APPROVED'] },
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+    });
+    return count > 0;
+  }
+
+  async hasOverlappingShift(departmentId: string, startTime: Date, endTime: Date, excludeId?: string): Promise<boolean> {
+    const count = await this.prisma.staffShift.count({
+      where: {
+        shiftType: 'PARACLINICAL',
         departmentId,
         status: 'APPROVED',
         isActive: true,

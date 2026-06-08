@@ -31,10 +31,10 @@ export class ParaclinicalShiftService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async registerShift(staffIdOrUserId: string, departmentId: string, startTime: Date, endTime: Date, actorId: string, note?: string, demoMode = false) {
+  async registerShift(staffIdOrUserId: string, departmentId: string, workDate: Date, shiftCode: import('@prisma/client').ShiftCode, actorId: string, note?: string, demoMode = false) {
     const resolvedDepartmentId = await this.registerShiftUC.resolveDepartment(departmentId);
     const staffId = (await this.registerShiftUC.resolveStaffId(staffIdOrUserId)) ?? staffIdOrUserId;
-    return this.registerShiftUC.execute(staffId, resolvedDepartmentId, startTime, endTime, actorId, note, demoMode);
+    return this.registerShiftUC.execute(staffId, resolvedDepartmentId, workDate, shiftCode, actorId, note, demoMode);
   }
 
   approveShift(shiftId: string, approvedById: string) {
@@ -45,9 +45,9 @@ export class ParaclinicalShiftService {
     return this.rejectShiftUC.execute(shiftId, rejectedById);
   }
 
-  async assignShift(staffId: string, departmentId: string, startTime: Date, endTime: Date, approvedById: string) {
+  async assignShift(staffId: string, departmentId: string, workDate: Date, shiftCode: import('@prisma/client').ShiftCode, approvedById: string) {
     const resolvedDepartmentId = await this.registerShiftUC.resolveDepartment(departmentId);
-    return this.assignShiftUC.execute(staffId, resolvedDepartmentId, startTime, endTime, approvedById);
+    return this.assignShiftUC.execute(staffId, resolvedDepartmentId, workDate, shiftCode, approvedById);
   }
 
   async listRoomShifts(departmentId: string, from?: Date, to?: Date) {
@@ -109,7 +109,7 @@ export class ParaclinicalShiftService {
   async getMyShifts(userId: string, from?: Date, to?: Date) {
     const staff = await this.registerShiftUC.resolveStaffId(userId);
     if (!staff) return [];
-    return this.prisma.paraclinicalShift.findMany({
+    return this.prisma.staffShift.findMany({
       where: {
         staffId: staff,
         ...(from || to

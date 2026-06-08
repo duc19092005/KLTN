@@ -40,20 +40,22 @@ export class ApproveShiftUseCase {
 
     await this.assertCanApprove(approvedById, role || 'STAFF', shift.staff.department?.id);
 
-    // Check for overlapping approved shifts in the same department
-    const hasOverlap = await this.repo.hasOverlappingShift(
-      shift.departmentId,
-      shift.startTime,
-      shift.endTime,
+    const duplicated = await this.repo.hasStaffShiftOnDateCode(
+      shift.staffId,
+      shift.workDate,
+      shift.shiftCode,
+      shift.id,
     );
-    if (hasOverlap) {
-      throw new BadRequestException('Ca trực trùng lặp với ca trực đã duyệt khác trong cùng phòng.');
+    if (duplicated) {
+      throw new BadRequestException('Nhân viên đã có ca trực khác trong cùng ngày và cùng mã ca.');
     }
 
     // Compute tamper-evidence hash
     const snapshot = {
       staffId: shift.staffId,
       departmentId: shift.departmentId,
+      workDate: shift.workDate.toISOString(),
+      shiftCode: shift.shiftCode,
       startTime: shift.startTime.toISOString(),
       endTime: shift.endTime.toISOString(),
       status: 'APPROVED',
@@ -79,6 +81,8 @@ export class ApproveShiftUseCase {
         metadata: {
           staffName: shift.staff.fullName,
           department: shift.department.name,
+          workDate: shift.workDate.toISOString(),
+          shiftCode: shift.shiftCode,
           startTime: shift.startTime.toISOString(),
           endTime: shift.endTime.toISOString(),
           // Detailed audit trail: who approved (role) and for which department. ADMIN approves

@@ -24,7 +24,8 @@ const FK_FIELD: Record<string, string> = {
   AiModelRegistry: 'aiModelRegistryId',
   MedicalConclusion: 'medicalConclusionId',
   AiQuality: 'aiQualityId',
-  ParaclinicalShift: 'paraclinicalShiftId',
+  StaffShift: 'staffShiftId',
+  ParaclinicalShift: 'staffShiftId',
   HandoverLog: 'handoverLogId',
 };
 

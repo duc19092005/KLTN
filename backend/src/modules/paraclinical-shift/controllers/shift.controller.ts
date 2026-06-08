@@ -47,8 +47,8 @@ export class ShiftController {
     return this.service.registerShift(
       user.sub,
       body.departmentId,
-      new Date(body.startTime),
-      new Date(body.endTime),
+      new Date(body.workDate),
+      body.shiftCode,
       user.sub,
       body.note,
       demoMode === '1' || demoMode === 'true',
@@ -81,8 +81,8 @@ export class ShiftController {
     return this.assignShift.execute(
       body.staffId,
       body.departmentId,
-      new Date(body.startTime),
-      new Date(body.endTime),
+      new Date(body.workDate),
+      body.shiftCode,
       user.sub,
     );
   }

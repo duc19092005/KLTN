@@ -1,4 +1,4 @@
-import { ShiftStatus } from '@prisma/client';
+import { ShiftCode, ShiftStatus } from '@prisma/client';
 
 /** DI token for the ParaclinicalShift repository port. */
 export const PARACLINICAL_SHIFT_REPOSITORY = Symbol('PARACLINICAL_SHIFT_REPOSITORY');
@@ -6,6 +6,8 @@ export const PARACLINICAL_SHIFT_REPOSITORY = Symbol('PARACLINICAL_SHIFT_REPOSITO
 export type CreateShiftData = {
   staffId: string;
   departmentId: string;
+  workDate: Date;
+  shiftCode: ShiftCode;
   startTime: Date;
   endTime: Date;
   note?: string | null;
@@ -19,6 +21,8 @@ export type ShiftWithStaff = {
   id: string;
   staffId: string;
   departmentId: string;
+  workDate: Date;
+  shiftCode: ShiftCode;
   startTime: Date;
   endTime: Date;
   status: ShiftStatus;
@@ -84,6 +88,7 @@ export interface ParaclinicalShiftRepositoryPort {
   findActiveShiftForDepartment(departmentId: string, now: Date): Promise<ShiftWithStaff | null>;
   findActiveShiftsForDepartment(departmentId: string, now: Date): Promise<ShiftWithStaff[]>;
   findActiveShiftForStaffDepartment(staffId: string, departmentId: string, now: Date, includeOutOfWindow?: boolean): Promise<ShiftWithStaff | null>;
+  hasStaffShiftOnDateCode(staffId: string, workDate: Date, shiftCode: ShiftCode, excludeId?: string): Promise<boolean>;
   hasOverlappingShift(departmentId: string, startTime: Date, endTime: Date, excludeId?: string): Promise<boolean>;
 
   createHandoverLog(data: {

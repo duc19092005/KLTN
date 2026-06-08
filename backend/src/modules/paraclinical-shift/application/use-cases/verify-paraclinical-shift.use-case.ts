@@ -23,7 +23,7 @@ export class VerifyParaclinicalShiftUseCase {
   }
 
   async verifyAll() {
-    const shifts = await this.prisma.paraclinicalShift.findMany({
+    const shifts = await this.prisma.staffShift.findMany({
       where: { status: 'APPROVED', isActive: true },
       include: {
         staff: { include: { user: true } },

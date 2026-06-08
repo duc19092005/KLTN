@@ -1,9 +1,9 @@
 import api from '../../../shared/apis/api';
 
 export const shiftService = {
-  /** Staff self-registers a shift. */
-  register: (departmentId, startTime, endTime, note, demoMode = false) =>
-    api.post('/paraclinical/shifts/register', { departmentId, startTime, endTime, note }, { params: { demo: demoMode ? '1' : '0' } }),
+  /** Staff self-registers a fixed Ca A / Ca B shift. */
+  register: (departmentId, workDate, shiftCode, note, demoMode = false) =>
+    api.post('/paraclinical/shifts/register', { departmentId, workDate, shiftCode, note }, { params: { demo: demoMode ? '1' : '0' } }),
 
   /** Admin/Head approves a PENDING shift. */
   approve: (shiftId) => api.post('/paraclinical/shifts/approve', { shiftId }),
@@ -11,9 +11,9 @@ export const shiftService = {
   /** Admin/Head rejects a PENDING shift. */
   reject: (shiftId, reason) => api.post('/paraclinical/shifts/reject', { shiftId, reason }),
 
-  /** Admin/Head directly assigns a shift (auto-APPROVED). */
-  assign: (staffId, departmentId, startTime, endTime) =>
-    api.post('/paraclinical/shifts/assign', { staffId, departmentId, startTime, endTime }),
+  /** Admin/Head directly assigns a fixed shift (auto-APPROVED). */
+  assign: (staffId, departmentId, workDate, shiftCode) =>
+    api.post('/paraclinical/shifts/assign', { staffId, departmentId, workDate, shiftCode }),
 
   /** List shifts for a specific department. */
   listByDepartment: (departmentId, from, to) =>

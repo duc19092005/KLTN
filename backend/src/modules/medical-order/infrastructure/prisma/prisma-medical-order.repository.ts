@@ -58,9 +58,10 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
   }
 
   async findActiveApprovedShift(shiftId: string, now: Date, includeOutOfWindow = false) {
-    return this.prisma.paraclinicalShift.findFirst({
+    return this.prisma.staffShift.findFirst({
       where: {
         id: shiftId,
+        shiftType: 'PARACLINICAL',
         status: 'APPROVED',
         isActive: true,
         ...(includeOutOfWindow ? {} : {
@@ -78,10 +79,11 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
   }
 
   async findActiveApprovedShiftForStaffDepartment(staffId: string, departmentId: string, now: Date, includeOutOfWindow = false) {
-    return this.prisma.paraclinicalShift.findFirst({
+    return this.prisma.staffShift.findFirst({
       where: {
         staffId,
         departmentId,
+        shiftType: 'PARACLINICAL',
         status: 'APPROVED',
         isActive: true,
         ...(includeOutOfWindow ? {} : {

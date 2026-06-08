@@ -41,6 +41,16 @@ enum ShiftStatus {
   REJECTED
 }
 
+enum ShiftCode {
+  A
+  B
+}
+
+enum StaffShiftType {
+  RECEPTION
+  PARACLINICAL
+}
+
 enum LabSpecialty {
   LABORATORY
   IMAGING
@@ -86,7 +96,7 @@ model User {
   performedResults  MedicalResult[]
   stepUpTickets     StepUpTicket[]
   stepUpSessions    StepUpSession[]
-  approvedShifts    ParaclinicalShift[] @relation("ApprovedShifts")
+  approvedShifts    StaffShift[] @relation("ApprovedStaffShifts")
   notifications     Notification[]
 
   @@index([role])
@@ -109,7 +119,7 @@ model Department {
   staffs         StaffProfile[] @relation("DepartmentStaffs")
   visits         Visit[]
   medicalOrders  MedicalOrder[]
-  paraclinicalShifts ParaclinicalShift[]
+  staffShifts    StaffShift[]
   handoverLogs   HandoverLog[]
   blockchainLogs BlockchainLogger[]
 
@@ -153,7 +163,7 @@ model StaffProfile {
   doctorProfile     DoctorProfile?
   assignedVisits    Visit[] @relation("VisitAssignedStaff")
   blockchainLogs    BlockchainLogger[]
-  paraclinicalShifts ParaclinicalShift[]
+  staffShifts       StaffShift[]
   handoversFrom     HandoverLog[] @relation("HandoverFrom")
   handoversTo       HandoverLog[] @relation("HandoverTo")
 
@@ -542,8 +552,8 @@ model BlockchainLogger {
   aiQualityId         String?
   aiQuality           AiQuality?         @relation(fields: [aiQualityId], references: [id])
 
-  paraclinicalShiftId String?
-  paraclinicalShift   ParaclinicalShift? @relation(fields: [paraclinicalShiftId], references: [id])
+  staffShiftId       String?
+  staffShift         StaffShift? @relation(fields: [staffShiftId], references: [id])
 
   handoverLogId       String?
   handoverLog         HandoverLog?       @relation(fields: [handoverLogId], references: [id])
@@ -560,7 +570,7 @@ model BlockchainLogger {
   @@index([aiModelRegistryId])
   @@index([medicalConclusionId])
   @@index([aiQualityId])
-  @@index([paraclinicalShiftId])
+  @@index([staffShiftId])
   @@index([handoverLogId])
   @@index([batchId])
   @@index([onChainStatus])
@@ -677,34 +687,42 @@ model StepUpSession {
   @@index([idleExpiresAt])
 }
 
-/// A scheduled paraclinical shift. Staff register for open slots (PENDING); a department head
-/// or admin approves/rejects. Approved shifts are batch-anchored on-chain via Merkle roots.
-/// Direct assignment by admin creates an APPROVED shift immediately.
-model ParaclinicalShift {
-  id             String            @id @default(uuid())
-  staffId        String
-  staff          StaffProfile      @relation(fields: [staffId], references: [id])
-  departmentId   String
-  department     Department        @relation(fields: [departmentId], references: [id])
-  startTime      DateTime
-  endTime        DateTime
-  status         ShiftStatus       @default(PENDING)
-  note            String?          // Optional message from staff at registration time.
-  rejectionReason String?          // Optional reason captured when a shift is rejected.
-  approvedById   String?
-  approvedBy     User?             @relation("ApprovedShifts", fields: [approvedById], references: [id])
-  isActive       Boolean           @default(true)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+/// A scheduled staff shift. Business APIs stay role-specific, but persistence is shared.
+/// `shiftType` separates reception shifts from paraclinical shifts while keeping one
+/// source of truth for staff/day/shift uniqueness.
+model StaffShift {
+  id              String         @id @default(uuid())
+  staffId         String
+  staff           StaffProfile   @relation(fields: [staffId], references: [id])
+  departmentId    String
+  department      Department     @relation(fields: [departmentId], references: [id])
+  shiftType       StaffShiftType
+  workDate        DateTime
+  shiftCode       ShiftCode
+  startTime       DateTime
+  endTime         DateTime
+  status          ShiftStatus    @default(PENDING)
+  note            String?
+  rejectionReason String?
+  approvedById    String?
+  approvedBy      User?          @relation("ApprovedStaffShifts", fields: [approvedById], references: [id])
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
-  // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
-  hash256        String?
-  dataSalt       String?
+  // Tamper-evidence fields are populated only for PARACLINICAL shifts.
+  hash256         String?
+  dataSalt        String?
 
-  blockchainLogs BlockchainLogger[]
+  blockchainLogs  BlockchainLogger[]
 
+  @@unique([staffId, workDate, shiftCode])
+  @@index([shiftType])
   @@index([staffId])
   @@index([departmentId])
+  @@index([departmentId, workDate, shiftCode])
+  @@index([shiftType, departmentId, workDate, shiftCode])
+  @@index([workDate, shiftCode, status])
   @@index([status])
   @@index([startTime, endTime])
   @@index([isActive])
@@ -736,12 +754,6 @@ model HandoverLog {
   @@index([isCompleted])
 }
 
-/// A reception staff shift. Receptionists self-register for slots (PENDING) at an
-/// administrative department; the department head (StaffProfile.managedDepartment) or an
-/// admin approves/rejects. Receptionists share a workstation per shift, so the slot is keyed
-/// to the department, not to a clinical room. Unlike ParaclinicalShift, reception shifts are
-/// NOT anchored on-chain - they are HR data, not medical data, and keeping them off-chain
-/// keeps audit batches focused on patient-facing records.
 model Notification {
   id        String   @id @default(uuid())
   userId    String
