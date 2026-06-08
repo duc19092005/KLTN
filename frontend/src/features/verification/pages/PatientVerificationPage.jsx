@@ -12,6 +12,8 @@ function genderLabel(value) {
   if (value === 'OTHER' || value === 'Khác') return 'Khác';
   return value || 'Chưa rõ';
 }
+function getVisitDepartmentName(visit) { return visit.department?.name || visit.department?.departmentCode || 'Chưa xếp phòng'; }
+function getVisitStaffName(visit) { return visit.staff?.fullName || visit.staff?.user?.username || 'Chưa phân công'; }
 
 export default function PatientVerificationPage() {
   const navigate = useNavigate();
@@ -421,10 +423,10 @@ export default function PatientVerificationPage() {
                                 Bác sĩ khám &amp; Phòng bệnh
                               </span>
                               <p className="text-sm font-bold text-[#111c2c]">
-                                Bác sĩ: {visit.doctor?.staffProfile?.fullName || 'Chưa phân công'}
+                                Bác sĩ: {getVisitStaffName(visit)}
                               </p>
                               <p className="text-xs font-semibold text-[#424752] mt-0.5">
-                                Phòng: {visit.clinicalRoom?.name || 'Chưa xếp phòng'}
+                                Phòng: {getVisitDepartmentName(visit)}
                               </p>
                             </div>
 

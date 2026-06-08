@@ -46,7 +46,7 @@ export class ShiftController {
   ) {
     return this.service.registerShift(
       user.sub,
-      body.clinicalRoomId,
+      body.departmentId,
       new Date(body.startTime),
       new Date(body.endTime),
       user.sub,
@@ -80,7 +80,7 @@ export class ShiftController {
   async assign(@CurrentUser() user: AuthUser, @Body() body: AssignShiftDto) {
     return this.assignShift.execute(
       body.staffId,
-      body.clinicalRoomId,
+      body.departmentId,
       new Date(body.startTime),
       new Date(body.endTime),
       user.sub,
@@ -111,17 +111,18 @@ export class ShiftController {
     );
   }
 
-  /** List shifts for a specific room with optional date range. */
+  /** List shifts for a specific department with optional date range. */
   @UseGuards(JwtAuthGuard)
-  @Get('room/:roomId')
-  async roomShifts(@Param('roomId') roomId: string, @Query() query: ListRoomShiftsDto) {
+  @Get('department/:departmentId')
+  async departmentShifts(@Param('departmentId') departmentId: string, @Query() query: ListRoomShiftsDto) {
     return this.service.listRoomShifts(
-      roomId,
+      departmentId,
       query.from ? new Date(query.from) : undefined,
       query.to ? new Date(query.to) : undefined,
     );
   }
 
+  @UseGuards(JwtAuthGuard)
   /** List all PENDING shifts for approval. */
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'LAB_MANAGER')

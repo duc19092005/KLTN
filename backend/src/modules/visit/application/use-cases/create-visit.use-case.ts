@@ -3,43 +3,39 @@ import { CreateVisitDto } from '../../dto/visit.dto';
 import { VISIT_REPOSITORY, VisitRepositoryPort } from '../ports/visit.repository.port';
 
 /**
- * Intake workflow: validate room/doctor coupling, then create the visit
- * (optionally creating the patient inline) inside the repository transaction.
- * Behavior copied verbatim from the former VisitService.create().
+ * Intake workflow: reception selects an active examination department, then the
+ * repository creates the visit and optional patient inside one transaction.
  */
 @Injectable()
 export class CreateVisitUseCase {
   constructor(@Inject(VISIT_REPOSITORY) private readonly repo: VisitRepositoryPort) {}
 
   async execute(dto: CreateVisitDto): Promise<unknown> {
-    if (!dto.patientId && !dto.patient) throw new BadRequestException('Vui lòng chọn bệnh nhân hoặc nhập thông tin bệnh nhân mới.');
+    if (!dto.patientId && !dto.patient) {
+      throw new BadRequestException('Vui lòng chọn bệnh nhân hoặc nhập thông tin bệnh nhân mới.');
+    }
 
-    const room = await this.repo.findRoomWithDoctor(dto.clinicalRoomId);
-    if (!room) throw new NotFoundException('Không tìm thấy phòng khám.');
-
-    const doctor = await this.repo.findDoctorProfileById(dto.doctorId);
-    if (!doctor) throw new NotFoundException('Không tìm thấy hồ sơ bác sĩ.');
-
-    if (room.doctorId && room.doctorId !== dto.doctorId) {
-      throw new BadRequestException('Bác sĩ được chọn không phụ trách phòng khám này.');
+    const department = await this.repo.findDepartmentForVisit(dto.departmentId);
+    if (!department) throw new NotFoundException('Không tìm thấy phòng ban khám.');
+    if (department.status !== 'ACTIVE' || department.type !== 'EXAMINATION') {
+      throw new BadRequestException('Lễ tân chỉ có thể chọn phòng ban loại phòng khám đang hoạt động.');
     }
 
     return this.repo.createVisitWithOptionalPatient({
       patientId: dto.patientId,
       patient: dto.patient
         ? {
-          fullName: dto.patient.fullName,
-          gender: dto.patient.gender,
-          birthDate: dto.patient.birthDate,
-          citizenId: dto.patient.citizenId,
-          phone: dto.patient.phone,
-          address: dto.patient.address,
-          insuranceNumber: dto.patient.insuranceNumber,
-          emergencyContact: dto.patient.emergencyContact,
-        }
+            fullName: dto.patient.fullName,
+            gender: dto.patient.gender,
+            birthDate: dto.patient.birthDate,
+            citizenId: dto.patient.citizenId,
+            phone: dto.patient.phone,
+            address: dto.patient.address,
+            insuranceNumber: dto.patient.insuranceNumber,
+            emergencyContact: dto.patient.emergencyContact,
+          }
         : undefined,
-      clinicalRoomId: dto.clinicalRoomId,
-      doctorId: dto.doctorId,
+      departmentId: dto.departmentId,
     });
   }
 }

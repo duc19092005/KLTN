@@ -7,14 +7,22 @@ export const MEDICAL_ORDER_REPOSITORY = Symbol('MEDICAL_ORDER_REPOSITORY');
 export type OrderVisitInfo = {
   id: string;
   patientId: string;
-  doctorId: string;
+  departmentId: string;
+  staffId: string | null;
   status: string;
+};
+
+export type DoctorStaffIdentity = {
+  doctorId: string;
+  staffId: string;
+  departmentId: string | null;
 };
 
 export type CreateOrderCommand = {
   visitId: string;
   patientId: string;
   doctorId: string;
+  staffId?: string;
   targetDepartmentId?: string | null;
   orderType: string;
   priority?: string;
@@ -67,7 +75,7 @@ export type OrderDepartmentInfo = {
 export type ActiveShiftInfo = {
   id: string;
   staffId: string;
-  clinicalRoomId: string;
+  departmentId: string;
   staff: { userId: string; departmentId: string | null };
 };
 
@@ -79,9 +87,11 @@ export type ActiveShiftInfo = {
 export interface MedicalOrderRepositoryPort {
   findVisitForOrder(visitId: string): Promise<OrderVisitInfo | null>;
   findDoctorIdByUserId(userId: string): Promise<string | null>;
+  findDoctorStaffByUserId(userId: string): Promise<DoctorStaffIdentity | null>;
   findStaffByUserId(userId: string): Promise<StaffIdentity | null>;
   findOrderDepartment(id: string): Promise<OrderDepartmentInfo | null>;
   findActiveApprovedShift(shiftId: string, now: Date, includeOutOfWindow?: boolean): Promise<ActiveShiftInfo | null>;
+  findActiveApprovedShiftForStaffDepartment(staffId: string, departmentId: string, now: Date, includeOutOfWindow?: boolean): Promise<ActiveShiftInfo | null>;
   departmentExists(id: string): Promise<boolean>;
 
   /** Atomic: generate unique order code, create order, transition visit to WAITING_TEST_RESULT (with retry). */

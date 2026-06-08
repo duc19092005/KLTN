@@ -40,9 +40,9 @@ export class ApproveShiftUseCase {
 
     await this.assertCanApprove(approvedById, role || 'STAFF', shift.staff.department?.id);
 
-    // Check for overlapping approved shifts in the same room
+    // Check for overlapping approved shifts in the same department
     const hasOverlap = await this.repo.hasOverlappingShift(
-      shift.clinicalRoomId,
+      shift.departmentId,
       shift.startTime,
       shift.endTime,
     );
@@ -53,7 +53,7 @@ export class ApproveShiftUseCase {
     // Compute tamper-evidence hash
     const snapshot = {
       staffId: shift.staffId,
-      clinicalRoomId: shift.clinicalRoomId,
+      departmentId: shift.departmentId,
       startTime: shift.startTime.toISOString(),
       endTime: shift.endTime.toISOString(),
       status: 'APPROVED',
@@ -78,7 +78,7 @@ export class ApproveShiftUseCase {
         onChainStatus: 'PENDING',
         metadata: {
           staffName: shift.staff.fullName,
-          room: shift.clinicalRoom.roomName,
+          department: shift.department.name,
           startTime: shift.startTime.toISOString(),
           endTime: shift.endTime.toISOString(),
           // Detailed audit trail: who approved (role) and for which department. ADMIN approves
@@ -94,7 +94,7 @@ export class ApproveShiftUseCase {
 
     const dateStr = new Date(shift.startTime).toLocaleDateString('vi-VN');
     const timeStr = `${new Date(shift.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - ${new Date(shift.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
-    const msg = `Ca trực của bạn vào ngày ${dateStr} (${timeStr}) tại phòng ${shift.clinicalRoom.roomName} đã được phê duyệt.`;
+    const msg = `Ca trực của bạn vào ngày ${dateStr} (${timeStr}) tại phòng ban ${shift.department.name} đã được phê duyệt.`;
 
     await this.notificationService.createNotification(
       shift.staff.user.id,

@@ -11,7 +11,6 @@ import { AppService } from './app.service';
 import { DepartmentModule } from './modules/department/department.module';
 import { StaffEnterpriseModule } from './modules/staff/staff.module';
 import { DoctorModule } from './modules/doctor/doctor.module';
-import { ClinicalRoomModule } from './modules/clinical-room/clinical-room.module';
 import { PatientModule } from './modules/patient/patient.module';
 import { VisitModule } from './modules/visit/visit.module';
 import { AiModelModule } from './modules/ai-model/ai-model.module';
@@ -36,7 +35,6 @@ import { NotificationModule } from './modules/notification/notification.module';
     DepartmentModule,
     StaffEnterpriseModule,
     DoctorModule,
-    ClinicalRoomModule,
     PatientModule,
     VisitModule,
     AiModelModule,

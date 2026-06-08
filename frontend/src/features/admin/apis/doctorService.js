@@ -7,7 +7,6 @@ export const doctorService = {
   createFull: (payload) => api.post('/doctors/full', payload),
   update: (id, payload, stepUpTicket) =>
     api.patch(`/doctors/${id}`, payload, stepUpTicket ? { headers: { 'x-stepup-ticket': stepUpTicket } } : undefined),
-  assignRoom: (id, clinicalRoomId) => api.patch(`/doctors/${id}/clinical-room`, { clinicalRoomId }),
   verifyAll: () => api.get('/doctors/audit/verify'),
   verifyOne: (id) => api.get(`/doctors/${id}/audit/verify`),
   history: (id = null) => api.get(id ? `/doctors/${id}/audit/history` : '/doctors/audit/history'),

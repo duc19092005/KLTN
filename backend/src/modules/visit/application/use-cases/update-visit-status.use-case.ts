@@ -7,8 +7,8 @@ import { VISIT_REPOSITORY, VisitRepositoryPort } from '../ports/visit.repository
 
 /**
  * Direct status transition workflow for PATCH /visits/:id/status.
- * Sequence preserved from the former VisitService.updateStatus():
- * doctor ownership -> cancel rule -> transition validation -> persist -> audit log.
+ * A doctor is scoped to their department and claims an unassigned visit by
+ * writing their StaffProfile id to Visit.staffId.
  */
 @Injectable()
 export class UpdateVisitStatusUseCase {
@@ -23,12 +23,17 @@ export class UpdateVisitStatusUseCase {
     const visit = await this.repo.findById(id);
     if (!visit) throw new NotFoundException('Không tìm thấy lượt khám.');
 
+    let assignedStaffId: string | undefined;
     if (user?.role === UserRole.DOCTOR) {
-      const doctorId = await this.repo.findDoctorIdByUserId(user.sub);
-      if (!doctorId) throw new ForbiddenException('Tài khoản hiện tại không có hồ sơ bác sĩ.');
-      if (visit.doctorId !== doctorId) {
-        throw new ForbiddenException('Bác sĩ chỉ có thể cập nhật lượt khám do mình phụ trách.');
+      const doctor = await this.repo.findDoctorStaffByUserId(user.sub);
+      if (!doctor) throw new ForbiddenException('Tài khoản hiện tại không có hồ sơ bác sĩ.');
+      if (!doctor.departmentId || visit.departmentId !== doctor.departmentId) {
+        throw new ForbiddenException('Bác sĩ chỉ có thể cập nhật lượt khám trong phòng ban của mình.');
       }
+      if (visit.staffId && visit.staffId !== doctor.staffId) {
+        throw new ForbiddenException('Lượt khám này đã được bác sĩ khác phụ trách.');
+      }
+      assignedStaffId = doctor.staffId;
     }
 
     if (status === VisitStatus.CANCELLED) {
@@ -40,16 +45,15 @@ export class UpdateVisitStatusUseCase {
     const previousStatus = visit.status;
     const completedAt =
       status === VisitStatus.COMPLETED || status === VisitStatus.CANCELLED ? new Date() : undefined;
-    const result = await this.repo.updateStatus(id, status, completedAt);
+    const result = await this.repo.updateStatus(id, status, completedAt, assignedStaffId);
 
-    // Record tamper-evident audit log for the status transition
     await this.auditLogger.record({
       entity: 'Visit',
       entityId: id,
       action: 'UPDATE',
       actorId: user?.sub ?? null,
       before: { status: previousStatus },
-      after: { status, completedAt: completedAt ?? null },
+      after: { status, completedAt: completedAt ?? null, staffId: assignedStaffId ?? visit.staffId },
       metadata: { field: 'status', from: previousStatus, to: status },
     });
 

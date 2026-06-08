@@ -140,7 +140,7 @@ export default function ShiftManagementPage() {
       const to = toLocalISODate(monthDays[monthDays.length - 1]?.date);
       const roomId = selectedRoomId;
       if (roomId && from && to) {
-        const res = await shiftService.listByRoom(roomId, `${from}T00:00:00Z`, `${to}T23:59:59Z`);
+        const res = await shiftService.listByDepartment(roomId, `${from}T00:00:00Z`, `${to}T23:59:59Z`);
         setShifts(Array.isArray(res.data) ? res.data : []);
       }
     } catch (err) {
@@ -215,7 +215,7 @@ export default function ShiftManagementPage() {
 
     const dayDate = toLocalISODate(dragDay.date);
     setRegisterForm({
-      roomId: selectedRoomId || user?.clinicalRoomId || '',
+      roomId: selectedRoomId || user?.departmentId || '',
       startTime: `${dayDate}T${pad(startHour)}:00`,
       endTime: `${dayDate}T${pad(endHour)}:00`,
       note: '',
@@ -248,7 +248,7 @@ export default function ShiftManagementPage() {
       await shiftService.register(registerForm.roomId, registerForm.startTime, registerForm.endTime, registerForm.note, demoMode);
       toast.success('Đã gửi đăng ký ca trực. Bạn chỉ đăng nhập được bằng quét khuôn mặt sau khi trưởng phòng duyệt ca.');
       setShowRegister(false);
-      setRegisterForm({ roomId: selectedRoomId || user?.clinicalRoomId || '', startTime: '', endTime: '', note: '' });
+      setRegisterForm({ roomId: selectedRoomId || user?.departmentId || '', startTime: '', endTime: '', note: '' });
       await Promise.all([loadShifts(), loadMyShifts()]);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Đăng ký thất bại');

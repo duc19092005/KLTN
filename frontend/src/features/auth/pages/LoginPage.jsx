@@ -250,20 +250,6 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
             </button>
           </div>
 
-          {/* Paraclinical Account Switcher Link */}
-          <div className="text-center pt-4 border-t border-[#ebedff] mt-4">
-            <button
-              type="button"
-              onClick={() => {
-                if (isModal && onClose) onClose();
-                navigate('/paraclinical-login');
-              }}
-              className="text-xs font-bold text-[#006b5b] hover:text-[#004a99] hover:underline transition-colors flex items-center justify-center gap-1.5 mx-auto"
-            >
-              <span className="material-symbols-outlined text-[16px]">desktop_windows</span>
-              Đăng nhập tài khoản CLS (Phòng máy)
-            </button>
-          </div>
         </form>
       )}
 

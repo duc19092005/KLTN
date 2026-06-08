@@ -7,8 +7,8 @@ import { VISIT_REPOSITORY, VisitRepositoryPort } from '../ports/visit.repository
 
 /**
  * Lists visits with pagination. Doctors are implicitly scoped to their own
- * visits; other roles may filter by the query's doctorId. Behavior copied
- * verbatim from the former VisitService.findAll().
+ * visits; other roles may filter by department/staff. Doctors are scoped to
+ * their current department so they can pick up WAITING visits assigned there.
  */
 @Injectable()
 export class ListVisitsUseCase {
@@ -18,14 +18,20 @@ export class ListVisitsUseCase {
     const { query, user } = input;
     const { page, limit, skip } = getPagination(query);
 
-    const doctorId =
-      user?.role === UserRole.DOCTOR ? await this.repo.findDoctorIdByUserId(user.sub) ?? undefined : query.doctorId;
+    let departmentId = query.departmentId;
+    let staffId = query.staffId;
+
+    if (user?.role === UserRole.DOCTOR) {
+      const doctor = await this.repo.findDoctorStaffByUserId(user.sub);
+      departmentId = doctor?.departmentId ?? '__no-doctor-department__';
+      staffId = undefined;
+    }
 
     const { items, total } = await this.repo.findManyPaginated(
       {
         status: query.status,
-        doctorId,
-        clinicalRoomId: query.clinicalRoomId,
+        staffId,
+        departmentId,
         patientId: query.patientId,
       },
       skip,

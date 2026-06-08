@@ -154,7 +154,7 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
                     <Field label="Chuyên khoa" value={detail.specialty} />
                     <Field label="Học hàm/Học vị" value={detail.qualification} />
                     <Field label="Kinh nghiệm" value={`${detail.yearsExperience ?? 0} năm`} />
-                    <Field label="Phòng khám phụ trách" value={detail.clinicalRoom ? `${detail.clinicalRoom.roomCode} - ${detail.clinicalRoom.roomName}` : 'Chưa gán'} />
+                    <Field label="Phòng khám" value={staff.department ? `${staff.department.departmentCode} - ${staff.department.name}` : 'Chưa gán'} />
                     <Field label="Ngày tạo hồ sơ" value={formatTime(detail.createdAt)} colSpan={2} />
                     <Field label="Lần cập nhật cuối" value={formatTime(detail.updatedAt)} colSpan={2} />
                   </div>

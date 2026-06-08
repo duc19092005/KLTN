@@ -5,7 +5,7 @@ export const PARACLINICAL_SHIFT_REPOSITORY = Symbol('PARACLINICAL_SHIFT_REPOSITO
 
 export type CreateShiftData = {
   staffId: string;
-  clinicalRoomId: string;
+  departmentId: string;
   startTime: Date;
   endTime: Date;
   note?: string | null;
@@ -18,7 +18,7 @@ export type AssignShiftData = CreateShiftData & {
 export type ShiftWithStaff = {
   id: string;
   staffId: string;
-  clinicalRoomId: string;
+  departmentId: string;
   startTime: Date;
   endTime: Date;
   status: ShiftStatus;
@@ -47,16 +47,17 @@ export type ShiftWithStaff = {
     department: { id: string; name: string; type: string } | null;
     doctorProfile: { id: string } | null;
   };
-  clinicalRoom: {
+  department: {
     id: string;
-    roomCode: string;
-    roomName: string;
+    departmentCode: string;
+    name: string;
+    type: string;
   };
 };
 
 export type HandoverLogFull = {
   id: string;
-  clinicalRoomId: string;
+  departmentId: string;
   fromStaffId: string;
   toStaffId: string;
   reason: string | null;
@@ -68,38 +69,25 @@ export type HandoverLogFull = {
   toStaff: { id: string; fullName: string; userId: string };
 };
 
-/**
- * Persistence boundary for ParaclinicalShift and HandoverLog aggregates.
- */
 export interface ParaclinicalShiftRepositoryPort {
-  // ── Shift management ──────────────────────────────────────────
   createShift(data: CreateShiftData): Promise<ShiftWithStaff>;
   assignShift(data: AssignShiftData): Promise<ShiftWithStaff>;
   findShiftById(id: string): Promise<ShiftWithStaff | null>;
   approveShift(id: string, approvedById: string, hash256: string, dataSalt: string): Promise<ShiftWithStaff>;
   rejectShift(id: string, approvedById: string, reason?: string | null): Promise<ShiftWithStaff>;
-
-  /** Persist integrity hash for a freshly-registered (PENDING) shift. */
   setShiftHash(id: string, hash256: string, dataSalt: string): Promise<ShiftWithStaff>;
-  /** Compensation: hard-delete a shift (used when post-create anchoring fails). */
   hardDeleteShift(id: string): Promise<void>;
-  /** Compensation: revert an approved shift back to PENDING (used when anchoring fails). */
   revertToPending(id: string): Promise<void>;
-  findShiftsByRoom(roomId: string, from?: Date, to?: Date): Promise<ShiftWithStaff[]>;
+
+  findShiftsByDepartment(departmentId: string, from?: Date, to?: Date): Promise<ShiftWithStaff[]>;
   findPendingShifts(departmentId?: string): Promise<ShiftWithStaff[]>;
+  findActiveShiftForDepartment(departmentId: string, now: Date): Promise<ShiftWithStaff | null>;
+  findActiveShiftsForDepartment(departmentId: string, now: Date): Promise<ShiftWithStaff[]>;
+  findActiveShiftForStaffDepartment(staffId: string, departmentId: string, now: Date, includeOutOfWindow?: boolean): Promise<ShiftWithStaff | null>;
+  hasOverlappingShift(departmentId: string, startTime: Date, endTime: Date, excludeId?: string): Promise<boolean>;
 
-  /** Find the APPROVED shift covering `now` for a given room. */
-  findActiveShiftForRoom(roomId: string, now: Date): Promise<ShiftWithStaff | null>;
-
-  /** Find all APPROVED shifts covering `now` for a given room (for multi-staff matching). */
-  findActiveShiftsForRoom(roomId: string, now: Date): Promise<ShiftWithStaff[]>;
-
-  /** Check for overlapping approved shifts. */
-  hasOverlappingShift(roomId: string, startTime: Date, endTime: Date, excludeId?: string): Promise<boolean>;
-
-  // ── Handover management ───────────────────────────────────────
   createHandoverLog(data: {
-    clinicalRoomId: string;
+    departmentId: string;
     fromStaffId: string;
     toStaffId: string;
     reason?: string;
@@ -109,25 +97,10 @@ export interface ParaclinicalShiftRepositoryPort {
   markFaceVerifiedB(id: string): Promise<HandoverLogFull>;
   completeHandover(id: string): Promise<HandoverLogFull>;
 
-  // ── Shared account helpers ────────────────────────────────────
-  findUserByUsername(username: string): Promise<{
-    id: string;
-    username: string;
-    passwordHash: string | null;
-    role: string;
-    status: string;
-  } | null>;
-
   findStaffByUserId(userId: string): Promise<{
     id: string;
     fullName: string;
     userId: string;
     departmentId: string | null;
   } | null>;
-
-  /** Find rooms linked to a department (for shared-account room scoping). */
-  findRoomsByDepartmentStaff(departmentId: string): Promise<{ id: string; roomCode: string; roomName: string }[]>;
-
-  /** Find the department linked to a DEPT_SHARED user. */
-  findDepartmentBySharedUserId(userId: string): Promise<{ id: string; name: string } | null>;
 }

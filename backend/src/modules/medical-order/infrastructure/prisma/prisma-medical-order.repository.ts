@@ -23,7 +23,7 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
   async findVisitForOrder(visitId: string): Promise<OrderVisitInfo | null> {
     const visit = await this.prisma.visit.findUnique({
       where: { id: visitId },
-      select: { id: true, patientId: true, doctorId: true, status: true },
+      select: { id: true, patientId: true, departmentId: true, staffId: true, status: true },
     });
     return visit;
   }
@@ -31,6 +31,19 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
   async findDoctorIdByUserId(userId: string): Promise<string | null> {
     const doctor = await this.prisma.doctorProfile.findFirst({ where: { staffProfile: { userId } }, select: { id: true } });
     return doctor?.id ?? null;
+  }
+
+  async findDoctorStaffByUserId(userId: string) {
+    const doctor = await this.prisma.doctorProfile.findFirst({
+      where: { staffProfile: { userId } },
+      select: { id: true, staffProfile: { select: { id: true, departmentId: true } } },
+    });
+    if (!doctor) return null;
+    return {
+      doctorId: doctor.id,
+      staffId: doctor.staffProfile.id,
+      departmentId: doctor.staffProfile.departmentId,
+    };
   }
 
   async findStaffByUserId(userId: string): Promise<StaffIdentity | null> {
@@ -58,7 +71,28 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
       select: {
         id: true,
         staffId: true,
-        clinicalRoomId: true,
+        departmentId: true,
+        staff: { select: { userId: true, departmentId: true } },
+      },
+    });
+  }
+
+  async findActiveApprovedShiftForStaffDepartment(staffId: string, departmentId: string, now: Date, includeOutOfWindow = false) {
+    return this.prisma.paraclinicalShift.findFirst({
+      where: {
+        staffId,
+        departmentId,
+        status: 'APPROVED',
+        isActive: true,
+        ...(includeOutOfWindow ? {} : {
+          startTime: { lte: now },
+          endTime: { gte: now },
+        }),
+      },
+      select: {
+        id: true,
+        staffId: true,
+        departmentId: true,
         staff: { select: { userId: true, departmentId: true } },
       },
     });
@@ -92,7 +126,10 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
 
           await tx.visit.update({
             where: { id: command.visitId },
-            data: { status: VisitStatus.WAITING_TEST_RESULT },
+            data: {
+              status: VisitStatus.WAITING_TEST_RESULT,
+              ...(command.staffId ? { staffId: command.staffId } : {}),
+            },
           });
 
           return order;
@@ -213,7 +250,7 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
 
   private includeRelations() {
     return {
-      visit: { include: { clinicalRoom: true } },
+      visit: { include: { department: true, staff: { include: { doctorProfile: true } } } },
       patient: true,
       doctor: { include: { staffProfile: { include: { department: true } } } },
       targetDepartment: true,

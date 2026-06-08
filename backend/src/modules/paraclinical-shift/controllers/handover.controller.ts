@@ -23,7 +23,7 @@ export class HandoverController {
     return this.initiateHandover.execute(
       fromStaffId,
       body.toStaffId,
-      body.clinicalRoomId,
+      body.departmentId,
       body.reason,
     );
   }

@@ -7,7 +7,6 @@ const ROLE_LABELS = {
   RECEPTIONIST: 'Lễ tân',
   DOCTOR: 'Bác sĩ',
   LAB_MANAGER: 'Quản lý xét nghiệm',
-  DEPT_SHARED: 'Tài khoản phòng máy',
 };
 
 export default function RoleDashboard({ title, subtitle, tone = 'indigo' }) {

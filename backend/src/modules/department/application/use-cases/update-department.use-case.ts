@@ -21,7 +21,7 @@ export class UpdateDepartmentUseCase {
     const existing = await this.repo.findByIdOrThrow(id);
     if (dto.name) await this.validator.assertNameUnique(dto.name, id);
     if (dto.departmentCode) await this.validator.assertDepartmentCodeUnique(dto.departmentCode, id);
-    if (dto.type && dto.type !== 'CLINICAL') {
+    if (dto.type && dto.type !== 'EXAMINATION' && dto.type !== 'CLINICAL') {
       const hasDoctors = existing.staffs?.some((staff: any) => staff.doctorProfile !== null);
       if (hasDoctors) {
         throw new BadRequestException('Không thể đổi phòng ban sang loại không lâm sàng vì đang có bác sĩ được gán.');
@@ -29,7 +29,7 @@ export class UpdateDepartmentUseCase {
     }
     const before = buildDepartmentSnapshot(existing);
     const targetType = dto.type || existing.type;
-    const specialtyValue = (targetType === 'CLINICAL' || targetType === 'LABORATORY')
+    const specialtyValue = (targetType === 'EXAMINATION' || targetType === 'CLINICAL' || targetType === 'LABORATORY')
       ? (dto.specialty !== undefined ? dto.specialty : existing.specialty)
       : null;
 

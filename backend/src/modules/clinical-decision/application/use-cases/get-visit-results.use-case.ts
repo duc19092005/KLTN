@@ -21,7 +21,7 @@ export class GetVisitResultsUseCase {
     if (!doctor) throw new BadRequestException('Tài khoản hiện tại không có hồ sơ bác sĩ.');
 
     const visit = await this.repo.findVisitById(visitId);
-    this.policy.assertDoctorOwnsVisit(visit, doctor.id);
+    this.policy.assertDoctorOwnsVisit(visit, doctor);
 
     return this.repo.findFullVisit(visitId);
   }

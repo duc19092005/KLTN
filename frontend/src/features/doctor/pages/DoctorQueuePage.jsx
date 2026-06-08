@@ -37,6 +37,8 @@ function getItems(data) { return Array.isArray(data) ? data : data?.items || [];
 function formatDate(value) { return value ? new Date(value).toLocaleDateString('vi-VN') : 'N/A'; }
 function formatTime(value) { return value ? new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--'; }
 function parseAiResult(value) { try { return JSON.parse(value || '{}'); } catch { return { summary: value }; } }
+function getVisitDepartmentName(visit) { return visit?.department?.name || visit?.department?.departmentCode || 'N/A'; }
+function getVisitStaffName(visit) { return visit?.staff?.fullName || visit?.staff?.user?.username || 'N/A'; }
 
 // Function to print doctor's conclusion with QR code
 function printConclusionWithQR(visit, conclusion, qrData) {
@@ -102,9 +104,9 @@ function printConclusionWithQR(visit, conclusion, qrData) {
           <span class="label">Ngày khám:</span>
           <span class="value">${visit?.checkInAt ? new Date(visit.checkInAt).toLocaleDateString('vi-VN') + ' ' + new Date(visit.checkInAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</span>
           <span class="label">Phòng khám:</span>
-          <span class="value">${visit?.clinicalRoom?.roomName || 'N/A'}</span>
+          <span class="value">${getVisitDepartmentName(visit)}</span>
           <span class="label">Bác sĩ:</span>
-          <span class="value">${visit?.doctor?.fullName || 'N/A'}</span>
+          <span class="value">${getVisitStaffName(visit)}</span>
         </div>
         
         <div class="section">
@@ -235,7 +237,7 @@ export default function DoctorQueuePage() {
   const filteredVisits = useMemo(() => {
     const text = query.trim().toLowerCase();
     if (!text) return visits;
-    return visits.filter((visit) => [visit.visitCode, visit.patient?.patientCode, visit.patient?.fullName, visit.patient?.phone, visit.patient?.citizenId, visit.clinicalRoom?.roomName].filter(Boolean).some((field) => field.toLowerCase().includes(text)));
+    return visits.filter((visit) => [visit.visitCode, visit.patient?.patientCode, visit.patient?.fullName, visit.patient?.phone, visit.patient?.citizenId, getVisitDepartmentName(visit), getVisitStaffName(visit)].filter(Boolean).some((field) => field.toLowerCase().includes(text)));
   }, [query, visits]);
 
   const pageSize = 6;
@@ -587,7 +589,7 @@ function VisitRow({ visit, active, busy, onSelect, onStart, onOpenWorkflow }) {
       <td className="px-5 py-4 whitespace-nowrap">
         <span className="rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-mono font-bold text-slate-600">{visit.visitCode}</span>
       </td>
-      <td className="px-5 py-4 whitespace-nowrap text-xs font-bold text-slate-700">{visit.clinicalRoom?.roomName || 'N/A'}</td>
+      <td className="px-5 py-4 whitespace-nowrap text-xs font-bold text-slate-700">{getVisitDepartmentName(visit)}</td>
       <td className="px-5 py-4 whitespace-nowrap text-xs font-semibold text-slate-500">{formatTime(visit.checkInAt)}</td>
       <td className="px-5 py-4 whitespace-nowrap">
         <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-black ${st.color}`}>
@@ -649,7 +651,7 @@ function VisitHeader({ visit, detailLoading, onStart, onContinue, busy }) {
 
       <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4 bg-white">
         <Info label="Ngày sinh / Tuổi" value={formatDate(visit.patient?.birthDate)} />
-        <Info label="Phòng chức năng" value={visit.clinicalRoom?.roomName || 'N/A'} />
+        <Info label="Phòng chức năng" value={getVisitDepartmentName(visit)} />
         <Info label="Thời gian tiếp nhận" value={formatTime(visit.checkInAt)} />
       </div>
     </section>

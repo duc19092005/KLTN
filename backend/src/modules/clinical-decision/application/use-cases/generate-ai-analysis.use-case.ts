@@ -31,14 +31,14 @@ export class GenerateAiAnalysisUseCase {
     if (!doctor) throw new BadRequestException('Tài khoản hiện tại không có hồ sơ bác sĩ.');
 
     const visit = await this.repo.findVisitById(dto.visitId);
-    this.policy.assertDoctorOwnsVisit(visit, doctor.id);
+    this.policy.assertDoctorOwnsVisit(visit, doctor);
 
     const fullVisit = await this.repo.findFullVisit(dto.visitId);
     this.policy.assertReadyForClinicalDecision(fullVisit.status);
 
     const aiModel = dto.aiModelId
       ? await this.repo.findAiModelById(dto.aiModelId)
-      : await this.repo.findDefaultAiModelForSpecialty(fullVisit.doctor.specialty);
+      : await this.repo.findDefaultAiModelForSpecialty(doctor.specialty);
 
     if (!aiModel) throw new NotFoundException('Chưa đăng ký mô hình AI.');
     if (aiModel.type !== 'API') throw new BadRequestException('Mô hình đã chọn không hỗ trợ API nên không thể phân tích trực tiếp.');

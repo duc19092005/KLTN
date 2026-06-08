@@ -21,27 +21,28 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
   async findById(id: string): Promise<VisitEntity | null> {
     return this.prisma.visit.findUnique({
       where: { id },
-      select: { id: true, patientId: true, doctorId: true, clinicalRoomId: true, status: true },
+      select: { id: true, patientId: true, departmentId: true, staffId: true, status: true },
     });
   }
 
-  async findRoomWithDoctor(roomId: string) {
-    return this.prisma.clinicalRoom.findUnique({
-      where: { id: roomId },
-      select: { id: true, doctorId: true },
+  async findDepartmentForVisit(departmentId: string) {
+    return this.prisma.department.findUnique({
+      where: { id: departmentId },
+      select: { id: true, type: true, status: true },
     });
   }
 
-  async findDoctorProfileById(doctorId: string) {
-    return this.prisma.doctorProfile.findUnique({ where: { id: doctorId }, select: { id: true } });
-  }
-
-  async findDoctorIdByUserId(userId: string): Promise<string | null> {
+  async findDoctorStaffByUserId(userId: string) {
     const doctor = await this.prisma.doctorProfile.findFirst({
       where: { staffProfile: { userId } },
-      select: { id: true },
+      select: { id: true, staffProfile: { select: { id: true, departmentId: true } } },
     });
-    return doctor?.id ?? null;
+    if (!doctor) return null;
+    return {
+      doctorId: doctor.id,
+      staffId: doctor.staffProfile.id,
+      departmentId: doctor.staffProfile.departmentId,
+    };
   }
 
   async createVisitWithOptionalPatient(command: CreateVisitCommand): Promise<unknown> {
@@ -91,8 +92,8 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
             data: {
               visitCode,
               patientId,
-              clinicalRoomId: command.clinicalRoomId,
-              doctorId: command.doctorId,
+              departmentId: command.departmentId,
+              staffId: command.staffId ?? null,
               status: VisitStatus.WAITING,
             },
             include: this.includeRelations(),
@@ -109,8 +110,8 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
   async findManyPaginated(filter: VisitListFilter, skip: number, take: number) {
     const where: Prisma.VisitWhereInput = {
       ...(filter.status ? { status: filter.status } : {}),
-      ...(filter.doctorId ? { doctorId: filter.doctorId } : {}),
-      ...(filter.clinicalRoomId ? { clinicalRoomId: filter.clinicalRoomId } : {}),
+      ...(filter.staffId ? { staffId: filter.staffId } : {}),
+      ...(filter.departmentId ? { departmentId: filter.departmentId } : {}),
       ...(filter.patientId ? { patientId: filter.patientId } : {}),
     };
     const [items, total] = await this.prisma.$transaction([
@@ -120,23 +121,29 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
     return { items, total };
   }
 
-  async updateStatus(id: string, status: VisitStatus, completedAt?: Date) {
+  async updateStatus(id: string, status: VisitStatus, completedAt?: Date, staffId?: string) {
     return this.prisma.visit.update({
       where: { id },
-      data: { status, completedAt },
+      data: { status, completedAt, ...(staffId ? { staffId } : {}) },
       include: this.includeRelations(),
     });
   }
 
-  async suggestRooms(specialty: string) {
-    const where: Prisma.ClinicalRoomWhereInput = {
+  async suggestDepartments(specialty: string) {
+    const where: Prisma.DepartmentWhereInput = {
       status: 'ACTIVE',
-      doctor: specialty ? { specialty: { contains: specialty, mode: 'insensitive' } } : { isNot: null },
+      type: 'EXAMINATION',
+      ...(specialty ? { specialty: { contains: specialty, mode: 'insensitive' } } : {}),
     };
-    return this.prisma.clinicalRoom.findMany({
+    return this.prisma.department.findMany({
       where,
-      include: { doctor: { include: { staffProfile: { include: { department: true } } } } },
-      orderBy: { roomCode: 'asc' },
+      include: {
+        staffs: {
+          where: { user: { role: 'DOCTOR', status: 'ACTIVE' } },
+          include: { user: { select: this.safeUserSelect() }, doctorProfile: true },
+        },
+      },
+      orderBy: { departmentCode: 'asc' },
       take: 10,
     });
   }
@@ -144,18 +151,19 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
   private includeRelations() {
     return {
       patient: true,
-      clinicalRoom: true,
-      doctor: {
+      department: true,
+      staff: {
         include: {
-          staffProfile: {
-            include: {
-              department: true,
-              user: { select: { id: true, username: true, email: true, role: true, status: true } },
-            },
-          },
+          department: true,
+          doctorProfile: true,
+          user: { select: this.safeUserSelect() },
         },
       },
     } as const;
+  }
+
+  private safeUserSelect() {
+    return { id: true, username: true, email: true, role: true, status: true } as const;
   }
 
   private async generatePatientCode(tx: Prisma.TransactionClient) {

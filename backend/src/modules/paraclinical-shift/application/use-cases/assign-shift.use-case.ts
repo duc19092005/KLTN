@@ -1,61 +1,42 @@
-import { Inject, Injectable, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import {
   PARACLINICAL_SHIFT_REPOSITORY,
   ParaclinicalShiftRepositoryPort,
 } from '../ports/paraclinical-shift.repository.port';
-import { SECURITY_EVENT_LOGGER, SecurityEventLoggerPort } from '../../../auth/application/ports/security-event-logger.port';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
 
 /**
  * Admin/Head-of-department directly assigns a shift (auto-APPROVED).
- * Generates hash + queues for batch Merkle anchoring.
  */
 @Injectable()
 export class AssignShiftUseCase {
   constructor(
     @Inject(PARACLINICAL_SHIFT_REPOSITORY) private readonly repo: ParaclinicalShiftRepositoryPort,
-    @Inject(SECURITY_EVENT_LOGGER) private readonly securityLogger: SecurityEventLoggerPort,
     private readonly auditLogger: AuditLoggerService,
   ) {}
 
-  async execute(
-    staffId: string,
-    clinicalRoomId: string,
-    startTime: Date,
-    endTime: Date,
-    approvedById: string,
-  ) {
+  async execute(staffId: string, departmentId: string, startTime: Date, endTime: Date, approvedById: string) {
     if (startTime >= endTime) {
       throw new BadRequestException('Thời gian bắt đầu phải trước thời gian kết thúc.');
     }
 
-    const hasOverlap = await this.repo.hasOverlappingShift(clinicalRoomId, startTime, endTime);
+    const hasOverlap = await this.repo.hasOverlappingShift(departmentId, startTime, endTime);
     if (hasOverlap) {
-      throw new BadRequestException('Ca trực trùng lặp với ca trực đã duyệt khác trong cùng phòng.');
+      throw new BadRequestException('Ca trực trùng lặp với ca trực đã duyệt khác trong cùng phòng ban.');
     }
 
-    // Compute tamper-evidence hash for the pre-approved shift
     const snapshot = {
       staffId,
-      clinicalRoomId,
+      departmentId,
       startTime: startTime.toISOString(),
       endTime: endTime.toISOString(),
       status: 'APPROVED',
     };
     const { salt, hash } = this.auditLogger.hashSnapshot(snapshot);
 
-    const shift = await this.repo.assignShift({
-      staffId,
-      clinicalRoomId,
-      startTime,
-      endTime,
-      approvedById,
-    });
-
-    // Update hash on the created shift
+    const shift = await this.repo.assignShift({ staffId, departmentId, startTime, endTime, approvedById });
     await this.repo.approveShift(shift.id, approvedById, hash, salt);
 
-    // Write to BlockchainLogger (batch anchoring)
     await this.auditLogger.record({
       entity: 'ParaclinicalShift',
       entityId: shift.id,
@@ -67,7 +48,7 @@ export class AssignShiftUseCase {
       onChainStatus: 'PENDING',
       metadata: {
         staffName: shift.staff.fullName,
-        room: shift.clinicalRoom.roomName,
+        department: shift.department.name,
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
         directAssignment: true,

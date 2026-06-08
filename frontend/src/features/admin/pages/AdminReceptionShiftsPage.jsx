@@ -26,6 +26,9 @@ function unwrapList(res) {
   if (Array.isArray(payload?.items)) return payload.items;
   return [];
 }
+function getShiftDepartment(shift) {
+  return shift.department || shift.staff?.department || null;
+}
 
 /**
  * Unified shift management page for ADMIN / LAB_MANAGER (paraclinical shifts only).
@@ -111,11 +114,12 @@ function ParaclinicalTab({ user, toast }) {
       const pendingList = unwrapList(pendingRes);
       setPending(pendingList);
 
-      // Build a deduped room list from pending shifts so the admin can navigate to a specific room.
+      // Build a deduped department list from pending shifts so the admin can navigate to a specific department.
       const roomMap = new Map();
       for (const s of pendingList) {
-        if (s.clinicalRoom?.id && !roomMap.has(s.clinicalRoom.id)) {
-          roomMap.set(s.clinicalRoom.id, s.clinicalRoom);
+        const department = getShiftDepartment(s);
+        if (department?.id && !roomMap.has(department.id)) {
+          roomMap.set(department.id, department);
         }
       }
       const roomArr = [...roomMap.values()];
@@ -130,7 +134,7 @@ function ParaclinicalTab({ user, toast }) {
 
   async function loadRoom() {
     try {
-      const res = await paraclinicalShiftService.listByRoom(selectedRoom);
+      const res = await paraclinicalShiftService.listByDepartment(selectedRoom);
       setApprovedByRoom(unwrapList(res));
     } catch { /* ignore */ }
   }
@@ -182,7 +186,7 @@ function ParaclinicalTab({ user, toast }) {
         >
           {rooms.length === 0 && <option value="">-- Chưa có phòng có ca chờ duyệt --</option>}
           {rooms.map((r) => (
-            <option key={r.id} value={r.id}>{r.roomCode} · {r.roomName}</option>
+            <option key={r.id} value={r.id}>{r.departmentCode} · {r.name}</option>
           ))}
         </select>
         <p className="text-[11px] font-bold text-slate-500">
@@ -201,7 +205,10 @@ function ParaclinicalTab({ user, toast }) {
         loading={loading}
         handleApprove={handleApprove}
         handleReject={handleReject}
-        getDeptLabel={(s) => s.clinicalRoom?.roomName || s.clinicalRoomId?.slice(0, 8)}
+        getDeptLabel={(s) => {
+          const department = getShiftDepartment(s);
+          return department?.name || department?.departmentCode || s.departmentId?.slice(0, 8);
+        }}
         hideFilters
       />
       <RejectReasonModal

@@ -12,7 +12,7 @@ import LoadingIndicator from '../../../shared/components/LoadingIndicator';
  * 3. Face scan Person B (incoming)
  * 4. Success confirmation
  */
-export default function HandoverModal({ isOpen, onClose, currentStaff, clinicalRoomId, availableStaff = [], onHandoverComplete }) {
+export default function HandoverModal({ isOpen, onClose, currentStaff, departmentId, availableStaff = [], onHandoverComplete }) {
   const toast = useToast();
   const [step, setStep] = useState(1);
   const [selectedStaff, setSelectedStaff] = useState('');
@@ -43,7 +43,7 @@ export default function HandoverModal({ isOpen, onClose, currentStaff, clinicalR
     setLoading(true);
     setError('');
     try {
-      const res = await handoverService.initiate(selectedStaff, clinicalRoomId, reason || undefined);
+      const res = await handoverService.initiate(selectedStaff, departmentId, reason || undefined);
       setHandoverId(res.data.id);
       setStep(2);
       toast.success('Phiên bàn giao đã được khởi tạo.');

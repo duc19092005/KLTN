@@ -14,13 +14,9 @@ export class CreateVisitDto {
   @IsOptional()
   patient?: CreatePatientDto;
 
-  @ApiProperty({ example: 'clinical-room-id' })
+  @ApiProperty({ example: 'department-id' })
   @IsUUID()
-  clinicalRoomId!: string;
-
-  @ApiProperty({ example: 'doctor-profile-id' })
-  @IsUUID()
-  doctorId!: string;
+  departmentId!: string;
 }
 
 export class UpdateVisitStatusDto {
@@ -38,12 +34,12 @@ export class VisitQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsUUID()
-  doctorId?: string;
+  staffId?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsUUID()
-  clinicalRoomId?: string;
+  departmentId?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

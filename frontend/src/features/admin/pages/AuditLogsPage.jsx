@@ -48,7 +48,6 @@ const ROLE_LABELS = {
   RECEPTIONIST: 'Lễ tân',
   DOCTOR: 'Bác sĩ',
   LAB_MANAGER: 'Quản lý xét nghiệm',
-  DEPT_SHARED: 'Tài khoản phòng máy',
 };
 
 const ROLE_TONE = {
@@ -56,7 +55,6 @@ const ROLE_TONE = {
   RECEPTIONIST: 'bg-sky-50 text-sky-700 border-sky-100',
   DOCTOR: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   LAB_MANAGER: 'bg-amber-50 text-amber-700 border-amber-100',
-  DEPT_SHARED: 'bg-slate-50 text-slate-600 border-slate-100',
 };
 
 function shortHash(hash) {

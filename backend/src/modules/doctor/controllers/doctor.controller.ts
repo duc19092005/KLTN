@@ -9,7 +9,7 @@ import { AuthUser } from '../../../common/types/auth-user.type';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
 import { RequireStepUpSession } from '../../../common/stepup/require-stepup-session.decorator';
-import { AssignClinicalRoomDto, CreateDoctorDto, CreateDoctorWithStaffDto, DoctorQueryDto, UpdateDoctorDto } from '../dto/doctor.dto';
+import { CreateDoctorDto, CreateDoctorWithStaffDto, DoctorQueryDto, UpdateDoctorDto } from '../dto/doctor.dto';
 import { DoctorService } from '../services/doctor.service';
 import { uploadAvatarToCloudinary } from '../../../infrastructure/storage/cloudinary-uploader';
 
@@ -50,7 +50,7 @@ export class DoctorController {
 
   @Post('full')
   @RequireStepUpSession()
-  @ApiOperation({ summary: 'Create doctor user, staff profile, doctor profile, and optional room assignment in one transaction' })
+  @ApiOperation({ summary: 'Create doctor user, staff profile, and doctor profile in one transaction' })
   createFull(@Body() dto: CreateDoctorWithStaffDto) {
     return this.service.createWithStaff(dto);
   }
@@ -99,10 +99,4 @@ export class DoctorController {
     return this.service.update(id, dto, user?.sub);
   }
 
-  @Patch(':id/clinical-room')
-  @ApiOperation({ summary: 'Assign, move, or clear a doctor clinical room' })
-  assignRoom(@Param('id') id: string, @Body() dto: AssignClinicalRoomDto) {
-    return this.service.assignRoom(id, dto);
-  }
 }
-

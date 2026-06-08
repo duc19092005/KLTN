@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import {
-  ParaclinicalShiftRepositoryPort,
-  CreateShiftData,
   AssignShiftData,
-  ShiftWithStaff,
+  CreateShiftData,
   HandoverLogFull,
+  ParaclinicalShiftRepositoryPort,
+  ShiftWithStaff,
 } from '../../application/ports/paraclinical-shift.repository.port';
 
 const SHIFT_INCLUDE = {
@@ -27,7 +27,7 @@ const SHIFT_INCLUDE = {
       doctorProfile: { select: { id: true } },
     },
   },
-  clinicalRoom: { select: { id: true, roomCode: true, roomName: true } },
+  department: { select: { id: true, departmentCode: true, name: true, type: true } },
 } as const;
 
 const HANDOVER_INCLUDE = {
@@ -39,13 +39,11 @@ const HANDOVER_INCLUDE = {
 export class PrismaParaclinicalShiftRepository implements ParaclinicalShiftRepositoryPort {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ── Shift management ──────────────────────────────────────────
-
   async createShift(data: CreateShiftData): Promise<ShiftWithStaff> {
     return this.prisma.paraclinicalShift.create({
       data: {
         staffId: data.staffId,
-        clinicalRoomId: data.clinicalRoomId,
+        departmentId: data.departmentId,
         startTime: data.startTime,
         endTime: data.endTime,
         note: data.note ?? null,
@@ -59,7 +57,7 @@ export class PrismaParaclinicalShiftRepository implements ParaclinicalShiftRepos
     return this.prisma.paraclinicalShift.create({
       data: {
         staffId: data.staffId,
-        clinicalRoomId: data.clinicalRoomId,
+        departmentId: data.departmentId,
         startTime: data.startTime,
         endTime: data.endTime,
         status: 'APPROVED',
@@ -70,18 +68,10 @@ export class PrismaParaclinicalShiftRepository implements ParaclinicalShiftRepos
   }
 
   async findShiftById(id: string): Promise<ShiftWithStaff | null> {
-    return this.prisma.paraclinicalShift.findUnique({
-      where: { id },
-      include: SHIFT_INCLUDE,
-    }) as any;
+    return this.prisma.paraclinicalShift.findUnique({ where: { id }, include: SHIFT_INCLUDE }) as any;
   }
 
-  async approveShift(
-    id: string,
-    approvedById: string,
-    hash256: string,
-    dataSalt: string,
-  ): Promise<ShiftWithStaff> {
+  async approveShift(id: string, approvedById: string, hash256: string, dataSalt: string): Promise<ShiftWithStaff> {
     return this.prisma.paraclinicalShift.update({
       where: { id },
       data: { status: 'APPROVED', approvedById, hash256, dataSalt },
@@ -116,10 +106,10 @@ export class PrismaParaclinicalShiftRepository implements ParaclinicalShiftRepos
     });
   }
 
-  async findShiftsByRoom(roomId: string, from?: Date, to?: Date): Promise<ShiftWithStaff[]> {
+  async findShiftsByDepartment(departmentId: string, from?: Date, to?: Date): Promise<ShiftWithStaff[]> {
     return this.prisma.paraclinicalShift.findMany({
       where: {
-        clinicalRoomId: roomId,
+        departmentId,
         isActive: true,
         ...(from && to
           ? {
@@ -148,64 +138,57 @@ export class PrismaParaclinicalShiftRepository implements ParaclinicalShiftRepos
     }) as any;
   }
 
-  async findActiveShiftForRoom(roomId: string, now: Date): Promise<ShiftWithStaff | null> {
+  async findActiveShiftForDepartment(departmentId: string, now: Date): Promise<ShiftWithStaff | null> {
     return this.prisma.paraclinicalShift.findFirst({
-      where: {
-        clinicalRoomId: roomId,
-        status: 'APPROVED',
-        isActive: true,
-        startTime: { lte: now },
-        endTime: { gte: now },
-      },
+      where: { departmentId, status: 'APPROVED', isActive: true, startTime: { lte: now }, endTime: { gte: now } },
       include: SHIFT_INCLUDE,
     }) as any;
   }
 
-  async findActiveShiftsForRoom(roomId: string, now: Date): Promise<ShiftWithStaff[]> {
+  async findActiveShiftsForDepartment(departmentId: string, now: Date): Promise<ShiftWithStaff[]> {
     return this.prisma.paraclinicalShift.findMany({
+      where: { departmentId, status: 'APPROVED', isActive: true, startTime: { lte: now }, endTime: { gte: now } },
+      include: SHIFT_INCLUDE,
+      orderBy: { startTime: 'asc' },
+    }) as any;
+  }
+
+  async findActiveShiftForStaffDepartment(staffId: string, departmentId: string, now: Date, includeOutOfWindow = false): Promise<ShiftWithStaff | null> {
+    return this.prisma.paraclinicalShift.findFirst({
       where: {
-        clinicalRoomId: roomId,
+        staffId,
+        departmentId,
         status: 'APPROVED',
         isActive: true,
-        startTime: { lte: now },
-        endTime: { gte: now },
+        ...(includeOutOfWindow ? {} : { startTime: { lte: now }, endTime: { gte: now } }),
       },
       include: SHIFT_INCLUDE,
       orderBy: { startTime: 'asc' },
     }) as any;
   }
 
-  async hasOverlappingShift(
-    roomId: string,
-    startTime: Date,
-    endTime: Date,
-    excludeId?: string,
-  ): Promise<boolean> {
+  async hasOverlappingShift(departmentId: string, startTime: Date, endTime: Date, excludeId?: string): Promise<boolean> {
     const count = await this.prisma.paraclinicalShift.count({
       where: {
-        clinicalRoomId: roomId,
+        departmentId,
         status: 'APPROVED',
         isActive: true,
         ...(excludeId ? { id: { not: excludeId } } : {}),
-        OR: [
-          { startTime: { lt: endTime }, endTime: { gt: startTime } },
-        ],
+        OR: [{ startTime: { lt: endTime }, endTime: { gt: startTime } }],
       },
     });
     return count > 0;
   }
 
-  // ── Handover management ───────────────────────────────────────
-
   async createHandoverLog(data: {
-    clinicalRoomId: string;
+    departmentId: string;
     fromStaffId: string;
     toStaffId: string;
     reason?: string;
   }): Promise<HandoverLogFull> {
     return this.prisma.handoverLog.create({
       data: {
-        clinicalRoomId: data.clinicalRoomId,
+        departmentId: data.departmentId,
         fromStaffId: data.fromStaffId,
         toStaffId: data.toStaffId,
         reason: data.reason ?? null,
@@ -215,74 +198,25 @@ export class PrismaParaclinicalShiftRepository implements ParaclinicalShiftRepos
   }
 
   async findHandoverById(id: string): Promise<HandoverLogFull | null> {
-    return this.prisma.handoverLog.findUnique({
-      where: { id },
-      include: HANDOVER_INCLUDE,
-    }) as any;
+    return this.prisma.handoverLog.findUnique({ where: { id }, include: HANDOVER_INCLUDE }) as any;
   }
 
   async markFaceVerifiedA(id: string): Promise<HandoverLogFull> {
-    return this.prisma.handoverLog.update({
-      where: { id },
-      data: { faceVerifiedA: true },
-      include: HANDOVER_INCLUDE,
-    }) as any;
+    return this.prisma.handoverLog.update({ where: { id }, data: { faceVerifiedA: true }, include: HANDOVER_INCLUDE }) as any;
   }
 
   async markFaceVerifiedB(id: string): Promise<HandoverLogFull> {
-    return this.prisma.handoverLog.update({
-      where: { id },
-      data: { faceVerifiedB: true },
-      include: HANDOVER_INCLUDE,
-    }) as any;
+    return this.prisma.handoverLog.update({ where: { id }, data: { faceVerifiedB: true }, include: HANDOVER_INCLUDE }) as any;
   }
 
   async completeHandover(id: string): Promise<HandoverLogFull> {
-    return this.prisma.handoverLog.update({
-      where: { id },
-      data: { isCompleted: true },
-      include: HANDOVER_INCLUDE,
-    }) as any;
-  }
-
-  // ── Shared account helpers ────────────────────────────────────
-
-  async findUserByUsername(username: string) {
-    return this.prisma.user.findFirst({
-      where: { username },
-      select: { id: true, username: true, passwordHash: true, role: true, status: true },
-    });
+    return this.prisma.handoverLog.update({ where: { id }, data: { isCompleted: true }, include: HANDOVER_INCLUDE }) as any;
   }
 
   async findStaffByUserId(userId: string) {
     return this.prisma.staffProfile.findUnique({
       where: { userId },
       select: { id: true, fullName: true, userId: true, departmentId: true },
-    });
-  }
-
-  async findRoomsByDepartmentStaff(departmentId: string) {
-    // Find clinical rooms that have shifts from staff in this department
-    const rooms = await this.prisma.clinicalRoom.findMany({
-      where: {
-        status: 'ACTIVE',
-        paraclinicalShifts: {
-          some: {
-            staff: { departmentId },
-            status: 'APPROVED',
-            isActive: true,
-          },
-        },
-      },
-      select: { id: true, roomCode: true, roomName: true },
-    });
-    return rooms;
-  }
-
-  async findDepartmentBySharedUserId(userId: string) {
-    return this.prisma.department.findFirst({
-      where: { sharedUserId: userId },
-      select: { id: true, name: true },
     });
   }
 }

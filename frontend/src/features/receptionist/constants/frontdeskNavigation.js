@@ -1,7 +1,4 @@
-// Navigation for the shared front-desk workstation account (DEPT_SHARED at an
-// ADMINISTRATIVE department). This is the account multiple receptionists use
-// during their shift; their personal receptionist account only manages the
-// shift roster, not patient-facing operations.
+// Navigation for receptionist intake operations.
 export const FRONTDESK_NAV_ITEMS = [
   { id: 'patient-intake', label: 'Tiếp nhận', icon: 'users' },
   { id: 'visit-queue', label: 'Hàng đợi khám', icon: 'activity' },

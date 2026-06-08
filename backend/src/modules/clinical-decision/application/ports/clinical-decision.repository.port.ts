@@ -4,10 +4,20 @@ import { AiModelRegistry } from '@prisma/client';
 export const CLINICAL_DECISION_REPOSITORY = Symbol('CLINICAL_DECISION_REPOSITORY');
 
 /** Minimal visit shape for doctor ownership checks. */
-export type ClinicalVisitInfo = { id: string; doctorId: string; status: string };
+export type ClinicalVisitInfo = {
+  id: string;
+  departmentId: string;
+  staffId: string | null;
+  status: string;
+};
 
 /** Doctor profile with specialty, used for AI-model defaulting. */
-export type ClinicalDoctor = { id: string; specialty: string };
+export type ClinicalDoctor = {
+  id: string;
+  staffId: string;
+  departmentId: string | null;
+  specialty: string;
+};
 
 export type CreateAiDiagnosisData = {
   aiModelId: string;
@@ -21,6 +31,7 @@ export type CreateAiDiagnosisData = {
 export type UpsertConclusionData = {
   visitId: string;
   doctorId: string;
+  staffId?: string;
   aiDiagnosisId?: string | null;
   finalDiagnosis: string;
   treatmentPlan?: string | null;
@@ -44,7 +55,7 @@ export interface ClinicalDecisionRepositoryPort {
 
   createAiDiagnosis(data: CreateAiDiagnosisData): Promise<unknown>;
 
-  findAiDiagnosisWithVisit(id: string): Promise<{ id: string; visit: { doctorId: string } | null } | null>;
+  findAiDiagnosisWithVisit(id: string): Promise<{ id: string; visit: ClinicalVisitInfo | null } | null>;
   updateAiDiagnosisReview(id: string, reviewedByDoctorId: string, doctorFeedback: string | null): Promise<unknown>;
 
   findAiDiagnosisById(id: string): Promise<{ id: string; visitId: string } | null>;

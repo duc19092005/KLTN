@@ -43,11 +43,11 @@ export class VerifyPatientPublicUseCase {
           checkInAt: visit.checkInAt,
           completedAt: visit.completedAt,
           status: visit.status,
-          clinicalRoom: visit.clinicalRoom
-            ? { name: visit.clinicalRoom.name, roomNumber: visit.clinicalRoom.roomNumber }
+          department: visit.department
+            ? { name: visit.department.name, departmentCode: visit.department.departmentCode }
             : null,
-          doctor: visit.doctor?.staffProfile
-            ? { fullName: visit.doctor.staffProfile.fullName, employeeCode: visit.doctor.staffProfile.employeeCode }
+          doctor: visit.staff?.doctorProfile
+            ? { fullName: visit.staff.fullName, employeeCode: visit.staff.employeeCode }
             : null,
           conclusion: conclusion
             ? {

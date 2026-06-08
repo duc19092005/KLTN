@@ -1,11 +1,11 @@
-import { IsString, IsArray, IsOptional, IsUUID, MaxLength } from 'class-validator';
+import { IsArray, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class InitiateHandoverDto {
   @IsUUID()
   toStaffId: string;
 
   @IsUUID()
-  clinicalRoomId: string;
+  departmentId: string;
 
   @IsOptional()
   @IsString()

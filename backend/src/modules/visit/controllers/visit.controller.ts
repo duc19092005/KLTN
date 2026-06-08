@@ -28,9 +28,9 @@ export class VisitController {
   }
 
   @Roles('ADMIN', 'RECEPTIONIST')
-  @Get('suggest-rooms')
-  suggestRooms(@Query('specialty') specialty = '') {
-    return this.visitService.suggestRooms(specialty);
+  @Get('suggest-departments')
+  suggestDepartments(@Query('specialty') specialty = '') {
+    return this.visitService.suggestDepartments(specialty);
   }
 
   @Roles('ADMIN', 'RECEPTIONIST', 'DOCTOR')

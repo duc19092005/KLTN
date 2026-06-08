@@ -6,9 +6,8 @@ import { MedicalOrderAccessPolicy } from '../policies/medical-order-access.polic
 import { MEDICAL_ORDER_REPOSITORY, MedicalOrderRepositoryPort } from '../ports/medical-order.repository.port';
 
 /**
- * LAB_MANAGER returns a result for an order. Validation and the atomic
- * result+order+visit transition are copied verbatim from the former
- * MedicalOrderService.createResult().
+ * LAB_MANAGER returns a result for an order in their department during an
+ * approved active shift.
  */
 @Injectable()
 export class CreateMedicalResultUseCase {
@@ -21,18 +20,20 @@ export class CreateMedicalResultUseCase {
     const order = await this.repo.findOrderForManage(orderId);
     if (!order) throw new NotFoundException('Không tìm thấy phiếu chỉ định.');
 
-    await this.accessPolicy.assertCanManageOrder(order, user, () => this.resolveStaff(this.getActualStaffUserId(user)));
+    await this.accessPolicy.assertCanManageOrder(order, user, () => this.resolveStaff(user.sub));
     await this.assertActiveApprovedShiftForOrder(order.targetDepartmentId, user);
 
     if (([MedicalOrderStatus.RESULT_READY, MedicalOrderStatus.CANCELLED] as MedicalOrderStatus[]).includes(order.status)) {
-      throw new BadRequestException('Không thể trả kết quả cho phiếu đã sẵn sàng, hoàn tất hoặc đã hủy.');
+      throw new BadRequestException('Không thể trả kết quả cho phiếu đã sẵn sàng hoặc đã hủy.');
     }
-    if (!dto.files?.length) throw new BadRequestException('Vui lòng cung cấp ít nhất một file kết quả PDF hoặc hình ảnh.');
+    if (!dto.files?.length) {
+      throw new BadRequestException('Vui lòng cung cấp ít nhất một file kết quả PDF hoặc hình ảnh.');
+    }
 
     return this.repo.createResultWithTransitions(
       {
         orderId,
-        performedById: this.getActualStaffUserId(user),
+        performedById: user.sub,
         note: dto.note?.trim() || undefined,
         files: dto.files.map((file) => ({
           fileName: file.fileName,
@@ -54,24 +55,27 @@ export class CreateMedicalResultUseCase {
 
   private async assertActiveApprovedShiftForOrder(targetDepartmentId: string | null, user: AuthUser) {
     if (user.role === 'ADMIN') return;
-    if (!user.verified || !user.shiftId || !user.staffId) {
-      throw new ForbiddenException('Chỉ nhân viên đã quét khuôn mặt trong ca trực được duyệt mới được trả kết quả.');
+    if (!user.verified) {
+      throw new ForbiddenException('Chỉ nhân viên đã xác thực khuôn mặt và đang có ca trực được duyệt mới được trả kết quả.');
     }
 
-    const shift = await this.repo.findActiveApprovedShift(user.shiftId, new Date(), this.isDemoMode());
-    if (!shift || shift.staffId !== user.staffId || shift.staff.userId !== this.getActualStaffUserId(user)) {
-      throw new ForbiddenException('Ca trực đã hết hiệu lực hoặc không khớp với nhân viên đang đăng nhập.');
+    const staff = await this.resolveStaff(user.sub);
+    if (!targetDepartmentId || staff.departmentId !== targetDepartmentId) {
+      throw new ForbiddenException('Nhân viên hiện tại không thuộc phòng ban nhận phiếu chỉ định này.');
     }
-    if (!targetDepartmentId || shift.staff.departmentId !== targetDepartmentId) {
-      throw new ForbiddenException('Ca trực hiện tại không thuộc phòng ban nhận phiếu chỉ định này.');
+
+    const shift = await this.repo.findActiveApprovedShiftForStaffDepartment(
+      staff.id,
+      targetDepartmentId,
+      new Date(),
+      this.isDemoMode(),
+    );
+    if (!shift || shift.staff.userId !== user.sub) {
+      throw new ForbiddenException('Ca trực đã hết hiệu lực hoặc không khớp với nhân viên đang đăng nhập.');
     }
   }
 
   private isDemoMode() {
     return process.env.DEMO_MODE === 'true';
-  }
-
-  private getActualStaffUserId(user: AuthUser) {
-    return user.actualStaffId || user.sub;
   }
 }

@@ -8,9 +8,8 @@ import { DOCTOR_INTEGRITY_ANCHOR, DoctorIntegrityAnchorPort } from '../ports/doc
 const DEFAULT_STAFF_PASSWORD = '123456';
 
 /**
- * Creates a doctor user + staff profile + doctor profile (+ optional room) in
- * one transaction, then unified-anchors. Behavior copied verbatim from the
- * former DoctorService.createWithStaff().
+ * Creates a doctor user + staff profile + doctor profile in one transaction,
+ * then anchors the unified staff+doctor snapshot.
  */
 @Injectable()
 export class CreateDoctorWithStaffUseCase {
@@ -20,24 +19,19 @@ export class CreateDoctorWithStaffUseCase {
   ) {}
 
   async execute(dto: CreateDoctorWithStaffDto) {
-    if (!dto.clinicalRoomId) {
-      throw new BadRequestException('Vui lòng chọn phòng khám.');
+    if (!dto.departmentId) {
+      throw new BadRequestException('Vui lòng chọn phòng ban khám cho bác sĩ.');
     }
-    if (!(await this.repo.roomExists(dto.clinicalRoomId))) {
-      throw new NotFoundException('Không tìm thấy phòng khám.');
+
+    const dept = await this.repo.findDepartment(dto.departmentId);
+    if (!dept) throw new NotFoundException('Không tìm thấy phòng ban.');
+    if (dept.type !== 'EXAMINATION' && dept.type !== 'CLINICAL') {
+      throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng ban khám.');
     }
-    if (dto.departmentId) {
-      const dept = await this.repo.findDepartment(dto.departmentId);
-      if (!dept) {
-        throw new NotFoundException('Không tìm thấy phòng ban.');
-      }
-      if (dept.type !== 'CLINICAL') {
-        throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng ban lâm sàng.');
-      }
-      if (dept.specialty && dept.specialty !== dto.specialty) {
-        throw new BadRequestException(`Bác sĩ chuyên khoa "${dto.specialty}" không thể được xếp vào phòng ban chuyên khoa "${dept.specialty}"`);
-      }
+    if (dept.specialty && dept.specialty !== dto.specialty) {
+      throw new BadRequestException(`Bác sĩ chuyên khoa "${dto.specialty}" không thể được xếp vào phòng ban chuyên khoa "${dept.specialty}"`);
     }
+
     if (await this.repo.findUserByUsernameOrEmail(dto.username, dto.email)) {
       throw new ConflictException('Tên đăng nhập hoặc email đã tồn tại.');
     }
@@ -56,7 +50,6 @@ export class CreateDoctorWithStaffUseCase {
 
     try {
       const doctor = await this.repo.createWithStaff(dto, employeeCode, passwordHash);
-      // Single unified anchor: staff + doctor data hashed together under doctor.id
       await this.integrity.anchorChange(doctor, 'CREATE', undefined, null);
       return doctor;
     } catch (error) {

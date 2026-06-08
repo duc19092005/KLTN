@@ -18,10 +18,7 @@ describe('UpdateMedicalOrderStatusUseCase shift enforcement and DEMO_MODE', () =
     role: UserRole.LAB_MANAGER,
     verified: true,
     staffId: 'staff-1',
-    actualStaffId: actualStaffUserId,
-    sharedAccountId: 'dept-shared-user-1',
     shiftId: 'shift-1',
-    clinicalRoomId: 'room-1',
   };
 
   afterEach(() => {
@@ -33,12 +30,12 @@ describe('UpdateMedicalOrderStatusUseCase shift enforcement and DEMO_MODE', () =
     const repo = {
       findOrderForManage: jest.fn().mockResolvedValue(order),
       findStaffByUserId: jest.fn().mockResolvedValue({ id: 'staff-1', userId: actualStaffUserId, departmentId: 'dept-lab-1' }),
-      findActiveApprovedShift: jest.fn().mockResolvedValue(
+      findActiveApprovedShiftForStaffDepartment: jest.fn().mockResolvedValue(
         options.shiftFound
           ? {
               id: 'shift-1',
               staffId: 'staff-1',
-              clinicalRoomId: 'room-1',
+              departmentId: 'dept-lab-1',
               staff: { userId: actualStaffUserId, departmentId: 'dept-lab-1' },
             }
           : null,
@@ -56,7 +53,7 @@ describe('UpdateMedicalOrderStatusUseCase shift enforcement and DEMO_MODE', () =
 
     await expect(useCase.execute(order.id, MedicalOrderStatus.IN_PROGRESS, authUser)).rejects.toThrow(ForbiddenException);
 
-    expect(repo.findActiveApprovedShift).toHaveBeenCalledWith('shift-1', expect.any(Date), false);
+    expect(repo.findActiveApprovedShiftForStaffDepartment).toHaveBeenCalledWith('staff-1', 'dept-lab-1', expect.any(Date), false);
     expect(repo.updateStatus).not.toHaveBeenCalled();
   });
 
@@ -69,7 +66,7 @@ describe('UpdateMedicalOrderStatusUseCase shift enforcement and DEMO_MODE', () =
       status: MedicalOrderStatus.IN_PROGRESS,
     });
 
-    expect(repo.findActiveApprovedShift).toHaveBeenCalledWith('shift-1', expect.any(Date), true);
+    expect(repo.findActiveApprovedShiftForStaffDepartment).toHaveBeenCalledWith('staff-1', 'dept-lab-1', expect.any(Date), true);
     expect(repo.updateStatus).toHaveBeenCalledWith(order.id, MedicalOrderStatus.IN_PROGRESS, undefined);
   });
 });

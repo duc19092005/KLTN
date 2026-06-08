@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma, UserRole, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { CreateDoctorDto, CreateDoctorWithStaffDto, UpdateDoctorDto } from '../../dto/doctor.dto';
@@ -11,7 +11,7 @@ import {
 /**
  * Prisma-backed DoctorProfile repository. Preserves the include shapes, employee
  * code generation, and the multi-step transactions (createWithStaff, update with
- * clinical-room reassignment, assignRoom) from the former DoctorService.
+ * nested staff updates) from the former DoctorService.
  */
 @Injectable()
 export class PrismaDoctorRepository implements DoctorRepositoryPort {
@@ -38,10 +38,6 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
     const dept = await this.prisma.department.findUnique({ where: { id }, select: { id: true, type: true, specialty: true } });
     if (!dept) return null;
     return { id: dept.id, type: dept.type, specialty: dept.specialty };
-  }
-
-  async roomExists(id: string): Promise<boolean> {
-    return Boolean(await this.prisma.clinicalRoom.findUnique({ where: { id }, select: { id: true } }));
   }
 
   async findDoctorByLicense(licenseNumber: string) {
@@ -76,10 +72,6 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
 
   async createWithStaff(dto: CreateDoctorWithStaffDto, employeeCode: string, passwordHash: string): Promise<any> {
     return this.prisma.$transaction(async (tx) => {
-      if (dto.clinicalRoomId) {
-        await tx.clinicalRoom.updateMany({ where: { doctorId: { not: null }, id: dto.clinicalRoomId }, data: { doctorId: null } });
-      }
-
       const user = await tx.user.create({
         data: {
           username: dto.username.trim(),
@@ -112,10 +104,6 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
       const doctorId = user.staffProfile?.doctorProfile?.id;
       if (!doctorId) throw new BadRequestException('Chưa tạo được hồ sơ bác sĩ.');
 
-      if (dto.clinicalRoomId) {
-        await tx.clinicalRoom.update({ where: { id: dto.clinicalRoomId }, data: { doctorId } });
-      }
-
       return tx.doctorProfile.findUniqueOrThrow({ where: { id: doctorId }, include: this.includeRelations() });
     });
   }
@@ -134,18 +122,6 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
 
   async updateWithRoom(id: string, dto: UpdateDoctorDto): Promise<any> {
     return this.prisma.$transaction(async (tx) => {
-      if (dto.clinicalRoomId !== undefined) {
-        const targetRoomId = dto.clinicalRoomId || null;
-        if (targetRoomId) {
-          const room = await tx.clinicalRoom.findUnique({ where: { id: targetRoomId } });
-          if (!room) throw new NotFoundException('Không tìm thấy phòng khám.');
-        }
-        await tx.clinicalRoom.updateMany({ where: { doctorId: id }, data: { doctorId: null } });
-        if (targetRoomId) {
-          await tx.clinicalRoom.update({ where: { id: targetRoomId }, data: { doctorId: id } });
-        }
-      }
-
       const staffData: any = {};
       if (dto.fullName !== undefined) staffData.fullName = dto.fullName.trim();
       if (dto.phone !== undefined) staffData.phone = dto.phone.trim();
@@ -173,21 +149,6 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
     });
   }
 
-  async assignRoom(id: string, clinicalRoomId?: string): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      if (clinicalRoomId) {
-        const room = await tx.clinicalRoom.findUnique({ where: { id: clinicalRoomId } });
-        if (!room) throw new NotFoundException('Không tìm thấy phòng khám.');
-      }
-
-      await tx.clinicalRoom.updateMany({ where: { doctorId: id }, data: { doctorId: null } });
-
-      if (clinicalRoomId) {
-        await tx.clinicalRoom.update({ where: { id: clinicalRoomId }, data: { doctorId: id } });
-      }
-    });
-  }
-
   async findByStaffProfileId(staffProfileId: string): Promise<any | null> {
     return this.prisma.doctorProfile.findUnique({ where: { staffProfileId }, include: this.includeRelations() });
   }
@@ -205,7 +166,7 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
   }
 
   private includeRelations() {
-    return { staffProfile: { include: { user: { select: this.safeUserSelect() }, department: true } }, clinicalRoom: true } as const;
+    return { staffProfile: { include: { user: { select: this.safeUserSelect() }, department: true } } } as const;
   }
 
   private safeUserSelect() {

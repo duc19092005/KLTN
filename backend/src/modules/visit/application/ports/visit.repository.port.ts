@@ -19,14 +19,14 @@ export type CreateVisitPatientInput = {
 export type CreateVisitCommand = {
   patientId?: string;
   patient?: CreateVisitPatientInput;
-  clinicalRoomId: string;
-  doctorId: string;
+  departmentId: string;
+  staffId?: string | null;
 };
 
 export type VisitListFilter = {
   status?: VisitStatus;
-  doctorId?: string;
-  clinicalRoomId?: string;
+  staffId?: string;
+  departmentId?: string;
   patientId?: string;
 };
 
@@ -34,9 +34,15 @@ export type VisitListFilter = {
 export type VisitEntity = {
   id: string;
   patientId: string;
-  doctorId: string;
-  clinicalRoomId: string;
+  departmentId: string;
+  staffId: string | null;
   status: VisitStatus;
+};
+
+export type VisitDoctorStaff = {
+  doctorId: string;
+  staffId: string;
+  departmentId: string | null;
 };
 
 /**
@@ -46,19 +52,18 @@ export type VisitEntity = {
  */
 export interface VisitRepositoryPort {
   findById(id: string): Promise<VisitEntity | null>;
-  findRoomWithDoctor(roomId: string): Promise<{ id: string; doctorId: string | null } | null>;
-  findDoctorProfileById(doctorId: string): Promise<{ id: string } | null>;
-  /** Returns the DoctorProfile id linked to a user, or null if none. */
-  findDoctorIdByUserId(userId: string): Promise<string | null>;
+  findDepartmentForVisit(departmentId: string): Promise<{ id: string; type: string; status: string } | null>;
+  /** Returns the DoctorProfile + StaffProfile identity linked to a user, or null if none. */
+  findDoctorStaffByUserId(userId: string): Promise<VisitDoctorStaff | null>;
 
   /** Atomic intake: optional patient creation + unique code generation + visit creation, with retry. */
   createVisitWithOptionalPatient(command: CreateVisitCommand): Promise<unknown>;
 
   findManyPaginated(filter: VisitListFilter, skip: number, take: number): Promise<{ items: unknown[]; total: number }>;
 
-  updateStatus(id: string, status: VisitStatus, completedAt?: Date): Promise<unknown>;
+  updateStatus(id: string, status: VisitStatus, completedAt?: Date, staffId?: string): Promise<unknown>;
 
-  suggestRooms(specialty: string): Promise<unknown[]>;
+  suggestDepartments(specialty: string): Promise<unknown[]>;
 }
 
 /** Detects a unique-constraint conflict on patientCode/visitCode/citizenId for retry. */

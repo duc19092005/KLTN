@@ -10,7 +10,6 @@ import { AiModelService } from './modules/ai-model/services/ai-model.service';
 import { VisitService } from './modules/visit/services/visit.service';
 import { MedicalOrderService } from './modules/medical-order/services/medical-order.service';
 import { ClinicalDecisionService } from './modules/clinical-decision/services/clinical-decision.service';
-import { ClinicalRoomService } from './modules/clinical-room/services/clinical-room.service';
 import { PatientService } from './modules/patient/services/patient.service';
 import { ParaclinicalShiftService } from './modules/paraclinical-shift/services/paraclinical-shift.service';
 
@@ -40,7 +39,6 @@ import { SECURITY_EVENT_LOGGER } from './modules/auth/application/ports/security
 import { AUTH_CHAIN_GATEWAY } from './modules/auth/application/ports/auth-chain-gateway.port';
 import { ENCRYPTION_PORT } from './modules/auth/application/ports/encryption.port';
 import { STEPUP_TICKET_ISSUER } from './modules/auth/application/ports/stepup-ticket-issuer.port';
-import { CLINICAL_ROOM_REPOSITORY } from './modules/clinical-room/application/ports/clinical-room.repository.port';
 import { PATIENT_REPOSITORY } from './modules/patient/application/ports/patient.repository.port';
 import { PARACLINICAL_SHIFT_REPOSITORY } from './modules/paraclinical-shift/application/ports/paraclinical-shift.repository.port';
 
@@ -71,7 +69,6 @@ describe('AppModule dependency injection (Clean Architecture wiring)', () => {
     expect(moduleRef.get(VisitService)).toBeDefined();
     expect(moduleRef.get(MedicalOrderService)).toBeDefined();
     expect(moduleRef.get(ClinicalDecisionService)).toBeDefined();
-    expect(moduleRef.get(ClinicalRoomService)).toBeDefined();
     expect(moduleRef.get(PatientService)).toBeDefined();
     expect(moduleRef.get(ParaclinicalShiftService)).toBeDefined();
   });
@@ -102,7 +99,6 @@ describe('AppModule dependency injection (Clean Architecture wiring)', () => {
       AUTH_CHAIN_GATEWAY,
       ENCRYPTION_PORT,
       STEPUP_TICKET_ISSUER,
-      CLINICAL_ROOM_REPOSITORY,
       PATIENT_REPOSITORY,
       PARACLINICAL_SHIFT_REPOSITORY,
     ];

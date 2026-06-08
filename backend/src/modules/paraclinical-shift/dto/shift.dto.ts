@@ -1,8 +1,8 @@
-import { IsString, IsDateString, IsUUID, IsOptional, Length, MaxLength } from 'class-validator';
+import { IsDateString, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class RegisterShiftDto {
   @IsUUID()
-  clinicalRoomId: string;
+  departmentId: string;
 
   @IsDateString()
   startTime: string;
@@ -36,7 +36,7 @@ export class AssignShiftDto {
   staffId: string;
 
   @IsUUID()
-  clinicalRoomId: string;
+  departmentId: string;
 
   @IsDateString()
   startTime: string;

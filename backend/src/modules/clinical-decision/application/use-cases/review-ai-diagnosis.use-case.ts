@@ -4,16 +4,17 @@ import {
   CLINICAL_DECISION_REPOSITORY,
   ClinicalDecisionRepositoryPort,
 } from '../ports/clinical-decision.repository.port';
+import { ClinicalDecisionPolicy } from '../policies/clinical-decision.policy';
 
 /**
- * Doctor reviews (annotates) an AI suggestion for their own visit. Behavior
- * copied verbatim from the former ClinicalDecisionService.reviewAiDiagnosis().
- * This only flags DOCTOR_REVIEWED; it does not create a MedicalConclusion.
+ * Doctor reviews an AI suggestion for a visit in their department. This only
+ * flags DOCTOR_REVIEWED; it does not create a MedicalConclusion.
  */
 @Injectable()
 export class ReviewAiDiagnosisUseCase {
   constructor(
     @Inject(CLINICAL_DECISION_REPOSITORY) private readonly repo: ClinicalDecisionRepositoryPort,
+    private readonly policy: ClinicalDecisionPolicy,
   ) {}
 
   async execute(id: string, dto: ReviewAiDiagnosisDto, doctorUserId: string) {
@@ -22,9 +23,7 @@ export class ReviewAiDiagnosisUseCase {
 
     const diagnosis = await this.repo.findAiDiagnosisWithVisit(id);
     if (!diagnosis) throw new NotFoundException('Không tìm thấy phân tích AI.');
-    if (!diagnosis.visit || diagnosis.visit.doctorId !== doctor.id) {
-      throw new BadRequestException('Bác sĩ chỉ được đánh giá phân tích AI của lượt khám do mình phụ trách.');
-    }
+    this.policy.assertDoctorOwnsVisit(diagnosis.visit, doctor);
 
     return this.repo.updateAiDiagnosisReview(id, doctor.id, dto.doctorFeedback?.trim() || null);
   }

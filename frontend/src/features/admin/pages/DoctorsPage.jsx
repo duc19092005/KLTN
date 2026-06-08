@@ -6,8 +6,6 @@ import AvatarUpload from '../../../shared/components/AvatarUpload';
 import BlockchainStatusBadge from '../../../shared/components/BlockchainStatusBadge';
 import { useAuth } from '../../../providers/AuthProvider';
 import { doctorService } from '../apis/doctorService';
-import { staffService } from '../apis/staffService';
-import { clinicalRoomService } from '../apis/clinicalRoomService';
 import { departmentService } from '../apis/departmentService';
 import DoctorDetailModal from '../components/DoctorDetailModal';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
@@ -68,7 +66,6 @@ const emptyForm = {
   licenseNumber: '',
   qualification: '',
   yearsExperience: '',
-  clinicalRoomId: '',
 };
 
 function getItems(data) { return Array.isArray(data) ? data : data?.items || []; }
@@ -94,7 +91,6 @@ function buildFullDoctorPayload(form) {
     birthDate: form.birthDate,
     address: form.address || undefined,
     position: form.position || undefined,
-    clinicalRoomId: form.clinicalRoomId || undefined,
     ...buildDoctorPayload(form),
   };
 }
@@ -104,7 +100,6 @@ export default function DoctorsPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const [doctors, setDoctors] = useState([]);
-  const [rooms, setRooms] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [filters, setFilters] = useState({ specialty: '', search: '' });
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
@@ -119,15 +114,13 @@ export default function DoctorsPage() {
   const load = async (page = pagination.page) => {
     setLoading(true);
     try {
-      const [doctorRes, roomRes, departmentRes] = await Promise.all([
+      const [doctorRes, departmentRes] = await Promise.all([
         doctorService.search({ ...filters, page, limit: pagination.limit }),
-        clinicalRoomService.search({ limit: 100 }),
         departmentService.list({ limit: 100 }),
       ]);
       const data = doctorRes.data || {};
       setDoctors(getItems(data));
       if (!Array.isArray(data)) setPagination({ page: data.page, limit: data.limit, total: data.total, totalPages: data.totalPages });
-      setRooms(getItems(roomRes.data));
       setDepartments(getItems(departmentRes.data));
     } catch (err) { toast.error(getError(err)); }
     finally { setLoading(false); }
@@ -160,7 +153,6 @@ export default function DoctorsPage() {
       licenseNumber: doctor.licenseNumber || '',
       qualification: doctor.qualification || '',
       yearsExperience: doctor.yearsExperience ?? '',
-      clinicalRoomId: doctor.clinicalRoom?.id || '',
     });
   };
   const close = () => { setEditing(null); setIsCreateOpen(false); setForm(emptyForm); };
@@ -187,7 +179,6 @@ export default function DoctorsPage() {
           departmentId: form.departmentId || undefined,
           position: form.position || undefined,
           birthDate: form.birthDate,
-          clinicalRoomId: form.clinicalRoomId || null,
         };
         await doctorService.update(editing.id, payload);
         toast.success('Cập nhật thông tin bác sĩ thành công!');
@@ -223,7 +214,7 @@ export default function DoctorsPage() {
             </section>
           </>
         )}
-        {(isCreateOpen || editing) && <DoctorModal mode={editing ? 'edit' : 'create'} form={form} setForm={setForm} departments={departments} rooms={rooms} onSubmit={submit} onClose={close} busy={busy} />}
+        {(isCreateOpen || editing) && <DoctorModal mode={editing ? 'edit' : 'create'} form={form} setForm={setForm} departments={departments} onSubmit={submit} onClose={close} busy={busy} />}
         {detailDoctorId && <DoctorDetailModal doctorId={detailDoctorId} onClose={() => setDetailDoctorId(null)} />}
       </div>
     </DashboardLayout>
@@ -244,20 +235,20 @@ function DoctorRow({ doctor, onEdit, onViewDetails, busy }) {
           </div>
         </div>
         <Info label="Chuyên khoa" value={doctor.specialty} />
-        <Info label="Phòng khám" value={doctor.clinicalRoom?.roomName || 'Chưa gán'} />
+        <Info label="Phòng khám" value={doctor.staffProfile?.department?.name || 'Chưa gán'} />
         <div>
           <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Trạng thái dữ liệu</p>
           <BlockchainStatusBadge status={doctor.blockchainStatus} size="xs" />
         </div>
         <div className="lg:text-right flex justify-end gap-2">
           <button type="button" disabled={busy} onClick={() => onViewDetails(doctor.id)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-indigo-600 hover:bg-indigo-50 disabled:opacity-50">Xem chi tiết</button>
-          <button type="button" disabled={busy} onClick={() => onEdit(doctor)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-50">Sửa / Gán phòng</button>
+          <button type="button" disabled={busy} onClick={() => onEdit(doctor)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-50">Sửa</button>
         </div>
       </div>
     </article>
   );
 }
-function DoctorModal({ mode, form, setForm, departments, rooms, onSubmit, onClose, busy }) {
+function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy }) {
   const isCreate = mode === 'create';
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
@@ -284,7 +275,7 @@ function DoctorModal({ mode, form, setForm, departments, rooms, onSubmit, onClos
           <Input label="CCCD/CMND" value={form.citizenId} onChange={(v) => setForm({ ...form, citizenId: v })} required />
           <Input type="date" label="Ngày sinh" value={form.birthDate} onChange={(v) => setForm({ ...form, birthDate: v })} required />
           <Select label="Giới tính" value={form.gender} onChange={(v) => setForm({ ...form, gender: v })} empty="Chọn giới tính" required options={['Nam', 'Nữ', 'Khác']} />
-          <Select label="Phòng ban" value={form.departmentId} onChange={(v) => setForm({ ...form, departmentId: v })} empty="Chưa gán phòng ban" options={departments.filter((d) => d.type === 'CLINICAL').map((d) => ({ value: d.id, label: `${d.departmentCode || 'PB'} - ${d.name}` }))} />
+          <Select label="Phòng ban" value={form.departmentId} onChange={(v) => setForm({ ...form, departmentId: v })} empty="Chưa gán phòng ban" options={departments.filter((d) => ['EXAMINATION', 'CLINICAL'].includes(d.type)).map((d) => ({ value: d.id, label: `${d.departmentCode || 'PB'} - ${d.name}` }))} />
           <Select label="Chức danh" value={form.position} onChange={(v) => setForm({ ...form, position: v })} empty="Chọn chức danh" required options={DOCTOR_POSITIONS} />
           <Input label="Địa chỉ" value={form.address} onChange={(v) => setForm({ ...form, address: v })} />
         </div>
@@ -294,7 +285,6 @@ function DoctorModal({ mode, form, setForm, departments, rooms, onSubmit, onClos
           <Input label="Số chứng chỉ" value={form.licenseNumber} onChange={(v) => setForm({ ...form, licenseNumber: v })} required />
           <Select label="Trình độ" value={form.qualification} onChange={(v) => setForm({ ...form, qualification: v })} empty="Chọn trình độ" required options={QUALIFICATIONS} />
           <Input type="number" label="Số năm kinh nghiệm" value={form.yearsExperience} onChange={(v) => setForm({ ...form, yearsExperience: v })} />
-          <Select label="Phòng khám phụ trách" value={form.clinicalRoomId} onChange={(v) => setForm({ ...form, clinicalRoomId: v })} empty="Chọn phòng khám" required options={rooms.map((r) => ({ value: r.id, label: `${r.roomCode} - ${r.roomName}` }))} />
         </div>
         <button disabled={busy} className="w-full rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white hover:bg-indigo-700 disabled:opacity-70">
           {isCreate ? 'Tạo bác sĩ' : 'Lưu thay đổi'}

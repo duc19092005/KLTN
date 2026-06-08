@@ -10,6 +10,7 @@ import { getVisitStatus } from '../constants/visitStatus';
 import { useToast } from '../../../providers/ToastProvider';
 
 function getItems(data) { return Array.isArray(data) ? data : data?.items || []; }
+function getVisitDepartmentName(visit) { return visit.department?.name || visit.department?.departmentCode || 'Chưa có phòng'; }
 
 export default function ReceptionistDashboard() {
   const { user, logout } = useAuth();
@@ -39,7 +40,7 @@ export default function ReceptionistDashboard() {
   const analytics = useMemo(() => {
     const total = visits.length || 1;
     const statusRows = Object.entries(visits.reduce((acc, visit) => { acc[visit.status] = (acc[visit.status] || 0) + 1; return acc; }, {})).map(([status, count]) => ({ status, count, percent: Math.round((count / total) * 100), meta: getVisitStatus(status) }));
-    const roomRows = Object.entries(visits.reduce((acc, visit) => { const room = visit.clinicalRoom?.roomName || 'Chưa có phòng'; acc[room] = (acc[room] || 0) + 1; return acc; }, {})).map(([label, count]) => ({ label, count, percent: Math.round((count / total) * 100) })).sort((a, b) => b.count - a.count).slice(0, 5);
+    const roomRows = Object.entries(visits.reduce((acc, visit) => { const room = getVisitDepartmentName(visit); acc[room] = (acc[room] || 0) + 1; return acc; }, {})).map(([label, count]) => ({ label, count, percent: Math.round((count / total) * 100) })).sort((a, b) => b.count - a.count).slice(0, 5);
     const today = new Date();
     const dayRows = Array.from({ length: 7 }).map((_, index) => { const date = new Date(today); date.setDate(today.getDate() - (6 - index)); const key = date.toISOString().slice(0, 10); const count = visits.filter((visit) => (visit.createdAt || visit.checkInAt || '').slice(0, 10) === key).length; return { label: date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }), count }; });
     const maxDay = Math.max(...dayRows.map((item) => item.count), 1);

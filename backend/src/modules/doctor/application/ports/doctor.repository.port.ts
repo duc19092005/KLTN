@@ -18,14 +18,13 @@ export type StaffForDoctorCreate = {
 /**
  * Persistence boundary for the DoctorProfile aggregate. The Prisma
  * implementation keeps the include shapes, code generation, and the multi-step
- * transactions (createWithStaff, update with clinical-room reassignment) intact.
+ * transactions (createWithStaff, update with nested staff) intact.
  */
 export interface DoctorRepositoryPort {
   findByIdWithRelations(id: string): Promise<any | null>;
   findStaffForDoctorCreate(staffProfileId: string): Promise<StaffForDoctorCreate | null>;
   departmentExists(id: string): Promise<boolean>;
   findDepartment(id: string): Promise<{ id: string; type: string; specialty?: string | null } | null>;
-  roomExists(id: string): Promise<boolean>;
 
   findDoctorByLicense(licenseNumber: string): Promise<{ id: string } | null>;
   findStaffByCitizenId(citizenId: string): Promise<{ id: string } | null>;
@@ -36,16 +35,13 @@ export interface DoctorRepositoryPort {
   /** Create a DoctorProfile for an existing DOCTOR staff. */
   createForExistingStaff(dto: CreateDoctorDto): Promise<any>;
 
-  /** Atomic: create user + staff + doctor profile + optional room assignment. */
+  /** Atomic: create user + staff + doctor profile. */
   createWithStaff(dto: CreateDoctorWithStaffDto, employeeCode: string, passwordHash: string): Promise<any>;
 
   findManyPaginated(filter: DoctorListFilter, skip: number, take: number): Promise<{ items: unknown[]; total: number }>;
 
-  /** Atomic: update doctor (+ nested staff) and reassign clinical room. */
+  /** Atomic: update doctor (+ nested staff). */
   updateWithRoom(id: string, dto: UpdateDoctorDto): Promise<any>;
-
-  /** Atomic: reassign/clear a doctor's clinical room. */
-  assignRoom(id: string, clinicalRoomId?: string): Promise<void>;
 
   findByStaffProfileId(staffProfileId: string): Promise<any | null>;
   findAllWithRelations(): Promise<any[]>;

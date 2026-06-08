@@ -4,7 +4,7 @@ import { AuthUser } from '../../../common/types/auth-user.type';
 import { CreateVisitDto, VisitQueryDto } from '../dto/visit.dto';
 import { CreateVisitUseCase } from '../application/use-cases/create-visit.use-case';
 import { ListVisitsUseCase } from '../application/use-cases/list-visits.use-case';
-import { SuggestRoomsUseCase } from '../application/use-cases/suggest-rooms.use-case';
+import { SuggestDepartmentsUseCase } from '../application/use-cases/suggest-departments.use-case';
 import { UpdateVisitStatusUseCase } from '../application/use-cases/update-visit-status.use-case';
 
 /**
@@ -17,7 +17,7 @@ export class VisitService {
     private readonly createVisitUseCase: CreateVisitUseCase,
     private readonly listVisitsUseCase: ListVisitsUseCase,
     private readonly updateVisitStatusUseCase: UpdateVisitStatusUseCase,
-    private readonly suggestRoomsUseCase: SuggestRoomsUseCase,
+    private readonly suggestDepartmentsUseCase: SuggestDepartmentsUseCase,
   ) {}
 
   create(dto: CreateVisitDto) {
@@ -32,7 +32,7 @@ export class VisitService {
     return this.updateVisitStatusUseCase.execute({ id, status, user });
   }
 
-  suggestRooms(specialty: string) {
-    return this.suggestRoomsUseCase.execute(specialty);
+  suggestDepartments(specialty: string) {
+    return this.suggestDepartmentsUseCase.execute(specialty);
   }
 }

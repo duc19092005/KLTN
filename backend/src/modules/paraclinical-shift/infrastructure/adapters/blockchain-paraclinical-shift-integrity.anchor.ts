@@ -26,7 +26,7 @@ export class BlockchainParaclinicalShiftIntegrityAnchor {
 
     const snapshot = {
       staffId: shift.staffId,
-      clinicalRoomId: shift.clinicalRoomId,
+      departmentId: shift.departmentId,
       startTime: shift.startTime.toISOString(),
       endTime: shift.endTime.toISOString(),
       status: 'APPROVED',
@@ -50,7 +50,7 @@ export class BlockchainParaclinicalShiftIntegrityAnchor {
           chainMatches = latestLog.dataHash === recomputed;
         }
       } catch {
-        // Proof verification failed; chainMatches stays false
+        chainMatches = false;
       }
     }
 
@@ -60,16 +60,16 @@ export class BlockchainParaclinicalShiftIntegrityAnchor {
     else status = 'TAMPERED';
 
     if (status === 'TAMPERED') {
-      const roomName = shift.clinicalRoom?.roomName ?? shift.clinicalRoomId;
+      const departmentName = shift.department?.name ?? shift.departmentId;
       const staffName = shift.staff?.fullName ?? shift.staffId;
       await this.auditAnchor.sendTelegramAlert(
         'Phát hiện giả mạo lịch trực (Shift)',
-        `Ca trực ID: ${shift.id} (Nhân viên: ${staffName}, Phòng: ${roomName})\n` +
-        `• Thời gian: ${new Date(shift.startTime).toLocaleString('vi-VN')} - ${new Date(shift.endTime).toLocaleString('vi-VN')}\n` +
-        `• Hash CSDL: ${dbHash}\n` +
-        `• Hash On-Chain: ${latestLog?.dataHash ?? 'N/A'}\n` +
-        `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}\n` +
-        `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`
+        `Ca trực ID: ${shift.id} (Nhân viên: ${staffName}, Phòng ban: ${departmentName})\n` +
+          `• Thời gian: ${new Date(shift.startTime).toLocaleString('vi-VN')} - ${new Date(shift.endTime).toLocaleString('vi-VN')}\n` +
+          `• Hash CSDL: ${dbHash}\n` +
+          `• Hash On-Chain: ${latestLog?.dataHash ?? 'N/A'}\n` +
+          `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}\n` +
+          `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`,
       );
     }
 

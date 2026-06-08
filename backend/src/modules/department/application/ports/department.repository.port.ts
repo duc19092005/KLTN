@@ -35,13 +35,6 @@ export type UpdateDepartmentData = {
   specialty?: string | null;
 };
 
-export type SharedUserData = {
-  username: string;
-  email: string;
-  passwordHash: string;
-  role: UserRole;
-};
-
 export type StaffProfileInfo = { id: string; departmentId: string | null; userRole?: UserRole };
 
 /**
@@ -58,8 +51,8 @@ export interface DepartmentRepositoryPort {
   findDepartmentByManagerId(managerId: string): Promise<{ id: string } | null>;
   countStaff(departmentId: string): Promise<number>;
 
-  /** Atomic: create department + (optional) assign manager's departmentId + create shared user. */
-  createWithManager(data: CreateDepartmentData, sharedUser?: SharedUserData): Promise<any>;
+  /** Atomic: create department + optionally assign manager's departmentId. */
+  createWithManager(data: CreateDepartmentData): Promise<any>;
 
   findManyPaginated(filter: DepartmentListFilter, skip: number, take: number): Promise<{ items: unknown[]; total: number }>;
 

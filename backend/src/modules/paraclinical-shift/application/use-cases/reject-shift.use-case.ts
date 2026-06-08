@@ -51,7 +51,7 @@ export class RejectShiftUseCase {
         onChainStatus: 'OFF_CHAIN',
         metadata: {
           staffName: shift.staff.fullName,
-          room: shift.clinicalRoom.roomName,
+          department: shift.department.name,
           reason: trimmedReason,
           rejectedByRole: role,
         },
@@ -63,7 +63,7 @@ export class RejectShiftUseCase {
 
     const dateStr = new Date(shift.startTime).toLocaleDateString('vi-VN');
     const timeStr = `${new Date(shift.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - ${new Date(shift.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
-    const msg = `Ca trực của bạn vào ngày ${dateStr} (${timeStr}) tại phòng ${shift.clinicalRoom.roomName} đã bị từ chối.${trimmedReason ? ` Lý do: ${trimmedReason}` : ''}`;
+    const msg = `Ca trực của bạn vào ngày ${dateStr} (${timeStr}) tại phòng ban ${shift.department.name} đã bị từ chối.${trimmedReason ? ` Lý do: ${trimmedReason}` : ''}`;
 
     await this.notificationService.createNotification(
       shift.staff.user.id,

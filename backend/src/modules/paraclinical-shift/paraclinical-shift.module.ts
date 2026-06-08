@@ -3,7 +3,6 @@ import { AuthModule } from '../auth/auth.module';
 
 // Controllers
 import { ShiftController } from './controllers/shift.controller';
-import { ParaclinicalAuthController } from './controllers/paraclinical-auth.controller';
 import { HandoverController } from './controllers/handover.controller';
 
 // Service facade
@@ -16,8 +15,6 @@ import { RejectShiftUseCase } from './application/use-cases/reject-shift.use-cas
 import { AssignShiftUseCase } from './application/use-cases/assign-shift.use-case';
 import { ListRoomShiftsUseCase } from './application/use-cases/list-room-shifts.use-case';
 import { ListPendingShiftsUseCase } from './application/use-cases/list-pending-shifts.use-case';
-import { ParaclinicalLoginUseCase } from './application/use-cases/paraclinical-login.use-case';
-import { VerifyShiftFaceUseCase } from './application/use-cases/verify-shift-face.use-case';
 import { InitiateHandoverUseCase } from './application/use-cases/initiate-handover.use-case';
 import { VerifyHandoverFaceAUseCase } from './application/use-cases/verify-handover-face-a.use-case';
 import { VerifyHandoverFaceBUseCase } from './application/use-cases/verify-handover-face-b.use-case';
@@ -30,8 +27,8 @@ import { BlockchainParaclinicalShiftIntegrityAnchor } from './infrastructure/ada
 import { VerifyParaclinicalShiftUseCase } from './application/use-cases/verify-paraclinical-shift.use-case';
 
 /**
- * Feature module for paraclinical shift management, shared-account login, and
- * dual-biometric handover. Imports AuthModule for FaceMatchService, JWT, and
+ * Feature module for paraclinical shift management and dual-biometric handover.
+ * Imports AuthModule for FaceMatchService, JWT, and
  * auth ports (AUTH_REPOSITORY, SECURITY_EVENT_LOGGER).
  *
  * AuditModule and BlockchainModule are @Global, so they are available without
@@ -39,7 +36,7 @@ import { VerifyParaclinicalShiftUseCase } from './application/use-cases/verify-p
  */
 @Module({
   imports: [AuthModule],
-  controllers: [ShiftController, ParaclinicalAuthController, HandoverController],
+  controllers: [ShiftController, HandoverController],
   providers: [
     ParaclinicalShiftService,
     BlockchainParaclinicalShiftIntegrityAnchor,
@@ -51,8 +48,6 @@ import { VerifyParaclinicalShiftUseCase } from './application/use-cases/verify-p
     AssignShiftUseCase,
     ListRoomShiftsUseCase,
     ListPendingShiftsUseCase,
-    ParaclinicalLoginUseCase,
-    VerifyShiftFaceUseCase,
     InitiateHandoverUseCase,
     VerifyHandoverFaceAUseCase,
     VerifyHandoverFaceBUseCase,

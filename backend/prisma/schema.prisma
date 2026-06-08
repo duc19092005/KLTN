@@ -12,7 +12,6 @@ enum UserRole {
   RECEPTIONIST
   DOCTOR
   LAB_MANAGER
-  DEPT_SHARED
 }
 
 enum UserStatus {
@@ -23,6 +22,7 @@ enum UserStatus {
 
 enum DepartmentType {
   ADMINISTRATIVE
+  EXAMINATION
   CLINICAL
   LABORATORY
   IMAGING
@@ -87,7 +87,6 @@ model User {
   stepUpTickets     StepUpTicket[]
   stepUpSessions    StepUpSession[]
   approvedShifts    ParaclinicalShift[] @relation("ApprovedShifts")
-  sharedDepartment  Department?         @relation("DeptSharedUser")
   notifications     Notification[]
 
   @@index([role])
@@ -105,12 +104,13 @@ model Department {
   description      String?
   specialty        String?
   managerId        String?        @unique
-  sharedUserId     String?        @unique
 
   manager        StaffProfile?  @relation("DepartmentManager", fields: [managerId], references: [id])
-  sharedUser     User?          @relation("DeptSharedUser", fields: [sharedUserId], references: [id])
   staffs         StaffProfile[] @relation("DepartmentStaffs")
+  visits         Visit[]
   medicalOrders  MedicalOrder[]
+  paraclinicalShifts ParaclinicalShift[]
+  handoverLogs   HandoverLog[]
   blockchainLogs BlockchainLogger[]
 
   // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain
@@ -151,6 +151,7 @@ model StaffProfile {
 
   managedDepartment Department? @relation("DepartmentManager")
   doctorProfile     DoctorProfile?
+  assignedVisits    Visit[] @relation("VisitAssignedStaff")
   blockchainLogs    BlockchainLogger[]
   paraclinicalShifts ParaclinicalShift[]
   handoversFrom     HandoverLog[] @relation("HandoverFrom")
@@ -176,8 +177,6 @@ model DoctorProfile {
   qualification   String
   yearsExperience Int?
 
-  clinicalRoom    ClinicalRoom? @relation("RoomDoctor")
-  visits          Visit[]
   aiQualities     AiQuality[]
   medicalOrders   MedicalOrder[]
   reviewedAiDiagnoses AiDiagnosis[]
@@ -262,27 +261,6 @@ model AuditLog {
   @@index([action])
 }
 
-model ClinicalRoom {
-  id                String          @id @default(uuid())
-
-  roomCode          String          @unique
-  roomName          String
-
-  doctorId          String?         @unique
-  doctor            DoctorProfile?  @relation("RoomDoctor", fields: [doctorId], references: [id])
-  visits            Visit[]
-  paraclinicalShifts ParaclinicalShift[]
-  handoverLogs      HandoverLog[]
-
-  floor             String?
-  description       String?
-
-  status            OperationalStatus @default(ACTIVE)
-
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-}
-
 model Visit {
   id             String       @id @default(uuid())
   visitCode      String       @unique
@@ -290,11 +268,11 @@ model Visit {
   patientId      String
   patient        Patient      @relation(fields: [patientId], references: [id])
 
-  clinicalRoomId String
-  clinicalRoom   ClinicalRoom @relation(fields: [clinicalRoomId], references: [id])
+  departmentId   String
+  department     Department   @relation(fields: [departmentId], references: [id])
 
-  doctorId       String
-  doctor         DoctorProfile @relation(fields: [doctorId], references: [id])
+  staffId        String?
+  staff          StaffProfile? @relation("VisitAssignedStaff", fields: [staffId], references: [id])
 
   status         VisitStatus  @default(WAITING)
   checkInAt      DateTime     @default(now())
@@ -307,8 +285,8 @@ model Visit {
   finalConclusion MedicalConclusion?
 
   @@index([patientId])
-  @@index([doctorId])
-  @@index([clinicalRoomId])
+  @@index([departmentId])
+  @@index([staffId])
   @@index([status])
 }
 
@@ -617,7 +595,7 @@ model AuditBatch {
 /// (so it survives even when the DB is destroyed/encrypted). Each backup records:
 ///  - sha256: SHA256 of the produced dump file, so we can later prove the file was not altered.
 ///  - maxSeq: the largest BlockchainLogger.seq the dump is known to contain, so we know how "fresh"
-///    (and up to which audited change) the backup is — key to diagnosing a poisoned backup.
+///    (and up to which audited change) the backup is - key to diagnosing a poisoned backup.
 ///  - anchorSeq/anchorTxHash: the BlockchainLogger seq + on-chain tx that anchored this manifest,
 ///    sealing the (sha256, maxSeq, createdAt) tuple immutably at creation time (Tier-A: anchored now).
 ///  - prevHash/entryHash: hash-chain over the backup ledger itself, mirroring the JSONL chain, so
@@ -706,8 +684,8 @@ model ParaclinicalShift {
   id             String            @id @default(uuid())
   staffId        String
   staff          StaffProfile      @relation(fields: [staffId], references: [id])
-  clinicalRoomId String
-  clinicalRoom   ClinicalRoom      @relation(fields: [clinicalRoomId], references: [id])
+  departmentId   String
+  department     Department        @relation(fields: [departmentId], references: [id])
   startTime      DateTime
   endTime        DateTime
   status         ShiftStatus       @default(PENDING)
@@ -726,7 +704,7 @@ model ParaclinicalShift {
   blockchainLogs BlockchainLogger[]
 
   @@index([staffId])
-  @@index([clinicalRoomId])
+  @@index([departmentId])
   @@index([status])
   @@index([startTime, endTime])
   @@index([isActive])
@@ -738,8 +716,8 @@ model ParaclinicalShift {
 /// demarcates a legal responsibility boundary in clinical operations.
 model HandoverLog {
   id             String       @id @default(uuid())
-  clinicalRoomId String
-  clinicalRoom   ClinicalRoom @relation(fields: [clinicalRoomId], references: [id])
+  departmentId   String
+  department     Department   @relation(fields: [departmentId], references: [id])
   fromStaffId    String
   fromStaff      StaffProfile @relation("HandoverFrom", fields: [fromStaffId], references: [id])
   toStaffId      String
@@ -752,7 +730,7 @@ model HandoverLog {
 
   blockchainLogs BlockchainLogger[]
 
-  @@index([clinicalRoomId])
+  @@index([departmentId])
   @@index([fromStaffId])
   @@index([toStaffId])
   @@index([isCompleted])
@@ -762,7 +740,7 @@ model HandoverLog {
 /// administrative department; the department head (StaffProfile.managedDepartment) or an
 /// admin approves/rejects. Receptionists share a workstation per shift, so the slot is keyed
 /// to the department, not to a clinical room. Unlike ParaclinicalShift, reception shifts are
-/// NOT anchored on-chain — they are HR data, not medical data, and keeping them off-chain
+/// NOT anchored on-chain - they are HR data, not medical data, and keeping them off-chain
 /// keeps audit batches focused on patient-facing records.
 model Notification {
   id        String   @id @default(uuid())

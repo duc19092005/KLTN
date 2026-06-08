@@ -91,7 +91,6 @@ function fieldLabel(property: string): string {
     address: 'Địa chỉ',
     avatarUrl: 'URL ảnh đại diện',
     departmentId: 'Phòng ban',
-    clinicalRoomId: 'Phòng khám',
     role: 'Vai trò',
     status: 'Trạng thái',
     specialty: 'Chuyên khoa',

@@ -6,7 +6,7 @@ import { VisitTransitionPolicy } from './application/policies/visit-transition.p
 import { CreateVisitUseCase } from './application/use-cases/create-visit.use-case';
 import { ListVisitsUseCase } from './application/use-cases/list-visits.use-case';
 import { UpdateVisitStatusUseCase } from './application/use-cases/update-visit-status.use-case';
-import { SuggestRoomsUseCase } from './application/use-cases/suggest-rooms.use-case';
+import { SuggestDepartmentsUseCase } from './application/use-cases/suggest-departments.use-case';
 import { VISIT_REPOSITORY } from './application/ports/visit.repository.port';
 import { PrismaVisitRepository } from './infrastructure/prisma/prisma-visit.repository';
 
@@ -18,7 +18,7 @@ import { PrismaVisitRepository } from './infrastructure/prisma/prisma-visit.repo
     CreateVisitUseCase,
     ListVisitsUseCase,
     UpdateVisitStatusUseCase,
-    SuggestRoomsUseCase,
+    SuggestDepartmentsUseCase,
     VisitTransitionPolicy,
     { provide: VISIT_REPOSITORY, useClass: PrismaVisitRepository },
   ],

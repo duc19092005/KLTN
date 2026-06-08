@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { AssignClinicalRoomDto, CreateDoctorDto, CreateDoctorWithStaffDto, DoctorQueryDto, UpdateDoctorDto } from '../dto/doctor.dto';
+import { CreateDoctorDto, CreateDoctorWithStaffDto, DoctorQueryDto, UpdateDoctorDto } from '../dto/doctor.dto';
 import { CreateDoctorUseCase } from '../application/use-cases/create-doctor.use-case';
 import { CreateDoctorWithStaffUseCase } from '../application/use-cases/create-doctor-with-staff.use-case';
 import { ListDoctorsUseCase } from '../application/use-cases/list-doctors.use-case';
 import { UpdateDoctorUseCase } from '../application/use-cases/update-doctor.use-case';
-import { AssignClinicalRoomUseCase } from '../application/use-cases/assign-clinical-room.use-case';
 import { VerifyDoctorUseCase } from '../application/use-cases/verify-doctor.use-case';
 import { ReanchorDoctorForStaffUpdateUseCase } from '../application/use-cases/reanchor-doctor-for-staff-update.use-case';
 
@@ -22,7 +21,6 @@ export class DoctorService {
     private readonly createDoctorWithStaffUseCase: CreateDoctorWithStaffUseCase,
     private readonly listDoctorsUseCase: ListDoctorsUseCase,
     private readonly updateDoctorUseCase: UpdateDoctorUseCase,
-    private readonly assignClinicalRoomUseCase: AssignClinicalRoomUseCase,
     private readonly verifyDoctorUseCase: VerifyDoctorUseCase,
     private readonly reanchorUseCase: ReanchorDoctorForStaffUpdateUseCase,
   ) {}
@@ -45,10 +43,6 @@ export class DoctorService {
 
   update(id: string, dto: UpdateDoctorDto, actorId?: string) {
     return this.updateDoctorUseCase.execute(id, dto, actorId);
-  }
-
-  assignRoom(id: string, dto: AssignClinicalRoomDto) {
-    return this.assignClinicalRoomUseCase.execute(id, dto);
   }
 
   getHistory(id?: string) {

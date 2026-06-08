@@ -28,30 +28,9 @@ export default function LabManagerDashboardPage() {
         const deptRes = await api.get('/departments', { params: { limit: 100 } });
         const allDepts = deptRes.data?.data?.items || deptRes.data?.items || deptRes.data?.data || [];
         const labDepts = allDepts.filter(d => d.type === 'LABORATORY' || d.type === 'IMAGING');
-
-        // 2. Load all clinical rooms
-        const roomRes = await api.get('/clinical-rooms', { params: { limit: 100 } });
-        let allRooms = roomRes.data?.data?.items || roomRes.data?.items || roomRes.data?.data || roomRes.data || [];
-        if (!Array.isArray(allRooms)) allRooms = [];
-
-        // 3. Match rooms to departments via doctor.staffProfile.departmentId (narrow filter)
-        const matchedRooms = [];
-        const usedRoomIds = new Set();
-        for (const dept of labDepts) {
-          const room = allRooms.find(r => {
-            const deptId = r.doctor?.staffProfile?.departmentId;
-            return deptId === dept.id && !usedRoomIds.has(r.id);
-          });
-          if (room) {
-            usedRoomIds.add(room.id);
-            matchedRooms.push({ ...room, _deptName: dept.name, _deptId: dept.id });
-          }
-        }
-
-        // 4. Fallback: if no room matched, synthesize from departments
-        const list = matchedRooms.length > 0 ? matchedRooms : labDepts.map(d => ({
+        const list = labDepts.map(d => ({
           id: d.id,
-          roomName: `[${d.type === 'LABORATORY' ? 'XN' : 'CĐHA'}] ${d.name}`,
+          roomName: `[${d.type === 'LABORATORY' ? 'XN' : 'CDHA'}] ${d.name}`,
           roomCode: d.departmentCode,
           _deptId: d.id,
         }));
@@ -76,7 +55,7 @@ export default function LabManagerDashboardPage() {
         const to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         const roomId = selectedRoomId;
         if (roomId) {
-          const res = await shiftService.listByRoom(roomId, from.toISOString(), to.toISOString());
+          const res = await shiftService.listByDepartment(roomId, from.toISOString(), to.toISOString());
           if (mounted) setShifts(getItems(res.data));
         }
       } catch {
@@ -125,7 +104,7 @@ export default function LabManagerDashboardPage() {
                 </select>
               )}
               <button onClick={() => navigate('/lab-manager/shifts')} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white hover:bg-cyan-700 shadow-sm">Đăng ký ca</button>
-              <button onClick={() => window.location.href = '/paraclinical-login'} className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-700 px-4 py-2.5 text-xs font-black text-white hover:from-emerald-600 hover:to-emerald-800 shadow-sm">🔬 Vào phòng xét nghiệm</button>
+              <button onClick={() => navigate('/lab-manager/orders')} className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-700 px-4 py-2.5 text-xs font-black text-white hover:from-emerald-600 hover:to-emerald-800 shadow-sm">🔬 Vào phòng xét nghiệm</button>
               {isManager && (
                 <button onClick={() => navigate('/admin/shifts')} className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs font-black text-amber-700 hover:bg-amber-100">Duyệt ca</button>
               )}
@@ -149,7 +128,7 @@ export default function LabManagerDashboardPage() {
                   if (btn) btn.click();
                 }, 300);
               }} />
-              <Shortcut title="Vào phòng xét nghiệm" desc="Đăng nhập tài khoản chung để nhận và xử lý phiếu chỉ định." onClick={() => window.location.href = '/paraclinical-login'} />
+              <Shortcut title="Phiếu CLS" desc="Nhận xử lý, tải lên và trả kết quả chỉ định." onClick={() => navigate('/lab-manager/orders')} />
             </section>
           </>
         )}

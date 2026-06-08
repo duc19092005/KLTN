@@ -45,9 +45,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       staffId: payload.staffId,
       staffName: payload.staffName,
       shiftId: payload.shiftId,
-      clinicalRoomId: payload.clinicalRoomId,
-      sharedAccountId: payload.sharedAccountId,
-      actualStaffId: payload.actualStaffId,
     };
   }
 }

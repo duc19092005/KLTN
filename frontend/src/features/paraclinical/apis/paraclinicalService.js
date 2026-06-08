@@ -2,8 +2,8 @@ import api from '../../../shared/apis/api';
 
 export const shiftService = {
   /** Staff self-registers a shift. */
-  register: (clinicalRoomId, startTime, endTime, note, demoMode = false) =>
-    api.post('/paraclinical/shifts/register', { clinicalRoomId, startTime, endTime, note }, { params: { demo: demoMode ? '1' : '0' } }),
+  register: (departmentId, startTime, endTime, note, demoMode = false) =>
+    api.post('/paraclinical/shifts/register', { departmentId, startTime, endTime, note }, { params: { demo: demoMode ? '1' : '0' } }),
 
   /** Admin/Head approves a PENDING shift. */
   approve: (shiftId) => api.post('/paraclinical/shifts/approve', { shiftId }),
@@ -12,12 +12,12 @@ export const shiftService = {
   reject: (shiftId, reason) => api.post('/paraclinical/shifts/reject', { shiftId, reason }),
 
   /** Admin/Head directly assigns a shift (auto-APPROVED). */
-  assign: (staffId, clinicalRoomId, startTime, endTime) =>
-    api.post('/paraclinical/shifts/assign', { staffId, clinicalRoomId, startTime, endTime }),
+  assign: (staffId, departmentId, startTime, endTime) =>
+    api.post('/paraclinical/shifts/assign', { staffId, departmentId, startTime, endTime }),
 
-  /** List shifts for a specific room. */
-  listByRoom: (roomId, from, to) =>
-    api.get(`/paraclinical/shifts/room/${roomId}`, { params: { from, to } }),
+  /** List shifts for a specific department. */
+  listByDepartment: (departmentId, from, to) =>
+    api.get(`/paraclinical/shifts/department/${departmentId}`, { params: { from, to } }),
 
   /** Rooms available for the current LAB_MANAGER, filtered by specialty. */
   availableRooms: () => api.get('/paraclinical/shifts/available-rooms'),
@@ -30,20 +30,10 @@ export const shiftService = {
     api.get('/paraclinical/shifts/pending', { params: { departmentId } }),
 };
 
-export const paraclinicalAuthService = {
-  /** Phase 1: Shared-account login (username/password). */
-  login: (username, password) =>
-    api.post('/auth/paraclinical/login', { username, password }),
-
-  /** Phase 2: Face verification against active shift. */
-  verifyShiftFace: (tempToken, faceDescriptor) =>
-    api.post('/auth/paraclinical/verify-shift-face', { tempToken, faceDescriptor }),
-};
-
 export const handoverService = {
   /** Initiate a handover. */
-  initiate: (toStaffId, clinicalRoomId, reason) =>
-    api.post('/paraclinical/handover/initiate', { toStaffId, clinicalRoomId, reason }),
+  initiate: (toStaffId, departmentId, reason) =>
+    api.post('/paraclinical/handover/initiate', { toStaffId, departmentId, reason }),
 
   /** Verify face of Person A (outgoing). */
   verifyFaceA: (handoverId, faceDescriptor) =>

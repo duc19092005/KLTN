@@ -27,8 +27,8 @@ export class PrismaPatientRepository implements PatientRepositoryPort {
         visits: {
           orderBy: { checkInAt: 'desc' as const },
           include: {
-            clinicalRoom: true,
-            doctor: { include: { staffProfile: true } },
+            department: true,
+            staff: { include: { doctorProfile: true } },
             finalConclusion: {
               include: {
                 aiDiagnosis: { include: { aiModel: true } },
@@ -95,6 +95,12 @@ export class PrismaPatientRepository implements PatientRepositoryPort {
   }
 
   private includeRelations() {
-    return { visits: { orderBy: { checkInAt: 'desc' }, take: 10, include: { clinicalRoom: true, doctor: { include: { staffProfile: true } } } } } as const;
+    return {
+      visits: {
+        orderBy: { checkInAt: 'desc' },
+        take: 10,
+        include: { department: true, staff: { include: { doctorProfile: true } } },
+      },
+    } as const;
   }
 }

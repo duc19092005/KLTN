@@ -5,8 +5,6 @@ import { RejectShiftUseCase } from '../application/use-cases/reject-shift.use-ca
 import { AssignShiftUseCase } from '../application/use-cases/assign-shift.use-case';
 import { ListRoomShiftsUseCase } from '../application/use-cases/list-room-shifts.use-case';
 import { ListPendingShiftsUseCase } from '../application/use-cases/list-pending-shifts.use-case';
-import { ParaclinicalLoginUseCase } from '../application/use-cases/paraclinical-login.use-case';
-import { VerifyShiftFaceUseCase } from '../application/use-cases/verify-shift-face.use-case';
 import { InitiateHandoverUseCase } from '../application/use-cases/initiate-handover.use-case';
 import { VerifyHandoverFaceAUseCase } from '../application/use-cases/verify-handover-face-a.use-case';
 import { VerifyHandoverFaceBUseCase } from '../application/use-cases/verify-handover-face-b.use-case';
@@ -14,7 +12,8 @@ import { VerifyParaclinicalShiftUseCase } from '../application/use-cases/verify-
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 
 /**
- * Facade preserving a stable API surface. Each method delegates to a single use case.
+ * Facade preserving the shift API while the storage model points directly to
+ * Department.
  */
 @Injectable()
 export class ParaclinicalShiftService {
@@ -25,8 +24,6 @@ export class ParaclinicalShiftService {
     private readonly assignShiftUC: AssignShiftUseCase,
     private readonly listRoomShiftsUC: ListRoomShiftsUseCase,
     private readonly listPendingShiftsUC: ListPendingShiftsUseCase,
-    private readonly paraclinicalLoginUC: ParaclinicalLoginUseCase,
-    private readonly verifyShiftFaceUC: VerifyShiftFaceUseCase,
     private readonly initiateHandoverUC: InitiateHandoverUseCase,
     private readonly verifyHandoverFaceAUC: VerifyHandoverFaceAUseCase,
     private readonly verifyHandoverFaceBUC: VerifyHandoverFaceBUseCase,
@@ -34,21 +31,10 @@ export class ParaclinicalShiftService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async registerShift(staffIdOrUserId: string, clinicalRoomId: string, startTime: Date, endTime: Date, actorId: string, note?: string, demoMode = false) {
-    // Auto-resolve: if clinicalRoomId is actually a department ID, find or create a ClinicalRoom
-    let resolvedRoomId = clinicalRoomId;
-    try {
-      resolvedRoomId = await this.registerShiftUC.resolveClinicalRoom(clinicalRoomId);
-    } catch { /* keep original, let use-case throw proper error */ }
-
-    // Auto-resolve: if staffIdOrUserId is actually a User.id, find the real StaffProfile.id
-    let staffId = staffIdOrUserId;
-    try {
-      const staff = await this.registerShiftUC.resolveStaffId(staffIdOrUserId);
-      if (staff) staffId = staff;
-    } catch { /* keep original */ }
-
-    return this.registerShiftUC.execute(staffId, resolvedRoomId, startTime, endTime, actorId, note, demoMode);
+  async registerShift(staffIdOrUserId: string, departmentId: string, startTime: Date, endTime: Date, actorId: string, note?: string, demoMode = false) {
+    const resolvedDepartmentId = await this.registerShiftUC.resolveDepartment(departmentId);
+    const staffId = (await this.registerShiftUC.resolveStaffId(staffIdOrUserId)) ?? staffIdOrUserId;
+    return this.registerShiftUC.execute(staffId, resolvedDepartmentId, startTime, endTime, actorId, note, demoMode);
   }
 
   approveShift(shiftId: string, approvedById: string) {
@@ -59,38 +45,22 @@ export class ParaclinicalShiftService {
     return this.rejectShiftUC.execute(shiftId, rejectedById);
   }
 
-  async assignShift(staffId: string, clinicalRoomId: string, startTime: Date, endTime: Date, approvedById: string) {
-    // Auto-resolve if clinicalRoomId is actually a department ID
-    let resolvedRoomId = clinicalRoomId;
-    try {
-      resolvedRoomId = await this.registerShiftUC.resolveClinicalRoom(clinicalRoomId);
-    } catch { /* keep original */ }
-    return this.assignShiftUC.execute(staffId, resolvedRoomId, startTime, endTime, approvedById);
+  async assignShift(staffId: string, departmentId: string, startTime: Date, endTime: Date, approvedById: string) {
+    const resolvedDepartmentId = await this.registerShiftUC.resolveDepartment(departmentId);
+    return this.assignShiftUC.execute(staffId, resolvedDepartmentId, startTime, endTime, approvedById);
   }
 
-  async listRoomShifts(roomId: string, from?: Date, to?: Date) {
-    // Auto-resolve if roomId is actually a department ID
-    let resolvedRoomId = roomId;
-    try {
-      resolvedRoomId = await this.registerShiftUC.resolveClinicalRoom(roomId);
-    } catch { /* keep original */ }
-    return this.listRoomShiftsUC.execute(resolvedRoomId, from, to);
+  async listRoomShifts(departmentId: string, from?: Date, to?: Date) {
+    const resolvedDepartmentId = await this.registerShiftUC.resolveDepartment(departmentId);
+    return this.listRoomShiftsUC.execute(resolvedDepartmentId, from, to);
   }
 
   listPendingShifts(departmentId?: string) {
     return this.listPendingShiftsUC.execute(departmentId);
   }
 
-  paraclinicalLogin(username: string, password: string) {
-    return this.paraclinicalLoginUC.execute(username, password);
-  }
-
-  verifyShiftFace(tempToken: string, faceDescriptor: number[]) {
-    return this.verifyShiftFaceUC.execute(tempToken, faceDescriptor);
-  }
-
-  initiateHandover(fromStaffId: string, toStaffId: string, clinicalRoomId: string, reason?: string) {
-    return this.initiateHandoverUC.execute(fromStaffId, toStaffId, clinicalRoomId, reason);
+  initiateHandover(fromStaffId: string, toStaffId: string, departmentId: string, reason?: string) {
+    return this.initiateHandoverUC.execute(fromStaffId, toStaffId, departmentId, reason);
   }
 
   verifyHandoverFaceA(handoverId: string, faceDescriptor: number[]) {
@@ -118,26 +88,21 @@ export class ParaclinicalShiftService {
         : ['LABORATORY' as const, 'IMAGING' as const];
 
     const departments = await this.prisma.department.findMany({
-      where: {
-        status: 'ACTIVE',
-        type: { in: allowedTypes },
-        canReceiveOrders: true,
-      },
+      where: { status: 'ACTIVE', type: { in: allowedTypes }, canReceiveOrders: true },
       orderBy: [{ type: 'asc' }, { name: 'asc' }],
       select: { id: true, departmentCode: true, name: true, type: true, floor: true, specialty: true },
     });
 
-    return Promise.all(departments.map(async (department) => {
-      const roomId = await this.registerShiftUC.resolveClinicalRoom(department.id);
-      return {
-        id: roomId,
-        departmentId: department.id,
-        roomCode: department.departmentCode,
-        roomName: `[${department.type === 'LABORATORY' ? 'XN' : 'CĐHA'}] ${department.name}`,
-        departmentType: department.type,
-        specialty: department.specialty,
-        floor: department.floor,
-      };
+    return departments.map((department) => ({
+      id: department.id,
+      departmentId: department.id,
+      departmentCode: department.departmentCode,
+      name: department.name,
+      roomCode: department.departmentCode,
+      roomName: `[${department.type === 'LABORATORY' ? 'XN' : 'CĐHA'}] ${department.name}`,
+      departmentType: department.type,
+      specialty: department.specialty,
+      floor: department.floor,
     }));
   }
 
@@ -147,16 +112,18 @@ export class ParaclinicalShiftService {
     return this.prisma.paraclinicalShift.findMany({
       where: {
         staffId: staff,
-        ...(from || to ? {
-          startTime: {
-            ...(from ? { gte: from } : {}),
-            ...(to ? { lte: to } : {}),
-          },
-        } : {}),
+        ...(from || to
+          ? {
+              startTime: {
+                ...(from ? { gte: from } : {}),
+                ...(to ? { lte: to } : {}),
+              },
+            }
+          : {}),
       },
       include: {
         staff: { select: { id: true, fullName: true, userId: true } },
-        clinicalRoom: { select: { id: true, roomCode: true, roomName: true } },
+        department: { select: { id: true, departmentCode: true, name: true, type: true } },
       },
       orderBy: { startTime: 'desc' },
     });

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+  import { Injectable } from '@nestjs/common';
 import { AiModelRegistry, MedicalOrderStatus, VisitStatus } from '@prisma/client';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import {
@@ -19,13 +19,24 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
   constructor(private readonly prisma: PrismaService) {}
 
   async findDoctorByUserId(userId: string): Promise<ClinicalDoctor | null> {
-    const doctor = await this.prisma.doctorProfile.findFirst({ where: { staffProfile: { userId } } });
+    const doctor = await this.prisma.doctorProfile.findFirst({
+      where: { staffProfile: { userId } },
+      include: { staffProfile: { select: { id: true, departmentId: true } } },
+    });
     if (!doctor) return null;
-    return { id: doctor.id, specialty: doctor.specialty };
+    return {
+      id: doctor.id,
+      staffId: doctor.staffProfile.id,
+      departmentId: doctor.staffProfile.departmentId,
+      specialty: doctor.specialty,
+    };
   }
 
   async findVisitById(visitId: string): Promise<ClinicalVisitInfo | null> {
-    const visit = await this.prisma.visit.findUnique({ where: { id: visitId }, select: { id: true, doctorId: true, status: true } });
+    const visit = await this.prisma.visit.findUnique({
+      where: { id: visitId },
+      select: { id: true, departmentId: true, staffId: true, status: true },
+    });
     return visit;
   }
 
@@ -66,7 +77,17 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
   async findAiDiagnosisWithVisit(id: string) {
     const diagnosis = await this.prisma.aiDiagnosis.findUnique({ where: { id }, include: { visit: true } });
     if (!diagnosis) return null;
-    return { id: diagnosis.id, visit: diagnosis.visit ? { doctorId: diagnosis.visit.doctorId } : null };
+    return {
+      id: diagnosis.id,
+      visit: diagnosis.visit
+        ? {
+            id: diagnosis.visit.id,
+            departmentId: diagnosis.visit.departmentId,
+            staffId: diagnosis.visit.staffId,
+            status: diagnosis.visit.status,
+          }
+        : null,
+    };
   }
 
   async updateAiDiagnosisReview(id: string, reviewedByDoctorId: string, doctorFeedback: string | null): Promise<unknown> {
@@ -126,7 +147,11 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
 
       await tx.visit.update({
         where: { id: data.visitId },
-        data: { status: VisitStatus.COMPLETED, completedAt: new Date() },
+        data: {
+          status: VisitStatus.COMPLETED,
+          completedAt: new Date(),
+          ...(data.staffId ? { staffId: data.staffId } : {}),
+        },
       });
 
       return conclusion;
@@ -136,8 +161,8 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
   private visitDecisionInclude() {
     return {
       patient: true,
-      doctor: { include: { staffProfile: { include: { department: true } } } },
-      clinicalRoom: true,
+      department: true,
+      staff: { include: { doctorProfile: true, department: true } },
       medicalOrders: {
         include: {
           targetDepartment: true,

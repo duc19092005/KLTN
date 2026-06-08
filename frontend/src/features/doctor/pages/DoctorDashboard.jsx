@@ -20,6 +20,8 @@ const VISIT_STATUS_LABELS = {
 function getItems(data) {
   return Array.isArray(data) ? data : data?.items || [];
 }
+function getVisitDepartmentName(visit) { return visit.department?.name || visit.department?.departmentCode || 'Chưa có phòng'; }
+function getVisitStaffName(visit) { return visit.staff?.fullName || visit.staff?.user?.username || 'N/A'; }
 
 export default function DoctorDashboard() {
   const { user, logout } = useAuth();
@@ -107,5 +109,5 @@ function StatCard({ label, value, hint }) {
   return <article className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold text-slate-500">{label}</p><strong className="mt-2 block text-3xl font-black text-slate-950">{String(value).padStart(2, '0')}</strong></div></div><p className="mt-3 text-xs font-semibold text-blue-600">{hint}</p></article>;
 }
 function Panel({ title, subtitle, children }) { return <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm"><div className="mb-5"><h2 className="text-xl font-black text-slate-950">{title}</h2><p className="mt-1 text-sm text-slate-500">{subtitle}</p></div>{children}</section>; }
-function VisitMini({ visit }) { return <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><strong className="text-slate-950">{visit.patient?.fullName || 'N/A'}</strong><span className="text-[10px] font-black text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-2 py-1">{VISIT_STATUS_LABELS[visit.status] || visit.status || 'Không rõ'}</span></div><p className="mt-1 text-xs font-semibold text-slate-500">{visit.visitCode} · {visit.patient?.patientCode || 'N/A'}</p><p className="mt-2 text-sm text-slate-600">{visit.clinicalRoom?.roomName || 'Chưa có phòng'} · BS. {visit.doctor?.staffProfile?.fullName || 'N/A'}</p></div>; }
+function VisitMini({ visit }) { return <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><strong className="text-slate-950">{visit.patient?.fullName || 'N/A'}</strong><span className="text-[10px] font-black text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-2 py-1">{VISIT_STATUS_LABELS[visit.status] || visit.status || 'Không rõ'}</span></div><p className="mt-1 text-xs font-semibold text-slate-500">{visit.visitCode} · {visit.patient?.patientCode || 'N/A'}</p><p className="mt-2 text-sm text-slate-600">{getVisitDepartmentName(visit)} · BS. {getVisitStaffName(visit)}</p></div>; }
 function Empty({ title, desc }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><strong className="text-slate-800">{title}</strong><p className="mt-1 text-sm text-slate-500">{desc}</p></div>; }

@@ -5,7 +5,7 @@ import {
 } from '../ports/paraclinical-shift.repository.port';
 
 /**
- * List shifts for a specific room with optional date range filter.
+ * List shifts for a specific department with optional date range filter.
  */
 @Injectable()
 export class ListRoomShiftsUseCase {
@@ -13,7 +13,7 @@ export class ListRoomShiftsUseCase {
     @Inject(PARACLINICAL_SHIFT_REPOSITORY) private readonly repo: ParaclinicalShiftRepositoryPort,
   ) {}
 
-  async execute(roomId: string, from?: Date, to?: Date) {
-    return this.repo.findShiftsByRoom(roomId, from, to);
+  async execute(departmentId: string, from?: Date, to?: Date) {
+    return this.repo.findShiftsByDepartment(departmentId, from, to);
   }
 }

@@ -76,7 +76,7 @@ export class VerifyHandoverFaceBUseCase {
     // ──────────────────────────────────────────────────────────────
     const snapshot = {
       handoverId: completed.id,
-      clinicalRoomId: completed.clinicalRoomId,
+      departmentId: completed.departmentId,
       fromStaffId: completed.fromStaffId,
       fromStaffName: completed.fromStaff.fullName,
       toStaffId: completed.toStaffId,
@@ -99,7 +99,7 @@ export class VerifyHandoverFaceBUseCase {
       metadata: {
         fromStaff: completed.fromStaff.fullName,
         toStaff: completed.toStaff.fullName,
-        clinicalRoomId: completed.clinicalRoomId,
+        departmentId: completed.departmentId,
         immediateAnchor: true,
       },
     });

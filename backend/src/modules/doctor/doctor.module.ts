@@ -6,7 +6,6 @@ import { CreateDoctorUseCase } from './application/use-cases/create-doctor.use-c
 import { CreateDoctorWithStaffUseCase } from './application/use-cases/create-doctor-with-staff.use-case';
 import { ListDoctorsUseCase } from './application/use-cases/list-doctors.use-case';
 import { UpdateDoctorUseCase } from './application/use-cases/update-doctor.use-case';
-import { AssignClinicalRoomUseCase } from './application/use-cases/assign-clinical-room.use-case';
 import { VerifyDoctorUseCase } from './application/use-cases/verify-doctor.use-case';
 import { ReanchorDoctorForStaffUpdateUseCase } from './application/use-cases/reanchor-doctor-for-staff-update.use-case';
 import { DOCTOR_REPOSITORY } from './application/ports/doctor.repository.port';
@@ -24,7 +23,6 @@ import { BlockchainDoctorIntegrityAnchor } from './infrastructure/adapters/block
     CreateDoctorWithStaffUseCase,
     ListDoctorsUseCase,
     UpdateDoctorUseCase,
-    AssignClinicalRoomUseCase,
     VerifyDoctorUseCase,
     ReanchorDoctorForStaffUpdateUseCase,
     { provide: DOCTOR_REPOSITORY, useClass: PrismaDoctorRepository },

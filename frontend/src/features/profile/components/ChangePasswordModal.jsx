@@ -6,7 +6,7 @@ import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 
 /**
  * In-place password change for already-active staff roles (RECEPTIONIST, DOCTOR,
- * LAB_MANAGER, DEPT_SHARED). Unlike the first-login ChangePasswordPage, this does
+ * LAB_MANAGER). Unlike the first-login ChangePasswordPage, this does
  * NOT redirect — the user stays on their profile after success. Admins are never
  * shown this (they authenticate by wallet and have no password).
  */

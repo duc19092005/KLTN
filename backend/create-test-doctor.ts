@@ -19,7 +19,7 @@ async function test() {
       licenseNumber: 'VN-MOH-999999',
       qualification: 'MD',
       yearsExperience: 5,
-      clinicalRoomId: '00000000-0000-0000-0000-000000000000'
+      departmentId: '00000000-0000-0000-0000-000000000000'
     });
     console.log('Doctor created successfully:', JSON.stringify(res, null, 2));
   } catch (err) {

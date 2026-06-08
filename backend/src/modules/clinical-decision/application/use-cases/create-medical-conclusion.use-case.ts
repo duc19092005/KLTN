@@ -33,7 +33,7 @@ export class CreateMedicalConclusionUseCase {
     if (!doctor) throw new BadRequestException('Tài khoản hiện tại không có hồ sơ bác sĩ.');
 
     const visit = await this.repo.findVisitById(dto.visitId);
-    this.policy.assertDoctorOwnsVisit(visit, doctor.id);
+    this.policy.assertDoctorOwnsVisit(visit, doctor);
     this.policy.assertReadyForClinicalDecision(visit!.status);
 
     const pendingOrders = await this.repo.countPendingMedicalOrders(visit!.id);
@@ -54,7 +54,8 @@ export class CreateMedicalConclusionUseCase {
 
     const conclusion = await this.repo.upsertConclusionAndCompleteVisit({
       visitId: visit!.id,
-      doctorId: visit!.doctorId,
+      doctorId: doctor.id,
+      staffId: doctor.staffId,
       aiDiagnosisId: dto.aiDiagnosisId || null,
       finalDiagnosis: dto.finalDiagnosis.trim(),
       treatmentPlan: dto.treatmentPlan?.trim() || null,

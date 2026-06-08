@@ -22,10 +22,6 @@ const ROLE_NAV = {
     items: LAB_MANAGER_NAV_ITEMS,
     routeFor: (id) => LAB_MANAGER_ROUTES[id] || LAB_MANAGER_ROUTES.overview,
   },
-  DEPT_SHARED: {
-    items: LAB_MANAGER_NAV_ITEMS,
-    routeFor: (id) => LAB_MANAGER_ROUTES[id] || LAB_MANAGER_ROUTES.overview,
-  },
   DOCTOR: {
     items: DOCTOR_NAV_ITEMS,
     routeFor: (id) => DOCTOR_NAV_ITEMS.find((item) => item.id === id)?.path || '/doctor',

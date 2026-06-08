@@ -105,7 +105,7 @@ export default function ShiftApprovalPage() {
                     </div>
                     <h2 className="mt-2 text-base font-black text-slate-950">{shift.staff?.fullName || 'Nhân viên'}</h2>
                     <p className="mt-1 text-xs font-bold text-slate-500">{formatDateTime(shift.startTime)} → {formatDateTime(shift.endTime)}</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-400">Phòng: {shift.clinicalRoom?.roomName || shift.clinicalRoom?.roomCode || 'N/A'}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-400">Phòng: {shift.department?.name || shift.department?.departmentCode || shift.staff?.department?.name || 'N/A'}</p>
                     <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
                       <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Lời nhắn đăng ký</p>
                       <p className="mt-1 text-xs font-semibold text-slate-700">{shift.note || 'Không có lời nhắn'}</p>
