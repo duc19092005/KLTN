@@ -16,12 +16,12 @@ export class CreateMedicalResultUseCase {
     private readonly accessPolicy: MedicalOrderAccessPolicy,
   ) {}
 
-  async execute(orderId: string, dto: CreateMedicalResultDto, user: AuthUser): Promise<unknown> {
+  async execute(orderId: string, dto: CreateMedicalResultDto, user: AuthUser, demoMode = false): Promise<unknown> {
     const order = await this.repo.findOrderForManage(orderId);
     if (!order) throw new NotFoundException('Không tìm thấy phiếu chỉ định.');
 
     await this.accessPolicy.assertCanManageOrder(order, user, () => this.resolveStaff(user.sub));
-    await this.assertActiveApprovedShiftForOrder(order.targetDepartmentId, user);
+    await this.assertActiveApprovedShiftForOrder(order.targetDepartmentId, user, demoMode);
 
     if (([MedicalOrderStatus.RESULT_READY, MedicalOrderStatus.CANCELLED] as MedicalOrderStatus[]).includes(order.status)) {
       throw new BadRequestException('Không thể trả kết quả cho phiếu đã sẵn sàng hoặc đã hủy.');
@@ -53,7 +53,7 @@ export class CreateMedicalResultUseCase {
     return staff;
   }
 
-  private async assertActiveApprovedShiftForOrder(targetDepartmentId: string | null, user: AuthUser) {
+  private async assertActiveApprovedShiftForOrder(targetDepartmentId: string | null, user: AuthUser, demoMode = false) {
     if (user.role === 'ADMIN') return;
     if (!user.verified) {
       throw new ForbiddenException('Chỉ nhân viên đã xác thực khuôn mặt và đang có ca trực được duyệt mới được trả kết quả.');
@@ -68,14 +68,14 @@ export class CreateMedicalResultUseCase {
       staff.id,
       targetDepartmentId,
       new Date(),
-      this.isDemoMode(),
+      this.isDemoMode(demoMode),
     );
     if (!shift || shift.staff.userId !== user.sub) {
       throw new ForbiddenException('Ca trực đã hết hiệu lực hoặc không khớp với nhân viên đang đăng nhập.');
     }
   }
 
-  private isDemoMode() {
-    return process.env.DEMO_MODE === 'true';
+  private isDemoMode(demoMode = false) {
+    return demoMode || process.env.DEMO_MODE === 'true';
   }
 }

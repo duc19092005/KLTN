@@ -33,12 +33,12 @@ export class MedicalOrderService {
     return this.listOrdersUseCase.execute(query, user);
   }
 
-  updateStatus(id: string, status: MedicalOrderStatus, user: AuthUser) {
-    return this.updateStatusUseCase.execute(id, status, user);
+  updateStatus(id: string, status: MedicalOrderStatus, user: AuthUser, demoMode = false) {
+    return this.updateStatusUseCase.execute(id, status, user, demoMode);
   }
 
-  createResult(orderId: string, dto: CreateMedicalResultDto, user: AuthUser) {
-    return this.createResultUseCase.execute(orderId, dto, user);
+  createResult(orderId: string, dto: CreateMedicalResultDto, user: AuthUser, demoMode = false) {
+    return this.createResultUseCase.execute(orderId, dto, user, demoMode);
   }
 
   mapUploadedResultFiles(orderId: string, files: UploadedResultFileInput[]) {

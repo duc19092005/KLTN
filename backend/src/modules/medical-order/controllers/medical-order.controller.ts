@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Post, Query, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -39,14 +39,14 @@ export class MedicalOrderController {
 
   @Roles('ADMIN', 'LAB_MANAGER')
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateMedicalOrderStatusDto, @CurrentUser() user: AuthUser) {
-    return this.service.updateStatus(id, dto.status, user);
+  updateStatus(@Param('id') id: string, @Body() dto: UpdateMedicalOrderStatusDto, @CurrentUser() user: AuthUser, @Headers('x-demo-mode') demoMode?: string) {
+    return this.service.updateStatus(id, dto.status, user, isDemoModeHeader(demoMode));
   }
 
   @Roles('LAB_MANAGER')
   @Post(':id/results')
-  createResult(@Param('id') id: string, @Body() dto: CreateMedicalResultDto, @CurrentUser() user: AuthUser) {
-    return this.service.createResult(id, dto, user);
+  createResult(@Param('id') id: string, @Body() dto: CreateMedicalResultDto, @CurrentUser() user: AuthUser, @Headers('x-demo-mode') demoMode?: string) {
+    return this.service.createResult(id, dto, user, isDemoModeHeader(demoMode));
   }
 
   @Roles('LAB_MANAGER')
@@ -62,4 +62,8 @@ export class MedicalOrderController {
   uploadResultFiles(@Param('id') id: string, @UploadedFiles() files: Array<{ buffer: Buffer; originalname: string; mimetype: string; size: number }>) {
     return this.service.mapUploadedResultFiles(id, files || []);
   }
+}
+
+function isDemoModeHeader(value?: string) {
+  return value === 'true' || value === '1';
 }

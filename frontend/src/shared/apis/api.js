@@ -15,6 +15,21 @@ api.interceptors.request.use((config) => {
     config.headers = config.headers || {};
     config.headers['x-stepup-session'] = token;
   }
+
+  // Demo Mode is a client-side presentation toggle. Send it with every request so
+  // server-side workflow checks can bypass date/time shift windows consistently.
+  try {
+    const demoEnabled = Object.keys(localStorage)
+      .filter((key) => key.startsWith('kltn.prefs.'))
+      .some((key) => JSON.parse(localStorage.getItem(key) || '{}')?.demoMode === true);
+    if (demoEnabled) {
+      config.headers = config.headers || {};
+      config.headers['x-demo-mode'] = 'true';
+    }
+  } catch {
+    // Ignore malformed preference payloads; normal validation still applies.
+  }
+
   return config;
 });
 

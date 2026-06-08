@@ -15,12 +15,12 @@ export class UpdateMedicalOrderStatusUseCase {
     private readonly accessPolicy: MedicalOrderAccessPolicy,
   ) {}
 
-  async execute(id: string, status: MedicalOrderStatus, user: AuthUser): Promise<unknown> {
+  async execute(id: string, status: MedicalOrderStatus, user: AuthUser, demoMode = false): Promise<unknown> {
     const order = await this.repo.findOrderForManage(id);
     if (!order) throw new NotFoundException('Không tìm thấy phiếu chỉ định.');
 
     await this.accessPolicy.assertCanManageOrder(order, user, () => this.resolveStaff(user.sub));
-    await this.assertActiveApprovedShiftForOrder(order.targetDepartmentId, user);
+    await this.assertActiveApprovedShiftForOrder(order.targetDepartmentId, user, demoMode);
 
     const completedAt =
       status === MedicalOrderStatus.RESULT_READY || status === MedicalOrderStatus.CANCELLED ? new Date() : undefined;
@@ -33,7 +33,7 @@ export class UpdateMedicalOrderStatusUseCase {
     return staff;
   }
 
-  private async assertActiveApprovedShiftForOrder(targetDepartmentId: string | null, user: AuthUser) {
+  private async assertActiveApprovedShiftForOrder(targetDepartmentId: string | null, user: AuthUser, demoMode = false) {
     if (user.role === 'ADMIN') return;
     if (!user.verified) {
       throw new ForbiddenException('Chỉ nhân viên đã xác thực khuôn mặt và đang có ca trực được duyệt mới được cập nhật phiếu chỉ định.');
@@ -48,14 +48,14 @@ export class UpdateMedicalOrderStatusUseCase {
       staff.id,
       targetDepartmentId,
       new Date(),
-      this.isDemoMode(),
+      this.isDemoMode(demoMode),
     );
     if (!shift || shift.staff.userId !== user.sub) {
       throw new ForbiddenException('Ca trực đã hết hiệu lực hoặc không khớp với nhân viên đang đăng nhập.');
     }
   }
 
-  private isDemoMode() {
-    return process.env.DEMO_MODE === 'true';
+  private isDemoMode(demoMode = false) {
+    return demoMode || process.env.DEMO_MODE === 'true';
   }
 }
