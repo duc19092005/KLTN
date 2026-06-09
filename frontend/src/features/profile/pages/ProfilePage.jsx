@@ -129,19 +129,19 @@ export default function ProfilePage() {
         {loading ? (
           <LoadingIndicator size="lg" label="Đang tải thông tin cá nhân..." />
         ) : !profile ? (
-          <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-10 text-center">
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-10 text-center">
             <strong className="text-slate-800">Không có dữ liệu</strong>
             <p className="mt-1 text-sm text-slate-500">Không tải được thông tin cá nhân của bạn.</p>
           </div>
         ) : (
           <>
             {/* Header / Hero */}
-            <section className="relative overflow-hidden rounded-[28px] border border-indigo-100 bg-gradient-to-br from-white via-indigo-50 to-cyan-50 p-8 shadow-sm">
-              <p className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.24em] mb-4">Hồ sơ cá nhân</p>
+            <section className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-cyan-50 p-8 shadow-sm">
+              <p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.24em] mb-4">Hồ sơ cá nhân</p>
               <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-indigo-600 text-2xl font-black text-white shadow-lg shadow-indigo-200">
+                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-cyan-600 text-2xl font-black text-white shadow-sm">
                   {staff?.avatarUrl ? (
-                    <img src={staff.avatarUrl} alt={displayName} className="h-full w-full rounded-3xl object-cover" />
+                    <img src={staff.avatarUrl} alt={displayName} className="h-full w-full rounded-2xl object-cover" />
                   ) : (
                     initials
                   )}
@@ -149,12 +149,12 @@ export default function ProfilePage() {
                 <div className="min-w-0">
                   <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight">{displayName}</h2>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center rounded-full border border-indigo-100 bg-white px-3 py-1 text-xs font-black text-indigo-700">
+                    <span className="inline-flex items-center rounded-full border border-cyan-100 bg-white px-3 py-1 text-xs font-black text-cyan-700">
                       {roleLabel}
                     </span>
                     {staff?.managedDepartment && (
                       <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
-                        👑 Trưởng khoa {staff.managedDepartment.name}
+                        Trưởng khoa {staff.managedDepartment.name}
                       </span>
                     )}
                     <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-black ${status.tone}`}>
@@ -180,7 +180,7 @@ export default function ProfilePage() {
                     id={`profile-tab-${tab.id}`}
                     type="button"
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 ${active ? 'bg-slate-50 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-colors duration-200 ${active ? 'bg-slate-50 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     style={active ? { color: accentHex } : undefined}
                   >
                     <tab.icon className="h-4 w-4" strokeWidth={2.25} />
@@ -233,7 +233,7 @@ export default function ProfilePage() {
 
             {/* Security: password change for staff roles only */}
             {canChangePassword && (
-              <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+              <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-start gap-3">
                     <div>
@@ -246,7 +246,7 @@ export default function ProfilePage() {
                   <button
                     type="button"
                     onClick={() => setShowChangePassword(true)}
-                    className="shrink-0 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-black text-white hover:bg-indigo-700"
+                    className="shrink-0 rounded-xl bg-cyan-600 px-5 py-2.5 text-sm font-black text-white hover:bg-cyan-700"
                   >
                     Đổi mật khẩu
                   </button>
@@ -255,7 +255,7 @@ export default function ProfilePage() {
             )}
 
             {/* Security: screen auto-lock (all roles) */}
-            <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+            <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
               <div className="flex flex-col gap-1">
                 <h3 className="text-lg font-black text-slate-950">Khóa màn hình tự động</h3>
                 <p className="text-sm text-slate-500">
@@ -267,7 +267,7 @@ export default function ProfilePage() {
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <label htmlFor="auto-lock-range" className="text-[11px] font-black uppercase tracking-wider text-slate-400">Thời gian rảnh trước khi khóa</label>
-                    <span className="text-sm font-black text-indigo-700">{autoLock} phút</span>
+                    <span className="text-sm font-black text-cyan-700">{autoLock} phút</span>
                   </div>
                   <input
                     id="auto-lock-range"
@@ -277,7 +277,7 @@ export default function ProfilePage() {
                     step={1}
                     value={autoLock}
                     onChange={(e) => setAutoLock(Number(e.target.value))}
-                    className="mt-3 w-full accent-indigo-600"
+                    className="mt-3 w-full accent-cyan-600"
                   />
                   <div className="mt-1 flex justify-between text-[10px] font-bold text-slate-400">
                     <span>{AUTO_LOCK_MIN} phút</span>
@@ -288,9 +288,9 @@ export default function ProfilePage() {
                   type="button"
                   onClick={saveAutoLock}
                   disabled={savingAutoLock || autoLock === (user?.autoLockMinutes ?? 5)}
-                  className="shrink-0 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-black text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="shrink-0 rounded-xl bg-cyan-600 px-5 py-2.5 text-sm font-black text-white hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {savingAutoLock ? 'Đang lưu…' : 'Lưu cài đặt'}
+                  {savingAutoLock ? 'Đang lưu...' : 'Lưu cài đặt'}
                 </button>
               </div>
             </section>
@@ -307,7 +307,7 @@ export default function ProfilePage() {
 
 function Card({ title, children }) {
   return (
-    <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+    <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
       <div className="mb-5 flex items-center gap-2">
         <h3 className="text-lg font-black text-slate-950">{title}</h3>
       </div>

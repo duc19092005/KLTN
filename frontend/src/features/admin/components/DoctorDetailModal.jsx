@@ -5,7 +5,7 @@ import { useToast } from '../../../providers/ToastProvider';
 
 const STATUS_TONE = {
   VERIFIED: { label: 'Xác thực khớp với blockchain', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
-  TAMPERED: { label: 'CẢNH BÁO: Dữ liệu đã bị sửa đổi!', cls: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500' },
+  TAMPERED: { label: 'CẢNH BÁO: Dữ liệu đã bị sửa đổi!', cls: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500' },
   UNANCHORED: { label: 'Chưa được neo trên blockchain', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
 };
 
@@ -67,19 +67,19 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
         {/* Header */}
         <div className="shrink-0 border-b border-slate-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             {staff.avatarUrl ? (
-              <img src={staff.avatarUrl} alt={staff.fullName} className="w-16 h-16 rounded-2xl object-cover border border-indigo-100" />
+              <img src={staff.avatarUrl} alt={staff.fullName} className="w-16 h-16 rounded-2xl object-cover border border-cyan-100" />
             ) : (
-              <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-xl font-black text-indigo-500">
+              <div className="w-16 h-16 rounded-2xl bg-cyan-50 border border-cyan-100 flex items-center justify-center text-xl font-black text-cyan-500">
                 BS
               </div>
             )}
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-indigo-600">Thông tin chi tiết</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-600">Thông tin chi tiết</p>
               <h3 className="text-2xl font-black text-slate-950">{staff.fullName || 'Bác sĩ'}</h3>
               <p className="text-sm text-slate-500">{detail?.specialty} • {detail?.qualification}</p>
             </div>
@@ -92,10 +92,10 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
 
         {/* Tab switcher */}
         <div className="shrink-0 px-6 py-2 border-b border-slate-100 flex gap-2">
-          <button onClick={() => setActiveTab('info')} className={`px-4 py-2 text-xs font-black rounded-xl border transition-all ${activeTab === 'info' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+          <button onClick={() => setActiveTab('info')} className={`px-4 py-2 text-xs font-black rounded-xl border transition-colors ${activeTab === 'info' ? 'bg-cyan-600 text-white border-cyan-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
             Hồ sơ & Xác thực blockchain
           </button>
-          <button onClick={() => setActiveTab('history')} className={`px-4 py-2 text-xs font-black rounded-xl border transition-all ${activeTab === 'history' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+          <button onClick={() => setActiveTab('history')} className={`px-4 py-2 text-xs font-black rounded-xl border transition-colors ${activeTab === 'history' ? 'bg-cyan-600 text-white border-cyan-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
             Lịch sử cập nhật ({history.length})
           </button>
         </div>
@@ -107,13 +107,13 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
           ) : activeTab === 'info' ? (
             <div className="space-y-6">
               {/* Blockchain verification card — single unified hash */}
-              <div className={`rounded-2xl border p-5 shadow-sm space-y-4 ${audit.status === 'VERIFIED' ? 'bg-emerald-50/60 border-emerald-100' : audit.status === 'TAMPERED' ? 'bg-red-50/60 border-red-100 animate-pulse' : 'bg-amber-50/60 border-amber-100'}`}>
+              <div className={`rounded-2xl border p-5 shadow-sm space-y-4 ${audit.status === 'VERIFIED' ? 'bg-emerald-50/60 border-emerald-100' : audit.status === 'TAMPERED' ? 'bg-rose-50/60 border-rose-100 animate-pulse' : 'bg-amber-50/60 border-amber-100'}`}>
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black ${tone.cls}`}>
                     <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
                     Trạng thái: {tone.label}
                   </span>
-                  <span className="text-[11px] font-black uppercase text-indigo-700 tracking-wider">
+                  <span className="text-[11px] font-black uppercase text-cyan-700 tracking-wider">
                     Xác thực bằng hợp đồng thông minh Solidity
                   </span>
                 </div>
@@ -168,7 +168,7 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
                 <div key={log.id} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm space-y-2">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
-                      <span className={`rounded-lg border px-2 py-0.5 text-[10px] font-black ${log.action === 'CREATE' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-indigo-50 text-indigo-700 border-indigo-100'}`}>
+                      <span className={`rounded-lg border px-2 py-0.5 text-[10px] font-black ${log.action === 'CREATE' ? 'bg-cyan-50 text-cyan-700 border-cyan-100' : 'bg-cyan-50 text-cyan-700 border-cyan-100'}`}>
                         {ACTION_LABEL[log.action] || log.action}
                       </span>
                       <span className="text-xs font-semibold text-slate-400">{formatTime(log.createdAt)}</span>
@@ -180,7 +180,7 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
                   {log.txHash && (
                     <div className="text-[10px] text-slate-500 font-mono flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100">
                       <span>Giao dịch TX:</span>
-                      <a href={`#`} className="text-indigo-600 font-bold hover:underline" onClick={(e) => e.preventDefault()}>{log.txHash}</a>
+                      <a href={`#`} className="text-cyan-600 font-bold hover:underline" onClick={(e) => e.preventDefault()}>{log.txHash}</a>
                     </div>
                   )}
                   {log.dataHash && (
@@ -209,7 +209,7 @@ function HashRow({ label, value, match }) {
   return (
     <div className="flex justify-between items-center gap-2 py-0.5">
       <span className="text-slate-500 font-semibold">{label}:</span>
-      <span className={`font-mono ${match === true ? 'text-emerald-600 font-bold' : match === false ? 'text-red-600 font-bold' : 'text-slate-700'}`}>
+      <span className={`font-mono ${match === true ? 'text-emerald-600 font-bold' : match === false ? 'text-rose-600 font-bold' : 'text-slate-700'}`}>
         {shortHash(value)}
       </span>
     </div>

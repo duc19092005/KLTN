@@ -5,14 +5,14 @@ import { useToast } from '../../../providers/ToastProvider';
 
 const STATUS_TONE = {
   VERIFIED: { label: 'Khớp blockchain', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
-  TAMPERED: { label: 'Đã bị sửa đổi', cls: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500' },
+  TAMPERED: { label: 'Đã bị sửa đổi', cls: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500' },
   UNANCHORED: { label: 'Chưa neo trên chuỗi', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
 };
 
 const ACTION_TONE = {
-  CREATE: 'bg-blue-50 text-blue-700 border-blue-100',
-  UPDATE: 'bg-indigo-50 text-indigo-700 border-indigo-100',
-  DELETE: 'bg-red-50 text-red-700 border-red-100',
+  CREATE: 'bg-cyan-50 text-cyan-700 border-cyan-100',
+  UPDATE: 'bg-cyan-50 text-cyan-700 border-cyan-100',
+  DELETE: 'bg-rose-50 text-rose-700 border-rose-100',
 };
 
 const ACTION_LABEL = {
@@ -68,12 +68,12 @@ export default function DepartmentAuditModal({ onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
         {/* Header */}
         <div className="shrink-0 border-b border-slate-100 p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600">Kiểm toán blockchain</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-600">Kiểm toán blockchain</p>
               <h3 className="mt-1 text-2xl font-black text-slate-950">Xác thực & Lịch sử thay đổi</h3>
               <p className="mt-1 text-sm text-slate-500">Đối chiếu hash trong CSDL với blockchain để phát hiện dữ liệu bị sửa đổi.</p>
             </div>
@@ -86,8 +86,8 @@ export default function DepartmentAuditModal({ onClose }) {
             <SummaryChip tone="VERIFIED" value={summary.VERIFIED || 0} label="Khớp" />
             <SummaryChip tone="TAMPERED" value={summary.TAMPERED || 0} label="Bị sửa" />
             <SummaryChip tone="UNANCHORED" value={summary.UNANCHORED || 0} label="Chưa neo" />
-            <button type="button" onClick={load} disabled={loading} className="ml-auto rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-black text-blue-700 hover:bg-blue-100 disabled:opacity-50">
-              {loading ? 'Đang kiểm tra…' : 'Kiểm tra lại'}
+            <button type="button" onClick={load} disabled={loading} className="ml-auto rounded-xl border border-cyan-100 bg-cyan-50 px-4 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-100 disabled:opacity-50">
+              {loading ? 'Đang kiểm tra...' : 'Kiểm tra lại'}
             </button>
           </div>
 
@@ -123,7 +123,7 @@ function VerifyList({ items }) {
           <div key={item.id} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[11px] font-black uppercase tracking-wider text-blue-600">{item.departmentCode}</p>
+                <p className="text-[11px] font-black uppercase tracking-wider text-cyan-600">{item.departmentCode}</p>
                 <h4 className="font-black text-slate-950">{item.name}</h4>
               </div>
               <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-black ${tone.cls}`}>
@@ -172,7 +172,7 @@ function HashRow({ label, value, match }) {
   return (
     <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
       <p className="font-black uppercase tracking-wider text-slate-400">{label}</p>
-      <p className={`mt-0.5 font-mono ${match ? 'text-emerald-600' : value ? 'text-red-600' : 'text-slate-400'}`}>{shortHash(value)}</p>
+      <p className={`mt-0.5 font-mono ${match ? 'text-emerald-600' : value ? 'text-rose-600' : 'text-slate-400'}`}>{shortHash(value)}</p>
     </div>
   );
 }
@@ -190,7 +190,7 @@ function SummaryChip({ tone, value, label }) {
 
 function TabButton({ active, onClick, children }) {
   return (
-    <button type="button" onClick={onClick} className={`rounded-xl border px-4 py-2 text-xs font-black transition-all ${active ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
+    <button type="button" onClick={onClick} className={`rounded-xl border px-4 py-2 text-xs font-black transition-colors ${active ? 'border-cyan-600 bg-cyan-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
       {children}
     </button>
   );

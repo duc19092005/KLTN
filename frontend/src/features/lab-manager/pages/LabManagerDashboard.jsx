@@ -82,11 +82,11 @@ export default function LabManagerDashboardPage() {
   return (
     <DashboardLayout user={user} navItems={LAB_MANAGER_NAV_ITEMS} activeItem="overview" onNavigate={(id) => navigate(labManagerRouteFor(id))} onLogout={logout}>
       <div className="max-w-7xl mx-auto space-y-4">
-        <section className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
+        <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-[10px] uppercase tracking-[0.18em] font-black text-cyan-600">
-                {isManager && <span className="inline-block mr-2 rounded-full bg-amber-100 px-2 py-0.5 text-amber-700 text-[9px]">👑 Trưởng khoa</span>}
+                {isManager && <span className="inline-block mr-2 rounded-full bg-amber-100 px-2 py-0.5 text-amber-700 text-[9px]">Trưởng khoa</span>}
                 Bảng điều khiển
               </p>
               <h1 className="mt-1 text-2xl font-black text-slate-950">Tổng quan</h1>
@@ -96,7 +96,7 @@ export default function LabManagerDashboardPage() {
                 <select
                   value={selectedRoomId}
                   onChange={(e) => setSelectedRoomId(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-colors"
                 >
                   {rooms.map((r) => (
                     <option key={r.id} value={r.id}>{r.roomName || r.roomCode || r.id.slice(0, 8)}</option>
@@ -104,9 +104,9 @@ export default function LabManagerDashboardPage() {
                 </select>
               )}
               <button onClick={() => navigate('/lab-manager/shifts')} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white hover:bg-cyan-700 shadow-sm">Đăng ký ca</button>
-              <button onClick={() => navigate('/lab-manager/orders')} className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-700 px-4 py-2.5 text-xs font-black text-white hover:from-emerald-600 hover:to-emerald-800 shadow-sm">🔬 Vào phòng xét nghiệm</button>
+              <button onClick={() => navigate('/lab-manager/orders')} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white shadow-sm hover:bg-cyan-700">Vào phòng xét nghiệm</button>
               {isManager && (
-                <button onClick={() => navigate('/admin/shifts')} className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs font-black text-amber-700 hover:bg-amber-100">Duyệt ca</button>
+                <button onClick={() => navigate('/admin/shifts')} className="rounded-xl border border-cyan-200 bg-white px-4 py-2.5 text-xs font-black text-cyan-700 hover:bg-cyan-50">Duyệt ca</button>
               )}
             </div>
           </div>
@@ -139,14 +139,14 @@ export default function LabManagerDashboardPage() {
 
 function Kpi({ label, value, percent, tone }) {
   const colors = {
-    emerald: { dot: 'bg-emerald-500', bg: 'bg-emerald-50 border-emerald-100', text: 'text-emerald-700' },
-    amber:   { dot: 'bg-amber-400',   bg: 'bg-amber-50 border-amber-100',     text: 'text-amber-700' },
-    red:     { dot: 'bg-red-400',     bg: 'bg-red-50 border-red-100',         text: 'text-red-600' },
+    emerald: { dot: 'bg-emerald-500', bg: 'bg-white border-slate-100', text: 'text-emerald-700' },
+    amber:   { dot: 'bg-amber-400',   bg: 'bg-white border-slate-100', text: 'text-amber-700' },
+    red:     { dot: 'bg-rose-400',    bg: 'bg-white border-slate-100', text: 'text-rose-600' },
   };
   const c = colors[tone] || colors.emerald;
 
   return (
-    <article className={`rounded-3xl border p-4 shadow-sm ${c.bg}`}>
+    <article className={`rounded-2xl border p-4 shadow-sm ${c.bg}`}>
       <div className="flex items-center justify-between">
         <span className={`h-2.5 w-2.5 rounded-full ${c.dot}`} />
         <strong className="text-2xl font-black text-slate-950">{value}</strong>
@@ -162,7 +162,7 @@ function Kpi({ label, value, percent, tone }) {
 
 function Shortcut({ title, desc, onClick }) {
   return (
-    <button type="button" onClick={onClick} className="rounded-2xl border border-cyan-100 bg-cyan-50/60 p-5 text-left hover:border-cyan-300 transition-all">
+    <button type="button" onClick={onClick} className="rounded-2xl border border-cyan-100 bg-cyan-50/60 p-5 text-left hover:border-cyan-300 transition-colors">
       <strong className="block text-slate-950">{title}</strong>
       <p className="mt-1 text-sm font-semibold text-slate-500">{desc}</p>
     </button>

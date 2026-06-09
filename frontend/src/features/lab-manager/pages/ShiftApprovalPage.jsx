@@ -74,15 +74,15 @@ export default function ShiftApprovalPage() {
   return (
     <DashboardLayout user={user} navItems={LAB_MANAGER_NAV_ITEMS} activeItem="approvals" onNavigate={(id) => navigate(labManagerRouteFor(id))} onLogout={logout}>
       <div className="mx-auto max-w-7xl space-y-5 pb-12">
-        <section className="overflow-hidden rounded-3xl border border-amber-100 bg-gradient-to-br from-white via-amber-50/70 to-cyan-50 p-6 shadow-sm">
+        <section className="overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600">Trưởng phòng · Duyệt lịch trực</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-600">Trưởng phòng · Duyệt lịch trực</p>
               <h1 className="mt-2 text-2xl font-black text-slate-950">Ca trực chờ duyệt</h1>
               <p className="mt-1 text-sm font-semibold text-slate-500">Bạn đang quản lý {departmentNames}. Ghi chú và lý do từ chối luôn được lưu/hiển thị để minh bạch.</p>
             </div>
             <div className="rounded-2xl border border-white/70 bg-white/80 px-5 py-4 text-center shadow-sm backdrop-blur">
-              <strong className="block text-3xl font-black text-amber-600">{pendingCount}</strong>
+              <strong className="block text-3xl font-black text-cyan-600">{pendingCount}</strong>
               <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">ca chờ duyệt</span>
             </div>
           </div>
@@ -91,12 +91,12 @@ export default function ShiftApprovalPage() {
         {loading ? <LoadingIndicator size="lg" label="Đang tải ca chờ duyệt..." /> : (
           <section className="grid grid-cols-1 gap-3">
             {shifts.length === 0 ? (
-              <div className="rounded-3xl border border-slate-100 bg-white p-10 text-center shadow-sm">
+              <div className="rounded-2xl border border-slate-100 bg-white p-10 text-center shadow-sm">
                 <p className="text-sm font-black text-slate-700">Không có ca nào đang chờ duyệt.</p>
                 <p className="mt-1 text-xs font-semibold text-slate-400">Khi nhân viên xét nghiệm/chẩn đoán hình ảnh đăng ký, ca sẽ xuất hiện ở đây.</p>
               </div>
             ) : shifts.map((shift) => (
-              <article key={shift.id} className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:border-amber-200 hover:shadow-md">
+              <article key={shift.id} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-colors hover:border-cyan-200 hover:shadow-sm">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -112,7 +112,7 @@ export default function ShiftApprovalPage() {
                     </div>
                   </div>
                   <div className="flex shrink-0 gap-2">
-                    <button disabled={Boolean(busyId)} onClick={() => approve(shift.id)} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-50">Duyệt</button>
+                    <button disabled={Boolean(busyId)} onClick={() => approve(shift.id)} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white shadow-sm hover:bg-cyan-700 disabled:opacity-50">Duyệt</button>
                     <button disabled={Boolean(busyId)} onClick={() => { setRejecting(shift); setReason(''); }} className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-black text-rose-700 hover:bg-rose-100 disabled:opacity-50">Từ chối</button>
                   </div>
                 </div>
@@ -123,8 +123,8 @@ export default function ShiftApprovalPage() {
 
         {rejecting && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-            <form onSubmit={reject} className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl">
-              <div className="bg-gradient-to-r from-rose-600 to-orange-500 p-5">
+            <form onSubmit={reject} className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl">
+              <div className="bg-rose-600 p-5">
                 <h3 className="text-lg font-black text-white">Từ chối ca trực</h3>
                 <p className="mt-1 text-xs font-semibold text-rose-50">Lý do là tùy chọn nhưng vẫn được hiển thị trong lịch sử của nhân viên.</p>
               </div>
@@ -133,7 +133,7 @@ export default function ShiftApprovalPage() {
                   {rejecting.staff?.fullName} · {formatDateTime(rejecting.startTime)}
                 </div>
                 <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500">Lý do từ chối <span className="text-slate-400">(có thể để trống)</span></label>
-                <textarea value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={4} placeholder="VD: Ca này trùng với lịch bảo trì thiết bị..." className="w-full resize-none rounded-2xl border border-slate-200 p-3 text-sm font-semibold outline-none transition-all focus:border-rose-400 focus:ring-2 focus:ring-rose-100" />
+                <textarea value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={4} placeholder="VD: Ca này trùng với lịch bảo trì thiết bị..." className="w-full resize-none rounded-2xl border border-slate-200 p-3 text-sm font-semibold outline-none transition-colors focus:border-rose-400 focus:ring-2 focus:ring-rose-100" />
                 <div className="flex gap-2 pt-2">
                   <button type="button" onClick={() => setRejecting(null)} className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50">Hủy</button>
                   <button type="submit" disabled={Boolean(busyId)} className="flex-1 rounded-xl bg-rose-600 py-2.5 text-xs font-black text-white hover:bg-rose-700 disabled:opacity-50">Xác nhận từ chối</button>

@@ -13,7 +13,7 @@ export default function ReceptionistQueuePage() {
   return (
     <DashboardLayout user={user} navItems={FRONTDESK_NAV_ITEMS} activeItem="visit-queue" onNavigate={(id) => navigate(frontdeskRouteFor(id))} onLogout={logout}>
       <div className="max-w-7xl mx-auto space-y-5">
-        <section className="rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
+        <section className="rounded-2xl border border-cyan-100 bg-white p-6 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <p className="text-[10px] font-black text-cyan-600 uppercase tracking-[0.18em]">Hàng đợi</p>

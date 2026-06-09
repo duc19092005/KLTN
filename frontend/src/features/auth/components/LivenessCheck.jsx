@@ -491,17 +491,17 @@ export default function LivenessCheck({
     if (allPassedUI) return 'bg-emerald-50 border-emerald-100 text-emerald-700';
     if (!blinkVerified && status === 'active') return 'bg-cyan-50 border-cyan-100 text-cyan-700';
     if (distanceWarn || (!faceDetected && status === 'active')) return 'bg-amber-50 border-amber-100/70 text-amber-700';
-    return 'bg-blue-50/70 border-blue-100/50 text-blue-800';
+    return 'bg-cyan-50/70 border-cyan-100/50 text-cyan-800';
   };
 
   // Đồng bộ màu đường viền của kén quét mượt mà bằng CSS transitions
   const getRingColorStyle = () => {
-    if (status === 'loading') return 'ring-slate-100/80 shadow-slate-100/40';
-    if (allPassedUI) return 'ring-emerald-500/30 shadow-emerald-100';
-    if (!blinkVerified && status === 'active') return 'ring-cyan-500/30 shadow-cyan-100';
-    if (distanceWarn || (!faceDetected && status === 'active')) return 'ring-amber-500/30 shadow-amber-100';
-    if (displayProgress > 0) return 'ring-blue-600/30 shadow-blue-100';
-    return 'ring-slate-200/60 shadow-slate-100/30';
+    if (status === 'loading') return 'ring-slate-100/80';
+    if (allPassedUI) return 'ring-emerald-500/30';
+    if (!blinkVerified && status === 'active') return 'ring-cyan-500/30';
+    if (distanceWarn || (!faceDetected && status === 'active')) return 'ring-amber-500/30';
+    if (displayProgress > 0) return 'ring-cyan-600/30';
+    return 'ring-slate-200/60';
   };
 
   const currentDirection = directions[displayIdx];
@@ -515,20 +515,20 @@ export default function LivenessCheck({
   };
 
   return (
-    <div className="w-full max-w-[480px] mx-auto p-6 bg-white border border-slate-100 rounded-3xl shadow-[0_20px_50px_rgba(59,130,246,0.04)] font-sans antialiased selection:bg-blue-50 selection:text-blue-700">
+    <div className="w-full max-w-[480px] mx-auto p-6 bg-white border border-slate-100 rounded-2xl shadow-[0_20px_50px_rgba(59,130,246,0.04)] font-sans antialiased selection:bg-cyan-50 selection:text-cyan-700">
 
       {/* Header Panel */}
       <div className="flex items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100/80">
         <div className="flex items-center gap-2.5">
-          <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+          <div className="w-2 h-2 rounded-full bg-cyan-600 animate-pulse" />
           <div>
-            <p className="text-[10px] font-bold text-blue-600/80 uppercase tracking-widest tracking-wider">Hệ thống nhận diện y tế</p>
+            <p className="text-[10px] font-bold text-cyan-600/80 uppercase tracking-widest tracking-wider">Hệ thống nhận diện y tế</p>
             <h3 className="text-base font-bold text-slate-800 tracking-tight">
               {isEnrollMode ? 'Khởi Tạo Sinh Trắc Học' : 'Xác Minh Khuôn Mặt'}
             </h3>
           </div>
         </div>
-        <div className="px-3 py-1 text-xs font-bold text-blue-700 bg-blue-50/60 border border-blue-100/60 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+        <div className="px-3 py-1 text-xs font-bold text-cyan-700 bg-cyan-50/60 border border-cyan-100/60 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
           Tiến trình: {Math.min(displayIdx + 1, directions.length)}/{directions.length}
         </div>
       </div>
@@ -540,7 +540,7 @@ export default function LivenessCheck({
         <div className="absolute inset-4 border border-dashed border-slate-200/50 rounded-xl pointer-events-none opacity-50" />
 
         {/* Kén Oval quét Camera (Chứa Video gốc và các vòng trạng thái) */}
-        <div className={`relative w-[210px] h-[260px] rounded-[105px/130px] bg-slate-950 flex items-center justify-center transition-all duration-500 ring-8 ${getRingColorStyle()} z-10`}>
+        <div className={`relative w-[210px] h-[260px] rounded-[105px/130px] bg-slate-950 flex items-center justify-center transition-colors duration-500 ring-8 ${getRingColorStyle()} z-10`}>
 
           {/* Lớp Mặt nạ chứa camera */}
           <div className="absolute inset-0 overflow-hidden rounded-inherit">
@@ -558,21 +558,21 @@ export default function LivenessCheck({
 
             {/* Thanh Quét Laser Chạy Chậm dọc khuôn mặt */}
             {status === 'active' && !allPassedUI && (
-              <div className="absolute left-[5%] right-[5%] h-[1.5px] bg-gradient-to-r from-transparent via-blue-400 to-transparent shadow-[0_0_8px_#3b82f6] opacity-90 animate-scan-line pointer-events-none" />
+              <div className="absolute left-[5%] right-[5%] h-[1.5px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_8px_#06b6d4] opacity-90 animate-scan-line pointer-events-none" />
             )}
           </div>
 
           {/* Màn kính phủ mờ khi Đang tải tài nguyên */}
           {status === 'loading' && (
             <div className="absolute inset-0 bg-slate-900/95 backdrop-blur-md rounded-inherit flex flex-col items-center justify-center z-20">
-              <LoadingIndicator size="md" tone="blue" />
+              <LoadingIndicator size="md" tone="cyan" />
               <p className="text-[11px] font-semibold text-slate-400 mt-3 tracking-wide">Đang khởi tạo mô hình AI...</p>
             </div>
           )}
 
           {/* Màn kính phủ xanh khi Xác thực Thành công hoàn toàn */}
           {allPassedUI && (
-            <div className="absolute inset-0 bg-emerald-600/95 backdrop-blur-sm rounded-inherit flex flex-col items-center justify-center z-20 animate-in zoom-in-95 duration-300">
+            <div className="absolute inset-0 bg-cyan-600/95 backdrop-blur-sm rounded-inherit flex flex-col items-center justify-center z-20 animate-in zoom-in-95 duration-300">
               <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-md mb-2 animate-bounce">
                 <Check className="w-5 h-5 text-emerald-600" strokeWidth={4} />
               </div>
@@ -582,7 +582,7 @@ export default function LivenessCheck({
 
           {/* Mũi tên nổi hướng dẫn quay đầu thiết kế dạng Bubble Cao Cấp */}
           {status === 'active' && !allPassedUI && faceDetected && !distanceWarn && currentDirection && currentDirection !== 'center' && (
-            <div className={`absolute w-10 h-10 bg-blue-600 text-white rounded-full shadow-lg shadow-blue-200/40 flex items-center justify-center border border-blue-400/20 z-30 ${arrowPositionClasses[currentDirection]}`}>
+            <div className={`absolute w-10 h-10 bg-cyan-600 text-white rounded-full shadow-sm flex items-center justify-center border border-cyan-400/20 z-30 ${arrowPositionClasses[currentDirection]}`}>
               {renderArrow(currentDirection)}
             </div>
           )}
@@ -593,7 +593,7 @@ export default function LivenessCheck({
       <div className="mt-6 flex flex-col items-center">
 
         {/* Hộp thông báo phản hồi động (Dynamic Feedback Card) */}
-        <div className={`w-full py-3.5 px-4 rounded-2xl border text-center transition-all duration-300 min-h-[52px] flex items-center justify-center ${getFeedbackStateClasses()}`}>
+        <div className={`w-full py-3.5 px-4 rounded-2xl border text-center transition-colors duration-300 min-h-[52px] flex items-center justify-center ${getFeedbackStateClasses()}`}>
           <p className="text-sm font-bold tracking-tight leading-snug">
             {message}
           </p>
@@ -608,8 +608,8 @@ export default function LivenessCheck({
               return (
                 <div
                   key={`${dir}-${idx}`}
-                  className={`h-2 rounded-full transition-all duration-300
-                    ${isPassed ? 'w-6 bg-emerald-500 shadow-sm shadow-emerald-100' : isCurrent ? 'w-4 bg-blue-600 ring-4 ring-blue-100' : 'w-2 bg-slate-200'}`}
+                  className={`h-2 rounded-full transition-colors duration-300
+                    ${isPassed ? 'w-6 bg-emerald-500 shadow-sm' : isCurrent ? 'w-4 bg-cyan-600 ring-4 ring-cyan-100' : 'w-2 bg-slate-200'}`}
                 />
               );
             })}
@@ -620,7 +620,7 @@ export default function LivenessCheck({
         {status === 'active' && !allPassedUI && displayProgress > 0 && (
           <div className="w-full max-w-[180px] h-1 bg-slate-100 rounded-full mt-4 overflow-hidden">
             <div
-              className="h-full bg-blue-600 transition-all duration-70 linear rounded-full shadow-sm"
+              className="h-full bg-cyan-600 transition-colors duration-70 linear rounded-full shadow-sm"
               style={{ width: `${displayProgress}%` }}
             />
           </div>
@@ -631,7 +631,7 @@ export default function LivenessCheck({
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="w-full mt-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-3 px-4 rounded-xl text-xs transition-colors shadow-sm outline-none"
+            className="w-full mt-4 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 px-4 rounded-xl text-xs transition-colors shadow-sm outline-none"
           >
             Khởi động lại Camera cấu hình
           </button>

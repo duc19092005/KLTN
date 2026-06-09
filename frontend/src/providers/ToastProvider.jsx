@@ -34,33 +34,31 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={{ success, error, info, addToast }}>
       {children}
-      {/* Self-contained CSS keyframes */}
       <style>{`
         @keyframes toast-in {
           from {
-            transform: translateX(120%);
+            transform: translateY(-8px);
             opacity: 0;
           }
           to {
-            transform: translateX(0);
+            transform: translateY(0);
             opacity: 1;
           }
         }
       `}</style>
-      
-      {/* Toast container */}
-      <div className="fixed top-5 right-5 z-[9999] flex flex-col gap-3 pointer-events-none max-w-sm w-full p-4 md:p-0">
+
+      <div className="fixed right-4 top-4 z-[9999] flex w-full max-w-sm flex-col gap-3 p-2 pointer-events-none sm:right-5 sm:top-5 sm:p-0">
         {toasts.map((toast) => {
-          let bg = 'bg-white border-slate-200 text-slate-800 shadow-xl';
+          let bg = 'bg-white border-slate-200 text-slate-800 shadow-sm';
           let iconColor = 'text-cyan-500';
           let Icon = Info;
 
           if (toast.type === 'success') {
-            bg = 'bg-emerald-50 border-emerald-200 text-emerald-900 shadow-lg shadow-emerald-50/50';
+            bg = 'bg-emerald-50 border-emerald-200 text-emerald-900 shadow-sm';
             iconColor = 'text-emerald-500';
             Icon = CheckCircle2;
           } else if (toast.type === 'error') {
-            bg = 'bg-rose-50 border-rose-200 text-rose-950 shadow-lg shadow-rose-50/50';
+            bg = 'bg-rose-50 border-rose-200 text-rose-950 shadow-sm';
             iconColor = 'text-rose-500';
             Icon = XCircle;
           }
@@ -68,10 +66,11 @@ export function ToastProvider({ children }) {
           return (
             <div
               key={toast.id}
-              className={`pointer-events-auto flex items-start gap-3 rounded-2xl border p-4 transition-all duration-300 transform translate-y-0 ${bg}`}
+              className={`pointer-events-auto flex items-start gap-3 rounded-xl border p-4 transition-colors duration-200 ${bg}`}
               style={{
-                animation: 'toast-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                animation: 'toast-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards',
               }}
+              role="status"
             >
               <Icon className={`h-5 w-5 flex-shrink-0 mt-0.5 ${iconColor}`} strokeWidth={2} />
               <div className="flex-1 text-sm font-semibold leading-relaxed">
@@ -79,7 +78,8 @@ export function ToastProvider({ children }) {
               </div>
               <button
                 onClick={() => remove(toast.id)}
-                className="text-slate-400 hover:text-slate-600 transition-colors mt-0.5"
+                className="mt-0.5 rounded-lg p-1 text-slate-400 transition-colors hover:bg-white/70 hover:text-slate-600"
+                aria-label="Đóng thông báo"
               >
                 <X className="h-4 w-4" strokeWidth={2} />
               </button>

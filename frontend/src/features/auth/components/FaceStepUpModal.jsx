@@ -57,11 +57,11 @@ export default function FaceStepUpModal({ mode = 'ticket', action, resourceId, s
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[94vh] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+      <div className="flex max-h-[94vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
         <div className="shrink-0 border-b border-slate-100 p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600">Xác thực bảo mật</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-600">Xác thực bảo mật</p>
               <h3 className="mt-1 text-xl font-black text-slate-950">{title || 'Quét khuôn mặt để xác nhận'}</h3>
               <p className="mt-1 text-sm text-slate-500">
                 {description || 'Thao tác này rất nhạy cảm và không thể hoàn tác. Vui lòng quét khuôn mặt để xác nhận chính bạn đang thực hiện.'}
@@ -73,12 +73,12 @@ export default function FaceStepUpModal({ mode = 'ticket', action, resourceId, s
 
         <div className="flex-1 overflow-y-auto bg-slate-50/60 p-5">
           {error && (
-            <div className="mb-4 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div>
+            <div className="mb-4 rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">{error}</div>
           )}
 
           {phase === 'submitting' ? (
             <div className="flex flex-col items-center justify-center py-10">
-              <LoadingIndicator size="lg" tone="blue" />
+              <LoadingIndicator size="lg" tone="cyan" />
               <p className="mt-4 text-sm font-bold text-slate-700">Đang xác thực và cấp vé bảo mật…</p>
             </div>
           ) : (
@@ -94,7 +94,7 @@ export default function FaceStepUpModal({ mode = 'ticket', action, resourceId, s
           {phase === 'error' && (
             <button
               onClick={() => { setError(''); setAttempt((n) => n + 1); setPhase('scan'); }}
-              className="mt-4 w-full rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-100 hover:bg-blue-700"
+              className="mt-4 w-full rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700"
             >
               Thử lại
             </button>

@@ -1,17 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ethers } from 'ethers';
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  KeyRound,
+  LockKeyhole,
+  ShieldCheck,
+  Stethoscope,
+  User,
+  UserPlus,
+  Wallet,
+  X,
+} from 'lucide-react';
 import { useAuth } from '../../../providers/AuthProvider';
 import { authService } from '../apis/authService';
-import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { getDashboardRoute } from '../../../shared/constants/roleRoutes';
 import { useToast } from '../../../providers/ToastProvider';
+import { Button, FormField, Input } from '../../../shared/components/ui';
+
+const MODES = [
+  { id: 'staff', label: 'Nhân sự', Icon: Stethoscope },
+  { id: 'wallet', label: 'Ví Admin', Icon: Wallet },
+  { id: 'invite', label: 'Mã mời', Icon: UserPlus },
+];
 
 export default function LoginPage({ isModal = false, onClose = null, initialMode = 'staff' }) {
   const navigate = useNavigate();
   const toast = useToast();
   const { loginWithWallet, loginWithInvite, loginWithPassword, loading } = useAuth();
-  const [mode, setMode] = useState(initialMode); // staff, wallet, invite
+  const [mode, setMode] = useState(initialMode);
   const [inviteToken, setInviteToken] = useState('');
   const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [busy, setBusy] = useState(false);
@@ -22,6 +41,15 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
   }, [initialMode]);
 
   const isFormDisabled = busy || loading;
+
+  const routeAfterLogin = (result) => {
+    if (!result.user?.hasFace) return navigate('/authenticate', { replace: true });
+    if (result.requirePasswordChange) return navigate('/change-password', { replace: true });
+    if (result.requireVerification || result.requireFaceRegistration || result.requireFaceVerification) {
+      return navigate('/authenticate', { replace: true });
+    }
+    return navigate(getDashboardRoute(result.user?.role), { replace: true });
+  };
 
   const handleWalletLogin = async () => {
     if (!window.ethereum) {
@@ -37,15 +65,7 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
       const signature = await signer.signMessage(challenge.data.message);
       const result = await loginWithWallet(address, signature, challenge.data.message);
       if (!result.success) throw new Error(result.error);
-      // First-login order: scan face FIRST so the user is biometrically known to the system
-      // before they set a permanent password. Otherwise a leaked invite/temp credential alone
-      // would let an attacker fully take over the account.
-      if (!result.user?.hasFace) return navigate('/authenticate', { replace: true });
-      if (result.requirePasswordChange) return navigate('/change-password', { replace: true });
-      if (result.requireVerification || result.requireFaceRegistration || result.requireFaceVerification) {
-        return navigate('/authenticate', { replace: true });
-      }
-      navigate(getDashboardRoute(result.user?.role), { replace: true });
+      routeAfterLogin(result);
     } catch (err) {
       toast.error(err.response?.data?.message || err.message || 'Xác thực ví thất bại.');
     } finally {
@@ -73,15 +93,7 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
       setBusy(true);
       const result = await loginWithPassword(credentials.username.trim(), credentials.password);
       if (!result.success) throw new Error(result.error);
-      // First-login order: scan face FIRST so the user is biometrically known to the system
-      // before they set a permanent password. Otherwise a leaked invite/temp credential alone
-      // would let an attacker fully take over the account.
-      if (!result.user?.hasFace) return navigate('/authenticate', { replace: true });
-      if (result.requirePasswordChange) return navigate('/change-password', { replace: true });
-      if (result.requireFaceRegistration || result.requireFaceVerification) {
-        return navigate('/authenticate', { replace: true });
-      }
-      navigate(getDashboardRoute(result.user?.role), { replace: true });
+      routeAfterLogin(result);
     } catch (err) {
       toast.error(err.response?.data?.message || err.message || 'Tên đăng nhập hoặc mật khẩu không hợp lệ.');
     } finally {
@@ -89,82 +101,52 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
     }
   };
 
-  const cardContent = (
-    <div className="bg-[#ffffff] shadow-[0px_20px_40px_rgba(99,115,193,0.08)] rounded-2xl w-full max-w-[480px] p-8 md:p-10 relative overflow-hidden backdrop-blur-sm border border-[#e4e7fe]/50">
+  const card = (
+    <section className="relative w-full max-w-[480px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-xl sm:p-8">
       {isModal && (
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 text-[#757682] hover:text-[#4656a2] transition-colors z-20 flex items-center justify-center p-1 rounded-full hover:bg-slate-100"
+          className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"
           aria-label="Đóng hộp thoại"
         >
-          <span className="material-symbols-outlined text-[20px]">close</span>
+          <X className="h-4 w-4" />
         </button>
       )}
-      
-      {/* Brand Header */}
-      <div className="text-center mb-8 flex flex-col items-center">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#dde1ff] text-[#4656a2] mb-4">
-          <span className="material-symbols-outlined fill text-[28px]">medical_services</span>
+
+      <div className="mb-7 text-center">
+        <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-cyan-50 text-cyan-700 ring-1 ring-cyan-100">
+          <ShieldCheck className="h-6 w-6" strokeWidth={2.25} />
         </div>
-        <h1 className="text-2xl font-bold text-[#4656a2] tracking-tight">Định danh Y tế</h1>
-        <p className="text-sm font-semibold text-[#454651] mt-2">Cổng truy cập bảo mật y tế</p>
+        <h1 className="text-2xl font-black tracking-tight text-slate-950">Hospital OS</h1>
+        <p className="mt-2 text-sm font-semibold text-slate-500">Cổng truy cập bảo mật y tế</p>
       </div>
 
-      {/* Contextual Tabs / Segmented Control */}
-      <div className="flex bg-[#f3f2ff] p-1 rounded-lg mb-8 shadow-inner border border-[#ebedff]">
-        <button
-          type="button"
-          onClick={() => setMode('staff')}
-          className={`flex-1 py-2.5 px-4 text-center rounded-md font-semibold text-xs transition-all flex items-center justify-center gap-1.5 ${
-            mode === 'staff'
-              ? 'bg-[#ffffff] shadow-sm text-[#4656a2]'
-              : 'text-[#454651] hover:text-[#4656a2]'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[18px]">medical_services</span>
-          <span>Nhân sự</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('wallet')}
-          className={`flex-1 py-2.5 px-4 text-center rounded-md font-semibold text-xs transition-all flex items-center justify-center gap-1.5 ${
-            mode === 'wallet'
-              ? 'bg-[#ffffff] shadow-sm text-[#4656a2]'
-              : 'text-[#454651] hover:text-[#4656a2]'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
-          <span>Ví Admin</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('invite')}
-          className={`flex-1 py-2.5 px-4 text-center rounded-md font-semibold text-xs transition-all flex items-center justify-center gap-1.5 ${
-            mode === 'invite'
-              ? 'bg-[#ffffff] shadow-sm text-[#4656a2]'
-              : 'text-[#454651] hover:text-[#4656a2]'
-          }`}
-        >
-          <span className="material-symbols-outlined fill text-[18px]">group_add</span>
-          <span>Mã mời</span>
-        </button>
+      <div className="mb-7 grid grid-cols-3 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+        {MODES.map(({ id, label, Icon }) => {
+          const active = mode === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setMode(id)}
+              className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-2.5 text-xs font-black transition-colors ${
+                active ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <Icon className="h-4 w-4" strokeWidth={2.25} />
+              <span>{label}</span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* TAB CONTENT: Staff Login */}
       {mode === 'staff' && (
-        <form onSubmit={handleStaffLogin} className="space-y-5">
-          {/* Email/Username Field */}
-          <div>
-            <label className="block font-semibold text-xs text-[#454651] mb-1.5" htmlFor="username">
-              Email hoặc tên đăng nhập
-            </label>
+        <form onSubmit={handleStaffLogin} className="space-y-4">
+          <FormField label="Email hoặc tên đăng nhập" htmlFor="username">
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#757682]">
-                <span className="material-symbols-outlined text-[20px]">person</span>
-              </div>
-              <input
-                className="w-full pl-10 pr-4 py-3 bg-[#faf8ff] border border-[#c6c5d3] focus:border-2 focus:border-[#4656a2] rounded-lg text-sm text-[#171b2b] outline-none transition-all placeholder:text-[#c6c5d3]"
+              <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
                 id="username"
                 name="username"
                 value={credentials.username}
@@ -173,52 +155,40 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
                 required
                 type="text"
                 disabled={isFormDisabled}
+                className="pl-10"
               />
             </div>
-          </div>
+          </FormField>
 
-          {/* Password Field */}
-          <div>
-            <label className="block font-semibold text-xs text-[#454651] mb-1.5" htmlFor="password">
-              Mật khẩu
-            </label>
+          <FormField label="Mật khẩu" htmlFor="password">
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#757682]">
-                <span className="material-symbols-outlined text-[20px]">lock</span>
-              </div>
-              <input
-                className="w-full pl-10 pr-10 py-3 bg-[#faf8ff] border border-[#c6c5d3] focus:border-2 focus:border-[#4656a2] rounded-lg text-sm text-[#171b2b] outline-none transition-all placeholder:text-[#c6c5d3]"
+              <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
                 id="password"
                 name="password"
                 value={credentials.password}
                 onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
-                placeholder="••••••••"
+                placeholder="Nhập mật khẩu"
                 required
                 type={showPassword ? 'text' : 'password'}
                 disabled={isFormDisabled}
+                className="pl-10 pr-10"
               />
               <button
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#757682] hover:text-[#4656a2] transition-colors"
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 transition-colors hover:text-cyan-700"
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
+                onClick={() => setShowPassword((value) => !value)}
+                aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
               >
-                <span className="material-symbols-outlined text-[20px]">
-                  {showPassword ? 'visibility' : 'visibility_off'}
-                </span>
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-          </div>
+          </FormField>
 
-          {/* Utilities Row */}
-          <div className="flex items-center justify-between mt-2 text-xs">
-            <label className="flex items-center gap-2 cursor-pointer group">
-              <input
-                className="w-4 h-4 rounded border-[#c6c5d3] text-[#4656a2] focus:ring-[#4656a2] focus:ring-offset-[#ffffff] bg-[#faf8ff] transition-all"
-                type="checkbox"
-              />
-              <span className="font-medium text-[#454651] group-hover:text-[#171b2b] transition-colors">
-                Ghi nhớ đăng nhập
-              </span>
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <label className="flex items-center gap-2 font-semibold text-slate-500">
+              <input className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500" type="checkbox" />
+              Ghi nhớ đăng nhập
             </label>
             <button
               type="button"
@@ -226,231 +196,95 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
                 if (isModal && onClose) onClose();
                 navigate('/forgot-password');
               }}
-              className="font-semibold text-[#4656a2] hover:text-[#5f6fbd] transition-colors"
+              className="font-black text-cyan-700 hover:text-cyan-800"
             >
               Quên mật khẩu?
             </button>
           </div>
 
-          {/* Submit Button */}
-          <div className="pt-2">
-            <button
-              disabled={isFormDisabled || !credentials.username.trim() || !credentials.password}
-              className="w-full bg-[#4656a2] hover:bg-[#5f6fbd] text-white font-bold text-sm py-3.5 rounded-lg shadow-sm hover:shadow-[0px_4px_8px_rgba(70,86,162,0.2)] transition-all hover:-translate-y-[1px] flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              type="submit"
-            >
-              {busy ? (
-                <LoadingIndicator size="sm" tone="white" />
-              ) : (
-                <>
-                  Đăng nhập hệ thống
-                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                </>
-              )}
-            </button>
-          </div>
-
+          <Button
+            type="submit"
+            className="w-full"
+            size="lg"
+            loading={busy}
+            disabled={isFormDisabled || !credentials.username.trim() || !credentials.password}
+          >
+            Đăng nhập hệ thống
+            <ArrowRight className="h-4 w-4" />
+          </Button>
         </form>
       )}
 
-      {/* TAB CONTENT: Wallet Login */}
       {mode === 'wallet' && (
-        <div className="text-center flex flex-col items-center py-4">
-          {/* Hero Icon */}
-          <div className="relative w-24 h-24 mb-6 flex items-center justify-center">
-            <div className="absolute inset-0 bg-[#dde1ff] rounded-full opacity-50 blur-xl"></div>
-            <div className="relative z-10 w-16 h-16 bg-[#dee1f8] rounded-full flex items-center justify-center border-4 border-[#ffffff] shadow-sm">
-              <span className="material-symbols-outlined text-[#4656a2] text-3xl">account_balance_wallet</span>
-            </div>
+        <div className="text-center">
+          <div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-2xl border border-cyan-100 bg-cyan-50 text-cyan-700">
+            <Wallet className="h-7 w-7" />
           </div>
-
-          {/* Instructions */}
-          <h2 className="text-lg font-bold text-[#171b2b] mb-3">Cần xác thực quản trị</h2>
-          <p className="text-xs font-semibold text-[#454651] mb-8 max-w-[280px] mx-auto leading-relaxed">
-            Vui lòng kết nối MetaMask hoặc ví Web3 tương thích để truy cập trang quản trị an toàn.
+          <h2 className="text-lg font-black text-slate-950">Xác thực quản trị</h2>
+          <p className="mx-auto mt-2 max-w-xs text-sm font-semibold leading-relaxed text-slate-500">
+            Kết nối MetaMask hoặc ví Web3 tương thích để truy cập khu vực quản trị.
           </p>
-
-          {/* Status Chip / Notice */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#f3f2ff] text-[#454651] font-semibold text-xs mb-8 border border-[#dee1f8]">
-            <span className="w-2 h-2 rounded-full bg-[#545d82]"></span>
-            Mạng: Hardhat Local / Mainnet
+          <div className="my-6 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-600">
+            <span className="h-2 w-2 rounded-full bg-cyan-600" />
+            Mạng blockchain audit
           </div>
-
-          {/* Primary Action Button */}
-          <button
-            onClick={handleWalletLogin}
-            disabled={isFormDisabled}
-            className="w-full bg-[#4656a2] hover:bg-[#4959a5] text-white font-bold text-sm py-4 px-6 rounded-xl shadow-md hover:shadow-lg hover:-translate-y-[1px] transition-all duration-200 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {busy ? (
-              <LoadingIndicator size="sm" tone="white" />
-            ) : (
-              <>
-                <span className="material-symbols-outlined text-[20px]">vpn_key</span>
-                Kết nối ví &amp; Ký xác thực
-              </>
-            )}
-          </button>
-
-          {/* Help Link */}
-          <a className="mt-6 text-xs text-[#757682] hover:text-[#4656a2] transition-colors hover:underline" href="#">
-            Cần hỗ trợ kết nối ví?
-          </a>
+          <Button onClick={handleWalletLogin} disabled={isFormDisabled} loading={busy} size="lg" className="w-full">
+            <KeyRound className="h-4 w-4" />
+            Kết nối ví và ký xác thực
+          </Button>
         </div>
       )}
 
-      {/* TAB CONTENT: Invite Code Login */}
       {mode === 'invite' && (
-        <form onSubmit={handleInviteLogin} className="flex flex-col gap-6 py-2">
-          <div className="flex flex-col gap-2 relative">
-            <label className="font-semibold text-xs text-[#171b2b]" htmlFor="invite-code">
-              Mã xác thực
-            </label>
+        <form onSubmit={handleInviteLogin} className="space-y-5">
+          <FormField label="Mã xác thực" htmlFor="invite-code" hint="Mã mời được cấp phát nội bộ bởi quản trị viên.">
             <div className="relative">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#c6c5d3]">
-                vpn_key
-              </span>
-              <input
-                autocomplete="off"
-                className="w-full pl-12 pr-4 py-3 bg-[#faf8ff] border border-[#c6c5d3] rounded-lg text-sm text-[#171b2b] focus:outline-none focus:border-[#4656a2] focus:ring-1 focus:ring-[#4656a2] transition-all placeholder:text-[#757682]/70 shadow-sm"
+              <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
                 id="invite-code"
+                autoComplete="off"
                 value={inviteToken}
                 onChange={(e) => setInviteToken(e.target.value)}
-                placeholder="Nhập mã mời của bạn..."
+                placeholder="Nhập mã mời của bạn"
                 type="text"
                 disabled={isFormDisabled}
                 required
+                className="pl-10"
               />
             </div>
-          </div>
-
-          <div className="pt-2">
-            <button
-              disabled={isFormDisabled || !inviteToken.trim()}
-              className="w-full py-3.5 bg-[#4656a2] text-white font-bold text-sm rounded-lg shadow-sm hover:translate-y-[-1px] hover:shadow-[0px_8px_16px_rgba(70,86,162,0.15)] transition-all active:translate-y-[1px] active:shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              type="submit"
-            >
-              {busy ? (
-                <LoadingIndicator size="sm" tone="white" />
-              ) : (
-                <>
-                  Xác thực mã mời
-                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          <div className="text-center mt-2">
-            <p className="text-xs text-[#454651] font-semibold leading-relaxed">
-              Mã mời được cấp phát nội bộ. Vui lòng liên hệ quản trị viên nếu bạn chưa có mã.
-            </p>
-          </div>
+          </FormField>
+          <Button
+            type="submit"
+            className="w-full"
+            size="lg"
+            loading={busy}
+            disabled={isFormDisabled || !inviteToken.trim()}
+          >
+            Xác thực mã mời
+            <ArrowRight className="h-4 w-4" />
+          </Button>
         </form>
       )}
-    </div>
+    </section>
   );
 
   if (isModal) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <style dangerouslySetInnerHTML={{__html: `
-          .hms-login-portal {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            --primary-fixed: #dde1ff;
-            --surface-container-lowest: #ffffff;
-            --surface-bright: #faf8ff;
-            --primary: #4656a2;
-            --surface-container: #ebedff;
-            --surface-container-high: #e4e7fe;
-            --surface-container-highest: #dee1f8;
-            --on-surface-variant: #454651;
-          }
-          .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-          }
-          .material-symbols-outlined.fill {
-            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-          }
-          @keyframes scaleUp {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
-          }
-          .animate-scale-up {
-            animation: scaleUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          }
-        `}} />
-        <div 
-          onClick={onClose}
-          className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300"
-        />
-        <div className="hms-login-portal relative z-10 w-full max-w-[480px] animate-scale-up">
-          {cardContent}
-        </div>
+        <div onClick={onClose} className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" />
+        <div className="relative z-10 w-full max-w-[480px] animate-fadeIn">{card}</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#faf8ff] text-[#171b2b] antialiased relative">
-      {/* Local styles for Plus Jakarta Sans and ambient background overlay */}
-      <style dangerouslySetInnerHTML={{__html: `
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
-        
-        .hms-login-portal {
-          font-family: 'Plus Jakarta Sans', sans-serif;
-          --primary-fixed: #dde1ff;
-          --surface-container-lowest: #ffffff;
-          --surface-bright: #faf8ff;
-          --primary: #4656a2;
-          --surface-container: #ebedff;
-          --surface-container-high: #e4e7fe;
-          --surface-container-highest: #dee1f8;
-          --on-surface-variant: #454651;
-        }
-        
-        .ambient-bg-login {
-          background: radial-gradient(circle at top left, var(--surface-container-highest, #dee1f8), transparent 40%),
-                      radial-gradient(circle at bottom right, var(--primary-fixed, #dde1ff), transparent 40%);
-          background-color: #faf8ff;
-        }
-
-        .material-symbols-outlined {
-          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-        .material-symbols-outlined.fill {
-          font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-      `}} />
-
-      <div className="hms-login-portal ambient-bg-login flex-grow flex flex-col justify-between min-h-screen">
-        {/* Main Content Area: Centered Login Canvas */}
-        <main className="flex-grow flex items-center justify-center px-6 py-12 relative z-10">
-          {cardContent}
-        </main>
-
-        {/* Decorative background ambient blobs */}
-        <div className="fixed top-[-10%] left-[-5%] w-[40vw] h-[40vw] rounded-full bg-[#cad2fe]/10 blur-[100px] pointer-events-none -z-10"></div>
-        <div className="fixed bottom-[-10%] right-[-5%] w-[50vw] h-[50vw] rounded-full bg-[#dde1ff]/20 blur-[120px] pointer-events-none -z-10"></div>
-
-        {/* Footer */}
-        <footer className="w-full py-10 bg-[#ffffff] relative z-10 border-t border-[#dee1f8]/30">
-          <div className="flex flex-col md:flex-row justify-between items-center px-10 max-w-[1280px] mx-auto gap-6 md:gap-0">
-            <div className="flex flex-col items-center md:items-start gap-2">
-              <span className="text-sm font-bold text-[#4656a2]">Định danh Y tế</span>
-              <p className="text-xs font-semibold text-[#545d82] text-center md:text-left">
-                © 2026 Hệ thống Định danh Y tế. Bảo lưu mọi quyền.
-              </p>
-            </div>
-            <nav className="flex flex-wrap justify-center gap-6">
-              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Chính sách bảo mật</span>
-              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Điều khoản sử dụng</span>
-              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Kiểm toán bảo mật</span>
-              <span className="text-xs font-semibold text-[#454651] hover:text-[#4656a2] hover:underline cursor-pointer transition-opacity duration-200">Hỗ trợ</span>
-            </nav>
-          </div>
-        </footer>
-      </div>
+    <div className="min-h-screen bg-slate-50 text-slate-950">
+      <main className="flex min-h-screen items-center justify-center px-4 py-10">
+        {card}
+      </main>
+      <footer className="border-t border-slate-200 bg-white px-6 py-6 text-center text-xs font-semibold text-slate-500">
+        © 2026 KLTN Hospital OS. Bảo mật sinh trắc học và toàn vẹn blockchain.
+      </footer>
     </div>
   );
 }

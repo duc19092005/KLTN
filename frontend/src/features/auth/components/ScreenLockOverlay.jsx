@@ -64,7 +64,7 @@ export default function ScreenLockOverlay({ user, onUnlock, onLogout }) {
     <div className="fixed inset-0 z-[80] flex flex-col items-center justify-center overflow-hidden bg-[#F4F7FA] text-slate-800">
       {/* Soft ambient backdrop (light) */}
       <div className="pointer-events-none absolute inset-0 opacity-80">
-        <div className="absolute -top-1/4 left-1/4 h-[60vh] w-[60vh] rounded-full bg-blue-200/40 blur-[120px]" />
+        <div className="absolute -top-1/4 left-1/4 h-[60vh] w-[60vh] rounded-full bg-cyan-200/40 blur-[120px]" />
         <div className="absolute bottom-0 right-1/4 h-[50vh] w-[50vh] rounded-full bg-cyan-200/40 blur-[120px]" />
       </div>
 
@@ -78,7 +78,7 @@ export default function ScreenLockOverlay({ user, onUnlock, onLogout }) {
         {phase === 'idle' && (
           <>
             <div className="flex flex-col items-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-xl font-black text-blue-600 ring-1 ring-blue-100 shadow-sm">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-cyan-50 text-xl font-black text-cyan-600 ring-1 ring-cyan-100 shadow-sm">
                 {initials}
               </div>
               <p className="mt-3 text-lg font-bold text-slate-900">{displayName}</p>
@@ -89,8 +89,8 @@ export default function ScreenLockOverlay({ user, onUnlock, onLogout }) {
             </div>
 
             {/* Explanatory description with a distinct ScanFace icon so the user knows what to do */}
-            <div className="mt-6 flex w-full items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+            <div className="mt-6 flex w-full items-start gap-3 rounded-2xl border border-cyan-100 bg-cyan-50/60 p-4">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-600 text-white shadow-sm">
                 <ScanFace className="h-5 w-5" strokeWidth={2} />
               </span>
               <div className="min-w-0">
@@ -103,7 +103,7 @@ export default function ScreenLockOverlay({ user, onUnlock, onLogout }) {
 
             <button
               onClick={() => setPhase('scan')}
-              className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3.5 text-sm font-black text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700"
+              className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-5 py-3.5 text-sm font-black text-white shadow-sm transition hover:bg-cyan-700"
             >
               <ScanFace className="h-4 w-4" strokeWidth={2.5} />
               Quét khuôn mặt để mở khóa
@@ -118,24 +118,24 @@ export default function ScreenLockOverlay({ user, onUnlock, onLogout }) {
         )}
 
         {(phase === 'scan' || phase === 'submitting' || phase === 'error') && (
-          <div className="w-full rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/50">
+          <div className="w-full rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
             {/* Heading with ScanFace so the scan step is clearly labeled */}
             <div className="mb-4 flex items-center gap-2.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-600 text-white shadow-sm">
                 <ScanFace className="h-5 w-5" strokeWidth={2} />
               </span>
               <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600">Mở khóa màn hình</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-600">Mở khóa màn hình</p>
                 <p className="text-sm font-bold text-slate-800">Quét khuôn mặt để xác minh</p>
               </div>
             </div>
 
             {error && (
-              <div className="mb-4 rounded-2xl border border-red-100 bg-red-50 p-3 text-sm font-bold text-red-700">{error}</div>
+              <div className="mb-4 rounded-2xl border border-rose-100 bg-rose-50 p-3 text-sm font-bold text-rose-700">{error}</div>
             )}
             {phase === 'submitting' ? (
               <div className="flex flex-col items-center justify-center py-10">
-                <LoadingIndicator size="lg" tone="blue" />
+                <LoadingIndicator size="lg" tone="cyan" />
                 <p className="mt-4 text-sm font-bold text-slate-700">Đang xác thực và mở khóa…</p>
               </div>
             ) : (
@@ -149,7 +149,7 @@ export default function ScreenLockOverlay({ user, onUnlock, onLogout }) {
             {phase === 'error' && (
               <button
                 onClick={() => { setError(''); setPhase('scan'); }}
-                className="mt-4 w-full rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white hover:bg-blue-700"
+                className="mt-4 w-full rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white hover:bg-cyan-700"
               >
                 Thử lại
               </button>

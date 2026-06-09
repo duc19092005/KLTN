@@ -35,7 +35,7 @@ export function Toggle({ id, checked, onChange, accent = '#4f46e5' }) {
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-400 ${
+      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-cyan-400 ${
         checked ? '' : 'bg-slate-200'
       }`}
       style={checked ? { backgroundColor: accent } : undefined}
@@ -60,7 +60,7 @@ export function Segmented({ value, onChange, options, accent = '#4f46e5' }) {
             key={opt.value}
             type="button"
             onClick={() => onChange(opt.value)}
-            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[13px] font-bold transition-all duration-200 ${
+            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[13px] font-bold transition-colors duration-200 ${
               active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
             style={active ? { color: accent } : undefined}
@@ -104,7 +104,7 @@ export function AccentPicker({ value, onChange, accents }) {
 // A section card with an icon header — mirrors the existing Card look on ProfilePage.
 export function SettingsCard({ icon: Icon, title, description, accent = '#4f46e5', children }) {
   return (
-    <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+    <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
       <div className="flex items-start gap-3.5">
         <span
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm"
@@ -133,7 +133,7 @@ export function RadioPicker({ value, onChange, options, accent = '#4f46e5' }) {
             key={opt.value}
             type="button"
             onClick={() => onChange(opt.value)}
-            className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-[13px] font-bold transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${
+            className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-[13px] font-bold transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${
               active
                 ? 'border-transparent text-white shadow-sm'
                 : 'border-slate-200 text-slate-600 bg-white hover:border-slate-300 hover:bg-slate-50'

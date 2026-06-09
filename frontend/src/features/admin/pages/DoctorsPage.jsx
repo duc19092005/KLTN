@@ -201,7 +201,7 @@ export default function DoctorsPage() {
         {loading ? <LoadingIndicator size="lg" label="Đang tải bác sĩ..." /> : (
           <>
             <SearchBar filters={filters} setFilters={setFilters} onSearch={search} />
-            <section className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+            <section className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
               <div className="p-5 border-b border-slate-100">
                 <h3 className="text-xl font-black text-slate-950">Danh sách bác sĩ</h3>
                 <p className="text-sm text-slate-500">Quản lý hồ sơ chuyên môn và phòng khám phụ trách.</p>
@@ -221,14 +221,14 @@ export default function DoctorsPage() {
   );
 }
 
-function Hero({ totalLabel, onCreate }) { return <section className="rounded-[28px] border border-indigo-100 bg-gradient-to-br from-white via-indigo-50 to-cyan-50 p-8 shadow-sm flex flex-col lg:flex-row lg:items-end justify-between gap-5"><div><p className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.24em] mb-3">Hệ thống bác sĩ</p><h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">Quản lý bác sĩ</h2><p className="mt-3 text-sm sm:text-base text-slate-600">Tạo mới đầy đủ tài khoản, hồ sơ nhân sự, chuyên khoa, chứng chỉ và phòng khám trong một bước.</p><span className="mt-4 inline-flex rounded-xl bg-white/80 px-3 py-1 text-xs font-black text-indigo-700 border border-indigo-100">{totalLabel}</span></div><div className="flex flex-wrap gap-3"><button onClick={onCreate} className="rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-indigo-100 hover:bg-indigo-700">+ Thêm bác sĩ</button></div></section>; }
-function SearchBar({ filters, setFilters, onSearch }) { return <form onSubmit={onSearch} className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-3 items-end"><Select label="Chuyên khoa" value={filters.specialty} onChange={(v) => setFilters({ ...filters, specialty: v })} empty="Tất cả chuyên khoa" options={SPECIALTIES} /><Input label="Tìm kiếm" value={filters.search} onChange={(v) => setFilters({ ...filters, search: v })} placeholder="Tên bác sĩ, chứng chỉ..." /><button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-black text-white hover:bg-slate-800">Tìm kiếm</button></form>; }
+function Hero({ totalLabel, onCreate }) { return <section className="rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-cyan-50 p-8 shadow-sm flex flex-col lg:flex-row lg:items-end justify-between gap-5"><div><p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.24em] mb-3">Hệ thống bác sĩ</p><h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">Quản lý bác sĩ</h2><p className="mt-3 text-sm sm:text-base text-slate-600">Tạo mới đầy đủ tài khoản, hồ sơ nhân sự, chuyên khoa, chứng chỉ và phòng khám trong một bước.</p><span className="mt-4 inline-flex rounded-xl bg-white/80 px-3 py-1 text-xs font-black text-cyan-700 border border-cyan-100">{totalLabel}</span></div><div className="flex flex-wrap gap-3"><button onClick={onCreate} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ Thêm bác sĩ</button></div></section>; }
+function SearchBar({ filters, setFilters, onSearch }) { return <form onSubmit={onSearch} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-3 items-end"><Select label="Chuyên khoa" value={filters.specialty} onChange={(v) => setFilters({ ...filters, specialty: v })} empty="Tất cả chuyên khoa" options={SPECIALTIES} /><Input label="Tìm kiếm" value={filters.search} onChange={(v) => setFilters({ ...filters, search: v })} placeholder="Tên bác sĩ, chứng chỉ..." /><button className="rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-black text-white hover:bg-cyan-700">Tìm kiếm</button></form>; }
 function DoctorRow({ doctor, onEdit, onViewDetails, busy }) {
   return (
     <article className="p-5 hover:bg-slate-50/70">
       <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr_1fr_0.9fr_240px] gap-4 lg:items-center">
         <div className="flex items-center gap-3">
-          <img src={doctor.staffProfile?.avatarUrl} alt={doctor.staffProfile?.fullName || 'Bác sĩ'} className="w-11 h-11 rounded-2xl object-cover border border-indigo-100 bg-indigo-50" />
+          <img src={doctor.staffProfile?.avatarUrl} alt={doctor.staffProfile?.fullName || 'Bác sĩ'} className="w-11 h-11 rounded-2xl object-cover border border-cyan-100 bg-cyan-50" />
           <div>
             <strong className="block text-slate-950">{doctor.staffProfile?.fullName}</strong>
             <span className="text-xs text-slate-500">{doctor.staffProfile?.user?.email}</span>
@@ -241,8 +241,8 @@ function DoctorRow({ doctor, onEdit, onViewDetails, busy }) {
           <BlockchainStatusBadge status={doctor.blockchainStatus} size="xs" />
         </div>
         <div className="lg:text-right flex justify-end gap-2">
-          <button type="button" disabled={busy} onClick={() => onViewDetails(doctor.id)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-indigo-600 hover:bg-indigo-50 disabled:opacity-50">Xem chi tiết</button>
-          <button type="button" disabled={busy} onClick={() => onEdit(doctor)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-50">Sửa</button>
+          <button type="button" disabled={busy} onClick={() => onViewDetails(doctor.id)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-cyan-600 hover:bg-cyan-50 disabled:opacity-50">Xem chi tiết</button>
+          <button type="button" disabled={busy} onClick={() => onEdit(doctor)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 disabled:opacity-50">Sửa</button>
         </div>
       </div>
     </article>
@@ -252,10 +252,10 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
   const isCreate = mode === 'create';
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
-      <form onSubmit={onSubmit} className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl space-y-5">
+      <form onSubmit={onSubmit} className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-5">
         <div className="flex justify-between gap-4">
           <div>
-            <p className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.18em]">Hồ sơ bác sĩ</p>
+            <p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.18em]">Hồ sơ bác sĩ</p>
             <h3 className="text-2xl font-black text-slate-950">{isCreate ? 'Thêm bác sĩ' : 'Cập nhật bác sĩ'}</h3>
             <p className="text-sm text-slate-500">
               {isCreate
@@ -286,7 +286,7 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
           <Select label="Trình độ" value={form.qualification} onChange={(v) => setForm({ ...form, qualification: v })} empty="Chọn trình độ" required options={QUALIFICATIONS} />
           <Input type="number" label="Số năm kinh nghiệm" value={form.yearsExperience} onChange={(v) => setForm({ ...form, yearsExperience: v })} />
         </div>
-        <button disabled={busy} className="w-full rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white hover:bg-indigo-700 disabled:opacity-70">
+        <button disabled={busy} className="w-full rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white hover:bg-cyan-700 disabled:opacity-70">
           {isCreate ? 'Tạo bác sĩ' : 'Lưu thay đổi'}
         </button>
       </form>
@@ -297,7 +297,7 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
 function SectionTitle({ title }) { return <h4 className="border-t border-slate-100 pt-4 text-sm font-black text-slate-800 first:border-t-0 first:pt-0">{title}</h4>; }
 function Pagination({ pagination, onPageChange }) { return <div className="flex items-center justify-between border-t border-slate-100 p-4"><p className="text-sm font-semibold text-slate-500">Trang {pagination.page}/{pagination.totalPages}</p><div className="flex gap-2"><SmallButton disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>Trước</SmallButton><SmallButton disabled={pagination.page >= pagination.totalPages} onClick={() => onPageChange(pagination.page + 1)}>Sau</SmallButton></div></div>; }
 function Info({ label, value }) { return <div><p className="text-[11px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className="text-sm font-bold text-slate-700">{value}</p></div>; }
-function Alert({ children }) { return <div className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-bold text-red-700">{children}</div>; }
-function SmallButton({ children, onClick, disabled }) { return <button type="button" disabled={disabled} onClick={onClick} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-50">{children}</button>; }
-function Input({ label, value, onChange, required, placeholder, type = 'text', disabled }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><input type={type} required={required} disabled={disabled} value={value || ''} min={type === 'number' ? '0' : undefined} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none disabled:opacity-60 disabled:cursor-not-allowed" /></label>; }
-function Select({ label, value, onChange, options, empty, required, disabled }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><select required={required} disabled={disabled} value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none disabled:opacity-60 disabled:cursor-not-allowed">{empty && <option value="">{empty}</option>}{options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>; }
+function Alert({ children }) { return <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">{children}</div>; }
+function SmallButton({ children, onClick, disabled }) { return <button type="button" disabled={disabled} onClick={onClick} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 disabled:opacity-50">{children}</button>; }
+function Input({ label, value, onChange, required, placeholder, type = 'text', disabled }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><input type={type} required={required} disabled={disabled} value={value || ''} min={type === 'number' ? '0' : undefined} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none disabled:opacity-60 disabled:cursor-not-allowed" /></label>; }
+function Select({ label, value, onChange, options, empty, required, disabled }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><select required={required} disabled={disabled} value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none disabled:opacity-60 disabled:cursor-not-allowed">{empty && <option value="">{empty}</option>}{options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>; }

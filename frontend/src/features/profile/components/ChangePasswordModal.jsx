@@ -46,11 +46,11 @@ export default function ChangePasswordModal({ onClose }) {
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={busy ? undefined : onClose} />
       <form
         onSubmit={submit}
-        className="relative z-10 w-full max-w-md rounded-3xl border border-slate-100 bg-white p-7 shadow-2xl space-y-5"
+        className="relative z-10 w-full max-w-md rounded-2xl border border-slate-100 bg-white p-7 shadow-xl space-y-5"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.22em] mb-1.5">Bảo mật tài khoản</p>
+            <p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.22em] mb-1.5">Bảo mật tài khoản</p>
             <h2 className="text-xl font-black text-slate-950">Đổi mật khẩu</h2>
           </div>
           <button
@@ -80,7 +80,7 @@ export default function ChangePasswordModal({ onClose }) {
           <button
             type="submit"
             disabled={busy || !form.currentPassword || !form.newPassword || !form.confirmPassword}
-            className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-black text-white hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-2"
+            className="rounded-xl bg-cyan-600 px-5 py-2.5 text-sm font-black text-white hover:bg-cyan-700 disabled:opacity-60 flex items-center gap-2"
           >
             {busy ? <LoadingIndicator size="sm" tone="white" /> : 'Cập nhật mật khẩu'}
           </button>
@@ -103,12 +103,12 @@ function Input({ id, label, value, onChange }) {
           onChange={(e) => onChange(e.target.value)}
           required
           minLength={6}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pr-11 text-sm outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pr-11 text-sm outline-none focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100"
         />
         <button
           type="button"
           onClick={() => setShow((s) => !s)}
-          className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-indigo-600"
+          className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-cyan-600"
           aria-label={show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
         >
           {show ? <EyeOff className="w-5 h-5" strokeWidth={1.8} /> : <Eye className="w-5 h-5" strokeWidth={1.8} />}

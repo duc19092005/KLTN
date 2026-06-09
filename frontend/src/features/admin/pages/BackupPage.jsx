@@ -21,8 +21,8 @@ const STATUS_TONE = {
   ANCHORED: 'border-emerald-100 bg-emerald-50 text-emerald-700',
   VERIFIED: 'border-emerald-100 bg-emerald-50 text-emerald-700',
   CREATED: 'border-amber-100 bg-amber-50 text-amber-700',
-  CORRUPT: 'border-red-100 bg-red-50 text-red-700',
-  FAILED: 'border-red-100 bg-red-50 text-red-700',
+  CORRUPT: 'border-rose-100 bg-rose-50 text-rose-700',
+  FAILED: 'border-rose-100 bg-rose-50 text-rose-700',
 };
 
 const STATUS_LABEL = {
@@ -174,7 +174,7 @@ export default function BackupPage() {
     >
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Hero */}
-        <section className="relative overflow-hidden rounded-[28px] border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-blue-50 p-8 shadow-sm">
+        <section className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-cyan-50 p-8 shadow-sm">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
             <div>
               <p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.24em] mb-3">Sao lưu & khôi phục</p>
@@ -192,15 +192,15 @@ export default function BackupPage() {
                 disabled={scanning}
                 className="rounded-2xl border border-cyan-200 bg-white px-5 py-3 text-sm font-black text-cyan-700 shadow-sm hover:bg-cyan-50 disabled:opacity-50"
               >
-                {scanning ? 'Đang quét…' : 'Quét toàn vẹn'}
+                {scanning ? 'Đang quét...' : 'Quét toàn vẹn'}
               </button>
               <button
                 id="backup-create-button"
                 onClick={handleCreate}
                 disabled={creating}
-                className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-cyan-100 hover:bg-cyan-700 disabled:opacity-50"
+                className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 disabled:opacity-50"
               >
-                {creating ? 'Đang tạo…' : 'Tạo backup ngay'}
+                {creating ? 'Đang tạo...' : 'Tạo backup ngay'}
               </button>
             </div>
           </div>
@@ -265,13 +265,13 @@ function ScanPanel({ scan, onRestoreAll, restoring }) {
   const tampered = scan.tampered || [];
   const ok = tampered.length === 0;
   return (
-    <section className={`rounded-3xl border p-6 shadow-sm ${ok ? 'border-emerald-100 bg-emerald-50/70' : 'border-red-100 bg-red-50/70'}`}>
+    <section className={`rounded-2xl border p-6 shadow-sm ${ok ? 'border-emerald-100 bg-emerald-50/70' : 'border-rose-100 bg-rose-50/70'}`}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className={`text-sm font-black ${ok ? 'text-emerald-800' : 'text-red-800'}`}>
+          <p className={`text-sm font-black ${ok ? 'text-emerald-800' : 'text-rose-800'}`}>
             {ok ? 'Dữ liệu toàn vẹn' : `Phát hiện ${tampered.length} bản ghi bị sửa lệch khỏi on-chain`}
           </p>
-          <p className={`mt-0.5 text-xs font-semibold ${ok ? 'text-emerald-700' : 'text-red-700'}`}>
+          <p className={`mt-0.5 text-xs font-semibold ${ok ? 'text-emerald-700' : 'text-rose-700'}`}>
             Đã đối chiếu {scan.totalChecked} bản ghi với snapshot đã neo · {scan.cleanCount} sạch ·{' '}
             quét lúc {formatTime(scan.scannedAt)}
           </p>
@@ -280,17 +280,17 @@ function ScanPanel({ scan, onRestoreAll, restoring }) {
           <button
             onClick={onRestoreAll}
             disabled={restoring}
-            className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-red-100 hover:bg-red-700 disabled:opacity-50"
+            className="rounded-2xl bg-rose-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-rose-700 disabled:opacity-50"
           >
-            {restoring ? 'Đang khôi phục…' : `Khôi phục phẫu thuật (${tampered.length})`}
+            {restoring ? 'Đang khôi phục...' : `Khôi phục phẫu thuật (${tampered.length})`}
           </button>
         )}
       </div>
 
       {!ok && (
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-red-100 bg-white">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-red-50/60 text-[11px] font-black uppercase tracking-wider text-red-500">
+        <div className="mt-4 overflow-x-auto rounded-2xl border border-rose-100 bg-white">
+          <table className="ui-table w-full text-left text-sm">
+            <thead className="bg-rose-50/60 text-[11px] font-black uppercase tracking-wider text-rose-500">
               <tr>
                 <th className="px-4 py-3">Đối tượng</th>
                 <th className="px-4 py-3">ID bản ghi</th>
@@ -298,15 +298,15 @@ function ScanPanel({ scan, onRestoreAll, restoring }) {
                 <th className="px-4 py-3">Seq đã neo</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-red-50">
+            <tbody className="divide-y divide-rose-50">
               {tampered.map((t) => (
-                <tr key={`${t.entity}-${t.entityId}`} className="hover:bg-red-50/40">
+                <tr key={`${t.entity}-${t.entityId}`} className="hover:bg-rose-50/40">
                   <td className="px-4 py-3 font-black text-slate-900">{ENTITY_LABELS[t.entity] || t.entity}</td>
                   <td className="px-4 py-3 font-mono text-[11px] text-slate-500">{shortHash(t.entityId)}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
                       {t.driftedFields.map((f) => (
-                        <span key={f} className="rounded-md border border-red-100 bg-red-50 px-2 py-0.5 text-[10px] font-black text-red-700">
+                        <span key={f} className="rounded-md border border-rose-100 bg-rose-50 px-2 py-0.5 text-[10px] font-black text-rose-700">
                           {f}
                         </span>
                       ))}
@@ -330,9 +330,9 @@ function BackupsTable({ backups, page, totalPages, total, onPrev, onNext }) {
     return <Empty title="Chưa có bản backup nào" desc="Bấm 'Tạo backup ngay' để tạo bản sao lưu đầu tiên và neo lên blockchain." />;
   }
   return (
-    <section className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+    <section className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
+        <table className="ui-table w-full text-left text-sm">
           <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500">
             <tr>
               <th className="px-4 py-3">Mã backup</th>
@@ -394,7 +394,7 @@ function Pagination({ page, totalPages, total, label, onPrev, onNext }) {
 
 function Empty({ title, desc }) {
   return (
-    <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-10 text-center">
+    <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center">
       <strong className="text-slate-700">{title}</strong>
       <p className="mt-1 text-sm text-slate-500">{desc}</p>
     </div>

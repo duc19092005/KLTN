@@ -86,7 +86,7 @@ export default function CreateVisitForm({ patient, onVisitCreated, onCancel }) {
                   type="button"
                   key={department.id}
                   onClick={() => setSelectedDepartment(department)}
-                  className={`rounded-xl border p-3 text-left transition-all ${isSelected ? 'border-cyan-400 bg-cyan-50 shadow-sm ring-1 ring-cyan-400' : 'border-slate-200 bg-white hover:border-cyan-300'}`}
+                  className={`rounded-xl border p-3 text-left transition-colors ${isSelected ? 'border-cyan-400 bg-cyan-50 shadow-sm ring-1 ring-cyan-400' : 'border-slate-200 bg-white hover:border-cyan-300'}`}
                 >
                   <p className={`text-sm font-black ${isSelected ? 'text-cyan-800' : 'text-slate-800'}`}>
                     {department.name} ({department.departmentCode || 'PK'})
@@ -117,7 +117,7 @@ export default function CreateVisitForm({ patient, onVisitCreated, onCancel }) {
           <button type="button" onClick={onCancel} className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-100">
             Quay lại
           </button>
-          <button onClick={handleCreateVisit} disabled={creating || !selectedDepartment} className="flex-1 rounded-xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-md shadow-cyan-200 transition-all hover:bg-cyan-700 disabled:opacity-60">
+          <button onClick={handleCreateVisit} disabled={creating || !selectedDepartment} className="flex-1 rounded-xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-md transition-colors hover:bg-cyan-700 disabled:opacity-60">
             {creating ? <LoadingIndicator size="sm" tone="white" /> : 'Xác nhận tạo lượt khám'}
           </button>
         </div>

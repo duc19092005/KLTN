@@ -9,13 +9,13 @@ import { RECEPTIONIST_NAV_ITEMS, receptionistRouteFor } from '../constants/navig
 import { receptionShiftService } from '../apis/receptionShiftService';
 
 const SHIFT_WINDOWS = {
-  A: { label: 'Ca A', time: '07:00 - 12:00', tone: 'border-amber-200 bg-amber-50 text-amber-900' },
-  B: { label: 'Ca B', time: '13:00 - 17:00', tone: 'border-cyan-200 bg-cyan-50 text-cyan-900' },
+  A: { label: 'Ca A', time: '07:00 - 12:00', tone: 'border-slate-200 bg-slate-50 text-slate-800' },
+  B: { label: 'Ca B', time: '13:00 - 17:00', tone: 'border-slate-200 bg-slate-50 text-slate-800' },
 };
 const STATUS_META = {
   PENDING: { label: 'Chờ duyệt', dot: 'bg-amber-400', bg: 'bg-amber-50 border-amber-200 text-amber-800' },
   APPROVED: { label: 'Đã duyệt', dot: 'bg-emerald-500', bg: 'bg-emerald-50 border-emerald-200 text-emerald-800' },
-  REJECTED: { label: 'Từ chối', dot: 'bg-red-400', bg: 'bg-red-50 border-red-200 text-red-700' },
+  REJECTED: { label: 'Từ chối', dot: 'bg-rose-400', bg: 'bg-rose-50 border-rose-200 text-rose-700' },
 };
 const DOW = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
@@ -128,17 +128,17 @@ export default function ReceptionistShiftPage() {
   return (
     <DashboardLayout user={user} navItems={RECEPTIONIST_NAV_ITEMS} activeItem="shifts" onNavigate={(id) => navigate(receptionistRouteFor(id))} onLogout={logout}>
       <div className="mx-auto max-w-7xl space-y-5 pb-12">
-        <section className="relative overflow-hidden rounded-[2rem] border border-sky-100 bg-gradient-to-br from-slate-950 via-sky-950 to-cyan-900 p-6 text-white shadow-2xl shadow-sky-950/20">
-          <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-cyan-300/20 blur-3xl" />
-          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-cyan-200">Lễ tân · Ca làm việc chuẩn</p>
-          <h1 className="mt-2 text-3xl font-black">Đăng ký Ca A / Ca B</h1>
-          <p className="mt-2 max-w-2xl text-sm font-semibold text-cyan-50/80">Lễ tân đăng ký ca theo ngày. Quản lý duyệt trước khi ca có hiệu lực cho vận hành quầy tiếp nhận.</p>
+        <section className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-white p-6 shadow-sm">
+          <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-cyan-100/70 blur-3xl" />
+          <p className="relative text-[11px] font-black uppercase tracking-[0.22em] text-cyan-600">Lễ tân · Ca làm việc chuẩn</p>
+          <h1 className="relative mt-2 text-3xl font-black text-slate-950">Đăng ký Ca A / Ca B</h1>
+          <p className="relative mt-2 max-w-2xl text-sm font-semibold text-slate-600">Lễ tân đăng ký ca theo ngày. Quản lý duyệt trước khi ca có hiệu lực cho vận hành quầy tiếp nhận.</p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            {Object.entries(SHIFT_WINDOWS).map(([code, shift]) => <div key={code} className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur"><p className="text-xs font-black">{shift.label}</p><p className="text-2xl font-black text-cyan-100">{shift.time}</p></div>)}
+            {Object.entries(SHIFT_WINDOWS).map(([code, shift]) => <div key={code} className="rounded-2xl border border-cyan-100 bg-white/80 p-4 shadow-sm"><p className="text-xs font-black text-cyan-700">{shift.label}</p><p className="text-2xl font-black text-slate-950">{shift.time}</p></div>)}
           </div>
         </section>
 
-        <section className="flex flex-col gap-3 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <section className="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={prevMonth} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-600">←</button>
             <span className="rounded-xl bg-cyan-50 px-4 py-2 text-xs font-black text-cyan-700">Tháng {month + 1}/{year}</span>
@@ -148,13 +148,13 @@ export default function ReceptionistShiftPage() {
             </select>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button onClick={openBulkModal} disabled={selectedSlots.length === 0} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white shadow-lg shadow-cyan-600/20 disabled:cursor-not-allowed disabled:opacity-50">Gửi {selectedSlots.length || ''} ca đã chọn</button>
+            <button onClick={openBulkModal} disabled={selectedSlots.length === 0} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50">Gửi {selectedSlots.length || ''} ca đã chọn</button>
             <button onClick={() => setSelectedSlots([])} disabled={selectedSlots.length === 0} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 disabled:cursor-not-allowed disabled:opacity-50">Bỏ chọn</button>
           </div>
         </section>
 
         {loading ? <LoadingIndicator size="lg" label="Đang tải lịch làm việc..." /> : (
-          <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+          <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
             <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50">{DOW.map((d) => <div key={d} className="py-3 text-center text-[11px] font-black text-slate-400">{d}</div>)}</div>
             <div className="grid grid-cols-7">
               {days.map((day, idx) => {
@@ -168,7 +168,7 @@ export default function ReceptionistShiftPage() {
                       const status = registered ? STATUS_META[registered.status] : null;
                       const isSelected = selectedSlots.some((slot) => slot.workDate === dateKey && slot.shiftCode === code);
                       const disabled = day.other || isPast || Boolean(registered);
-                      return <button key={code} disabled={disabled} onClick={() => toggleSlot(dateKey, code)} className={`w-full rounded-2xl border p-2 text-left transition-all ${registered ? status.bg : isSelected ? 'scale-[1.02] border-violet-400 bg-violet-50 text-violet-900 shadow-lg shadow-violet-200/70 ring-2 ring-violet-300' : shift.tone} ${disabled ? 'cursor-not-allowed opacity-50' : 'hover:-translate-y-0.5 hover:shadow-md'}`}>
+                      return <button key={code} disabled={disabled} onClick={() => toggleSlot(dateKey, code)} className={`w-full rounded-xl border p-2 text-left transition-colors ${registered ? status.bg : isSelected ? 'border-cyan-400 bg-cyan-50 text-cyan-900 shadow-sm ring-2 ring-cyan-200' : shift.tone} ${disabled ? 'cursor-not-allowed opacity-50' : ' hover:border-cyan-200 hover:bg-cyan-50/60'}`}>
                         <div className="flex items-center justify-between"><span className="text-[11px] font-black">{shift.label}</span><span className="text-[9px] font-bold opacity-70">{shift.time}</span></div>
                         <p className="mt-1 text-[10px] font-bold opacity-70">{registered ? status.label : isSelected ? 'Đã chọn' : 'Chưa đăng ký'}</p>
                       </button>;
@@ -181,16 +181,16 @@ export default function ReceptionistShiftPage() {
         )}
 
         {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-md">
-          <form onSubmit={submitRegister} className="w-full max-w-lg overflow-hidden rounded-[2rem] bg-white shadow-2xl">
-            <div className="bg-gradient-to-r from-cyan-600 to-blue-700 p-6 text-white"><h3 className="text-xl font-black">Đăng ký ca làm lễ tân</h3><p className="mt-1 text-xs font-semibold text-cyan-50">Chọn ngày và Ca A/B, không nhập giờ thủ công.</p></div>
+          <form onSubmit={submitRegister} className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="bg-gradient-to-r from-cyan-600 to-cyan-700 p-6 text-white"><h3 className="text-xl font-black">Đăng ký ca làm lễ tân</h3><p className="mt-1 text-xs font-semibold text-cyan-50">Chọn ngày và Ca A/B, không nhập giờ thủ công.</p></div>
             <div className="space-y-4 p-5">
               <select value={modal.departmentId} onChange={(e) => setModal({ ...modal, departmentId: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm font-bold" required>{departments.map((dep) => <option key={dep.id} value={dep.id}>{dep.departmentCode} · {dep.name}</option>)}</select>
               <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
-                <div className="mb-2 flex items-center justify-between"><p className="text-[11px] font-black uppercase tracking-wider text-slate-600">Ca đã chọn</p><span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-700">{(selectedSlots.length || 1)} ca</span></div>
+                <div className="mb-2 flex items-center justify-between"><p className="text-[11px] font-black uppercase tracking-wider text-slate-600">Ca đã chọn</p><span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-black text-cyan-700">{(selectedSlots.length || 1)} ca</span></div>
                 <div className="grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2">
                   {(selectedSlots.length > 0 ? selectedSlots : [{ workDate: modal.workDate, shiftCode: modal.shiftCode }]).map((slot) => {
                     const meta = SHIFT_WINDOWS[slot.shiftCode];
-                    return <div key={`${slot.workDate}:${slot.shiftCode}`} className={`rounded-xl border px-3 py-2 ${meta.tone}`}><p className="text-xs font-black">{new Date(slot.workDate).toLocaleDateString('vi-VN')}</p><p className="mt-0.5 text-[11px] font-bold">{meta.label} · {meta.time}</p></div>;
+                    return <div key={`${slot.workDate}:${slot.shiftCode}`} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-800"><p className="text-xs font-black">{new Date(slot.workDate).toLocaleDateString('vi-VN')}</p><p className="mt-0.5 text-[11px] font-bold">{meta.label} · {meta.time}</p></div>;
                   })}
                 </div>
               </div>

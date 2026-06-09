@@ -47,8 +47,8 @@ export default function AdminPage() {
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="overview" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
       <div className="max-w-7xl mx-auto space-y-6">
-        <section className="relative overflow-hidden rounded-[28px] border border-blue-100 bg-gradient-to-br from-white via-blue-50 to-cyan-50 p-8 shadow-sm">
-          <p className="text-[11px] font-black text-blue-600 uppercase tracking-[0.24em] mb-3">Phân tích hệ thống</p>
+        <section className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-cyan-50 p-8 shadow-sm">
+          <p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.24em] mb-3">Phân tích hệ thống</p>
           <h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">Tổng quan hệ thống</h2>
           <p className="mt-3 max-w-3xl text-sm sm:text-base text-slate-600 leading-relaxed">
             Trang thống kê nhanh tình trạng phòng ban, nhân sự, tài khoản hoạt động và các hồ sơ đang chờ kích hoạt trong hệ thống bệnh viện.
@@ -68,7 +68,7 @@ export default function AdminPage() {
                     <div key={dep.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                       <div className="flex items-center justify-between">
                         <strong className="text-slate-950">{dep.name}</strong>
-                        <span className="text-xs font-black text-blue-700">{dep.manager?.fullName || 'Chưa có phụ trách'}</span>
+                        <span className="text-xs font-black text-cyan-700">{dep.manager?.fullName || 'Chưa có phụ trách'}</span>
                       </div>
                       <p className="mt-1 text-sm text-slate-500">{dep.description || 'Chưa có mô tả'}</p>
                     </div>
@@ -92,8 +92,8 @@ export default function AdminPage() {
 }
 
 function StatCard({ label, value, hint }) {
-  return <article className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm"><div className="flex justify-between"><div><p className="text-xs font-bold text-slate-500">{label}</p><strong className="block text-3xl font-black text-slate-950 mt-2">{String(value).padStart(2, '0')}</strong></div></div><p className="mt-3 text-xs font-semibold text-blue-600">{hint}</p></article>;
+  return <article className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm"><div className="flex justify-between"><div><p className="text-xs font-bold text-slate-500">{label}</p><strong className="block text-3xl font-black text-slate-950 mt-2">{String(value).padStart(2, '0')}</strong></div></div><p className="mt-3 text-xs font-semibold text-cyan-600">{hint}</p></article>;
 }
-function Card({ title, action, onAction, children }) { return <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm"><div className="mb-5 flex items-center justify-between"><h3 className="text-xl font-black text-slate-950">{title}</h3><button onClick={onAction} className="text-sm font-black text-blue-600">{action}</button></div>{children}</section>; }
+function Card({ title, action, onAction, children }) { return <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm"><div className="mb-5 flex items-center justify-between"><h3 className="text-xl font-black text-slate-950">{title}</h3><button onClick={onAction} className="text-sm font-black text-cyan-600">{action}</button></div>{children}</section>; }
 function StaffMini({ staff }) { return <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><strong className="block text-slate-950">{staff.fullName}</strong><span className="text-xs text-slate-500">{staff.department?.name || 'Chưa gán phòng ban'}</span></div>; }
 function Empty({ title, desc }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><strong className="text-slate-800">{title}</strong><p className="mt-1 text-sm text-slate-500">{desc}</p></div>; }

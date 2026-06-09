@@ -28,7 +28,7 @@ export default function StepUpSessionBadge() {
         id="stepup-session-open"
         type="button"
         onClick={open}
-        className="hidden sm:flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-slate-500 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+        className="hidden sm:flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-slate-500 hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700 transition-colors"
         title="Mở phiên xác thực khuôn mặt để thực hiện các thao tác bảo mật mà không cần quét lại từng lần."
       >
         <ScanFace className="h-4 w-4" strokeWidth={2} />

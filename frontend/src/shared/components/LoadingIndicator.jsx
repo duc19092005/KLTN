@@ -8,7 +8,7 @@ const sizeClasses = {
 };
 
 const toneClasses = {
-  blue: 'border-slate-200 border-t-blue-600',
+  cyan: 'border-slate-200 border-t-cyan-600',
   white: 'border-white/35 border-t-white',
   slate: 'border-slate-200 border-t-slate-700',
   emerald: 'border-emerald-100 border-t-emerald-600',
@@ -20,7 +20,7 @@ const toneClasses = {
  */
 export default function LoadingIndicator({
   size = 'sm',
-  tone = 'blue',
+  tone = 'cyan',
   label,
   className = '',
   labelClassName = '',
@@ -30,13 +30,13 @@ export default function LoadingIndicator({
     <div
       role="status"
       aria-label={label || 'Đang tải'}
-      className={`shrink-0 rounded-full animate-spin shadow-sm ${sizeClasses[size] || sizeClasses.sm} ${toneClasses[tone] || toneClasses.blue} ${className}`}
+      className={`shrink-0 rounded-full animate-spin shadow-sm ${sizeClasses[size] || sizeClasses.sm} ${toneClasses[tone] || toneClasses.cyan} ${className}`}
     />
   );
 
   if (fullScreen) {
     return (
-      <main className="min-h-screen w-full flex flex-col items-center justify-center gap-4 bg-[#F4F7FA] font-sans antialiased selection:bg-blue-100 selection:text-blue-700">
+      <main className="min-h-screen w-full flex flex-col items-center justify-center gap-4 bg-[#F4F7FA] font-sans antialiased selection:bg-cyan-100 selection:text-cyan-700">
         {spinner}
         {label && <p className={`text-sm font-bold text-slate-600 tracking-tight ${labelClassName}`}>{label}</p>}
       </main>

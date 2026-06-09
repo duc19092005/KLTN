@@ -46,8 +46,8 @@ export default function DoctorDashboard() {
 
   const stats = useMemo(() => [
     { label: 'Chờ khám', value: visits.filter((v) => v.status === 'WAITING').length, hint: 'Bệnh nhân đang chờ vào phòng', tone: 'amber' },
-    { label: 'Đang xử lý', value: visits.filter((v) => ACTIVE_STATUSES.includes(v.status)).length, hint: 'Đang trong quy trình khám', tone: 'blue' },
-    { label: 'Chờ xét nghiệm', value: visits.filter((v) => v.status === 'WAITING_TEST_RESULT').length, hint: 'Đợi kết quả cận lâm sàng', tone: 'purple' },
+    { label: 'Đang xử lý', value: visits.filter((v) => ACTIVE_STATUSES.includes(v.status)).length, hint: 'Đang trong quy trình khám', tone: 'cyan' },
+    { label: 'Chờ xét nghiệm', value: visits.filter((v) => v.status === 'WAITING_TEST_RESULT').length, hint: 'Đợi kết quả cận lâm sàng', tone: 'cyan' },
     { label: 'Hoàn tất', value: visits.filter((v) => v.status === 'COMPLETED').length, hint: 'Đã kết thúc lượt khám', tone: 'emerald' },
   ], [visits]);
 
@@ -57,21 +57,20 @@ export default function DoctorDashboard() {
   return (
     <DashboardLayout user={user} navItems={DOCTOR_NAV_ITEMS} activeItem="overview" onNavigate={(id) => navigateDoctor(navigate, id)} onLogout={logout}>
       <div className="max-w-7xl mx-auto space-y-6">
-        <section className="relative overflow-hidden rounded-[32px] bg-slate-950 p-7 sm:p-8 text-white shadow-2xl shadow-blue-100">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.55),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.28),transparent_36%)]" />
-          <div className="absolute right-8 top-8 h-28 w-28 rounded-full border border-white/10 bg-white/5 blur-sm" />
+        <section className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-white p-7 shadow-sm sm:p-8">
+          <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-cyan-100/70 blur-3xl" />
           <div className="relative flex flex-col xl:flex-row xl:items-end justify-between gap-7">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.28em] text-blue-200">Tổng quan bác sĩ</p>
-              <h1 className="mt-3 text-3xl sm:text-4xl font-black tracking-tight">Tổng quan bác sĩ</h1>
-              <p className="mt-3 max-w-3xl text-sm sm:text-base leading-relaxed text-slate-300">
+              <p className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan-600">Tổng quan bác sĩ</p>
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">Tổng quan bác sĩ</h1>
+              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base">
                 Theo dõi nhanh khối lượng bệnh nhân, trạng thái xử lý trong ca trực và truy cập riêng sang hàng đợi khám khi cần thao tác lâm sàng.
               </p>
             </div>
             <button
               id="doctor-open-queue-button"
               onClick={() => navigate('/doctor/queue')}
-              className="w-fit rounded-2xl bg-white px-5 py-3 text-sm font-black text-blue-700 shadow-xl shadow-blue-950/20 transition-all hover:-translate-y-0.5 hover:bg-blue-50"
+              className="w-fit rounded-xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-cyan-700"
             >
               Mở hàng đợi khám
             </button>
@@ -106,8 +105,8 @@ export default function DoctorDashboard() {
 }
 
 function StatCard({ label, value, hint }) {
-  return <article className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold text-slate-500">{label}</p><strong className="mt-2 block text-3xl font-black text-slate-950">{String(value).padStart(2, '0')}</strong></div></div><p className="mt-3 text-xs font-semibold text-blue-600">{hint}</p></article>;
+  return <article className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-colors  hover:shadow-md"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold text-slate-500">{label}</p><strong className="mt-2 block text-3xl font-black text-slate-950">{String(value).padStart(2, '0')}</strong></div></div><p className="mt-3 text-xs font-semibold text-cyan-600">{hint}</p></article>;
 }
-function Panel({ title, subtitle, children }) { return <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm"><div className="mb-5"><h2 className="text-xl font-black text-slate-950">{title}</h2><p className="mt-1 text-sm text-slate-500">{subtitle}</p></div>{children}</section>; }
-function VisitMini({ visit }) { return <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><strong className="text-slate-950">{visit.patient?.fullName || 'N/A'}</strong><span className="text-[10px] font-black text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-2 py-1">{VISIT_STATUS_LABELS[visit.status] || visit.status || 'Không rõ'}</span></div><p className="mt-1 text-xs font-semibold text-slate-500">{visit.visitCode} · {visit.patient?.patientCode || 'N/A'}</p><p className="mt-2 text-sm text-slate-600">{getVisitDepartmentName(visit)} · BS. {getVisitStaffName(visit)}</p></div>; }
+function Panel({ title, subtitle, children }) { return <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm"><div className="mb-5"><h2 className="text-xl font-black text-slate-950">{title}</h2><p className="mt-1 text-sm text-slate-500">{subtitle}</p></div>{children}</section>; }
+function VisitMini({ visit }) { return <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><strong className="text-slate-950">{visit.patient?.fullName || 'N/A'}</strong><span className="text-[10px] font-black text-cyan-700 bg-cyan-50 border border-cyan-100 rounded-full px-2 py-1">{VISIT_STATUS_LABELS[visit.status] || visit.status || 'Không rõ'}</span></div><p className="mt-1 text-xs font-semibold text-slate-500">{visit.visitCode} · {visit.patient?.patientCode || 'N/A'}</p><p className="mt-2 text-sm text-slate-600">{getVisitDepartmentName(visit)} · BS. {getVisitStaffName(visit)}</p></div>; }
 function Empty({ title, desc }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><strong className="text-slate-800">{title}</strong><p className="mt-1 text-sm text-slate-500">{desc}</p></div>; }

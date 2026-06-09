@@ -89,7 +89,7 @@ export default function FaceCapture({
 
       {extractingEmbedding && (
         <div className="absolute inset-0 bg-white/80 backdrop-blur-md rounded-2xl border border-slate-200 flex flex-col items-center justify-center z-50 animate-in fade-in duration-300">
-          <LoadingIndicator size="lg" tone="blue" />
+          <LoadingIndicator size="lg" tone="cyan" />
           <p className="mt-4 text-sm font-bold text-slate-800 tracking-tight text-center px-6">
             {label || (captureMode === 'enroll'
               ? 'Đang mã hóa dữ liệu sinh trắc học đa góc...'

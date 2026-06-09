@@ -14,10 +14,10 @@ import { useToast } from '../../../providers/ToastProvider';
 import { Search, X } from 'lucide-react';
 
 const emptyStaff = { username: '', email: '', fullName: '', avatarUrl: '', departmentId: '', phone: '', gender: '', citizenId: '', birthDate: '', address: '', position: '', role: 'LAB_MANAGER' };
-const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100', INACTIVE: 'bg-red-50 text-red-700 border-red-100', PENDING: 'bg-amber-50 text-amber-700 border-amber-100' };
+const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100', INACTIVE: 'bg-rose-50 text-rose-700 border-rose-100', PENDING: 'bg-amber-50 text-amber-700 border-amber-100' };
 const statusLabel = { ACTIVE: 'Đang hoạt động', INACTIVE: 'Ngưng hoạt động', PENDING: 'Chờ kích hoạt' };
 const ROLE_LABEL = { DOCTOR: 'Bác sĩ', RECEPTIONIST: 'Lễ tân', LAB_MANAGER: 'KTV cận lâm sàng', ADMIN: 'Quản trị viên' };
-const ROLE_TONE = { DOCTOR: 'bg-blue-50 text-blue-700 border-blue-100', RECEPTIONIST: 'bg-cyan-50 text-cyan-700 border-cyan-100', LAB_MANAGER: 'bg-indigo-50 text-indigo-700 border-indigo-100', ADMIN: 'bg-slate-100 text-slate-700 border-slate-200' };
+const ROLE_TONE = { DOCTOR: 'bg-cyan-50 text-cyan-700 border-cyan-100', RECEPTIONIST: 'bg-cyan-50 text-cyan-700 border-cyan-100', LAB_MANAGER: 'bg-cyan-50 text-cyan-700 border-cyan-100', ADMIN: 'bg-slate-100 text-slate-700 border-slate-200' };
 function getError(err) { return err?.response?.data?.message || err.message || 'Thao tác thất bại'; }
 function buildStaffPayload(form) {
   return {
@@ -167,7 +167,7 @@ export default function StaffPage() {
     </DashboardLayout>
   );
 }
-function Hero({ onCreate }) { return <section className="rounded-[28px] border border-blue-100 bg-gradient-to-br from-white via-blue-50 to-cyan-50 p-8 shadow-sm flex flex-col lg:flex-row lg:items-end justify-between gap-5"><div><p className="text-[11px] font-black text-blue-600 uppercase tracking-[0.24em] mb-3">Hệ thống nhân sự</p><h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">Quản lý nhân sự</h2><p className="mt-3 max-w-3xl text-sm sm:text-base text-slate-600 leading-relaxed">Hiển thị toàn bộ nhân sự có phân trang, bộ lọc và thao tác từng dòng. Mã nhân viên được hệ thống tự sinh NV-0001 hoặc BS-0001 cho bác sĩ.</p></div><button onClick={onCreate} className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-100 hover:bg-blue-700">+ Thêm nhân sự</button></section>; }
+function Hero({ onCreate }) { return <section className="rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-cyan-50 p-8 shadow-sm flex flex-col lg:flex-row lg:items-end justify-between gap-5"><div><p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.24em] mb-3">Hệ thống nhân sự</p><h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">Quản lý nhân sự</h2><p className="mt-3 max-w-3xl text-sm sm:text-base text-slate-600 leading-relaxed">Hiển thị toàn bộ nhân sự có phân trang, bộ lọc và thao tác từng dòng. Mã nhân viên được hệ thống tự sinh NV-0001 hoặc BS-0001 cho bác sĩ.</p></div><button onClick={onCreate} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ Thêm nhân sự</button></section>; }
 const ROLE_OPTIONS = [{ value: 'DOCTOR', label: 'Bác sĩ' }, { value: 'RECEPTIONIST', label: 'Lễ tân' }, { value: 'LAB_MANAGER', label: 'Kỹ thuật viên cận lâm sàng' }];
 
 // Remove empty/falsey filter values so we never send blank `departmentId` (the backend
@@ -186,10 +186,10 @@ function cleanFilters(filters) {
 function StaffSearch({ filters, setFilters, onSearch, onReset, departments }) {
   const activeCount = [filters.fullName, filters.employeeCode, filters.citizenId, filters.departmentId, filters.role, filters.isManager].filter(Boolean).length;
   return (
-    <form onSubmit={onSearch} className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm space-y-4">
+    <form onSubmit={onSearch} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><Search className="h-4 w-4" strokeWidth={2.5} /></span>
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600"><Search className="h-4 w-4" strokeWidth={2.5} /></span>
           <div>
             <p className="text-sm font-black text-slate-900">Bộ lọc nhân sự</p>
             <p className="text-[11px] font-semibold text-slate-400">{activeCount > 0 ? `${activeCount} bộ lọc đang áp dụng` : 'Lọc theo tên, phòng ban, vai trò...'}</p>
@@ -205,21 +205,21 @@ function StaffSearch({ filters, setFilters, onSearch, onReset, departments }) {
       </div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <label className="inline-flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">
-          <input type="checkbox" checked={filters.isManager} onChange={(e) => setFilters({ ...filters, isManager: e.target.checked })} className="h-4 w-4 rounded accent-blue-600" />
+          <input type="checkbox" checked={filters.isManager} onChange={(e) => setFilters({ ...filters, isManager: e.target.checked })} className="h-4 w-4 rounded accent-cyan-600" />
           <span className="text-sm font-bold text-slate-700">Chỉ hiện trưởng phòng / trưởng khoa</span>
         </label>
-        <button className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-black text-white shadow-lg shadow-blue-100 hover:bg-blue-700"><Search className="h-4 w-4" strokeWidth={2.5} /> Tìm kiếm</button>
+        <button className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-600 px-6 py-2.5 text-sm font-black text-white shadow-sm hover:bg-cyan-700"><Search className="h-4 w-4" strokeWidth={2.5} /> Tìm kiếm</button>
       </div>
     </form>
   );
 }
-function StaffList({ staffs, totalLabel, onEdit, onToggleStatus, onRemove, onViewDetails, busy, pagination, onPageChange }) { return <section className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden"><div className="p-5 border-b border-slate-100 flex items-center justify-between"><div><h3 className="text-xl font-black text-slate-950">Danh sách nhân sự</h3><p className="text-sm text-slate-500">Theo dõi phòng ban và trạng thái tài khoản.</p></div><span className="rounded-xl bg-slate-50 px-3 py-1 text-xs font-black text-slate-600 border border-slate-100">{totalLabel}</span></div><div className="divide-y divide-slate-100">{staffs.map((staff) => <StaffRow key={staff.id} staff={staff} onEdit={onEdit} onToggleStatus={onToggleStatus} onRemove={onRemove} onViewDetails={onViewDetails} busy={busy} />)}{!staffs.length && <div className="p-6"><Empty title="Không có nhân sự" desc="Thử đổi bộ lọc hoặc tạo nhân sự mới." /></div>}</div><Pagination pagination={pagination} onPageChange={onPageChange} /></section>; }
+function StaffList({ staffs, totalLabel, onEdit, onToggleStatus, onRemove, onViewDetails, busy, pagination, onPageChange }) { return <section className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden"><div className="p-5 border-b border-slate-100 flex items-center justify-between"><div><h3 className="text-xl font-black text-slate-950">Danh sách nhân sự</h3><p className="text-sm text-slate-500">Theo dõi phòng ban và trạng thái tài khoản.</p></div><span className="rounded-xl bg-slate-50 px-3 py-1 text-xs font-black text-slate-600 border border-slate-100">{totalLabel}</span></div><div className="divide-y divide-slate-100">{staffs.map((staff) => <StaffRow key={staff.id} staff={staff} onEdit={onEdit} onToggleStatus={onToggleStatus} onRemove={onRemove} onViewDetails={onViewDetails} busy={busy} />)}{!staffs.length && <div className="p-6"><Empty title="Không có nhân sự" desc="Thử đổi bộ lọc hoặc tạo nhân sự mới." /></div>}</div><Pagination pagination={pagination} onPageChange={onPageChange} /></section>; }
 function StaffRow({ staff, onEdit, onToggleStatus, onRemove, onViewDetails, busy }) {
   return (
     <article className="p-5 hover:bg-slate-50/70">
       <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr_0.8fr_0.7fr_0.8fr_190px] gap-4 xl:items-center">
         <div className="flex items-center gap-3">
-          <img src={staff.avatarUrl} alt={staff.fullName} className="w-11 h-11 rounded-2xl object-cover border border-blue-100 bg-blue-50" />
+          <img src={staff.avatarUrl} alt={staff.fullName} className="w-11 h-11 rounded-2xl object-cover border border-cyan-100 bg-cyan-50" />
           <div className="min-w-0">
             <strong className="block text-slate-950 truncate">{staff.fullName}</strong>
             <span className="text-xs text-slate-500 truncate block">{staff.user?.email}</span>
@@ -249,10 +249,10 @@ function StaffRow({ staff, onEdit, onToggleStatus, onRemove, onViewDetails, busy
 function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editingStaff }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
-      <form onSubmit={onSubmit} className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl space-y-5">
+      <form onSubmit={onSubmit} className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-5">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-[11px] font-black text-blue-600 uppercase tracking-[0.18em]">Thiết lập nhân sự</p>
+            <p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.18em]">Thiết lập nhân sự</p>
             <h3 className="text-2xl font-black text-slate-950">{editingStaff ? 'Chỉnh sửa nhân sự' : 'Thêm nhân sự'}</h3>
             <p className="text-sm text-slate-500">
               Tài khoản nhân sự dùng mật khẩu mặc định 123456. Mật khẩu được mã hóa trước khi lưu. Bác sĩ được tạo ở trang Bác sĩ.
@@ -263,7 +263,7 @@ function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editi
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Select label="Loại nhân sự" value={form.role} onChange={(v) => setForm({ ...form, role: v })} options={[...(editingStaff?.user?.role === 'DOCTOR' ? [{ value: 'DOCTOR', label: 'Bác sĩ' }] : []), { value: 'RECEPTIONIST', label: 'Lễ tân' }, { value: 'LAB_MANAGER', label: 'Kỹ thuật viên cận lâm sàng' }]} required />
           <Input label="Họ tên" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: v })} required />
-          <AvatarUpload value={form.avatarUrl} onChange={(url) => setForm({ ...form, avatarUrl: url })} uploadFn={staffService.uploadAvatar} ringTone="blue" />
+          <AvatarUpload value={form.avatarUrl} onChange={(url) => setForm({ ...form, avatarUrl: url })} uploadFn={staffService.uploadAvatar} ringTone="cyan" />
           <Input label="Tên đăng nhập" value={form.username} onChange={(v) => setForm({ ...form, username: v })} required />
           <Input label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} required />
           <Input label="Số điện thoại" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} required />
@@ -274,7 +274,7 @@ function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editi
           <Input label="Chức danh" value={form.position} onChange={(v) => setForm({ ...form, position: v })} placeholder="Lễ tân, KTV xét nghiệm, KTV chẩn đoán hình ảnh..." />
           <Input label="Địa chỉ" value={form.address} onChange={(v) => setForm({ ...form, address: v })} />
         </div>
-        <button disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-100 hover:bg-blue-700 disabled:opacity-70">
+        <button disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 disabled:opacity-70">
           {busy && <LoadingIndicator size="sm" tone="white" />}{editingStaff ? 'Lưu thay đổi' : 'Tạo nhân sự'}
         </button>
       </form>
@@ -285,6 +285,6 @@ function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editi
 function Pagination({ pagination, onPageChange }) { return <div className="flex items-center justify-between border-t border-slate-100 p-4"><p className="text-sm font-semibold text-slate-500">Trang {pagination.page}/{pagination.totalPages}</p><div className="flex gap-2"><SmallButton disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>Trước</SmallButton><SmallButton disabled={pagination.page >= pagination.totalPages} onClick={() => onPageChange(pagination.page + 1)}>Sau</SmallButton></div></div>; }
 function Info({ label, value, mono }) { return <div><p className="text-[11px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className={`text-sm text-slate-700 ${mono ? 'font-mono' : 'font-bold'}`}>{value}</p></div>; }
 function Empty({ title, desc }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><strong>{title}</strong><p className="mt-1 text-sm text-slate-500">{desc}</p></div>; }
-function SmallButton({ children, onClick, disabled, danger }) { return <button type="button" disabled={disabled} onClick={onClick} className={`rounded-xl border px-3 py-2 text-xs font-black disabled:opacity-50 ${danger ? 'border-red-100 bg-red-50 text-red-600 hover:bg-red-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-600'}`}>{children}</button>; }
-function Input({ label, value, onChange, required, placeholder, type = 'text' }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><input type={type} required={required} value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} min={type === 'number' ? '0' : undefined} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none" /></label>; }
-function Select({ label, value, onChange, options, empty, required }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><select required={required} value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none">{empty && <option value="">{empty}</option>}{options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>; }
+function SmallButton({ children, onClick, disabled, danger }) { return <button type="button" disabled={disabled} onClick={onClick} className={`rounded-xl border px-3 py-2 text-xs font-black disabled:opacity-50 ${danger ? 'border-rose-100 bg-rose-50 text-rose-600 hover:bg-rose-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-cyan-50 hover:text-cyan-600'}`}>{children}</button>; }
+function Input({ label, value, onChange, required, placeholder, type = 'text' }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><input type={type} required={required} value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} min={type === 'number' ? '0' : undefined} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none" /></label>; }
+function Select({ label, value, onChange, options, empty, required }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><select required={required} value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none">{empty && <option value="">{empty}</option>}{options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>; }

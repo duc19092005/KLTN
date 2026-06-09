@@ -15,7 +15,7 @@ export default function SleepButton() {
       id="dashboard-sleep-button"
       type="button"
       onClick={lockNow}
-      className="p-2 rounded-xl bg-white hover:bg-slate-900 text-slate-400 hover:text-white transition-colors border border-slate-200 hover:border-slate-900 outline-none"
+      className="p-2 rounded-xl bg-white hover:bg-cyan-50 text-slate-400 hover:text-cyan-600 transition-colors border border-slate-200 hover:border-cyan-100 outline-none"
       title="Khóa màn hình (Ngủ)"
       aria-label="Khóa màn hình"
     >

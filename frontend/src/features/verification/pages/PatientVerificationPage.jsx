@@ -2,6 +2,26 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import jsQR from 'jsqr';
+import {
+  AlertCircle,
+  CalendarCheck,
+  Camera,
+  CheckCircle2,
+  Clock3,
+  Fingerprint,
+  GitBranch,
+  HeartPulse,
+  History,
+  Info,
+  KeyRound,
+  LockKeyhole,
+  LogIn,
+  Paperclip,
+  QrCode,
+  ShieldAlert,
+  ShieldCheck,
+  Upload,
+} from 'lucide-react';
 import { API_URL } from '../../../utils/constants';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { LoginPage } from '../../auth';
@@ -233,21 +253,15 @@ export default function PatientVerificationPage() {
   useEffect(() => () => stopCamera(), []);
 
   return (
-    <div className="min-h-screen flex flex-col relative hero-bg text-[#171b2b] antialiased">
+    <div className="min-h-screen flex flex-col relative hero-bg text-[#020617] antialiased">
       <style dangerouslySetInnerHTML={{__html: `
         .hero-bg {
-            background: radial-gradient(circle at 50% -20%, #dde1ff 0%, #faf8ff 60%);
+            background: radial-gradient(circle at 50% -20%, #cffafe 0%, #f8fafc 60%);
         }
         .glass-panel {
             background: linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.4) 100%);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-        }
-        .material-symbols-outlined {
-          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-        .material-symbols-outlined.fill {
-          font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
         }
         @keyframes fadeInUp {
           0% { opacity: 0; transform: translateY(16px); }
@@ -263,14 +277,14 @@ export default function PatientVerificationPage() {
       `}} />
 
       {/* TopAppBar */}
-      <header className="fixed top-0 w-full z-40 bg-surface/80 dark:bg-surface-container-lowest/80 backdrop-blur-md shadow-[0px_20px_40px_rgba(99,115,193,0.08)]">
+      <header className="fixed top-0 w-full z-40 bg-surface/80 dark:bg-surface-container-lowest/80 backdrop-blur-md shadow-sm">
         <div className="flex justify-between items-center px-container-padding-mobile md:px-container-padding-desktop max-w-[1280px] mx-auto h-20 w-full">
           {/* Brand */}
           <div 
             onClick={(e) => { e.preventDefault(); setPatientCode(''); setData(null); setError(null); }}
             className="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary flex items-center gap-2 cursor-pointer"
           >
-            <span className="material-symbols-outlined fill" style={{ fontVariationSettings: "'FILL' 1" }}>health_and_safety</span>
+            <HeartPulse className="h-6 w-6" strokeWidth={2.25} />
             Định danh Y tế
           </div>
           {/* Desktop Nav */}
@@ -278,9 +292,9 @@ export default function PatientVerificationPage() {
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setSearchParams({ login: 'true', tab: 'staff' })}
-              className="hidden md:flex items-center gap-2 bg-primary text-on-primary font-label-md text-label-md px-6 py-2.5 rounded-lg hover:translate-y-[-1px] shadow-[0px_4px_12px_rgba(70,86,162,0.2)] transition-all font-bold"
+              className="hidden md:flex items-center gap-2 bg-primary text-on-primary font-label-md text-label-md px-6 py-2.5 rounded-lg  shadow-sm transition-colors font-bold"
             >
-              <span className="material-symbols-outlined text-[18px]">login</span>
+              <LogIn className="h-[18px] w-[18px]" />
               Đăng nhập nhân sự
             </button>
             {/* Mobile Login Toggle */}
@@ -289,7 +303,7 @@ export default function PatientVerificationPage() {
               className="md:hidden text-primary flex items-center justify-center p-2 rounded-full hover:bg-slate-100"
               title="Đăng nhập nhân sự"
             >
-              <span className="material-symbols-outlined text-[24px]">login</span>
+              <LogIn className="h-6 w-6" />
             </button>
           </div>
         </div>
@@ -312,8 +326,8 @@ export default function PatientVerificationPage() {
           </p>
 
           {/* Search Console */}
-          <form onSubmit={handleVerify} className="w-full max-w-2xl mx-auto bg-surface-container-lowest rounded-xl p-2 pl-6 shadow-[0px_20px_40px_rgba(99,115,193,0.08)] border border-outline-variant/30 flex items-center gap-4 transition-all focus-within:shadow-[0px_20px_40px_rgba(99,115,193,0.15)] focus-within:border-primary-fixed animate-fade-in-up delay-300">
-            <span className="material-symbols-outlined text-outline">key</span>
+          <form onSubmit={handleVerify} className="w-full max-w-2xl mx-auto bg-surface-container-lowest rounded-xl p-2 pl-6 shadow-sm border border-outline-variant/30 flex items-center gap-4 transition-colors  focus-within:border-primary-fixed animate-fade-in-up delay-300">
+            <KeyRound className="h-5 w-5 text-outline" />
             <input 
               value={patientCode}
               onChange={(e) => setPatientCode(e.target.value)}
@@ -327,11 +341,11 @@ export default function PatientVerificationPage() {
               className="p-3 bg-surface-container-low text-primary rounded-lg hover:bg-primary-fixed transition-colors"
               title="Quét hoặc tải ảnh mã QR"
             >
-              <span className="material-symbols-outlined">qr_code_scanner</span>
+              <QrCode className="h-5 w-5" />
             </button>
             <button 
               disabled={loading || !patientCode.trim()} 
-              className="bg-primary text-on-primary font-label-md text-label-md px-8 py-4 rounded-lg hover:translate-y-[-1px] transition-all shadow-[0px_4px_10px_rgba(70,86,162,0.2)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-bold"
+              className="bg-primary text-on-primary font-label-md text-label-md px-8 py-4 rounded-lg  transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-bold"
               type="submit"
             >
               {loading ? <LoadingIndicator size="sm" tone="white" /> : 'Kiểm chứng'}
@@ -340,7 +354,7 @@ export default function PatientVerificationPage() {
 
           {error && (
             <div className="mt-6 w-full max-w-2xl mx-auto p-4 bg-rose-50 border border-rose-100 text-rose-700 text-xs font-semibold rounded-xl text-left flex items-center gap-2 animate-pulse">
-              <span className="material-symbols-outlined text-rose-500 text-[18px]">error</span>
+              <AlertCircle className="h-[18px] w-[18px] text-rose-500" />
               {error}
             </div>
           )}
@@ -348,12 +362,12 @@ export default function PatientVerificationPage() {
           {/* Security Badges */}
           <div className="flex flex-wrap justify-center items-center gap-6 mt-12 opacity-80 animate-fade-in-up delay-400">
             <div className="flex items-center gap-2 font-label-md text-label-md text-secondary font-bold">
-              <span className="material-symbols-outlined text-[20px]">shield_locked</span>
+              <LockKeyhole className="h-5 w-5" />
               Mã hóa AES-256
             </div>
             <div className="w-1 h-1 rounded-full bg-outline-variant"></div>
             <div className="flex items-center gap-2 font-label-md text-label-md text-secondary font-bold">
-              <span className="material-symbols-outlined text-[20px]">verified_user</span>
+              <ShieldCheck className="h-5 w-5" />
               Tiêu chuẩn HIPAA quốc tế
             </div>
           </div>
@@ -365,14 +379,14 @@ export default function PatientVerificationPage() {
             {/* Patient Profile Card */}
             <div className="bg-[#ffffff] rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-[#f0f3ff] text-[#003f87] flex items-center justify-center font-bold text-lg border border-[#acc7ff]">
+                <div className="w-12 h-12 rounded-full bg-[#f0f3ff] text-[#0891b2] flex items-center justify-center font-bold text-lg border border-[#acc7ff]">
                   {data.patient.fullName.charAt(0)}
                 </div>
                 <div>
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Bệnh nhân</span>
-                  <h3 className="text-lg font-bold text-[#111c2c]">{data.patient.fullName}</h3>
-                  <div className="flex gap-4 text-xs font-semibold text-[#424752] mt-1">
-                    <span>Mã số: <strong className="text-[#003f87]">{data.patient.patientCode}</strong></span>
+                  <h3 className="text-lg font-bold text-[#020617]">{data.patient.fullName}</h3>
+                  <div className="flex gap-4 text-xs font-semibold text-[#475569] mt-1">
+                    <span>Mã số: <strong className="text-[#0891b2]">{data.patient.patientCode}</strong></span>
                     <span>•</span>
                     <span>Giới tính: <strong>{genderLabel(data.patient.gender)}</strong></span>
                     <span>•</span>
@@ -388,8 +402,8 @@ export default function PatientVerificationPage() {
 
             {/* Visit History */}
             <div>
-              <h3 className="text-lg font-bold text-[#111c2c] mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#003f87]">history</span>
+              <h3 className="text-lg font-bold text-[#020617] mb-4 flex items-center gap-2">
+                <History className="h-5 w-5 text-[#0891b2]" />
                 Lịch sử lượt khám ({data.visits.length} ca khám)
               </h3>
 
@@ -403,17 +417,17 @@ export default function PatientVerificationPage() {
                     const verification = visit.blockchainVerification || { status: 'unanchored' };
                     
                     return (
-                      <div key={visit.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all hover:border-slate-300">
+                      <div key={visit.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-colors hover:border-slate-300">
                         
                         {/* Card Header */}
                         <div className="bg-[#f0f3ff] px-6 py-4 border-b border-[#c2c6d4]/30 flex flex-wrap justify-between items-center gap-3">
                           <div className="flex items-center gap-3">
-                            <span className="p-2 bg-[#e7eeff] text-[#003f87] rounded-xl flex items-center justify-center">
-                              <span className="material-symbols-outlined fill">event_note</span>
+                            <span className="p-2 bg-[#e7eeff] text-[#0891b2] rounded-xl flex items-center justify-center">
+                              <CalendarCheck className="h-5 w-5" />
                             </span>
                             <div>
                               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Thời gian khám</div>
-                              <span className="text-sm font-bold text-[#111c2c]">
+                              <span className="text-sm font-bold text-[#020617]">
                                 {getVisitDisplayDate(visit) ? new Date(getVisitDisplayDate(visit)).toLocaleString('vi-VN') : 'Chưa cập nhật'}
                               </span>
                             </div>
@@ -422,19 +436,19 @@ export default function PatientVerificationPage() {
                           {/* On-Chain Badge */}
                           {verification.status === 'verified' && (
                             <span className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold rounded-full flex items-center gap-1.5 shadow-sm">
-                              <span className="material-symbols-outlined fill text-[14px]">check_circle</span>
+                              <CheckCircle2 className="h-3.5 w-3.5" />
                               Đã xác thực (khớp blockchain)
                             </span>
                           )}
                           {verification.status === 'tampered' && (
-                            <span className="px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-full flex items-center gap-1.5 animate-pulse shadow-sm shadow-rose-100">
-                              <span className="material-symbols-outlined fill text-[14px]">gpp_maybe</span>
+                            <span className="px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-full flex items-center gap-1.5 animate-pulse shadow-sm">
+                              <ShieldAlert className="h-3.5 w-3.5" />
                               Bị sửa đổi (cảnh báo toàn vẹn)
                             </span>
                           )}
                           {verification.status === 'unanchored' && (
                             <span className="px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold rounded-full flex items-center gap-1.5">
-                              <span className="material-symbols-outlined text-[14px]">hourglass_empty</span>
+                              <Clock3 className="h-3.5 w-3.5" />
                               Chưa neo (đang chờ blockchain)
                             </span>
                           )}
@@ -449,32 +463,32 @@ export default function PatientVerificationPage() {
                               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">
                                 Bác sĩ khám &amp; Phòng bệnh
                               </span>
-                              <p className="text-sm font-bold text-[#111c2c]">
+                              <p className="text-sm font-bold text-[#020617]">
                                 Bác sĩ: {getVisitStaffName(visit)}
                               </p>
-                              <p className="text-xs font-semibold text-[#424752] mt-0.5">
+                              <p className="text-xs font-semibold text-[#475569] mt-0.5">
                                 Phòng: {getVisitDepartmentName(visit)}
                               </p>
                             </div>
 
                             {getVisitConclusion(visit) ? (
                               <div className="p-4 bg-[#f9f9ff] border border-[#c2c6d4]/30 rounded-xl space-y-1.5">
-                                <span className="text-[10px] font-bold text-[#003f87] uppercase tracking-widest block">
+                                <span className="text-[10px] font-bold text-[#0891b2] uppercase tracking-widest block">
                                   Kết luận lâm sàng
                                 </span>
-                                <p className="text-sm font-bold text-[#111c2c]">
+                                <p className="text-sm font-bold text-[#020617]">
                                   Chẩn đoán: {getVisitConclusion(visit).finalDiagnosis}
                                 </p>
-                                <p className="text-xs font-semibold text-[#424752] leading-relaxed">
+                                <p className="text-xs font-semibold text-[#475569] leading-relaxed">
                                   Hướng điều trị: {getVisitConclusion(visit).treatmentPlan || 'Chưa ghi nhận'}
                                 </p>
-                                <p className="text-xs font-semibold text-[#424752] leading-relaxed">
+                                <p className="text-xs font-semibold text-[#475569] leading-relaxed">
                                   Ghi chú: {getVisitConclusion(visit).doctorNote || getVisitConclusion(visit).notes || 'Không có ghi chú thêm'}
                                 </p>
                               </div>
                             ) : (
                               <div className="p-4 bg-amber-50/50 border border-amber-100 rounded-xl text-amber-700 text-xs font-bold flex items-center gap-1.5">
-                                <span className="material-symbols-outlined text-[16px]">info</span>
+                                <Info className="h-4 w-4" />
                                 Chưa có kết luận chính thức từ bác sĩ.
                               </div>
                             )}
@@ -514,8 +528,8 @@ export default function PatientVerificationPage() {
                         {getVisitConclusion(visit)?.hash256 && (
                           <div className="border-t border-slate-100 bg-[#f9f9ff]/30 px-6 py-4 flex flex-col gap-3">
                             <div className="flex flex-wrap justify-between items-center gap-2">
-                              <span className="text-xs font-semibold text-[#424752] flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[16px] text-[#727784]">fingerprint</span>
+                              <span className="text-xs font-semibold text-[#475569] flex items-center gap-1">
+                                <Fingerprint className="h-4 w-4 text-[#727784]" />
                                 Hash chẩn đoán: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-[11px] font-mono text-slate-800 break-all">{getVisitConclusion(visit).hash256}</code>
                               </span>
                               
@@ -523,7 +537,7 @@ export default function PatientVerificationPage() {
                                 <button
                                   type="button"
                                   onClick={() => toggleProof(verification.seq)}
-                                  className="text-xs font-bold text-[#003f87] hover:underline flex items-center gap-1 active:scale-95"
+                                  className="text-xs font-bold text-[#0891b2] hover:underline flex items-center gap-1 active:scale-95"
                                 >
                                   {expandedProof === verification.seq ? 'Ẩn chi tiết Blockchain ▴' : 'Xem chi tiết Blockchain ▾'}
                                 </button>
@@ -534,7 +548,7 @@ export default function PatientVerificationPage() {
                             {expandedProof === verification.seq && verification.proofDetails && (
                               <div className="mt-3 p-5 bg-[#1e293b] text-slate-300 font-mono text-[11px] rounded-xl space-y-2 border border-slate-800 overflow-x-auto shadow-inner">
                                 <p className="text-[#38bdf8] font-bold border-b border-slate-800 pb-1.5 mb-3 flex items-center gap-1.5">
-                                  <span className="material-symbols-outlined text-[16px] text-[#38bdf8]">account_tree</span>
+                                  <GitBranch className="h-4 w-4 text-[#38bdf8]" />
                                   BẰNG CHỨNG MẬT MÃ TRÊN BLOCKCHAIN (BẰNG CHỨNG MERKLE)
                                 </p>
                                 <p>
@@ -561,7 +575,7 @@ export default function PatientVerificationPage() {
                                   </ul>
                                 </div>
                                 <div className="text-emerald-400 font-bold mt-3 pt-2.5 border-t border-slate-800 flex items-center gap-1.5">
-                                  <span className="material-symbols-outlined text-[16px] text-emerald-400">verified</span>
+                                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
                                   Trạng thái hợp đồng thông minh: đã xác thực và đã neo (toàn vẹn tuyệt đối)
                                 </div>
                               </div>
@@ -585,7 +599,7 @@ export default function PatientVerificationPage() {
             onClick={(e) => { e.preventDefault(); setPatientCode(''); setData(null); setError(null); }}
             className="font-label-md text-label-md font-bold text-primary flex items-center gap-2 cursor-pointer"
           >
-            <span className="material-symbols-outlined fill" style={{ fontVariationSettings: "'FILL' 1" }}>health_and_safety</span>
+            <HeartPulse className="h-5 w-5" strokeWidth={2.25} />
             Định danh Y tế
           </div>
           <div className="flex flex-wrap justify-center gap-6 font-caption text-caption text-on-surface-variant dark:text-outline-variant font-semibold">
@@ -603,7 +617,7 @@ export default function PatientVerificationPage() {
       {/* QR Scanner Modal: upload an image or scan via camera */}
       {qrModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 backdrop-blur-sm p-4 animate-fade-in-up">
-          <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl overflow-hidden">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Cổng kiểm chứng</p>
@@ -631,7 +645,7 @@ export default function PatientVerificationPage() {
                   <canvas ref={canvasRef} className="hidden" />
                   {!cameraActive && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-300 text-xs font-semibold gap-2">
-                      <span className="material-symbols-outlined text-[40px]">photo_camera</span>
+                      <Camera className="h-10 w-10" />
                       Camera chưa bật
                     </div>
                   )}
@@ -644,7 +658,7 @@ export default function PatientVerificationPage() {
                     <button
                       type="button"
                       onClick={startCameraScan}
-                      className="flex-1 rounded-xl bg-primary text-on-primary font-bold text-xs py-2.5 hover:translate-y-[-1px] transition-transform shadow-[0px_4px_10px_rgba(70,86,162,0.2)]"
+                      className="flex-1 rounded-xl bg-primary text-on-primary font-bold text-xs py-2.5  transition-transform shadow-sm"
                     >
                       Bật camera & quét
                     </button>
@@ -662,7 +676,7 @@ export default function PatientVerificationPage() {
 
               {/* Upload area */}
               <div className="rounded-2xl border-2 border-dashed border-primary-fixed/60 bg-surface-container-low/40 p-5 text-center">
-                <span className="material-symbols-outlined text-primary text-[28px]">upload_file</span>
+                <Upload className="mx-auto h-7 w-7 text-primary" />
                 <p className="mt-2 text-xs font-bold text-slate-700">Tải ảnh chứa mã QR</p>
                 <p className="mt-0.5 text-[11px] font-semibold text-slate-500">JPG, PNG · Đối với PDF, hãy chụp ảnh trang QR</p>
                 <input
@@ -677,14 +691,14 @@ export default function PatientVerificationPage() {
                   htmlFor="qr-file-input"
                   className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white border border-primary-fixed text-primary font-bold text-xs px-4 py-2 cursor-pointer hover:bg-surface-container-low transition-colors"
                 >
-                  <span className="material-symbols-outlined text-[16px]">attach_file</span>
+                  <Paperclip className="h-4 w-4" />
                   Chọn tệp ảnh
                 </label>
               </div>
 
               {qrError && (
                 <div className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-[11px] font-bold text-rose-700 flex items-start gap-1.5">
-                  <span className="material-symbols-outlined text-[16px] shrink-0">error</span>
+                  <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>{qrError}</span>
                 </div>
               )}
@@ -710,15 +724,15 @@ function AiDiagnosisSummary({ aiDiagnosis }) {
   const primaryProbability = parsed.probabilities[0];
 
   return (
-    <div className="min-w-0 flex-1 rounded-xl border border-indigo-100 bg-white shadow-sm overflow-hidden">
+    <div className="min-w-0 flex-1 rounded-xl border border-cyan-100 bg-white shadow-sm overflow-hidden">
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="flex w-full items-start justify-between gap-3 p-3 text-left hover:bg-indigo-50/40 transition-colors"
+        className="flex w-full items-start justify-between gap-3 p-3 text-left hover:bg-cyan-50/40 transition-colors"
         aria-expanded={expanded}
       >
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-wider text-indigo-600">Tóm tắt AI</p>
+          <p className="text-[10px] font-black uppercase tracking-wider text-cyan-600">Tóm tắt AI</p>
           <p className="mt-1 line-clamp-3 text-xs font-semibold leading-relaxed text-slate-700">
             {parsed.summary}
           </p>
@@ -728,13 +742,13 @@ function AiDiagnosisSummary({ aiDiagnosis }) {
             </p>
           )}
         </div>
-        <span className="shrink-0 rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-black text-indigo-700">
+        <span className="shrink-0 rounded-full bg-cyan-50 px-2.5 py-1 text-[10px] font-black text-cyan-700">
           {expanded ? 'Thu gọn ▲' : 'Chi tiết ▼'}
         </span>
       </button>
 
       {expanded && (
-        <div className="space-y-3 border-t border-indigo-50 bg-slate-50/60 p-3 animate-fade-in-up">
+        <div className="space-y-3 border-t border-cyan-50 bg-slate-50/60 p-3 animate-fade-in-up">
           {parsed.probabilities.length > 0 && (
             <div className="space-y-1.5">
               <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Khả năng gợi ý</p>

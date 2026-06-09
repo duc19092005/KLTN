@@ -9,14 +9,14 @@ import { shiftService } from '../apis/paraclinicalService';
 import { LAB_MANAGER_NAV_ITEMS, labManagerRouteFor } from '../../lab-manager/constants/navigation';
 
 const SHIFT_WINDOWS = {
-  A: { label: 'Ca A', time: '07:00 - 12:00', accent: 'from-amber-400 to-orange-500', soft: 'bg-amber-50 border-amber-200 text-amber-900' },
-  B: { label: 'Ca B', time: '13:00 - 17:00', accent: 'from-cyan-500 to-blue-600', soft: 'bg-cyan-50 border-cyan-200 text-cyan-900' },
+  A: { label: 'Ca A', time: '07:00 - 12:00', soft: 'bg-slate-50 border-slate-200 text-slate-800' },
+  B: { label: 'Ca B', time: '13:00 - 17:00', soft: 'bg-slate-50 border-slate-200 text-slate-800' },
 };
 
 const STATUS_META = {
   PENDING: { label: 'Chờ duyệt', dot: 'bg-amber-400', bg: 'bg-amber-50 border-amber-200 text-amber-800' },
   APPROVED: { label: 'Đã duyệt', dot: 'bg-emerald-500', bg: 'bg-emerald-50 border-emerald-200 text-emerald-800' },
-  REJECTED: { label: 'Từ chối', dot: 'bg-red-400', bg: 'bg-red-50 border-red-200 text-red-700' },
+  REJECTED: { label: 'Từ chối', dot: 'bg-rose-400', bg: 'bg-rose-50 border-rose-200 text-rose-700' },
 };
 
 const DAYS_OF_WEEK = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -198,29 +198,29 @@ export default function ShiftManagementPage() {
   return (
     <DashboardLayout user={user} navItems={LAB_MANAGER_NAV_ITEMS} activeItem="shifts" onNavigate={(id) => navigate(labManagerRouteFor(id))} onLogout={logout}>
       <div className="mx-auto max-w-7xl space-y-5 pb-12">
-        <section className="relative overflow-hidden rounded-[2rem] border border-cyan-100 bg-gradient-to-br from-slate-950 via-cyan-950 to-blue-950 p-6 text-white shadow-2xl shadow-cyan-950/20">
-          <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-cyan-400/20 blur-3xl" />
-          <div className="absolute bottom-0 left-1/3 h-32 w-32 rounded-full bg-blue-400/20 blur-3xl" />
+        <section className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-white p-6 shadow-sm">
+          <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-cyan-100/70 blur-3xl" />
+          <div className="absolute bottom-0 left-1/3 h-32 w-32 rounded-full bg-cyan-100/60 blur-3xl" />
           <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan-200">Lịch trực cận lâm sàng · Ca chuẩn</p>
-              <h1 className="mt-2 text-3xl font-black">Đăng ký Ca A / Ca B</h1>
-              <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-cyan-50/80">
+              <p className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan-600">Lịch trực cận lâm sàng · Ca chuẩn</p>
+              <h1 className="mt-2 text-3xl font-black text-slate-950">Đăng ký Ca A / Ca B</h1>
+              <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-slate-600">
                 Nhân viên đăng ký ca theo ngày, quản lý duyệt trước khi ca có hiệu lực. Chỉ ca <b>Đã duyệt</b> mới được tính là đang trực để xử lý chỉ định.
               </p>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               {Object.entries(SHIFT_WINDOWS).map(([code, meta]) => (
-                <div key={code} className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur">
-                  <p className="text-xs font-black text-white">{meta.label}</p>
-                  <p className="text-lg font-black text-cyan-100">{meta.time}</p>
+                <div key={code} className="rounded-2xl border border-cyan-100 bg-white/80 p-3 shadow-sm">
+                  <p className="text-xs font-black text-cyan-700">{meta.label}</p>
+                  <p className="text-lg font-black text-slate-950">{meta.time}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+        <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               {rooms.length > 0 && (
@@ -234,7 +234,7 @@ export default function ShiftManagementPage() {
               <button onClick={goToday} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50">Hôm nay</button>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button onClick={openBulkRegister} disabled={selectedSlots.length === 0} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white shadow-lg shadow-cyan-600/20 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50">Gửi {selectedSlots.length || ''} ca đã chọn</button>
+              <button onClick={openBulkRegister} disabled={selectedSlots.length === 0} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white shadow-sm hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50">Gửi {selectedSlots.length || ''} ca đã chọn</button>
               <button onClick={() => setSelectedSlots([])} disabled={selectedSlots.length === 0} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">Bỏ chọn</button>
               <button onClick={() => setShowHistory(true)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50">Lịch sử đăng ký</button>
             </div>
@@ -242,13 +242,13 @@ export default function ShiftManagementPage() {
           <div className="mt-3 flex flex-wrap items-center gap-4 text-[10px] font-bold text-slate-500">
             <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> Chờ duyệt</span>
             <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-emerald-500" /> Đã duyệt</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-400" /> Từ chối</span>
+            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-rose-400" /> Từ chối</span>
             <span className="text-slate-400">Chỉ chọn được ca có ngày trực cách hôm nay tối thiểu 7 ngày. Click nhiều Ca A/Ca B rồi bấm “Gửi ca đã chọn”.</span>
           </div>
         </section>
 
         {loading ? <LoadingIndicator size="lg" label="Đang tải lịch trực..." /> : (
-          <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+          <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
             <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/80">
               {DAYS_OF_WEEK.map((day) => <div key={day} className="py-3 text-center text-[11px] font-black uppercase text-slate-400">{day}</div>)}
             </div>
@@ -269,7 +269,7 @@ export default function ShiftManagementPage() {
                         const disabled = day.isOtherMonth || isBeforeRegistrationWindow;
                         const isSelected = selectedSlots.some((slot) => slot.workDate === dateStr && slot.shiftCode === code);
                         return (
-                          <button key={code} type="button" disabled={disabled} onClick={() => toggleSlot(dateStr, code)} className={`w-full rounded-2xl border p-2 text-left transition-all ${disabled ? 'cursor-not-allowed border-slate-100 bg-slate-50 opacity-60' : isSelected ? 'scale-[1.02] border-violet-400 bg-violet-50 shadow-lg shadow-violet-200/70 ring-2 ring-violet-300' : `${meta.soft} hover:-translate-y-0.5 hover:shadow-lg`}`}>
+                          <button key={code} type="button" disabled={disabled} onClick={() => toggleSlot(dateStr, code)} className={`w-full rounded-xl border p-2 text-left transition-colors ${disabled ? 'cursor-not-allowed border-slate-100 bg-slate-50 opacity-60' : isSelected ? 'border-cyan-400 bg-cyan-50 shadow-sm ring-2 ring-cyan-200' : `${meta.soft} hover:border-cyan-200 hover:bg-cyan-50/60`}`}>
                             <div className="flex items-center justify-between gap-2">
                               <span className="text-[11px] font-black">{meta.label}</span>
                               <span className="text-[9px] font-bold opacity-70">{meta.time}</span>
@@ -305,8 +305,8 @@ function RegisterModal({ form, setForm, selectedSlots, onSubmit, onClose, rooms,
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-md">
-      <div className="w-full max-w-xl overflow-hidden rounded-[2rem] border border-white/70 bg-white shadow-2xl">
-        <div className="bg-gradient-to-br from-cyan-600 via-blue-600 to-indigo-700 p-6 text-white">
+      <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-white/70 bg-white shadow-xl">
+        <div className="bg-gradient-to-br from-cyan-600 via-cyan-600 to-cyan-700 p-6 text-white">
           <span className="rounded-full bg-white/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ring-1 ring-white/20">Đăng ký · Chờ duyệt</span>
           <h3 className="mt-3 text-xl font-black">Xác nhận {slots.length} ca trực</h3>
           <p className="mt-1 text-xs font-semibold text-cyan-50">Các ca đã chọn sẽ được gửi đăng ký trong một lần.</p>
@@ -324,13 +324,13 @@ function RegisterModal({ form, setForm, selectedSlots, onSubmit, onClose, rooms,
           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-[11px] font-black uppercase tracking-wider text-slate-600">Ca đã chọn</p>
-              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-700">{slots.length} ca</span>
+              <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-black text-cyan-700">{slots.length} ca</span>
             </div>
             <div className="grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2">
               {slots.map((slot) => {
                 const meta = SHIFT_WINDOWS[slot.shiftCode];
                 return (
-                  <div key={`${slot.workDate}:${slot.shiftCode}`} className={`rounded-xl border px-3 py-2 ${meta.soft}`}>
+                  <div key={`${slot.workDate}:${slot.shiftCode}`} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-800">
                     <p className="text-xs font-black">{formatDateLocal(new Date(slot.workDate))}</p>
                     <p className="mt-0.5 text-[11px] font-bold">{meta.label} · {meta.time}</p>
                   </div>
@@ -344,7 +344,7 @@ function RegisterModal({ form, setForm, selectedSlots, onSubmit, onClose, rooms,
           </div>
           <div className="flex gap-2 pt-2">
             <button type="button" disabled={submitting} onClick={onClose} className="flex-1 rounded-xl border border-slate-200 py-3 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-50">Hủy</button>
-            <button type="submit" disabled={submitting || !form.roomId || slots.length === 0} className="flex-1 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 py-3 text-xs font-black text-white shadow-lg shadow-cyan-600/25 hover:from-cyan-700 hover:to-blue-700 disabled:opacity-60">{submitting ? 'Đang gửi...' : `Gửi ${slots.length} đăng ký`}</button>
+            <button type="submit" disabled={submitting || !form.roomId || slots.length === 0} className="flex-1 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-600 py-3 text-xs font-black text-white shadow-sm hover:from-cyan-700 hover:to-cyan-700 disabled:opacity-60">{submitting ? 'Đang gửi...' : `Gửi ${slots.length} đăng ký`}</button>
           </div>
         </form>
       </div>
@@ -357,15 +357,15 @@ function HistoryModal({ shifts, loading, onClose }) {
   const filtered = useMemo(() => (filter ? shifts.filter((shift) => shift.status === filter) : shifts), [shifts, filter]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
-        <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div className="border-b border-slate-100 bg-white p-5">
           <div className="flex items-center justify-between">
-            <div><h3 className="text-lg font-black text-white">Lịch sử đăng ký ca</h3><p className="mt-1 text-xs text-slate-400">Danh sách ca A/B bạn đã đăng ký.</p></div>
-            <button onClick={onClose} className="rounded-xl border border-slate-600 px-4 py-2 text-xs font-black text-slate-300 hover:bg-slate-700">Đóng</button>
+            <div><h3 className="text-lg font-black text-slate-950">Lịch sử đăng ký ca</h3><p className="mt-1 text-xs font-semibold text-slate-500">Danh sách ca A/B bạn đã đăng ký.</p></div>
+            <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-black text-slate-600 hover:bg-slate-50">Đóng</button>
           </div>
           <div className="mt-3 flex gap-1.5">
-            {['', 'PENDING', 'APPROVED', 'REJECTED'].map((status) => <button key={status} onClick={() => setFilter(status)} className={`rounded-lg px-3 py-1.5 text-[10px] font-bold ${filter === status ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:bg-white/10 hover:text-white'}`}>{status ? STATUS_META[status]?.label || status : 'Tất cả'}</button>)}
+            {['', 'PENDING', 'APPROVED', 'REJECTED'].map((status) => <button key={status} onClick={() => setFilter(status)} className={`rounded-lg border px-3 py-1.5 text-[10px] font-bold ${filter === status ? 'border-cyan-600 bg-cyan-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>{status ? STATUS_META[status]?.label || status : 'Tất cả'}</button>)}
           </div>
         </div>
         <div className="flex-1 space-y-2 overflow-y-auto p-4">
@@ -378,7 +378,7 @@ function HistoryModal({ shifts, loading, onClose }) {
                   <p className="text-xs font-black">{formatDateLocal(new Date(shift.workDate || shift.startTime))} · {SHIFT_WINDOWS[code]?.label}</p>
                   <p className="mt-0.5 text-[11px] font-bold">{SHIFT_WINDOWS[code]?.time || `${formatTimeLocal(shift.startTime)} - ${formatTimeLocal(shift.endTime)}`}</p>
                   <p className="mt-0.5 max-w-[300px] truncate text-[10px] text-slate-500">Ghi chú: {shift.note || 'Không có'}</p>
-                  {shift.status === 'REJECTED' && <p className="mt-0.5 text-[10px] text-red-600">Lý do: {shift.rejectionReason || 'Không có'}</p>}
+                  {shift.status === 'REJECTED' && <p className="mt-0.5 text-[10px] text-rose-600">Lý do: {shift.rejectionReason || 'Không có'}</p>}
                 </div>
                 <span className={`inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-[10px] font-black ${meta.bg}`}><span className={`mr-1 h-1.5 w-1.5 rounded-full ${meta.dot}`} />{meta.label}</span>
               </div>

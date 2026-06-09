@@ -6,8 +6,8 @@ import { useToast } from '../../../providers/ToastProvider';
 const emptyPatient = { fullName: '', gender: 'MALE', birthDate: '', citizenId: '', phone: '', address: '', insuranceNumber: '', emergencyContact: '' };
 const GENDERS = [{ value: 'MALE', label: 'Nam' }, { value: 'FEMALE', label: 'Nữ' }, { value: 'OTHER', label: 'Khác' }];
 const genderLabel = (value) => GENDERS.find((item) => item.value === value)?.label || value || 'Chưa rõ';
-function Input({ id, label, value, onChange, required, type = 'text', placeholder }) { return <label htmlFor={id} className="block space-y-1"><span className="text-[12px] font-bold text-slate-600">{label}{required && <span className="text-red-500 ml-0.5">*</span>}</span><input id={id} type={type} value={value || ''} required={required} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none" /></label>; }
-function Select({ id, label, value, onChange, options }) { return <label htmlFor={id} className="block space-y-1"><span className="text-[12px] font-bold text-slate-600">{label}</span><select id={id} value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none">{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></label>; }
+function Input({ id, label, value, onChange, required, type = 'text', placeholder }) { return <label htmlFor={id} className="block space-y-1"><span className="text-[12px] font-bold text-slate-600">{label}{required && <span className="text-rose-500 ml-0.5">*</span>}</span><input id={id} type={type} value={value || ''} required={required} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none" /></label>; }
+function Select({ id, label, value, onChange, options }) { return <label htmlFor={id} className="block space-y-1"><span className="text-[12px] font-bold text-slate-600">{label}</span><select id={id} value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none">{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></label>; }
 
 export default function PatientFinder({ onPatientSelected }) {
   const [query, setQuery] = useState('');
@@ -67,7 +67,7 @@ export default function PatientFinder({ onPatientSelected }) {
             </div>
           ) : (
             results.map((p) => (
-              <button key={p.id} onClick={() => onPatientSelected(p)} className="w-full text-left rounded-2xl border border-slate-100 bg-white p-4 shadow-sm hover:border-cyan-300 hover:shadow-cyan-50 transition-all group">
+              <button key={p.id} onClick={() => onPatientSelected(p)} className="w-full text-left rounded-2xl border border-slate-100 bg-white p-4 shadow-sm hover:border-cyan-300 transition-colors group">
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="font-black text-slate-900 group-hover:text-cyan-700">{p.fullName}</p>

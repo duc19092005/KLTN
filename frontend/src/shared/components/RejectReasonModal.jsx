@@ -67,11 +67,11 @@ export default function RejectReasonModal({
         if (e.target === e.currentTarget && !submitting) onClose?.();
       }}
     >
-      <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 p-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
               <AlertTriangle className="h-5 w-5" />
             </div>
             <div>
@@ -102,15 +102,15 @@ export default function RejectReasonModal({
             placeholder="Nhập lý do để nhân viên hiểu vì sao ca trực bị từ chối..."
             className={`w-full resize-none rounded-xl border px-3 py-2.5 text-sm font-semibold outline-none transition-colors focus:ring-1 ${
               tooLong
-                ? 'border-red-300 focus:border-red-400 focus:ring-red-400'
+                ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-400'
                 : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-400'
             }`}
           />
           <div className="mt-1 flex items-center justify-between">
-            <p className={`text-[11px] font-bold ${tooLong ? 'text-red-500' : 'text-slate-400'}`}>
+            <p className={`text-[11px] font-bold ${tooLong ? 'text-rose-500' : 'text-slate-400'}`}>
               {tooLong ? 'Lý do không được vượt quá 500 ký tự.' : 'Để trống nếu không cần ghi lý do.'}
             </p>
-            <span className={`text-[11px] font-bold ${tooLong ? 'text-red-500' : 'text-slate-400'}`}>
+            <span className={`text-[11px] font-bold ${tooLong ? 'text-rose-500' : 'text-slate-400'}`}>
               {reason.length}/{MAX_LEN}
             </span>
           </div>
@@ -130,7 +130,7 @@ export default function RejectReasonModal({
             type="button"
             onClick={handleConfirm}
             disabled={submitting || tooLong}
-            className="flex-1 rounded-xl bg-red-600 py-2.5 text-xs font-black text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex-1 rounded-xl bg-rose-600 py-2.5 text-xs font-black text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? 'Đang xử lý...' : confirmLabel}
           </button>

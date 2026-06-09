@@ -91,9 +91,9 @@ export default function HandoverModal({ isOpen, onClose, currentStaff, departmen
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="rounded-3xl bg-white shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+      <div className="rounded-2xl bg-white shadow-xl w-full max-w-lg mx-4 overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 p-5">
+        <div className="bg-gradient-to-r from-cyan-600 to-cyan-600 p-5">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-black text-white">Bàn giao ca trực</h2>
@@ -115,7 +115,7 @@ export default function HandoverModal({ isOpen, onClose, currentStaff, departmen
         {/* Content */}
         <div className="p-5">
           {error && (
-            <div className="rounded-2xl bg-red-50 border border-red-100 p-3 mb-4 text-sm font-bold text-red-700 text-center">
+            <div className="rounded-2xl bg-rose-50 border border-rose-100 p-3 mb-4 text-sm font-bold text-rose-700 text-center">
               {error}
             </div>
           )}
@@ -162,13 +162,13 @@ export default function HandoverModal({ isOpen, onClose, currentStaff, departmen
           {/* Step 2: Face A */}
           {step === 2 && (
             <div className="space-y-4">
-              <div className="rounded-2xl bg-blue-50 border border-blue-100 p-4 text-center">
-                <p className="text-sm font-black text-blue-800">Bước 1: Quét mặt người bàn giao</p>
-                <p className="text-xs font-bold text-blue-600 mt-1">{currentStaff?.fullName || 'Bạn'}</p>
+              <div className="rounded-2xl bg-cyan-50 border border-cyan-100 p-4 text-center">
+                <p className="text-sm font-black text-cyan-800">Bước 1: Quét mặt người bàn giao</p>
+                <p className="text-xs font-bold text-cyan-600 mt-1">{currentStaff?.fullName || 'Bạn'}</p>
               </div>
               {loading ? (
                 <div className="flex flex-col items-center py-8">
-                  <LoadingIndicator size="lg" tone="blue" />
+                  <LoadingIndicator size="lg" tone="cyan" />
                   <p className="mt-4 text-sm font-bold text-slate-600">Đang xác thực...</p>
                 </div>
               ) : (
@@ -186,7 +186,7 @@ export default function HandoverModal({ isOpen, onClose, currentStaff, departmen
               </div>
               {loading ? (
                 <div className="flex flex-col items-center py-8">
-                  <LoadingIndicator size="lg" tone="blue" />
+                  <LoadingIndicator size="lg" tone="cyan" />
                   <p className="mt-4 text-sm font-bold text-slate-600">Đang xác thực & neo blockchain...</p>
                 </div>
               ) : (
@@ -210,7 +210,7 @@ export default function HandoverModal({ isOpen, onClose, currentStaff, departmen
                   Sự kiện đã được neo bất biến lên chuỗi khối
                 </p>
               </div>
-              <button onClick={handleClose} className="rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-black text-white hover:bg-emerald-700">
+              <button onClick={handleClose} className="rounded-xl bg-cyan-600 px-6 py-2.5 text-xs font-black text-white hover:bg-cyan-700">
                 Hoàn tất
               </button>
             </div>

@@ -23,17 +23,15 @@ export function usePreferences() {
 // Curated accent palette — harmonized with the "Hospital OS" design system. Each maps to a hex
 // exposed as the `--app-accent` CSS variable so personalized surfaces can opt in.
 export const ACCENTS = {
-  indigo: { label: 'Chàm', hex: '#4f46e5' },
   cyan: { label: 'Xanh ngọc', hex: '#0891b2' },
-  emerald: { label: 'Lục bảo', hex: '#059669' },
-  violet: { label: 'Tím', hex: '#7c3aed' },
-  rose: { label: 'Hồng', hex: '#e11d48' },
-  amber: { label: 'Hổ phách', hex: '#d97706' },
+  teal: { label: 'Xanh teal', hex: '#0f766e' },
+  sky: { label: 'Xanh trời', hex: '#0284c7' },
+  slate: { label: 'Xám y tế', hex: '#475569' },
 };
 
 export const DEFAULT_PREFERENCES = {
   timeFormat: '24h', // '24h' | '12h'
-  accent: 'indigo', // key of ACCENTS
+  accent: 'cyan', // key of ACCENTS
   reduceMotion: false, // calm UI: kill non-essential animations
   compactTables: false, // denser tables for data-heavy roles
   soundAlerts: true, // audible cue for new queue / results
@@ -79,7 +77,7 @@ export function PreferencesProvider({ children }) {
     const root = document.documentElement;
     root.dataset.reduceMotion = prefs.reduceMotion ? 'true' : 'false';
     root.dataset.density = prefs.compactTables ? 'compact' : 'comfortable';
-    root.style.setProperty('--app-accent', (ACCENTS[prefs.accent] || ACCENTS.indigo).hex);
+    root.style.setProperty('--app-accent', (ACCENTS[prefs.accent] || ACCENTS.cyan).hex);
   }, [prefs, user?.id, user?.username]);
 
   const setPreference = useCallback((key, value) => {
@@ -101,7 +99,7 @@ export function PreferencesProvider({ children }) {
     [prefs.timeFormat],
   );
 
-  const accentHex = (ACCENTS[prefs.accent] || ACCENTS.indigo).hex;
+  const accentHex = (ACCENTS[prefs.accent] || ACCENTS.cyan).hex;
 
   const value = useMemo(
     () => ({ prefs, setPreference, resetPreferences, formatTime, accentHex }),

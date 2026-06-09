@@ -222,7 +222,7 @@ export default function AiModelsPage() {
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="aiModels" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
       <div className="mx-auto max-w-5xl space-y-5">
-        <section className="rounded-[28px] border border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-emerald-50 p-7 shadow-sm">
+        <section className="rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-white p-7 shadow-sm">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
             <div>
               <p className="text-[11px] uppercase tracking-[0.28em] font-black text-cyan-600">Danh mục mô hình AI</p>
@@ -230,7 +230,7 @@ export default function AiModelsPage() {
               <p className="mt-3 max-w-3xl text-sm text-slate-600">Một luồng duy nhất cho mọi mô hình. Chọn nền tảng đám mây hoặc mô hình tự lưu trữ (Llama, Ollama, vLLM) - chỉ cần dán điểm cuối API là chạy.</p>
               <span className="mt-4 inline-flex rounded-full bg-cyan-100 px-3 py-1 text-[11px] font-black text-cyan-700">{pagination.total} mô hình</span>
             </div>
-            <button type="button" onClick={openCreateModal} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-cyan-100 hover:bg-cyan-700 transition-all">+ Thêm mô hình AI</button>
+            <button type="button" onClick={openCreateModal} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 transition-colors">+ Thêm mô hình AI</button>
           </div>
         </section>
 
@@ -238,7 +238,7 @@ export default function AiModelsPage() {
           {stats.map((item) => <div key={item.label} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"><p className="text-[10px] uppercase tracking-wider text-slate-400 font-black">{item.label}</p><strong className="mt-1 block text-2xl font-black text-slate-950">{String(item.value).padStart(2, '0')}</strong></div>)}
         </section>
 
-        <section className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+        <section className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
@@ -266,7 +266,7 @@ export default function AiModelsPage() {
 
         {/* Bảng phân tích & Xác thực toàn vẹn Đánh giá AI */}
         {statsData && (
-          <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm space-y-6">
+          <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm space-y-6">
             <div>
               <span className="text-[10px] uppercase tracking-[0.2em] font-black text-cyan-600 bg-cyan-50 px-2.5 py-1 rounded-md">Kiểm định chất lượng và bảo mật AI</span>
               <h2 className="text-xl font-black text-slate-950 mt-2">Bảng điều khiển Chất lượng & Xác thực Đánh giá AI</h2>
@@ -275,31 +275,31 @@ export default function AiModelsPage() {
 
             {/* Top & Bottom Models */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/20 p-5 space-y-4">
-                <h3 className="text-sm font-black text-emerald-950 flex items-center gap-2">
+              <div className="rounded-2xl border border-slate-100 bg-white p-5 space-y-4 shadow-sm">
+                <h3 className="text-sm font-black text-slate-950 flex items-center gap-2">
 	              Mô hình được đánh giá cao nhất
                 </h3>
                 <div className="space-y-2">
                   {statsData.topModels?.map((m) => (
-                    <div key={m.id} className="flex justify-between items-center rounded-xl bg-white border border-emerald-100/60 p-3 shadow-xs">
+                    <div key={m.id} className="flex justify-between items-center rounded-xl bg-slate-50 border border-slate-100 p-3 shadow-xs">
                       <div>
                         <strong className="block text-xs text-slate-900">{m.modelName}</strong>
 	                        <span className="text-[10px] font-bold text-slate-400">Phiên bản {m.modelVersion} · {providerLabel(m.provider) || m.provider}</span>
                       </div>
-                      <span className="rounded-lg bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-700">{m.averageAccuracy}% tin cậy</span>
+                      <span className="rounded-lg bg-cyan-50 px-2 py-1 text-xs font-black text-cyan-700">{m.averageAccuracy}% tin cậy</span>
                     </div>
                   ))}
                   {!statsData.topModels?.length && <div className="text-xs text-slate-500 italic text-center py-4">Chưa có đánh giá nào.</div>}
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-rose-100 bg-rose-50/20 p-5 space-y-4">
-                <h3 className="text-sm font-black text-rose-950 flex items-center gap-2">
+              <div className="rounded-2xl border border-slate-100 bg-white p-5 space-y-4 shadow-sm">
+                <h3 className="text-sm font-black text-slate-950 flex items-center gap-2">
 	                  Mô hình được đánh giá thấp nhất
                 </h3>
                 <div className="space-y-2">
                   {statsData.bottomModels?.map((m) => (
-                    <div key={m.id} className="flex justify-between items-center rounded-xl bg-white border border-rose-100/60 p-3 shadow-xs">
+                    <div key={m.id} className="flex justify-between items-center rounded-xl bg-slate-50 border border-slate-100 p-3 shadow-xs">
                       <div>
                         <strong className="block text-xs text-slate-900">{m.modelName}</strong>
 	                        <span className="text-[10px] font-bold text-slate-400">Phiên bản {m.modelVersion} · {providerLabel(m.provider) || m.provider}</span>
@@ -398,7 +398,7 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-      <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-[32px] border border-white/60 bg-white shadow-2xl">
+      <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/60 bg-white shadow-xl">
         <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 p-6 backdrop-blur">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -452,7 +452,7 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
 
           <label className="block">
             <span className="text-xs font-black text-slate-600">
-	              Khóa API / Token {keyRequired ? <span className="text-red-500">*</span> : <span className="font-bold text-slate-400">(tùy chọn)</span>}
+	              Khóa API / Token {keyRequired ? <span className="text-rose-500">*</span> : <span className="font-bold text-slate-400">(tùy chọn)</span>}
             </span>
             <textarea
               required={keyRequired}
@@ -477,7 +477,7 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
 
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600">Hủy</button>
-            <button disabled={saving} className="flex-1 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-100 transition-all hover:bg-slate-800 disabled:opacity-60">{saving ? 'Đang lưu...' : 'Thêm mô hình AI'}</button>
+            <button disabled={saving} className="flex-1 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-cyan-700 disabled:opacity-60">{saving ? 'Đang lưu...' : 'Thêm mô hình AI'}</button>
           </div>
         </form>
       </div>
@@ -507,10 +507,10 @@ function ModelPicker({ form, updateForm }) {
   );
 }
 
-function Field({ label, value, onChange, required = false, placeholder = '' }) { return <label className="block"><span className="text-xs font-black text-slate-600">{label}{required && <span className="text-red-500"> *</span>}</span><input required={required} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100" /></label>; }
+function Field({ label, value, onChange, required = false, placeholder = '' }) { return <label className="block"><span className="text-xs font-black text-slate-600">{label}{required && <span className="text-rose-500"> *</span>}</span><input required={required} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100" /></label>; }
 function ModelCard({ model }) {
   const isLocal = model.provider === 'local';
-  const badgeCls = isLocal ? 'bg-purple-50 text-purple-700 border-purple-100' : 'bg-blue-50 text-blue-700 border-blue-100';
+  const badgeCls = isLocal ? 'bg-cyan-50 text-cyan-700 border-cyan-100' : 'bg-cyan-50 text-cyan-700 border-cyan-100';
   const badge = isLocal ? 'TỰ LƯU TRỮ' : (providerLabel(model.provider) || model.provider || 'API').toUpperCase();
   const hasAccuracy = model.averageAccuracy !== null && model.averageAccuracy !== undefined;
 
@@ -522,7 +522,7 @@ function ModelCard({ model }) {
             <h3 className="font-black text-slate-950">{model.modelName}</h3>
             <span className={`rounded-full border px-2 py-1 text-[10px] font-black ${badgeCls}`}>{badge}</span>
             {hasAccuracy && (
-              <span className={`rounded-full border px-2 py-1 text-[10px] font-black ${model.averageAccuracy >= 80 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
+              <span className={`rounded-full border px-2 py-1 text-[10px] font-black ${model.averageAccuracy >= 80 ? 'bg-cyan-50 text-cyan-700 border-cyan-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
                 Độ tin cậy: {model.averageAccuracy}% ({model.totalRatings} đánh giá)
               </span>
             )}
@@ -531,7 +531,7 @@ function ModelCard({ model }) {
         </div>
         <div className="flex gap-2 items-center">
           <BlockchainStatusBadge status={model.blockchainStatus} />
-          <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-emerald-700 border border-slate-100 shadow-xs">AES-256</span>
+          <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-cyan-700 border border-slate-100 shadow-xs">AES-256</span>
         </div>
       </div>
       <p className="mt-3 text-sm text-slate-600">{model.description || 'Chưa có mô tả'}</p>
@@ -548,7 +548,7 @@ function ModelCard({ model }) {
     </article>
   );
 }
-function Alert({ tone, message }) { const cls = tone === 'error' ? 'bg-red-50 border-red-100 text-red-700' : 'bg-emerald-50 border-emerald-100 text-emerald-800'; return <div className={`rounded-2xl border p-4 text-sm font-bold ${cls}`}>{message}</div>; }
+function Alert({ tone, message }) { const cls = tone === 'error' ? 'bg-rose-50 border-rose-100 text-rose-700' : 'bg-emerald-50 border-emerald-100 text-emerald-800'; return <div className={`rounded-2xl border p-4 text-sm font-bold ${cls}`}>{message}</div>; }
 function Empty({ title, desc }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><strong className="text-slate-800">{title}</strong><p className="mt-1 text-sm text-slate-500">{desc}</p></div>; }
 function Pagination({ pagination, onPageChange }) {
   return (

@@ -132,13 +132,13 @@ export default function NotificationBell() {
         id="notification-bell-button"
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-500 hover:text-blue-600 transition-colors border border-slate-200 outline-none"
+        className="relative p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-500 hover:text-cyan-600 transition-colors border border-slate-200 outline-none"
         title="Thông báo"
       >
         {unreadCount > 0 ? (
           <>
-            <BellRing className="w-5 h-5 text-blue-600 animate-swing" strokeWidth={2} />
-            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-black text-white ring-2 ring-white">
+            <BellRing className="w-5 h-5 text-cyan-600 animate-swing" strokeWidth={2} />
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white ring-2 ring-white">
               {unreadCount}
             </span>
           </>
@@ -149,7 +149,7 @@ export default function NotificationBell() {
 
       {/* Dropdown panel */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-slate-100 bg-white shadow-xl z-50 overflow-hidden transform origin-top-right transition-all duration-200">
+        <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-slate-100 bg-white shadow-xl z-50 overflow-hidden transform origin-top-right transition-colors duration-200">
           {/* Header */}
           <div className="p-4 border-b border-slate-100 bg-slate-50/50">
             <div className="flex items-center justify-between">
@@ -160,7 +160,7 @@ export default function NotificationBell() {
                   onClick={() => setShowFilters((v) => !v)}
                   className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-black transition-colors ${
                     showFilters || hasDateFilter
-                      ? 'bg-blue-100 text-blue-700'
+                      ? 'bg-cyan-100 text-cyan-700'
                       : 'text-slate-500 hover:bg-slate-100'
                   }`}
                   title="Bộ lọc"
@@ -172,7 +172,7 @@ export default function NotificationBell() {
                   <button
                     type="button"
                     onClick={handleMarkAllAsRead}
-                    className="text-[11px] font-black text-blue-600 hover:text-blue-700"
+                    className="text-[11px] font-black text-cyan-600 hover:text-cyan-700"
                   >
                     Đọc tất cả
                   </button>
@@ -188,7 +188,7 @@ export default function NotificationBell() {
                   type="button"
                   onClick={() => setReadFilter(f.id)}
                   className={`flex-1 rounded-lg px-2 py-1 text-[11px] font-black transition-colors ${
-                    readFilter === f.id ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                    readFilter === f.id ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
                   {f.label}
@@ -206,7 +206,7 @@ export default function NotificationBell() {
                       type="date"
                       value={fromDate}
                       onChange={(e) => setFromDate(e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-400"
+                      className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold text-slate-700 outline-none focus:border-cyan-400"
                     />
                   </div>
                   <div className="flex-1">
@@ -215,7 +215,7 @@ export default function NotificationBell() {
                       type="date"
                       value={toDate}
                       onChange={(e) => setToDate(e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-400"
+                      className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold text-slate-700 outline-none focus:border-cyan-400"
                     />
                   </div>
                 </div>
@@ -223,7 +223,7 @@ export default function NotificationBell() {
                   <button
                     type="button"
                     onClick={clearDateFilter}
-                    className="text-[11px] font-black text-slate-400 hover:text-red-600"
+                    className="text-[11px] font-black text-slate-400 hover:text-rose-600"
                   >
                     Xóa lọc ngày
                   </button>
@@ -251,14 +251,14 @@ export default function NotificationBell() {
                   key={n.id}
                   onClick={() => !n.isRead && handleMarkAsRead(n.id)}
                   className={`p-4 flex gap-3 hover:bg-slate-50/80 cursor-pointer transition-colors ${
-                    !n.isRead ? 'bg-blue-50/30' : ''
+                    !n.isRead ? 'bg-cyan-50/30' : ''
                   }`}
                 >
                   {/* Icon indicator */}
                   <div className="mt-0.5 shrink-0">
                     <div
                       className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-                        !n.isRead ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-400'
+                        !n.isRead ? 'bg-cyan-100 text-cyan-600' : 'bg-slate-100 text-slate-400'
                       }`}
                     >
                       <AlertCircle className="w-4 h-4" />
@@ -286,7 +286,7 @@ export default function NotificationBell() {
                             e.stopPropagation();
                             handleMarkAsRead(n.id);
                           }}
-                          className="inline-flex items-center gap-1 text-[10px] font-black text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100/70 px-2 py-0.5 rounded"
+                          className="inline-flex items-center gap-1 text-[10px] font-black text-cyan-600 hover:text-cyan-700 bg-cyan-50 hover:bg-cyan-100/70 px-2 py-0.5 rounded"
                         >
                           <Check className="w-3 h-3" />
                           Đánh dấu đã đọc
@@ -295,7 +295,7 @@ export default function NotificationBell() {
                       <button
                         type="button"
                         onClick={(e) => handleDelete(n.id, e)}
-                        className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-red-600 hover:bg-red-50 px-2 py-0.5 rounded ml-auto"
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-2 py-0.5 rounded ml-auto"
                       >
                         <Trash2 className="w-3 h-3" />
                         Xóa

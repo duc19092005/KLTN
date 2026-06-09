@@ -12,15 +12,15 @@ import { ArrowUp, ArrowDown, Eye, X, Layers, User as UserIcon } from 'lucide-rea
 // ---- Display helpers --------------------------------------------------------
 
 const ACTION_TONE = {
-  CREATE: 'bg-blue-50 text-blue-700 border-blue-100',
-  UPDATE: 'bg-indigo-50 text-indigo-700 border-indigo-100',
-  DELETE: 'bg-red-50 text-red-700 border-red-100',
+  CREATE: 'bg-cyan-50 text-cyan-700 border-cyan-100',
+  UPDATE: 'bg-cyan-50 text-cyan-700 border-cyan-100',
+  DELETE: 'bg-rose-50 text-rose-700 border-rose-100',
   LOGIN_PASSWORD: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   LOGIN_INVITE: 'bg-teal-50 text-teal-700 border-teal-100',
-  LOGIN_FAIL: 'bg-red-50 text-red-700 border-red-100',
+  LOGIN_FAIL: 'bg-rose-50 text-rose-700 border-rose-100',
   FACE_VERIFY_PASS: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   FACE_VERIFY_FAIL: 'bg-amber-50 text-amber-700 border-amber-100',
-  FACE_INTEGRITY_FAIL: 'bg-red-50 text-red-700 border-red-100',
+  FACE_INTEGRITY_FAIL: 'bg-rose-50 text-rose-700 border-rose-100',
   FACE_ENROLL: 'bg-cyan-50 text-cyan-700 border-cyan-100',
 };
 
@@ -51,7 +51,7 @@ const ROLE_LABELS = {
 };
 
 const ROLE_TONE = {
-  ADMIN: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+  ADMIN: 'bg-cyan-50 text-cyan-700 border-cyan-100',
   RECEPTIONIST: 'bg-sky-50 text-sky-700 border-sky-100',
   DOCTOR: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   LAB_MANAGER: 'bg-amber-50 text-amber-700 border-amber-100',
@@ -227,10 +227,10 @@ export default function AuditLogsPage() {
     >
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Hero */}
-        <section className="relative overflow-hidden rounded-[28px] border border-blue-100 bg-gradient-to-br from-white via-blue-50 to-cyan-50 p-8 shadow-sm">
+        <section className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-cyan-50 p-8 shadow-sm">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
             <div>
-              <p className="text-[11px] font-black text-blue-600 uppercase tracking-[0.24em] mb-3">Nhật ký & toàn vẹn</p>
+              <p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.24em] mb-3">Nhật ký & toàn vẹn</p>
               <h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">Nhật ký hệ thống</h2>
               <p className="mt-3 max-w-3xl text-sm sm:text-base text-slate-600 leading-relaxed">
                 Toàn bộ hoạt động (đăng nhập, thay đổi dữ liệu) được ghi bằng chuỗi hash chống giả mạo và neo định kỳ lên blockchain.
@@ -240,7 +240,7 @@ export default function AuditLogsPage() {
               id="audit-anchor-now-button"
               onClick={handleAnchorNow}
               disabled={anchoring}
-              className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-100 hover:bg-blue-700 disabled:opacity-50"
+              className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 disabled:opacity-50"
             >
               {anchoring ? 'Đang neo…' : 'Neo lên blockchain ngay'}
             </button>
@@ -262,7 +262,7 @@ export default function AuditLogsPage() {
         <div className="flex flex-wrap gap-2">
           <TabButton active={tab === 'logs'} onClick={() => setTab('logs')}>Hoạt động ({logsTotal})</TabButton>
           <TabButton active={tab === 'batches'} onClick={() => setTab('batches')}>Lô blockchain ({batchesTotal})</TabButton>
-          <button onClick={refreshAll} disabled={loading} className="ml-auto rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-black text-blue-700 hover:bg-blue-100 disabled:opacity-50">
+          <button onClick={refreshAll} disabled={loading} className="ml-auto rounded-xl border border-cyan-100 bg-cyan-50 px-4 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-100 disabled:opacity-50">
             {loading ? 'Đang tải…' : 'Làm mới'}
           </button>
         </div>
@@ -325,14 +325,14 @@ function ChainBanner({ chain, loading }) {
   const ok = chain.ok;
   return (
     <section
-      className={`rounded-2xl border p-5 shadow-sm ${ok ? 'border-emerald-100 bg-emerald-50/70' : 'border-red-100 bg-red-50/70 animate-pulse'}`}
+      className={`rounded-2xl border p-5 shadow-sm ${ok ? 'border-emerald-100 bg-emerald-50/70' : 'border-rose-100 bg-rose-50/70 animate-pulse'}`}
     >
       <div className="flex items-center gap-4">
         <div className="min-w-0">
-          <p className={`text-sm font-black ${ok ? 'text-emerald-800' : 'text-red-800'}`}>
+          <p className={`text-sm font-black ${ok ? 'text-emerald-800' : 'text-rose-800'}`}>
             {ok ? 'Chuỗi nhật ký toàn vẹn' : 'Phát hiện sửa đổi nhật ký!'}
           </p>
-          <p className={`mt-0.5 text-xs font-semibold ${ok ? 'text-emerald-700' : 'text-red-700'}`}>
+          <p className={`mt-0.5 text-xs font-semibold ${ok ? 'text-emerald-700' : 'text-rose-700'}`}>
             {ok
               ? `Đã xác minh ${chain.total} bản ghi — không có dấu hiệu sửa/xóa/chèn.`
               : `Lỗi tại bản ghi seq=${chain.brokenAtSeq}: ${chain.reason}`}
@@ -384,7 +384,7 @@ function LogsTable({
   };
 
   return (
-    <section className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+    <section className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
       {/* Toolbar: entity filter + sort + batch filter (kept mounted even when empty) */}
       <div className="flex flex-col gap-3 border-b border-slate-100 p-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -404,7 +404,7 @@ function LogsTable({
             <button
               type="button"
               onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-black text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-black text-slate-700 hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 transition-colors"
               title={sortOrder === 'desc' ? 'Mới nhất trước (giảm dần)' : 'Cũ nhất trước (tăng dần)'}
             >
               {sortOrder === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />}
@@ -426,13 +426,13 @@ function LogsTable({
                 onChange={(e) => setBatchInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') applyBatch(); }}
                 placeholder="Tất cả"
-                className="w-28 rounded-lg border border-slate-200 bg-white py-1.5 pl-6 pr-2 text-[12px] font-bold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="w-28 rounded-lg border border-slate-200 bg-white py-1.5 pl-6 pr-2 text-[12px] font-bold text-slate-700 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
               />
             </div>
             <button
               type="button"
               onClick={applyBatch}
-              className="rounded-lg bg-blue-600 px-3 py-1.5 text-[12px] font-black text-white hover:bg-blue-700"
+              className="rounded-lg bg-cyan-600 px-3 py-1.5 text-[12px] font-black text-white hover:bg-cyan-700"
             >
               Lọc
             </button>
@@ -457,7 +457,7 @@ function LogsTable({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <table className="ui-table w-full text-left text-sm">
               <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Seq</th>
@@ -475,7 +475,7 @@ function LogsTable({
                   <tr
                     key={log.id}
                     onClick={() => setDetail(log)}
-                    className="cursor-pointer hover:bg-blue-50/40"
+                    className="cursor-pointer hover:bg-cyan-50/40"
                     title="Bấm để xem chi tiết"
                   >
                     <td className="px-4 py-3 font-mono font-black text-slate-400">{log.seq ?? '—'}</td>
@@ -504,15 +504,15 @@ function LogsTable({
                           Healthy
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-lg border border-red-100 bg-red-50 px-2 py-0.5 text-[10px] font-black text-red-700 animate-pulse">
-                          <span className="h-1 w-1 rounded-full bg-red-500" />
+                        <span className="inline-flex items-center gap-1 rounded-lg border border-rose-100 bg-rose-50 px-2 py-0.5 text-[10px] font-black text-rose-700 animate-pulse">
+                          <span className="h-1 w-1 rounded-full bg-rose-500" />
                           Unhealthy
                         </span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       {log.onChainStatus === 'ANCHORED' ? (
-                        <button onClick={() => onProof(log.seq)} className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1 text-[11px] font-black text-blue-700 hover:bg-blue-100">
+                        <button onClick={() => onProof(log.seq)} className="rounded-lg border border-cyan-100 bg-cyan-50 px-3 py-1 text-[11px] font-black text-cyan-700 hover:bg-cyan-100">
                           Xem bằng chứng
                         </button>
                       ) : (
@@ -562,7 +562,7 @@ function LogDetailModal({ log, onClose, onProof }) {
   const actor = log.actor;
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <div className="flex items-center gap-2">
             <span className="font-mono text-sm font-black text-slate-400">#{log.seq ?? '—'}</span>
@@ -621,7 +621,7 @@ function LogDetailModal({ log, onClose, onProof }) {
           {log.onChainStatus === 'ANCHORED' && (
             <button
               onClick={() => { onProof(log.seq); onClose(); }}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white hover:bg-blue-700"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-black text-white hover:bg-cyan-700"
             >
               <Eye className="h-4 w-4" /> Xem bằng chứng Merkle
             </button>
@@ -656,9 +656,9 @@ function BatchesTable({
     return <Empty title="Chưa có lô nào được neo" desc="Hệ thống gom bản ghi thành lô và neo Merkle root định kỳ. Bấm 'Neo ngay' để tạo lô đầu tiên." />;
   }
   return (
-    <section className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+    <section className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
+        <table className="ui-table w-full text-left text-sm">
           <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500">
             <tr>
               <th className="px-4 py-3">Lô</th>
@@ -675,13 +675,13 @@ function BatchesTable({
             {batches.map((b) => (
               <tr key={b.id} className="hover:bg-slate-50/60">
                 <td className="px-4 py-3 font-mono font-black text-slate-900">#{b.batchId}</td>
-                <td className="px-4 py-3 font-mono text-[11px] text-indigo-600">{shortHash(b.merkleRoot)}</td>
+                <td className="px-4 py-3 font-mono text-[11px] text-cyan-600">{shortHash(b.merkleRoot)}</td>
                 <td className="px-4 py-3 font-black text-slate-700">{b.leafCount}</td>
                 <td className="px-4 py-3 font-mono text-[11px] text-slate-500">{b.fromSeq}–{b.toSeq}</td>
                 <td className="px-4 py-3">
                   <span className={`rounded-md border px-2 py-0.5 text-[10px] font-black ${
                     b.status === 'ANCHORED' ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-                    : b.status === 'FAILED' ? 'border-red-100 bg-red-50 text-red-700'
+                    : b.status === 'FAILED' ? 'border-rose-100 bg-rose-50 text-rose-700'
                     : 'border-amber-100 bg-amber-50 text-amber-700'}`}>
                     {BATCH_STATUS_LABEL[b.status] || b.status}
                   </span>
@@ -693,8 +693,8 @@ function BatchesTable({
                       Healthy
                     </span>
                   ) : b.status === 'FAILED' ? (
-                    <span className="inline-flex items-center gap-1 rounded-lg border border-red-100 bg-red-50 px-2 py-0.5 text-[10px] font-black text-red-700 animate-pulse">
-                      <span className="h-1 w-1 rounded-full bg-red-500" />
+                    <span className="inline-flex items-center gap-1 rounded-lg border border-rose-100 bg-rose-50 px-2 py-0.5 text-[10px] font-black text-rose-700 animate-pulse">
+                      <span className="h-1 w-1 rounded-full bg-rose-500" />
                       Unhealthy
                     </span>
                   ) : (
@@ -729,10 +729,10 @@ function ProofModal({ proof, onClose }) {
   const d = proof.data;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
         <div className="shrink-0 border-b border-slate-100 p-6 flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-indigo-600">Bằng chứng bao hàm Merkle</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-600">Bằng chứng bao hàm Merkle</p>
             <h3 className="mt-1 text-2xl font-black text-slate-950">Bằng chứng bản ghi #{proof.seq}</h3>
             <p className="mt-1 text-sm text-slate-500">Chứng minh bản ghi này nằm trong lô đã neo, đối chiếu trực tiếp với root trên chuỗi.</p>
           </div>
@@ -742,13 +742,13 @@ function ProofModal({ proof, onClose }) {
           {proof.loading ? (
             <LoadingIndicator size="md" label="Đang tạo bằng chứng..." />
           ) : proof.error ? (
-            <div className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-bold text-red-700">{proof.error}</div>
+            <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">{proof.error}</div>
           ) : !d ? (
             <Empty title="Không có bằng chứng" desc="Bản ghi này chưa được neo vào lô nào." />
           ) : (
             <div className="space-y-4">
-              <div className={`rounded-2xl border p-4 ${d.verified ? 'border-emerald-100 bg-emerald-50' : 'border-red-100 bg-red-50'}`}>
-                <p className={`text-sm font-black ${d.verified ? 'text-emerald-800' : 'text-red-800'}`}>
+              <div className={`rounded-2xl border p-4 ${d.verified ? 'border-emerald-100 bg-emerald-50' : 'border-rose-100 bg-rose-50'}`}>
+                <p className={`text-sm font-black ${d.verified ? 'text-emerald-800' : 'text-rose-800'}`}>
                   {d.verified ? 'Bằng chứng hợp lệ - khớp với root trên blockchain' : 'Bằng chứng KHÔNG khớp root trên chuỗi'}
                 </p>
               </div>
@@ -786,14 +786,14 @@ function StatCard({ label, value, hint }) {
           <strong className="block text-3xl font-black text-slate-950 mt-2">{String(value).padStart(2, '0')}</strong>
         </div>
       </div>
-      <p className="mt-3 text-xs font-semibold text-blue-600">{hint}</p>
+      <p className="mt-3 text-xs font-semibold text-cyan-600">{hint}</p>
     </article>
   );
 }
 
 function TabButton({ active, onClick, children }) {
   return (
-    <button onClick={onClick} className={`rounded-xl border px-4 py-2 text-xs font-black transition-all ${active ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
+    <button onClick={onClick} className={`rounded-xl border px-4 py-2 text-xs font-black transition-colors ${active ? 'border-cyan-600 bg-cyan-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
       {children}
     </button>
   );
@@ -801,7 +801,7 @@ function TabButton({ active, onClick, children }) {
 
 function FilterChip({ active, onClick, children }) {
   return (
-    <button onClick={onClick} className={`rounded-lg border px-3 py-1 text-[11px] font-black transition-all ${active ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
+    <button onClick={onClick} className={`rounded-lg border px-3 py-1 text-[11px] font-black transition-colors ${active ? 'border-cyan-200 bg-cyan-50 text-cyan-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
       {children}
     </button>
   );
@@ -830,7 +830,7 @@ function Pagination({ page, totalPages, total, label, onPrev, onNext }) {
 
 function Empty({ title, desc }) {
   return (
-    <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-10 text-center">
+    <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center">
       <strong className="text-slate-700">{title}</strong>
       <p className="mt-1 text-sm text-slate-500">{desc}</p>
     </div>
