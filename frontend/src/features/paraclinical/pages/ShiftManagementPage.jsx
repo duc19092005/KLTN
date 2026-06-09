@@ -37,6 +37,12 @@ function formatTimeLocal(iso) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
 function getMonthDays(year, month) {
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
@@ -56,6 +62,7 @@ export default function ShiftManagementPage() {
   const { prefs } = usePreferences();
   const demoMode = prefs.demoMode || false;
   const today = new Date();
+  const minRegistrationDate = toLocalISODate(addDays(today, 7));
 
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
@@ -65,6 +72,7 @@ export default function ShiftManagementPage() {
   const [loading, setLoading] = useState(true);
   const [showRegister, setShowRegister] = useState(false);
   const [registering, setRegistering] = useState(false);
+  const [selectedSlots, setSelectedSlots] = useState([]);
   const [registerForm, setRegisterForm] = useState({ roomId: '', workDate: toLocalISODate(today), shiftCode: 'A', note: '' });
   const [showHistory, setShowHistory] = useState(false);
   const [myShifts, setMyShifts] = useState([]);
@@ -136,7 +144,27 @@ export default function ShiftManagementPage() {
   useEffect(() => { if (showHistory) loadMyShifts(); }, [showHistory, loadMyShifts]);
 
   const openRegister = (workDate, shiftCode) => {
+    setSelectedSlots([{ workDate, shiftCode }]);
     setRegisterForm({ roomId: selectedRoomId || '', workDate, shiftCode, note: '' });
+    setShowRegister(true);
+  };
+
+  const toggleSlot = (workDate, shiftCode) => {
+    setSelectedSlots((current) => {
+      const exists = current.some((slot) => slot.workDate === workDate && slot.shiftCode === shiftCode);
+      if (exists) return current.filter((slot) => !(slot.workDate === workDate && slot.shiftCode === shiftCode));
+      return [...current, { workDate, shiftCode }].sort((a, b) => `${a.workDate}:${a.shiftCode}`.localeCompare(`${b.workDate}:${b.shiftCode}`));
+    });
+    setRegisterForm((current) => ({ ...current, roomId: selectedRoomId || current.roomId }));
+  };
+
+  const openBulkRegister = () => {
+    if (selectedSlots.length === 0) {
+      toast.error('Vui lòng chọn ít nhất một ca trên lịch.');
+      return;
+    }
+    const first = selectedSlots[0];
+    setRegisterForm({ roomId: selectedRoomId || '', workDate: first.workDate, shiftCode: first.shiftCode, note: '' });
     setShowRegister(true);
   };
 
@@ -144,8 +172,16 @@ export default function ShiftManagementPage() {
     e.preventDefault();
     setRegistering(true);
     try {
-      await shiftService.register(registerForm.roomId, registerForm.workDate, registerForm.shiftCode, registerForm.note, demoMode);
-      toast.success(demoMode ? 'Demo mode: ca trực đã được đăng ký và tự duyệt.' : 'Đã gửi đăng ký ca trực, chờ quản lý duyệt.');
+      const slotsToSubmit = selectedSlots.length > 0 ? selectedSlots : [{ workDate: registerForm.workDate, shiftCode: registerForm.shiftCode }];
+      const payload = slotsToSubmit.map((slot) => ({
+        departmentId: registerForm.roomId,
+        workDate: slot.workDate,
+        shiftCode: slot.shiftCode,
+        note: registerForm.note,
+      }));
+      await shiftService.registerMany(payload, demoMode);
+      toast.success(demoMode ? `Demo mode: đã đăng ký và tự duyệt ${payload.length} ca.` : `Đã gửi ${payload.length} đăng ký ca trực, chờ quản lý duyệt.`);
+      setSelectedSlots([]);
       setShowRegister(false);
       await Promise.all([loadShifts(), loadMyShifts()]);
     } catch (err) {
@@ -198,7 +234,8 @@ export default function ShiftManagementPage() {
               <button onClick={goToday} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50">Hôm nay</button>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => openRegister(toLocalISODate(today), 'A')} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white shadow-lg shadow-cyan-600/20 hover:bg-cyan-700">+ Đăng ký ca</button>
+              <button onClick={openBulkRegister} disabled={selectedSlots.length === 0} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white shadow-lg shadow-cyan-600/20 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50">Gửi {selectedSlots.length || ''} ca đã chọn</button>
+              <button onClick={() => setSelectedSlots([])} disabled={selectedSlots.length === 0} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">Bỏ chọn</button>
               <button onClick={() => setShowHistory(true)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50">Lịch sử đăng ký</button>
             </div>
           </div>
@@ -206,7 +243,7 @@ export default function ShiftManagementPage() {
             <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> Chờ duyệt</span>
             <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-emerald-500" /> Đã duyệt</span>
             <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-400" /> Từ chối</span>
-            <span className="text-slate-400">Click vào Ca A/Ca B trong ngày để đăng ký nhanh.</span>
+            <span className="text-slate-400">Chỉ chọn được ca có ngày trực cách hôm nay tối thiểu 7 ngày. Click nhiều Ca A/Ca B rồi bấm “Gửi ca đã chọn”.</span>
           </div>
         </section>
 
@@ -219,7 +256,7 @@ export default function ShiftManagementPage() {
               {monthDays.map((day, idx) => {
                 const dateStr = toLocalISODate(day.date);
                 const isToday = dateStr === toLocalISODate(today);
-                const isPast = !demoMode && dateStr < toLocalISODate(today);
+                const isBeforeRegistrationWindow = dateStr < minRegistrationDate;
                 return (
                   <div key={idx} className={`min-h-[168px] border-b border-r border-slate-100 p-2 ${day.isOtherMonth ? 'bg-slate-50/60 text-slate-300' : isToday ? 'bg-cyan-50/40' : 'bg-white'}`}>
                     <div className="mb-2 flex items-center justify-between">
@@ -229,9 +266,10 @@ export default function ShiftManagementPage() {
                     <div className="space-y-2">
                       {Object.entries(SHIFT_WINDOWS).map(([code, meta]) => {
                         const slotShifts = shiftsByDateCode[`${dateStr}:${code}`] || [];
-                        const disabled = day.isOtherMonth || isPast;
+                        const disabled = day.isOtherMonth || isBeforeRegistrationWindow;
+                        const isSelected = selectedSlots.some((slot) => slot.workDate === dateStr && slot.shiftCode === code);
                         return (
-                          <button key={code} type="button" disabled={disabled} onClick={() => openRegister(dateStr, code)} className={`w-full rounded-2xl border p-2 text-left transition-all ${disabled ? 'cursor-not-allowed border-slate-100 bg-slate-50 opacity-60' : `${meta.soft} hover:-translate-y-0.5 hover:shadow-lg`}`}>
+                          <button key={code} type="button" disabled={disabled} onClick={() => toggleSlot(dateStr, code)} className={`w-full rounded-2xl border p-2 text-left transition-all ${disabled ? 'cursor-not-allowed border-slate-100 bg-slate-50 opacity-60' : isSelected ? 'scale-[1.02] border-violet-400 bg-violet-50 shadow-lg shadow-violet-200/70 ring-2 ring-violet-300' : `${meta.soft} hover:-translate-y-0.5 hover:shadow-lg`}`}>
                             <div className="flex items-center justify-between gap-2">
                               <span className="text-[11px] font-black">{meta.label}</span>
                               <span className="text-[9px] font-bold opacity-70">{meta.time}</span>
@@ -254,27 +292,24 @@ export default function ShiftManagementPage() {
           </section>
         )}
 
-        {showRegister && <RegisterModal form={registerForm} setForm={setRegisterForm} onSubmit={handleRegister} onClose={() => setShowRegister(false)} rooms={rooms} demoMode={demoMode} submitting={registering} />}
+        {showRegister && <RegisterModal form={registerForm} setForm={setRegisterForm} selectedSlots={selectedSlots} onSubmit={handleRegister} onClose={() => setShowRegister(false)} rooms={rooms} demoMode={demoMode} submitting={registering} />}
         {showHistory && <HistoryModal shifts={myShifts} loading={historyLoading} onClose={() => setShowHistory(false)} />}
       </div>
     </DashboardLayout>
   );
 }
 
-function RegisterModal({ form, setForm, onSubmit, onClose, rooms, demoMode, submitting }) {
-  const today = new Date();
-  const minDate = demoMode ? '2020-01-01' : toLocalISODate(today);
-  const maxDate = demoMode ? '2030-12-31' : toLocalISODate(new Date(today.getFullYear(), today.getMonth() + 2, 0));
-  const selectedShift = SHIFT_WINDOWS[form.shiftCode];
+function RegisterModal({ form, setForm, selectedSlots, onSubmit, onClose, rooms, demoMode, submitting }) {
   const update = (patch) => setForm({ ...form, ...patch });
+  const slots = selectedSlots.length > 0 ? selectedSlots : [{ workDate: form.workDate, shiftCode: form.shiftCode }];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-md">
       <div className="w-full max-w-xl overflow-hidden rounded-[2rem] border border-white/70 bg-white shadow-2xl">
         <div className="bg-gradient-to-br from-cyan-600 via-blue-600 to-indigo-700 p-6 text-white">
           <span className="rounded-full bg-white/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ring-1 ring-white/20">Đăng ký · Chờ duyệt</span>
-          <h3 className="mt-3 text-xl font-black">Đăng ký ca trực chuẩn</h3>
-          <p className="mt-1 text-xs font-semibold text-cyan-50">Chọn ngày và Ca A/Ca B. Hệ thống tự áp dụng giờ làm cố định.</p>
+          <h3 className="mt-3 text-xl font-black">Xác nhận {slots.length} ca trực</h3>
+          <p className="mt-1 text-xs font-semibold text-cyan-50">Các ca đã chọn sẽ được gửi đăng ký trong một lần.</p>
         </div>
         <form onSubmit={onSubmit} className="space-y-4 p-5">
           <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-3 text-xs font-semibold text-amber-800">
@@ -286,21 +321,22 @@ function RegisterModal({ form, setForm, onSubmit, onClose, rooms, demoMode, subm
               {rooms.map((room) => <option key={room.id} value={room.id}>{room.roomName || room.name}</option>)}
             </select>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-[11px] font-black uppercase tracking-wider text-slate-600">Ngày trực</label>
-              <input type="date" value={form.workDate} min={minDate} max={maxDate} onChange={(e) => update({ workDate: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100" required />
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[11px] font-black uppercase tracking-wider text-slate-600">Ca đã chọn</p>
+              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-700">{slots.length} ca</span>
             </div>
-            <div>
-              <label className="mb-1.5 block text-[11px] font-black uppercase tracking-wider text-slate-600">Ca trực</label>
-              <select value={form.shiftCode} onChange={(e) => update({ shiftCode: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-black outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100" required>
-                {Object.entries(SHIFT_WINDOWS).map(([code, meta]) => <option key={code} value={code}>{meta.label} · {meta.time}</option>)}
-              </select>
+            <div className="grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2">
+              {slots.map((slot) => {
+                const meta = SHIFT_WINDOWS[slot.shiftCode];
+                return (
+                  <div key={`${slot.workDate}:${slot.shiftCode}`} className={`rounded-xl border px-3 py-2 ${meta.soft}`}>
+                    <p className="text-xs font-black">{formatDateLocal(new Date(slot.workDate))}</p>
+                    <p className="mt-0.5 text-[11px] font-bold">{meta.label} · {meta.time}</p>
+                  </div>
+                );
+              })}
             </div>
-          </div>
-          <div className={`rounded-2xl border p-4 ${selectedShift.soft}`}>
-            <p className="text-xs font-black">{selectedShift.label}</p>
-            <p className="text-2xl font-black">{selectedShift.time}</p>
           </div>
           <div>
             <label className="mb-1.5 block text-[11px] font-black uppercase tracking-wider text-slate-600">Ghi chú</label>
@@ -308,7 +344,7 @@ function RegisterModal({ form, setForm, onSubmit, onClose, rooms, demoMode, subm
           </div>
           <div className="flex gap-2 pt-2">
             <button type="button" disabled={submitting} onClick={onClose} className="flex-1 rounded-xl border border-slate-200 py-3 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-50">Hủy</button>
-            <button type="submit" disabled={submitting || !form.roomId || !form.workDate || !form.shiftCode} className="flex-1 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 py-3 text-xs font-black text-white shadow-lg shadow-cyan-600/25 hover:from-cyan-700 hover:to-blue-700 disabled:opacity-60">{submitting ? 'Đang gửi...' : 'Gửi đăng ký'}</button>
+            <button type="submit" disabled={submitting || !form.roomId || slots.length === 0} className="flex-1 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 py-3 text-xs font-black text-white shadow-lg shadow-cyan-600/25 hover:from-cyan-700 hover:to-blue-700 disabled:opacity-60">{submitting ? 'Đang gửi...' : `Gửi ${slots.length} đăng ký`}</button>
           </div>
         </form>
       </div>

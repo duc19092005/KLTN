@@ -1,9 +1,12 @@
 import api from '../../../shared/apis/api';
 
 export const shiftService = {
-  /** Staff self-registers a fixed Ca A / Ca B shift. */
   register: (departmentId, workDate, shiftCode, note, demoMode = false) =>
     api.post('/paraclinical/shifts/register', { departmentId, workDate, shiftCode, note }, { params: { demo: demoMode ? '1' : '0' } }),
+
+  /** Staff self-registers multiple fixed Ca A / Ca B shifts in one request. */
+  registerMany: (shifts, demoMode = false) =>
+    api.post('/paraclinical/shifts/register-many', { shifts }, { params: { demo: demoMode ? '1' : '0' } }),
 
   /** Admin/Head approves a PENDING shift. */
   approve: (shiftId) => api.post('/paraclinical/shifts/approve', { shiftId }),

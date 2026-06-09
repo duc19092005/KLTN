@@ -16,6 +16,7 @@ import { VerifyParaclinicalShiftUseCase } from '../application/use-cases/verify-
 import { ParaclinicalShiftService } from '../services/paraclinical-shift.service';
 import {
   RegisterShiftDto,
+  RegisterManyShiftsDto,
   ApproveShiftDto,
   RejectShiftDto,
   AssignShiftDto,
@@ -53,6 +54,33 @@ export class ShiftController {
       body.note,
       demoMode === '1' || demoMode === 'true',
     );
+  }
+
+  /** Staff self-registers multiple shifts in one request. */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('LAB_MANAGER', 'DOCTOR')
+  @Post('register-many')
+  async registerMany(
+    @CurrentUser() user: AuthUser,
+    @Body() body: RegisterManyShiftsDto,
+    @Query('demo') demoMode?: string,
+  ) {
+    const isDemoMode = demoMode === '1' || demoMode === 'true';
+    const results = [];
+
+    for (const shift of body.shifts) {
+      results.push(await this.service.registerShift(
+        user.sub,
+        shift.departmentId,
+        new Date(shift.workDate),
+        shift.shiftCode,
+        user.sub,
+        shift.note,
+        isDemoMode,
+      ));
+    }
+
+    return { count: results.length, results };
   }
 
   /** Admin/Head-of-dept approves a PENDING shift. */

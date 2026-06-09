@@ -52,7 +52,7 @@ function printConclusionWithQR(visit, conclusion, qrData) {
     <p style="color: #065f46; font-size: 11px; margin-top: 10px; font-family: monospace;">${qrData}</p>
     <p style="color: #065f46; font-size: 12px; margin-top: 10px;">Quét để xác minh tính xác thực của hồ sơ</p>
   </div>`;
-  
+
   const html = `
     <!DOCTYPE html>
     <html>
@@ -135,7 +135,7 @@ function printConclusionWithQR(visit, conclusion, qrData) {
     </body>
     </html>
   `;
-  
+
   printWindow.document.write(html);
   printWindow.document.close();
 }
@@ -214,14 +214,14 @@ export default function DoctorQueuePage() {
 
   useEffect(() => { loadVisits(); }, [filter]);
   useEffect(() => { if (activeVisit?.id) { loadDecision(activeVisit.id); setShowWorkflowModal(false); } }, [activeVisit?.id]);
-  useEffect(() => { 
+  useEffect(() => {
     (async () => {
       try {
         // Chỉ load các phòng cận lâm sàng có thể nhận chỉ định.
         const res = await departmentService.list({ canReceiveOrders: true, status: 'ACTIVE', limit: 100 });
         const items = getItems(res.data).filter((department) => ['LABORATORY', 'IMAGING'].includes(department.type));
         console.log('[DoctorQueue] paraclinical departments loaded:', items.length, items.map(d => d.name));
-        
+
         if (!items.length) {
           toast.info('Chưa có phòng xét nghiệm/chẩn đoán hình ảnh nào được bật "Nhận phiếu chỉ định".', 8000);
         }
@@ -320,11 +320,11 @@ export default function DoctorQueuePage() {
       } else {
         await loadVisits();
       }
-    } catch (err) { 
-      toast.error(err.response?.data?.message || 'Không lưu được kết luận cuối'); 
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Không lưu được kết luận cuối');
       await loadVisits();
-    } finally { 
-      setBusy(false); 
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -976,7 +976,7 @@ function ResultsPanel({ orders }) {
                       {res.note && (
                         <p className="mb-2 text-slate-700"><span className="font-bold text-slate-900">KTV Ghi chú:</span> {res.note}</p>
                       )}
-                       {res.files?.length > 0 && (
+                      {res.files?.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-2">
                           {res.files.map(f => (
                             <button
@@ -987,7 +987,7 @@ function ResultsPanel({ orders }) {
                                   const dl = await medicalOrderService.getResultFileDownloadUrl(f.id);
                                   if (dl.data?.url) window.open(dl.data.url, '_blank', 'noopener,noreferrer');
                                 } catch {
-	                                  toast.error('Không tải được tệp kết quả hoặc bạn không có quyền truy cập.');
+                                  toast.error('Không tải được tệp kết quả hoặc bạn không có quyền truy cập.');
                                 }
                               }}
                               className="flex items-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 px-3 py-2 rounded-lg border border-blue-100 hover:bg-blue-100 transition-colors"
@@ -1027,8 +1027,8 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
         </div>
         <div className="flex flex-col sm:flex-row gap-2 xl:min-w-[520px]">
           <select value={selectedAiModelId} onChange={(e) => setSelectedAiModelId(e.target.value)} disabled={busy} className="flex-1 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:opacity-50 transition-all">
-	            <option value="">-- Chọn mô hình AI --</option>
-	            {aiModels.map((model) => <option key={model.id} value={model.id}>{model.modelName || model.name || 'Mô hình AI'} {model.modelVersion ? `(${model.modelVersion})` : ''} - {model.provider || 'khác'}</option>)}
+            <option value="">-- Chọn mô hình AI --</option>
+            {aiModels.map((model) => <option key={model.id} value={model.id}>{model.modelName || model.name || 'Mô hình AI'} {model.modelVersion ? `(${model.modelVersion})` : ''} - {model.provider || 'khác'}</option>)}
           </select>
           <button type="button" onClick={onGenerate} disabled={busy || !selectedAiModelId} className="rounded-xl bg-indigo-600 px-5 py-3 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-indigo-600/25 hover:bg-indigo-700 disabled:opacity-50 disabled:shadow-none whitespace-nowrap transition-all flex items-center justify-center gap-2">
             {busy ? (<><LoadingIndicator size="sm" /><span>Đang phân tích...</span></>) : (`Chạy ${selectedModel?.provider || 'AI'}`)}
@@ -1053,7 +1053,7 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
                       <span className="rounded-lg bg-indigo-50 px-2 py-1 text-[10px] font-black uppercase text-indigo-700 border border-indigo-100">#{index + 1} · {parsed.provider || diagnosis.aiModel?.provider || 'AI'}</span>
                       <span className="text-[10px] font-bold text-slate-400">{formatTime(diagnosis.createdAt)}</span>
                     </div>
-	                    <strong className="mt-2 block text-xs font-black text-slate-900">{parsed.modelName || diagnosis.aiModel?.modelName || 'Mô hình AI'}</strong>
+                    <strong className="mt-2 block text-xs font-black text-slate-900">{parsed.modelName || diagnosis.aiModel?.modelName || 'Mô hình AI'}</strong>
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <span className="text-[10px] font-black text-slate-400">Confidence</span>
                       <span className="text-[10px] font-black text-indigo-700">{formatConfidence(diagnosis.confidence)}</span>
@@ -1076,8 +1076,8 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
                   <span className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-[10px] font-black text-emerald-700">Confidence {formatConfidence(currentDiagnosis?.confidence)}</span>
                   <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black text-slate-600">{currentDiagnosis?.status === 'DOCTOR_REVIEWED' ? 'Bác sĩ đã review' : 'AI gợi ý'}</span>
                 </div>
-	                <h4 className="mt-3 text-lg font-black text-slate-950">{parsedResult.modelName || currentDiagnosis?.aiModel?.modelName || 'Mô hình AI'}</h4>
-	                <p className="mt-1 text-[11px] font-semibold text-slate-500">Nền tảng: {parsedResult.provider || currentDiagnosis?.aiModel?.provider || 'khác'} · {currentDiagnosis?.createdAt ? new Date(currentDiagnosis.createdAt).toLocaleString('vi-VN') : 'N/A'}</p>
+                <h4 className="mt-3 text-lg font-black text-slate-950">{parsedResult.modelName || currentDiagnosis?.aiModel?.modelName || 'Mô hình AI'}</h4>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">Nền tảng: {parsedResult.provider || currentDiagnosis?.aiModel?.provider || 'khác'} · {currentDiagnosis?.createdAt ? new Date(currentDiagnosis.createdAt).toLocaleString('vi-VN') : 'N/A'}</p>
               </div>
               <span className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-[10px] font-black text-emerald-700">Đã lưu DB</span>
             </div>
@@ -1276,7 +1276,7 @@ function ConclusionPanel({ form, setForm, onSubmit, busy, completed, activeVisit
             {busy ? 'Đang lưu dữ liệu...' : completed ? 'Hồ sơ đã đóng' : 'Hoàn Tất & Đóng Bệnh Án'}
           </button>
         </div>
-        
+
         {completed && (
           <div className="flex justify-center mt-4">
             <button

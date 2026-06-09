@@ -57,8 +57,10 @@ export class VerifyPatientPublicUseCase {
                 followUpNote: conclusion.followUpNote,
                 doctorNote: conclusion.doctorNote,
                 concludedAt: conclusion.concludedAt,
+                hash256: conclusion.hash256,
               }
             : null,
+          aiDiagnosis: this.mapAiDiagnosis(conclusion?.aiDiagnosis || visit.aiDiagnoses?.[0] || null),
           blockchainVerification,
         };
       }),
@@ -78,6 +80,25 @@ export class VerifyPatientPublicUseCase {
       },
       totalVisits: visits.length,
       visits,
+    };
+  }
+
+  private mapAiDiagnosis(aiDiagnosis: any) {
+    if (!aiDiagnosis) return null;
+    return {
+      id: aiDiagnosis.id,
+      result: aiDiagnosis.result,
+      confidence: aiDiagnosis.confidence,
+      status: aiDiagnosis.status,
+      createdAt: aiDiagnosis.createdAt,
+      aiModel: aiDiagnosis.aiModel
+        ? {
+            id: aiDiagnosis.aiModel.id,
+            modelName: aiDiagnosis.aiModel.modelName,
+            modelVersion: aiDiagnosis.aiModel.modelVersion,
+            provider: aiDiagnosis.aiModel.provider,
+          }
+        : null,
     };
   }
 

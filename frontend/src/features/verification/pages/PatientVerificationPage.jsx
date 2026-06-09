@@ -13,7 +13,34 @@ function genderLabel(value) {
   return value || 'Chưa rõ';
 }
 function getVisitDepartmentName(visit) { return visit.department?.name || visit.department?.departmentCode || 'Chưa xếp phòng'; }
-function getVisitStaffName(visit) { return visit.staff?.fullName || visit.staff?.user?.username || 'Chưa phân công'; }
+function getVisitStaffName(visit) {
+  return visit.doctor?.fullName || visit.staff?.fullName || visit.staff?.user?.username || 'Chưa phân công';
+}
+function getPatientBirthDate(patient) {
+  return patient?.birthDate || patient?.dateOfBirth || patient?.dob || null;
+}
+function getVisitDisplayDate(visit) {
+  return visit?.completedAt || visit?.checkInAt || visit?.createdAt || null;
+}
+function getVisitConclusion(visit) {
+  return visit?.conclusion || visit?.medicalConclusion || visit?.finalConclusion || null;
+}
+function parseAiDiagnosisResult(aiDiagnosis) {
+  const raw = aiDiagnosis?.result || aiDiagnosis?.diagnosisResult || '';
+  if (!raw) return { summary: 'Chưa có nội dung gợi ý.', probabilities: [], nextSteps: [] };
+  try {
+    const parsed = JSON.parse(raw);
+    const analysis = parsed.analysis || parsed;
+    return {
+      summary: analysis.summary || parsed.summary || analysis.diagnosis || parsed.diagnosis || 'AI đã phân tích nhưng chưa có tóm tắt.',
+      probabilities: Array.isArray(analysis.diagnosticProbabilities) ? analysis.diagnosticProbabilities.slice(0, 3) : [],
+      nextSteps: Array.isArray(analysis.recommendedNextSteps) ? analysis.recommendedNextSteps.slice(0, 3) : [],
+      disclaimer: analysis.disclaimer || parsed.disclaimer || '',
+    };
+  } catch {
+    return { summary: raw, probabilities: [], nextSteps: [] };
+  }
+}
 
 export default function PatientVerificationPage() {
   const navigate = useNavigate();
@@ -349,7 +376,7 @@ export default function PatientVerificationPage() {
                     <span>•</span>
                     <span>Giới tính: <strong>{genderLabel(data.patient.gender)}</strong></span>
                     <span>•</span>
-                    <span>Sinh: <strong>{new Date(data.patient.dateOfBirth).toLocaleDateString('vi-VN')}</strong></span>
+                    <span>Sinh: <strong>{getPatientBirthDate(data.patient) ? new Date(getPatientBirthDate(data.patient)).toLocaleDateString('vi-VN') : 'Chưa cập nhật'}</strong></span>
                   </div>
                 </div>
               </div>
@@ -387,7 +414,7 @@ export default function PatientVerificationPage() {
                             <div>
                               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Thời gian khám</div>
                               <span className="text-sm font-bold text-[#111c2c]">
-                                {new Date(visit.createdAt).toLocaleString('vi-VN')}
+                                {getVisitDisplayDate(visit) ? new Date(getVisitDisplayDate(visit)).toLocaleString('vi-VN') : 'Chưa cập nhật'}
                               </span>
                             </div>
                           </div>
@@ -430,16 +457,19 @@ export default function PatientVerificationPage() {
                               </p>
                             </div>
 
-                            {visit.medicalConclusion ? (
+                            {getVisitConclusion(visit) ? (
                               <div className="p-4 bg-[#f9f9ff] border border-[#c2c6d4]/30 rounded-xl space-y-1.5">
                                 <span className="text-[10px] font-bold text-[#003f87] uppercase tracking-widest block">
                                   Kết luận lâm sàng
                                 </span>
                                 <p className="text-sm font-bold text-[#111c2c]">
-                                  Chẩn đoán: {visit.medicalConclusion.finalDiagnosis}
+                                  Chẩn đoán: {getVisitConclusion(visit).finalDiagnosis}
                                 </p>
                                 <p className="text-xs font-semibold text-[#424752] leading-relaxed">
-                                  Ghi chú: {visit.medicalConclusion.notes || 'Không có ghi chú thêm'}
+                                  Hướng điều trị: {getVisitConclusion(visit).treatmentPlan || 'Chưa ghi nhận'}
+                                </p>
+                                <p className="text-xs font-semibold text-[#424752] leading-relaxed">
+                                  Ghi chú: {getVisitConclusion(visit).doctorNote || getVisitConclusion(visit).notes || 'Không có ghi chú thêm'}
                                 </p>
                               </div>
                             ) : (
@@ -466,14 +496,7 @@ export default function PatientVerificationPage() {
                                       className="w-16 h-16 rounded-xl object-cover border border-slate-200 shadow-sm"
                                     />
                                   )}
-                                  <div>
-                                    <p className="text-sm font-bold text-[#111c2c]">
-                                      Kết quả AI: {visit.aiDiagnosis.diagnosisResult}
-                                    </p>
-                                    <p className="text-xs font-bold text-[#006b5b] mt-1">
-                                      Độ tin cậy: {(visit.aiDiagnosis.confidence * 100).toFixed(1)}%
-                                    </p>
-                                  </div>
+                                  <AiDiagnosisSummary aiDiagnosis={visit.aiDiagnosis} />
                                 </div>
                                 <p className="text-[11px] font-semibold text-slate-400">
                                   Mô hình: {visit.aiDiagnosis.aiModel?.modelName} (v{visit.aiDiagnosis.aiModel?.modelVersion})
@@ -488,12 +511,12 @@ export default function PatientVerificationPage() {
                         </div>
 
                         {/* Card Footer: Cryptographic hashes */}
-                        {visit.medicalConclusion && (
+                        {getVisitConclusion(visit)?.hash256 && (
                           <div className="border-t border-slate-100 bg-[#f9f9ff]/30 px-6 py-4 flex flex-col gap-3">
                             <div className="flex flex-wrap justify-between items-center gap-2">
                               <span className="text-xs font-semibold text-[#424752] flex items-center gap-1">
                                 <span className="material-symbols-outlined text-[16px] text-[#727784]">fingerprint</span>
-                                Hash chẩn đoán: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-[11px] font-mono text-slate-800 break-all">{visit.medicalConclusion.hash256}</code>
+                                Hash chẩn đoán: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-[11px] font-mono text-slate-800 break-all">{getVisitConclusion(visit).hash256}</code>
                               </span>
                               
                               {verification.status !== 'unanchored' && (
@@ -677,6 +700,69 @@ export default function PatientVerificationPage() {
           onClose={() => setSearchParams({})} 
           initialMode={initialMode} 
         />
+      )}
+    </div>
+  );
+}
+function AiDiagnosisSummary({ aiDiagnosis }) {
+  const [expanded, setExpanded] = useState(false);
+  const parsed = parseAiDiagnosisResult(aiDiagnosis);
+  const primaryProbability = parsed.probabilities[0];
+
+  return (
+    <div className="min-w-0 flex-1 rounded-xl border border-indigo-100 bg-white shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        className="flex w-full items-start justify-between gap-3 p-3 text-left hover:bg-indigo-50/40 transition-colors"
+        aria-expanded={expanded}
+      >
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-wider text-indigo-600">Tóm tắt AI</p>
+          <p className="mt-1 line-clamp-3 text-xs font-semibold leading-relaxed text-slate-700">
+            {parsed.summary}
+          </p>
+          {primaryProbability && (
+            <p className="mt-2 text-[11px] font-bold text-cyan-700">
+              Gợi ý chính: {primaryProbability.condition} {primaryProbability.probability != null ? `(${primaryProbability.probability}%)` : ''}
+            </p>
+          )}
+        </div>
+        <span className="shrink-0 rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-black text-indigo-700">
+          {expanded ? 'Thu gọn ▲' : 'Chi tiết ▼'}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="space-y-3 border-t border-indigo-50 bg-slate-50/60 p-3 animate-fade-in-up">
+          {parsed.probabilities.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Khả năng gợi ý</p>
+              {parsed.probabilities.map((item, index) => (
+                <div key={`${item.condition || index}`} className="rounded-lg border border-slate-100 bg-white px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-black text-slate-800">{item.condition || 'Chẩn đoán gợi ý'}</span>
+                    {item.probability != null && <span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[10px] font-black text-cyan-700">{item.probability}%</span>}
+                  </div>
+                  {item.reason && <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-500">{item.reason}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {parsed.nextSteps.length > 0 && (
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+              <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Khuyến nghị tiếp theo</p>
+              <ul className="mt-1 list-disc space-y-1 pl-4 text-[11px] font-medium leading-relaxed text-slate-600">
+                {parsed.nextSteps.map((step, index) => <li key={index}>{step}</li>)}
+              </ul>
+            </div>
+          )}
+
+          <p className="text-xs font-bold text-[#006b5b]">
+            Độ tin cậy: {aiDiagnosis.confidence != null ? `${(aiDiagnosis.confidence * 100).toFixed(1)}%` : 'Theo từng gợi ý bên trên'}
+          </p>
+        </div>
       )}
     </div>
   );

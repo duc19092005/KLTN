@@ -35,6 +35,10 @@ export class PrismaPatientRepository implements PatientRepositoryPort {
                 doctor: { include: { staffProfile: true } },
               },
             },
+            aiDiagnoses: {
+              include: { aiModel: true },
+              orderBy: { createdAt: 'desc' as const },
+            },
           },
         },
       },

@@ -28,8 +28,12 @@ export class RegisterShiftUseCase {
     demoMode = false,
   ) {
     const schedule = resolveParaclinicalShiftWindow(workDateInput, shiftCode);
-    if (!demoMode && schedule.endTime < new Date()) {
-      throw new BadRequestException('Không thể đăng ký ca trực trong quá khứ.');
+    const minRegistrationDate = new Date();
+    minRegistrationDate.setHours(0, 0, 0, 0);
+    minRegistrationDate.setDate(minRegistrationDate.getDate() + 7);
+
+    if (!demoMode && schedule.workDate < minRegistrationDate) {
+      throw new BadRequestException('Lịch trực phải được đăng ký trước ít nhất 1 tuần.');
     }
 
     const trimmedNote = note?.trim() || null;

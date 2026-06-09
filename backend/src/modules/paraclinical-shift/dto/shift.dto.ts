@@ -1,5 +1,6 @@
 import { ShiftCode } from '@prisma/client';
-import { IsDateString, IsEnum, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsEnum, IsOptional, IsString, IsUUID, MaxLength, ValidateNested } from 'class-validator';
 
 export class RegisterShiftDto {
   @IsUUID()
@@ -15,6 +16,15 @@ export class RegisterShiftDto {
   @IsString()
   @MaxLength(500)
   note?: string;
+}
+
+export class RegisterManyShiftsDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(62)
+  @ValidateNested({ each: true })
+  @Type(() => RegisterShiftDto)
+  shifts: RegisterShiftDto[];
 }
 
 export class ApproveShiftDto {
