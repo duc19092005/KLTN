@@ -47,6 +47,8 @@ export default function ReceptionistShiftPage() {
   const [myShifts, setMyShifts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
+  const [selectedSlots, setSelectedSlots] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
   const days = useMemo(() => monthDays(year, month), [year, month]);
   const shiftsBySlot = useMemo(() => {
     const map = {};
@@ -81,15 +83,43 @@ export default function ReceptionistShiftPage() {
 
   async function submitRegister(e) {
     e.preventDefault();
+    const slots = selectedSlots.length > 0 ? selectedSlots : [{ workDate: modal.workDate, shiftCode: modal.shiftCode }];
+    const payload = slots.map((slot) => ({
+      departmentId: modal.departmentId,
+      workDate: slot.workDate,
+      shiftCode: slot.shiftCode,
+      note: modal.note,
+    }));
+    setSubmitting(true);
     try {
-      await receptionShiftService.register(modal.departmentId, modal.workDate, modal.shiftCode, modal.note, demoMode);
-      toast.success(demoMode ? 'Demo mode: ca làm đã được tự duyệt.' : 'Đã gửi đăng ký ca làm, chờ quản lý duyệt.');
+      await receptionShiftService.registerMany(payload, demoMode);
+      toast.success(demoMode ? `Demo mode: đã đăng ký và tự duyệt ${payload.length} ca.` : `Đã gửi ${payload.length} đăng ký ca làm, chờ quản lý duyệt.`);
+      setSelectedSlots([]);
       setModal(null);
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Đăng ký ca làm thất bại.');
+    } finally {
+      setSubmitting(false);
     }
   }
+
+  const toggleSlot = (workDate, shiftCode) => {
+    setSelectedSlots((current) => {
+      const exists = current.some((slot) => slot.workDate === workDate && slot.shiftCode === shiftCode);
+      if (exists) return current.filter((slot) => !(slot.workDate === workDate && slot.shiftCode === shiftCode));
+      return [...current, { workDate, shiftCode }].sort((a, b) => `${a.workDate}:${a.shiftCode}`.localeCompare(`${b.workDate}:${b.shiftCode}`));
+    });
+  };
+
+  const openBulkModal = () => {
+    if (selectedSlots.length === 0) {
+      toast.error('Vui lòng chọn ít nhất một ca trên lịch.');
+      return;
+    }
+    const first = selectedSlots[0];
+    setModal({ departmentId: selectedDepartmentId || departments[0]?.id || '', workDate: first.workDate, shiftCode: first.shiftCode, note: '' });
+  };
 
   const openModal = (workDate, shiftCode) => setModal({ departmentId: selectedDepartmentId || departments[0]?.id || '', workDate, shiftCode, note: '' });
   const prevMonth = () => month === 0 ? (setYear((y) => y - 1), setMonth(11)) : setMonth((m) => m - 1);
@@ -117,7 +147,10 @@ export default function ReceptionistShiftPage() {
               {departments.map((dep) => <option key={dep.id} value={dep.id}>{dep.departmentCode} · {dep.name}</option>)}
             </select>
           </div>
-          <button onClick={() => openModal(toDateKey(today), 'A')} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white shadow-lg shadow-cyan-600/20">+ Đăng ký ca</button>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={openBulkModal} disabled={selectedSlots.length === 0} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white shadow-lg shadow-cyan-600/20 disabled:cursor-not-allowed disabled:opacity-50">Gửi {selectedSlots.length || ''} ca đã chọn</button>
+            <button onClick={() => setSelectedSlots([])} disabled={selectedSlots.length === 0} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 disabled:cursor-not-allowed disabled:opacity-50">Bỏ chọn</button>
+          </div>
         </section>
 
         {loading ? <LoadingIndicator size="lg" label="Đang tải lịch làm việc..." /> : (
@@ -133,9 +166,11 @@ export default function ReceptionistShiftPage() {
                     {Object.entries(SHIFT_WINDOWS).map(([code, shift]) => {
                       const registered = shiftsBySlot[`${dateKey}:${code}`];
                       const status = registered ? STATUS_META[registered.status] : null;
-                      return <button key={code} disabled={day.other || isPast || Boolean(registered)} onClick={() => openModal(dateKey, code)} className={`w-full rounded-2xl border p-2 text-left transition ${registered ? status.bg : shift.tone} ${day.other || isPast ? 'opacity-50' : 'hover:-translate-y-0.5 hover:shadow-md'}`}>
+                      const isSelected = selectedSlots.some((slot) => slot.workDate === dateKey && slot.shiftCode === code);
+                      const disabled = day.other || isPast || Boolean(registered);
+                      return <button key={code} disabled={disabled} onClick={() => toggleSlot(dateKey, code)} className={`w-full rounded-2xl border p-2 text-left transition-all ${registered ? status.bg : isSelected ? 'scale-[1.02] border-violet-400 bg-violet-50 text-violet-900 shadow-lg shadow-violet-200/70 ring-2 ring-violet-300' : shift.tone} ${disabled ? 'cursor-not-allowed opacity-50' : 'hover:-translate-y-0.5 hover:shadow-md'}`}>
                         <div className="flex items-center justify-between"><span className="text-[11px] font-black">{shift.label}</span><span className="text-[9px] font-bold opacity-70">{shift.time}</span></div>
-                        <p className="mt-1 text-[10px] font-bold opacity-70">{registered ? status.label : 'Chưa đăng ký'}</p>
+                        <p className="mt-1 text-[10px] font-bold opacity-70">{registered ? status.label : isSelected ? 'Đã chọn' : 'Chưa đăng ký'}</p>
                       </button>;
                     })}
                   </div>
@@ -150,9 +185,17 @@ export default function ReceptionistShiftPage() {
             <div className="bg-gradient-to-r from-cyan-600 to-blue-700 p-6 text-white"><h3 className="text-xl font-black">Đăng ký ca làm lễ tân</h3><p className="mt-1 text-xs font-semibold text-cyan-50">Chọn ngày và Ca A/B, không nhập giờ thủ công.</p></div>
             <div className="space-y-4 p-5">
               <select value={modal.departmentId} onChange={(e) => setModal({ ...modal, departmentId: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm font-bold" required>{departments.map((dep) => <option key={dep.id} value={dep.id}>{dep.departmentCode} · {dep.name}</option>)}</select>
-              <div className="grid gap-3 sm:grid-cols-2"><input type="date" value={modal.workDate} onChange={(e) => setModal({ ...modal, workDate: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-3 text-sm font-bold" required /><select value={modal.shiftCode} onChange={(e) => setModal({ ...modal, shiftCode: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-3 text-sm font-bold">{Object.entries(SHIFT_WINDOWS).map(([code, shift]) => <option key={code} value={code}>{shift.label} · {shift.time}</option>)}</select></div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
+                <div className="mb-2 flex items-center justify-between"><p className="text-[11px] font-black uppercase tracking-wider text-slate-600">Ca đã chọn</p><span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-700">{(selectedSlots.length || 1)} ca</span></div>
+                <div className="grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2">
+                  {(selectedSlots.length > 0 ? selectedSlots : [{ workDate: modal.workDate, shiftCode: modal.shiftCode }]).map((slot) => {
+                    const meta = SHIFT_WINDOWS[slot.shiftCode];
+                    return <div key={`${slot.workDate}:${slot.shiftCode}`} className={`rounded-xl border px-3 py-2 ${meta.tone}`}><p className="text-xs font-black">{new Date(slot.workDate).toLocaleDateString('vi-VN')}</p><p className="mt-0.5 text-[11px] font-bold">{meta.label} · {meta.time}</p></div>;
+                  })}
+                </div>
+              </div>
               <textarea value={modal.note} onChange={(e) => setModal({ ...modal, note: e.target.value })} placeholder="Ghi chú ca làm..." rows={3} maxLength={500} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-3 text-sm font-semibold" />
-              <div className="flex gap-2"><button type="button" onClick={() => setModal(null)} className="flex-1 rounded-xl border border-slate-200 py-3 text-xs font-black text-slate-600">Hủy</button><button type="submit" className="flex-1 rounded-xl bg-cyan-600 py-3 text-xs font-black text-white">Gửi đăng ký</button></div>
+              <div className="flex gap-2"><button type="button" disabled={submitting} onClick={() => setModal(null)} className="flex-1 rounded-xl border border-slate-200 py-3 text-xs font-black text-slate-600 disabled:opacity-50">Hủy</button><button type="submit" disabled={submitting} className="flex-1 rounded-xl bg-cyan-600 py-3 text-xs font-black text-white disabled:opacity-60">{submitting ? 'Đang gửi...' : `Gửi ${selectedSlots.length || 1} đăng ký`}</button></div>
             </div>
           </form>
         </div>}

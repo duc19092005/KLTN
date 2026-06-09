@@ -4,7 +4,6 @@ export const RECEPTIONIST_NAV_ITEMS = [
   { id: 'visit-queue', label: 'Hàng đợi khám', icon: 'activity' },
   { id: 'patient-records', label: 'Hồ sơ bệnh nhân', icon: 'file' },
   { id: 'shifts', label: 'Ca làm việc', icon: 'calendar' },
-  { id: 'profile', label: 'Thông tin cá nhân', icon: 'user' },
 ];
 
 export const RECEPTIONIST_ROUTES = {

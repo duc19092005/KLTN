@@ -53,6 +53,50 @@ export class ReceptionShiftService {
     });
   }
 
+  async registerMany(
+    userId: string,
+    items: Array<{ departmentId: string; workDate: string; shiftCode: ShiftCode; note?: string }>,
+    demoMode = false,
+  ) {
+    const staff = await this.resolveReceptionistStaff(userId);
+    const now = new Date();
+    const seen = new Set<string>();
+    const prepared = [];
+
+    for (const item of items) {
+      await this.assertAdministrativeDepartment(item.departmentId);
+      const schedule = resolveParaclinicalShiftWindow(new Date(item.workDate), item.shiftCode);
+      const key = `${schedule.workDate.toISOString()}:${schedule.shiftCode}`;
+      if (seen.has(key)) {
+        throw new BadRequestException('Danh sách gửi có ca bị chọn trùng.');
+      }
+      seen.add(key);
+      if (!demoMode && schedule.endTime < now) {
+        throw new BadRequestException('Không thể đăng ký ca làm trong quá khứ.');
+      }
+      await this.assertNoDuplicate(staff.id, schedule.workDate, schedule.shiftCode);
+      prepared.push({ item, schedule });
+    }
+
+    return this.prisma.$transaction(
+      prepared.map(({ item, schedule }) => this.prisma.staffShift.create({
+        data: {
+          staffId: staff.id,
+          departmentId: item.departmentId,
+          workDate: schedule.workDate,
+          shiftCode: schedule.shiftCode,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+          note: item.note?.trim() || null,
+          status: demoMode ? 'APPROVED' : 'PENDING',
+          shiftType: 'RECEPTION',
+          approvedById: demoMode ? userId : null,
+        },
+        include: RECEPTION_SHIFT_INCLUDE,
+      })),
+    );
+  }
+
   async assign(actorUserId: string, actorRole: string, staffId: string, departmentId: string, workDate: Date, shiftCode: ShiftCode) {
     await this.assertCanManage(actorUserId, actorRole, departmentId);
     const staff = await this.prisma.staffProfile.findUnique({ where: { id: staffId }, include: { user: true } });

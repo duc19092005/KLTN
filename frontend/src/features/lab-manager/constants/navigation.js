@@ -1,11 +1,11 @@
 export const LAB_MANAGER_NAV_ITEMS = [
-  { id: 'overview', label: 'Tong quan', icon: 'grid' },
-  { id: 'orders', label: 'Phieu CLS', icon: 'activity' },
-  { id: 'results', label: 'Ket qua CLS', icon: 'file' },
-  { id: 'shifts', label: 'Lich truc', icon: 'calendar' },
-  { id: 'history', label: 'Lich su', icon: 'clock' },
-  { id: 'approvals', label: 'Duyet ca', icon: 'shield' },
-  { id: 'profile', label: 'Thong tin ca nhan', icon: 'user' },
+  { id: 'overview', label: 'Tổng quan', icon: 'grid' },
+  { id: 'orders', label: 'Phiếu CLS', icon: 'activity' },
+  { id: 'results', label: 'Kết quả CLS', icon: 'file' },
+  { id: 'shifts', label: 'Lịch trực', icon: 'calendar' },
+  { id: 'history', label: 'Lịch sử', icon: 'clock' },
+  { id: 'approvals', label: 'Duyệt ca', icon: 'shield' },
+  { id: 'profile', label: 'Thông tin cá nhân', icon: 'user' },
 ];
 
 export const LAB_MANAGER_ROUTES = {

@@ -6,6 +6,7 @@ import { ReceptionShiftService } from './reception-shift.service';
 import {
   ApproveReceptionShiftDto,
   AssignReceptionShiftDto,
+  RegisterManyReceptionShiftDto,
   RegisterReceptionShiftDto,
   RejectReceptionShiftDto,
 } from './dto/reception-shift.dto';
@@ -32,6 +33,12 @@ export class ReceptionShiftController {
       body.note,
       demo === '1' || demo === 'true',
     );
+  }
+
+  @Post('register-many')
+  @Roles('RECEPTIONIST')
+  registerMany(@Req() req: any, @Body() body: RegisterManyReceptionShiftDto, @Query('demo') demo?: string) {
+    return this.service.registerMany(req.user.sub, body.items, demo === '1' || demo === 'true');
   }
 
   @Get('my-shifts')

@@ -4,6 +4,9 @@ export const receptionShiftService = {
   register: (departmentId, workDate, shiftCode, note, demoMode = false) =>
     api.post('/reception/shifts/register', { departmentId, workDate, shiftCode, note }, { params: { demo: demoMode ? '1' : '0' } }),
 
+  registerMany: (items, demoMode = false) =>
+    api.post('/reception/shifts/register-many', { items }, { params: { demo: demoMode ? '1' : '0' } }),
+
   myShifts: (from, to) => api.get('/reception/shifts/my-shifts', { params: { from, to } }),
 
   availableDepartments: () => api.get('/reception/shifts/available-departments'),
