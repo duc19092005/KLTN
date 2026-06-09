@@ -195,19 +195,6 @@ export default function DashboardLayout({
             })}
           </nav>
 
-          {/* Security Status Card (Y tế bảo mật) */}
-          <div className={`px-4 pt-4 transition-all duration-200 ${isSidebarCollapsed ? 'lg:hidden' : ''}`}>
-            <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-3 flex items-center gap-2.5">
-              <span className="relative flex h-2 w-2 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Hệ thống an toàn</p>
-                <p className="text-xs font-semibold text-emerald-950 truncate">MFA + chuẩn y tế</p>
-              </div>
-            </div>
-          </div>
 
           {/* Profile + Settings (đáy sidebar). Avatar mở thông tin cá nhân, bánh răng mở cài đặt. */}
           <div className={`p-4 border-t border-slate-100 mt-3 flex items-center gap-2 ${isSidebarCollapsed ? 'lg:flex-col lg:justify-center' : 'justify-center'}`}>
