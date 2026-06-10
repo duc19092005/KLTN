@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query, UseGuards, NotFoundException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
@@ -8,6 +8,10 @@ import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.de
 import { AuditLoggerService } from '../../../infrastructure/audit/audit-logger.service';
 import { AuditAnchorService } from '../../../infrastructure/audit/audit-anchor.service';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { AuthUser } from '../../../common/types/auth-user.type';
+import { toDisplayAuditDiff } from '../../../infrastructure/audit/audit-diff.util';
+import { verifyAuditRow } from '../../../infrastructure/audit/audit-verification.util';
 
 /**
  * Admin-only audit + integrity API. Surfaces the tamper-evidence machinery so it can be
@@ -38,6 +42,7 @@ export class AuditController {
     @Query('sort') sortRaw?: string,
     @Query('page') pageRaw?: string,
     @Query('limit') limitRaw?: string,
+    @CurrentUser() user?: AuthUser,
   ) {
     const page = Math.max(Number(pageRaw) || 1, 1);
     const limit = Math.max(Number(limitRaw) || 10, 1);
@@ -82,19 +87,7 @@ export class AuditController {
 
     const itemsWithStatus = items.map((row) => {
       const actor = row.actorId ? actorMap.get(row.actorId) : null;
-      return {
-        ...row,
-        blockchainStatus: this.audit.verifyEntry(row) ? 'VERIFIED' : 'TAMPERED',
-        actor: actor
-          ? {
-              id: actor.id,
-              username: actor.username,
-              email: actor.email,
-              role: actor.role,
-              displayName: actor.staffProfile?.fullName || actor.adminProfile?.adminUserName || actor.username,
-            }
-          : null,
-      };
+      return this.presentAuditRow(row, actor, user, false);
     });
 
     return {
@@ -140,6 +133,30 @@ export class AuditController {
     };
   }
 
+  @Get('logs/:seq')
+  @RequireFaceStepUp('AUDIT_DETAIL')
+  @ApiOperation({ summary: 'Get one audit log with readable diff and V2 verification details' })
+  async logDetail(@Param('seq') seq: string, @CurrentUser() user?: AuthUser) {
+    const row = await this.prisma.blockchainLogger.findFirst({ where: { seq: Number(seq) } });
+    if (!row) throw new NotFoundException('Không tìm thấy audit log.');
+
+    const actor = row.actorId
+      ? await this.prisma.user.findUnique({
+          where: { id: row.actorId },
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            role: true,
+            staffProfile: { select: { fullName: true } },
+            adminProfile: { select: { adminUserName: true } },
+          },
+        })
+      : null;
+
+    return this.presentAuditRow(row, actor, user, true);
+  }
+
   @Get('logs/:seq/proof')
   @ApiOperation({ summary: 'Merkle inclusion proof for one log, verified against the on-chain root' })
   proof(@Param('seq') seq: string) {
@@ -151,5 +168,88 @@ export class AuditController {
   @ApiOperation({ summary: 'Force-seal the pending batch and commit its Merkle root on-chain (requires face step-up)' })
   anchorNow() {
     return this.anchor.anchorNow();
+  }
+
+  private presentAuditRow(row: any, actor: any, user: AuthUser | undefined, includeDetail: boolean) {
+    const verification = verifyAuditRow(row);
+    const diff = row.diffJson?.schema === 'KLTN_AUDIT_DIFF_V1'
+      ? toDisplayAuditDiff(row.diffJson, {
+          role: user?.role,
+          faceVerified: true,
+          clinicalContextAllowed: includeDetail,
+        })
+      : [];
+    const base = {
+      id: row.id,
+      seq: row.seq,
+      entity: row.entity,
+      entityId: row.entityId,
+      action: row.action,
+      actorId: row.actorId,
+      createdAt: row.createdAt,
+      hashVersion: row.hashVersion,
+      onChainStatus: row.onChainStatus,
+      txHash: row.txHash,
+      blockNumber: row.blockNumber,
+      batchId: row.batchId,
+      blockchainStatus: verification.status,
+      verification: {
+        ok: verification.ok,
+        status: verification.status,
+        version: verification.version,
+        reason: verification.reason,
+        suspiciousFields: verification.suspiciousFields,
+      },
+      actor: actor
+        ? {
+            id: actor.id,
+            username: actor.username,
+            email: actor.email,
+            role: actor.role,
+            displayName: actor.staffProfile?.fullName || actor.adminProfile?.adminUserName || actor.username,
+          }
+        : null,
+      diff,
+      fieldsChanged: row.fieldsChanged ?? row.diffJson?.fieldsChanged ?? [],
+      hashes: {
+        dataHash: row.dataHash,
+        beforeHash: row.beforeHash,
+        afterHash: row.afterHash,
+        diffHash: row.diffHash,
+        entryHash: row.entryHash,
+        prevHash: row.prevHash,
+      },
+    };
+
+    if (!includeDetail) return base;
+
+    return {
+      ...base,
+      encryptedSnapshots: {
+        before: this.describeEncryptedSnapshot(row.beforeEncrypted),
+        after: this.describeEncryptedSnapshot(row.afterEncrypted),
+      },
+      decryptedSnapshots: this.canExposeDecryptedSnapshots(user)
+        ? {
+            before: verification.decryptedBefore ?? null,
+            after: verification.decryptedAfter ?? null,
+          }
+        : null,
+    };
+  }
+
+  private canExposeDecryptedSnapshots(user?: AuthUser): boolean {
+    return user?.role === 'ADMIN';
+  }
+
+  private describeEncryptedSnapshot(value: any) {
+    if (!value || typeof value !== 'object') return null;
+    return {
+      alg: value.alg ?? null,
+      keyId: value.keyId ?? null,
+      ivPresent: Boolean(value.iv),
+      tagPresent: Boolean(value.tag),
+      ciphertextPresent: Boolean(value.ciphertext),
+    };
   }
 }
