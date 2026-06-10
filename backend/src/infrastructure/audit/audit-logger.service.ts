@@ -5,10 +5,23 @@ import {
   computeRecordHash,
   generateSalt,
   computeEntryHash,
+  computeEntryHashV2,
+  computeBeforeHashV2,
+  computeAfterHashV2,
+  computeDiffHashV2,
+  computeDataHashV2,
   GENESIS_PREV_HASH,
+  AUDIT_ENTRY_V2,
+  canonicalize,
 } from './audit-hash.util';
 import { AuditAnchorService } from './audit-anchor.service';
 import { sanitizeAuditPayload } from './audit-sanitizer.util';
+import { buildAuditDiff } from './audit-diff.util';
+import {
+  AUDIT_ENCRYPTION_VERSION,
+  buildAuditEncryptionAad,
+  encryptAuditSnapshot,
+} from './audit-encryption.util';
 
 export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'ACCESS' | 'SECURITY';
 
@@ -105,6 +118,25 @@ export class AuditLoggerService {
     return this.enqueue(() => this.prisma.$transaction((transaction) => this.appendRecord(params, transaction)));
   }
 
+  async recordV2(
+    params: {
+      entity: string;
+      entityId: string;
+      action: AuditAction | string;
+      actorId?: string | null;
+      before?: Record<string, unknown> | null;
+      after?: Record<string, unknown> | null;
+      onChainStatus?: string;
+      txHash?: string | null;
+      blockNumber?: number | null;
+      metadata?: unknown;
+    },
+    tx?: Prisma.TransactionClient,
+  ) {
+    if (tx) return this.appendRecordV2(params, tx);
+    return this.enqueue(() => this.prisma.$transaction((transaction) => this.appendRecordV2(params, transaction)));
+  }
+
   private async appendRecord(
     params: {
       entity: string;
@@ -159,6 +191,108 @@ export class AuditLoggerService {
       dataSalt: params.dataSalt ?? null,
       beforeJson: sanitizeAuditPayload(params.entity, params.before) as any,
       afterJson: sanitizeAuditPayload(params.entity, params.after) as any,
+      onChainStatus: params.onChainStatus ?? 'PENDING',
+      txHash: params.txHash ?? null,
+      blockNumber: params.blockNumber ?? null,
+      metadata: sanitizeAuditPayload(params.entity, params.metadata) as any,
+      seq,
+      prevHash,
+      entryHash,
+      createdAt,
+    };
+    if (fkField) data[fkField] = params.entityId;
+
+    return client.blockchainLogger.create({
+      data: data as Prisma.BlockchainLoggerUncheckedCreateInput,
+    });
+  }
+
+  private async appendRecordV2(
+    params: {
+      entity: string;
+      entityId: string;
+      action: AuditAction | string;
+      actorId?: string | null;
+      before?: Record<string, unknown> | null;
+      after?: Record<string, unknown> | null;
+      onChainStatus?: string;
+      txHash?: string | null;
+      blockNumber?: number | null;
+      metadata?: unknown;
+    },
+    client: Prisma.TransactionClient,
+  ) {
+    await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('blockchain_logger_chain'))`;
+
+    const tail = await client.blockchainLogger.findFirst({
+      where: { seq: { not: null } },
+      orderBy: { seq: 'desc' },
+      select: { seq: true, entryHash: true },
+    });
+    const seq = (tail?.seq ?? 0) + 1;
+    const prevHash = tail?.entryHash ?? GENESIS_PREV_HASH;
+    const createdAt = new Date();
+    const createdAtIso = createdAt.toISOString();
+    const rawBefore = params.before ?? null;
+    const rawAfter = params.after ?? null;
+    const diffJson = buildAuditDiff(params.before ?? null, params.after ?? null);
+    const fieldsChanged = diffJson.fieldsChanged;
+
+    const beforeHash = computeBeforeHashV2(params.entity, params.entityId, rawBefore);
+    const afterHash = computeAfterHashV2(params.entity, params.entityId, rawAfter);
+    const diffHash = computeDiffHashV2(diffJson);
+    const dataHash = computeDataHashV2({
+      entity: params.entity,
+      entityId: params.entityId,
+      action: params.action,
+      beforeHash,
+      afterHash,
+      diffHash,
+      fieldsChanged,
+    });
+    const entryHash = computeEntryHashV2({
+      seq,
+      prevHash,
+      entity: params.entity,
+      entityId: params.entityId,
+      action: params.action,
+      actorId: params.actorId ?? null,
+      beforeHash,
+      afterHash,
+      diffHash,
+      dataHash,
+      createdAtIso,
+    });
+    const aad = buildAuditEncryptionAad({
+      seq,
+      entity: params.entity,
+      entityId: params.entityId,
+      action: params.action,
+      createdAtIso,
+    });
+    const beforeEncrypted = encryptAuditSnapshot(canonicalize(rawBefore), aad);
+    const afterEncrypted = encryptAuditSnapshot(canonicalize(rawAfter), aad);
+
+    const fkField = FK_FIELD[params.entity];
+    const data: Record<string, any> = {
+      entity: params.entity,
+      entityId: params.entityId,
+      action: params.action,
+      actorId: params.actorId ?? null,
+      dataHash,
+      dataSalt: null,
+      beforeJson: sanitizeAuditPayload(params.entity, rawBefore) as any,
+      afterJson: sanitizeAuditPayload(params.entity, rawAfter) as any,
+      beforeHash,
+      afterHash,
+      diffHash,
+      hashVersion: AUDIT_ENTRY_V2,
+      beforeEncrypted: beforeEncrypted as any,
+      afterEncrypted: afterEncrypted as any,
+      encryptionVersion: AUDIT_ENCRYPTION_VERSION,
+      encryptionKeyId: beforeEncrypted.keyId,
+      diffJson: diffJson as any,
+      fieldsChanged: fieldsChanged as any,
       onChainStatus: params.onChainStatus ?? 'PENDING',
       txHash: params.txHash ?? null,
       blockNumber: params.blockNumber ?? null,
