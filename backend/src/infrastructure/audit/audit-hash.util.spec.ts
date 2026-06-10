@@ -1,4 +1,14 @@
-import { canonicalize, computeEntryHash, computeRecordHash, GENESIS_PREV_HASH } from './audit-hash.util';
+import {
+  canonicalize,
+  computeAfterHashV2,
+  computeBeforeHashV2,
+  computeDataHashV2,
+  computeDiffHashV2,
+  computeEntryHash,
+  computeEntryHashV2,
+  computeRecordHash,
+  GENESIS_PREV_HASH,
+} from './audit-hash.util';
 
 describe('audit-hash.util canonicalize', () => {
   it('sorts object keys deterministically', () => {
@@ -142,5 +152,106 @@ describe('audit-hash.util canonicalize', () => {
       if (originalPepper === undefined) delete process.env.AUDIT_PEPPER;
       else process.env.AUDIT_PEPPER = originalPepper;
     }
+  });
+});
+
+describe('audit-hash.util v2 HMAC payloads', () => {
+  const key = 'audit-hash-key-for-tests';
+  const before = { fullName: 'abc', status: 'ACTIVE' };
+  const after = { status: 'ACTIVE', fullName: 'def' };
+  const diffJson = {
+    schema: 'KLTN_AUDIT_DIFF_V1',
+    fieldsChanged: ['fullName'],
+    changes: [{ field: 'fullName', before: 'abc', after: 'def', sensitivity: 'PII' }],
+  };
+
+  it('computes deterministic domain-separated before, after, and diff hashes', () => {
+    const beforeHash = computeBeforeHashV2('StaffProfile', 'staff-1', { status: 'ACTIVE', fullName: 'abc' }, key);
+    const beforeHashReordered = computeBeforeHashV2('StaffProfile', 'staff-1', before, key);
+    const afterHash = computeAfterHashV2('StaffProfile', 'staff-1', after, key);
+    const diffHash = computeDiffHashV2(diffJson, key);
+
+    expect(beforeHash).toBe(beforeHashReordered);
+    expect(beforeHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(afterHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(diffHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(new Set([beforeHash, afterHash, diffHash]).size).toBe(3);
+  });
+
+  it('computes dataHash from plaintext hashes and never requires ciphertext', () => {
+    const beforeHash = computeBeforeHashV2('StaffProfile', 'staff-1', before, key);
+    const afterHash = computeAfterHashV2('StaffProfile', 'staff-1', after, key);
+    const diffHash = computeDiffHashV2(diffJson, key);
+
+    const left = computeDataHashV2(
+      { entity: 'StaffProfile', entityId: 'staff-1', action: 'UPDATE', beforeHash, afterHash, diffHash, fieldsChanged: ['fullName'] },
+      key,
+    );
+    const right = computeDataHashV2(
+      { entity: 'StaffProfile', entityId: 'staff-1', action: 'UPDATE', beforeHash, afterHash, diffHash, fieldsChanged: ['fullName'] },
+      key,
+    );
+
+    expect(left).toBe(right);
+    expect(left).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('computes entryHash V2 from canonical entry payload and changes when component hashes change', () => {
+    const beforeHash = computeBeforeHashV2('StaffProfile', 'staff-1', before, key);
+    const afterHash = computeAfterHashV2('StaffProfile', 'staff-1', after, key);
+    const diffHash = computeDiffHashV2(diffJson, key);
+    const dataHash = computeDataHashV2(
+      { entity: 'StaffProfile', entityId: 'staff-1', action: 'UPDATE', beforeHash, afterHash, diffHash, fieldsChanged: ['fullName'] },
+      key,
+    );
+
+    const entryHash = computeEntryHashV2({
+      seq: 7,
+      prevHash: GENESIS_PREV_HASH,
+      entity: 'StaffProfile',
+      entityId: 'staff-1',
+      action: 'UPDATE',
+      actorId: 'admin-1',
+      beforeHash,
+      afterHash,
+      diffHash,
+      dataHash,
+      createdAtIso: '2026-06-10T00:00:00.000Z',
+    });
+    const tampered = computeEntryHashV2({
+      seq: 7,
+      prevHash: GENESIS_PREV_HASH,
+      entity: 'StaffProfile',
+      entityId: 'staff-1',
+      action: 'UPDATE',
+      actorId: 'admin-1',
+      beforeHash,
+      afterHash: beforeHash,
+      diffHash,
+      dataHash,
+      createdAtIso: '2026-06-10T00:00:00.000Z',
+    });
+
+    expect(entryHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(tampered).not.toBe(entryHash);
+  });
+
+  it('requires AUDIT_HASH_KEY in production for configured V2 hashes', () => {
+    const originalEnv = process.env.NODE_ENV;
+    const originalKey = process.env.AUDIT_HASH_KEY;
+    process.env.NODE_ENV = 'production';
+    delete process.env.AUDIT_HASH_KEY;
+
+    try {
+      expect(() => computeDiffHashV2(diffJson)).toThrow('AUDIT_HASH_KEY is required in production for Blockchain Audit V2');
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+      if (originalKey === undefined) delete process.env.AUDIT_HASH_KEY;
+      else process.env.AUDIT_HASH_KEY = originalKey;
+    }
+  });
+
+  it('keeps V1 record hashing available for legacy rows', () => {
+    expect(computeRecordHash({ legacy: true }, 'salt', 'pepper')).toMatch(/^[0-9a-f]{64}$/);
   });
 });

@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'crypto';
+import { createHash, createHmac, randomBytes } from 'crypto';
 
 /**
  * Audit hashing utilities for tamper-evidence.
@@ -169,4 +169,90 @@ export function computeEntryHash(core: AuditEntryCore, prevHash: string, pepper 
     createdAtIso: core.createdAtIso,
   });
   return createHash('sha256').update(`${pepper}|${core.seq}|${prevHash}|${canonical}`).digest('hex');
+}
+
+export const AUDIT_ENTRY_V2 = 'KLTN_AUDIT_ENTRY_V2';
+export const AUDIT_DATA_V2 = 'KLTN_AUDIT_DATA_V2';
+const AUDIT_BEFORE_V1 = 'KLTN_AUDIT_BEFORE_V1';
+const AUDIT_AFTER_V1 = 'KLTN_AUDIT_AFTER_V1';
+const AUDIT_DIFF_V1 = 'KLTN_AUDIT_DIFF_V1';
+
+export interface AuditDataHashV2Input {
+  entity: string;
+  entityId?: string | null;
+  action: string;
+  beforeHash?: string | null;
+  afterHash?: string | null;
+  diffHash?: string | null;
+  fieldsChanged?: unknown;
+}
+
+export interface AuditEntryHashV2Input extends AuditDataHashV2Input {
+  seq: number;
+  prevHash: string;
+  actorId?: string | null;
+  dataHash: string;
+  createdAtIso: string;
+}
+
+/** The configured V2 HMAC key. Required in production for Blockchain Audit V2. */
+export function getAuditHashKey(): string {
+  const key = process.env.AUDIT_HASH_KEY || '';
+  if (process.env.NODE_ENV === 'production' && !key) {
+    throw new Error('AUDIT_HASH_KEY is required in production for Blockchain Audit V2');
+  }
+  return key;
+}
+
+function hmacSha256Hex(message: string, key = getAuditHashKey()): string {
+  return createHmac('sha256', key).update(message).digest('hex');
+}
+
+export function computeBeforeHashV2(entity: string, entityId: string | null | undefined, rawBefore: unknown, key = getAuditHashKey()): string {
+  return hmacSha256Hex(`${AUDIT_BEFORE_V1}|${entity}|${entityId ?? null}|${canonicalize(rawBefore)}`, key);
+}
+
+export function computeAfterHashV2(entity: string, entityId: string | null | undefined, rawAfter: unknown, key = getAuditHashKey()): string {
+  return hmacSha256Hex(`${AUDIT_AFTER_V1}|${entity}|${entityId ?? null}|${canonicalize(rawAfter)}`, key);
+}
+
+export function computeDiffHashV2(diffJson: unknown, key = getAuditHashKey()): string {
+  return hmacSha256Hex(`${AUDIT_DIFF_V1}|${canonicalize(diffJson)}`, key);
+}
+
+export function computeDataHashV2(input: AuditDataHashV2Input, key = getAuditHashKey()): string {
+  return hmacSha256Hex(
+    canonicalize({
+      schema: AUDIT_DATA_V2,
+      entity: input.entity,
+      entityId: input.entityId ?? null,
+      action: input.action,
+      beforeHash: input.beforeHash ?? null,
+      afterHash: input.afterHash ?? null,
+      diffHash: input.diffHash ?? null,
+      fieldsChanged: input.fieldsChanged ?? [],
+    }),
+    key,
+  );
+}
+
+export function computeEntryHashV2(input: AuditEntryHashV2Input): string {
+  return createHash('sha256')
+    .update(
+      canonicalize({
+        schema: AUDIT_ENTRY_V2,
+        seq: input.seq,
+        prevHash: input.prevHash,
+        entity: input.entity,
+        entityId: input.entityId ?? null,
+        action: input.action,
+        actorId: input.actorId ?? null,
+        dataHash: input.dataHash,
+        beforeHash: input.beforeHash ?? null,
+        afterHash: input.afterHash ?? null,
+        diffHash: input.diffHash ?? null,
+        createdAtIso: input.createdAtIso,
+      }),
+    )
+    .digest('hex');
 }
