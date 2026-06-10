@@ -14,9 +14,10 @@ describe('audit-diff.util', () => {
         {
           field: 'fullName',
           label: 'Họ tên',
-          before: 'abc',
-          after: 'def',
+          before: '[REDACTED]',
+          after: '[REDACTED]',
           sensitivity: 'PII',
+          storedRedacted: true,
         },
       ],
     });
@@ -29,11 +30,14 @@ describe('audit-diff.util', () => {
       {
         field: 'fullName',
         label: 'Họ tên',
-        before: 'abc',
-        after: 'def',
+        before: '[REDACTED]',
+        after: '[REDACTED]',
         sensitivity: 'PII',
-        redacted: false,
-        summary: 'Họ tên: abc → def',
+        storedRedacted: true,
+        redacted: true,
+        reason: 'PII không được lưu plaintext trong diff; xem snapshot mã hóa qua quy trình break-glass nếu cần.',
+        policyCode: 'AUDIT_REDACT_PII_STORED',
+        summary: 'Họ tên đã thay đổi',
       },
     ]);
     expect(toDisplayAuditDiff(diff, { role: 'RECEPTIONIST', faceVerified: true })[0]).toMatchObject({
@@ -64,7 +68,9 @@ describe('audit-diff.util', () => {
     expect(display[0]).toMatchObject({
       before: '[REDACTED]',
       after: '[REDACTED]',
+      storedRedacted: true,
       redacted: true,
+      policyCode: 'AUDIT_REDACT_FILE_URL',
       summary: 'Ảnh đại diện đã thay đổi',
     });
   });
@@ -78,10 +84,12 @@ describe('audit-diff.util', () => {
       before: '[REDACTED]',
       after: '[REDACTED]',
       sensitivity: 'CLINICAL_TEXT',
+      storedRedacted: true,
     });
 
     expect(toDisplayAuditDiff(diff, { role: 'ADMIN', faceVerified: true })[0]).toMatchObject({
       redacted: true,
+      policyCode: 'AUDIT_REDACT_CLINICAL_STORED',
       summary: 'Chẩn đoán đã thay đổi',
     });
   });
@@ -90,6 +98,8 @@ describe('audit-diff.util', () => {
     expect(classifyAuditField('downloadUrl')).toBe('FILE_URL');
     expect(classifyAuditField('xrayFileName')).toBe('FILE_URL');
     expect(classifyAuditField('customUrl')).toBe('FILE_URL');
+    expect(classifyAuditField('passwordHash')).toBe('REDACTED');
+    expect(classifyAuditField('faceEmbedding')).toBe('REDACTED');
   });
 
   it('keeps safe scalar changes readable', () => {
@@ -100,6 +110,11 @@ describe('audit-diff.util', () => {
       before: 'PENDING',
       after: 'ACTIVE',
       sensitivity: 'SAFE',
+      storedRedacted: false,
+      fieldPath: 'Entity.status',
+      entity: undefined,
+      entityLabel: 'Đối tượng',
+      changeKind: 'SAFE',
       redacted: false,
       summary: 'status: PENDING → ACTIVE',
     });

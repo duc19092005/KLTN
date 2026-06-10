@@ -8,6 +8,7 @@ export interface AuditDiffChange {
   before: unknown;
   after: unknown;
   sensitivity: AuditDiffSensitivity;
+  storedRedacted: boolean;
 }
 
 export interface AuditDiffJson {
@@ -34,6 +35,8 @@ export interface DisplayAuditDiffChange {
   after: unknown;
   sensitivity: AuditDiffSensitivity;
   redacted: boolean;
+  reason?: string;
+  policyCode?: string;
   summary: string;
 }
 
@@ -57,6 +60,13 @@ const FIELD_LABELS: Record<string, string> = {
   prescription: 'Đơn thuốc',
   note: 'Ghi chú',
   clinicalNote: 'Ghi chú lâm sàng',
+  finalDiagnosis: 'Chẩn đoán cuối cùng',
+  doctorNote: 'Ghi chú bác sĩ',
+  birthDate: 'Ngày sinh',
+  address: 'Địa chỉ',
+  insuranceNumber: 'Số bảo hiểm',
+  emergencyContact: 'Liên hệ khẩn cấp',
+  licenseNumber: 'Số giấy phép',
 };
 
 const ENTITY_LABELS: Record<string, string> = {
@@ -87,6 +97,12 @@ const PII_FIELDS = new Set([
   'dateOfBirth',
   'dob',
   'gender',
+  'birthDate',
+  'address',
+  'insuranceNumber',
+  'emergencyContact',
+  'employeeCode',
+  'licenseNumber',
 ]);
 
 const FILE_URL_FIELDS = new Set([
@@ -105,9 +121,23 @@ const CLINICAL_TEXT_FIELDS = new Set([
   'prescription',
   'note',
   'clinicalNote',
+  'finalDiagnosis',
+  'doctorNote',
   'conclusion',
   'symptoms',
 ]);
+
+const SENSITIVE_FIELD_PATTERNS = [
+  /password/i,
+  /token/i,
+  /secret/i,
+  /embedding/i,
+  /hash$/i,
+  /privateKey/i,
+  /wallet/i,
+  /citizen/i,
+  /insurance/i,
+];
 
 function isPlainComparable(value: unknown): boolean {
   return value === null || ['string', 'number', 'boolean'].includes(typeof value);
@@ -127,16 +157,19 @@ export function getAuditEntityLabel(entity?: string | null): string {
 }
 
 export function classifyAuditField(field: string): AuditDiffSensitivity {
+  if (SENSITIVE_FIELD_PATTERNS.some((pattern) => pattern.test(field))) return 'REDACTED';
   if (FILE_URL_FIELDS.has(field) || /url$/i.test(field) || /file/i.test(field)) return 'FILE_URL';
   if (CLINICAL_TEXT_FIELDS.has(field)) return 'CLINICAL_TEXT';
   if (PII_FIELDS.has(field)) return 'PII';
   return 'SAFE';
 }
 
+function shouldRedactStoredValue(sensitivity: AuditDiffSensitivity): boolean {
+  return sensitivity !== 'SAFE';
+}
+
 function displayValueForStoredDiff(field: string, value: unknown, sensitivity: AuditDiffSensitivity): unknown {
-  if (sensitivity === 'FILE_URL') return '[REDACTED]';
-  if (sensitivity === 'CLINICAL_TEXT') return '[REDACTED]';
-  if (sensitivity === 'REDACTED') return '[REDACTED]';
+  if (shouldRedactStoredValue(sensitivity)) return '[REDACTED]';
   if (isPlainComparable(value)) return value;
   return `[${field} changed]`;
 }
@@ -155,6 +188,7 @@ export function buildAuditDiff(before: Record<string, unknown> | null | undefine
         before: displayValueForStoredDiff(field, beforeSnapshot[field] ?? null, sensitivity),
         after: displayValueForStoredDiff(field, afterSnapshot[field] ?? null, sensitivity),
         sensitivity,
+        storedRedacted: shouldRedactStoredValue(sensitivity),
       } satisfies AuditDiffChange;
     });
 
@@ -165,72 +199,54 @@ export function buildAuditDiff(before: Record<string, unknown> | null | undefine
   };
 }
 
-function canViewPii(context: AuditDiffViewerContext): boolean {
-  return context.role === 'ADMIN' && context.faceVerified === true;
-}
-
-function canViewClinicalText(context: AuditDiffViewerContext): boolean {
-  return ['ADMIN', 'DOCTOR'].includes(context.role ?? '') && context.faceVerified === true && context.clinicalContextAllowed === true;
-}
-
 function changedSummary(label: string): string {
   return `${label} đã thay đổi`;
 }
 
+function buildDisplayBase(change: AuditDiffChange, context: AuditDiffViewerContext) {
+  return {
+    ...change,
+    fieldPath: `${context.entity ?? 'Entity'}.${change.field}`,
+    label: getAuditFieldLabel(change.field, context.entity),
+    entity: context.entity,
+    entityLabel: getAuditEntityLabel(context.entity),
+    changeKind: change.sensitivity,
+  };
+}
+
+function redactedDisplay(change: AuditDiffChange, context: AuditDiffViewerContext, reason: string, policyCode: string): DisplayAuditDiffChange {
+  const label = getAuditFieldLabel(change.field, context.entity);
+  return {
+    ...buildDisplayBase(change, context),
+    before: '[REDACTED]',
+    after: '[REDACTED]',
+    redacted: true,
+    reason,
+    policyCode,
+    summary: changedSummary(label),
+  };
+}
+
 export function toDisplayAuditDiff(diff: AuditDiffJson, context: AuditDiffViewerContext): DisplayAuditDiffChange[] {
   return diff.changes.map((change) => {
+    if (change.sensitivity === 'REDACTED') {
+      return redactedDisplay(change, context, 'Trường bảo mật luôn bị ẩn khỏi audit UI.', 'AUDIT_REDACT_ALWAYS');
+    }
+
     if (change.sensitivity === 'FILE_URL') {
-      return {
-        ...change,
-        fieldPath: `${context.entity ?? 'Entity'}.${change.field}`,
-        label: getAuditFieldLabel(change.field, context.entity),
-        entity: context.entity,
-        entityLabel: getAuditEntityLabel(context.entity),
-        changeKind: change.sensitivity,
-        before: '[REDACTED]',
-        after: '[REDACTED]',
-        redacted: true,
-        summary: changedSummary(change.label),
-      };
+      return redactedDisplay(change, context, 'Đường dẫn tệp/Cloudinary không hiển thị trong audit UI.', 'AUDIT_REDACT_FILE_URL');
     }
 
-    if (change.sensitivity === 'CLINICAL_TEXT' && !canViewClinicalText(context)) {
-      return {
-        ...change,
-        fieldPath: `${context.entity ?? 'Entity'}.${change.field}`,
-        label: getAuditFieldLabel(change.field, context.entity),
-        entity: context.entity,
-        entityLabel: getAuditEntityLabel(context.entity),
-        changeKind: change.sensitivity,
-        before: '[REDACTED]',
-        after: '[REDACTED]',
-        redacted: true,
-        summary: changedSummary(change.label),
-      };
+    if (change.sensitivity === 'CLINICAL_TEXT') {
+      return redactedDisplay(change, context, 'Nội dung lâm sàng không được lưu plaintext trong diff; cần quy trình break-glass có kiểm soát nếu cần đối chiếu snapshot.', 'AUDIT_REDACT_CLINICAL_STORED');
     }
 
-    if (change.sensitivity === 'PII' && !canViewPii(context)) {
-      return {
-        ...change,
-        fieldPath: `${context.entity ?? 'Entity'}.${change.field}`,
-        label: getAuditFieldLabel(change.field, context.entity),
-        entity: context.entity,
-        entityLabel: getAuditEntityLabel(context.entity),
-        changeKind: change.sensitivity,
-        before: '[REDACTED]',
-        after: '[REDACTED]',
-        redacted: true,
-        summary: changedSummary(change.label),
-      };
+    if (change.sensitivity === 'PII') {
+      return redactedDisplay(change, context, 'PII không được lưu plaintext trong diff; xem snapshot mã hóa qua quy trình break-glass nếu cần.', 'AUDIT_REDACT_PII_STORED');
     }
 
     return {
-      ...change,
-      fieldPath: `${context.entity ?? 'Entity'}.${change.field}`,
-      label: getAuditFieldLabel(change.field, context.entity),
-      entity: context.entity,
-      entityLabel: getAuditEntityLabel(context.entity),
-      changeKind: change.sensitivity,
+      ...buildDisplayBase(change, context),
       redacted: false,
       summary: `${getAuditFieldLabel(change.field, context.entity)}: ${String(change.before)} → ${String(change.after)}`,
     };

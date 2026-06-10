@@ -812,7 +812,11 @@ function DiffList({ diff }) {
             </div>
           </div>
           <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-cyan-700">{item.label || item.field}</p>
-          {item.reason && <p className="mt-2 text-[10px] font-semibold text-amber-700">Policy: {item.reason}</p>}
+          {item.reason && (
+            <p className="mt-2 rounded-xl border border-amber-100 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">
+              Policy {item.policyCode ? `· ${item.policyCode}` : ''}: {item.reason}
+            </p>
+          )}
         </div>
       ))}
     </div>
