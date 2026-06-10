@@ -7,18 +7,15 @@ interface IIdentityRegistry {
 
 /**
  * @title AuditAnchor
- * @notice Standalone, append-only logger contract shared by many backend services.
- *         To minimise gas, individual audit log entries are NOT stored on-chain.
- *         Instead the backend builds a Merkle binary tree from a batch of log leaves
- *         (each leaf being a domino-chained SHA256 of the change) and commits only the
- *         Merkle ROOT ("đỉnh cây") here.
- *
- *         Ownership is NOT managed here. This contract defers to IdentityRegistry as the
- *         single source of truth for who the owner is, so the super-admin relayer that owns
- *         IdentityRegistry is automatically the only account allowed to commit roots.
+ * @notice Append-only Merkle root anchor for audit logs. Individual logs, PII, medical text,
+ *         files, PDFs and X-Rays are never stored on-chain. Only batch roots, counts and
+ *         timestamps are committed.
  */
 contract AuditAnchor {
     IIdentityRegistry public immutable identityRegistry;
+
+    string private constant LEAF_DOMAIN = "KLTN_AUDIT_LEAF_V2";
+    string private constant NODE_DOMAIN = "KLTN_AUDIT_NODE_V2";
 
     struct Checkpoint {
         bytes32 root;
@@ -51,12 +48,13 @@ contract AuditAnchor {
 
     /// @notice Commit the Merkle root of a sealed batch of audit logs.
     /// @param batchId Monotonic batch identifier assigned off-chain.
-    /// @param root    Merkle root over the batch's leaves.
-    /// @param leafCount Number of leaves included (for transparency).
+    /// @param root Merkle root over the batch's leaves.
+    /// @param leafCount Number of leaves included.
     function commitRoot(uint256 batchId, bytes32 root, uint256 leafCount) external onlyOwner {
         require(root != bytes32(0), "AuditAnchor: empty root");
-        require(!checkpoints[batchId].exists, "AuditAnchor: batch already committed");
         require(leafCount > 0, "AuditAnchor: empty batch");
+        require(!checkpoints[batchId].exists, "AuditAnchor: batch already committed");
+        require(batchId == latestBatchId + 1, "AuditAnchor: non-sequential batch");
 
         checkpoints[batchId] = Checkpoint({
             root: root,
@@ -65,10 +63,33 @@ contract AuditAnchor {
             exists: true
         });
 
-        if (batchId > latestBatchId) latestBatchId = batchId;
+        latestBatchId = batchId;
         totalBatches += 1;
 
         emit RootCommitted(batchId, root, leafCount, block.timestamp);
+    }
+
+    /// @notice Solidity-side v2 leaf hash. Matches backend MERKLE_SHA256_BYTES32_V2.
+    function hashLeaf(bytes32 entryHash) public pure returns (bytes32) {
+        return sha256(abi.encodePacked(LEAF_DOMAIN, entryHash));
+    }
+
+    /// @notice Solidity-side v2 pair hash. Sorted pairs keep proofs order-independent.
+    function hashPair(bytes32 a, bytes32 b) public pure returns (bytes32) {
+        (bytes32 lo, bytes32 hi) = a <= b ? (a, b) : (b, a);
+        return sha256(abi.encodePacked(NODE_DOMAIN, lo, hi));
+    }
+
+    /// @notice Verify that entryHash belongs to an anchored v2 Merkle root.
+    function verifyProof(uint256 batchId, bytes32 entryHash, bytes32[] calldata proof) external view returns (bool) {
+        Checkpoint storage cp = checkpoints[batchId];
+        if (!cp.exists) return false;
+
+        bytes32 acc = hashLeaf(entryHash);
+        for (uint256 i = 0; i < proof.length; i++) {
+            acc = hashPair(acc, proof[i]);
+        }
+        return acc == cp.root;
     }
 
     /// @notice Read the Merkle root for a batch. Returns bytes32(0) if not committed.

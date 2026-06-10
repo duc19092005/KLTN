@@ -1,5 +1,5 @@
   import { Injectable } from '@nestjs/common';
-import { AiModelRegistry, MedicalOrderStatus, VisitStatus } from '@prisma/client';
+import { AiModelRegistry, MedicalOrderStatus, Prisma, VisitStatus } from '@prisma/client';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import {
   ClinicalDecisionRepositoryPort,
@@ -119,7 +119,10 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
     return this.prisma.medicalConclusion.findUnique({ where: { visitId } });
   }
 
-  async upsertConclusionAndCompleteVisit(data: UpsertConclusionData): Promise<unknown> {
+  async upsertConclusionAndCompleteVisit(
+    data: UpsertConclusionData,
+    afterWrite?: (conclusion: unknown, tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<unknown> {
     return this.prisma.$transaction(async (tx) => {
       const conclusion = await tx.medicalConclusion.upsert({
         where: { visitId: data.visitId },
@@ -153,6 +156,8 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
           ...(data.staffId ? { staffId: data.staffId } : {}),
         },
       });
+
+      await afterWrite?.(conclusion, tx);
 
       return conclusion;
     });

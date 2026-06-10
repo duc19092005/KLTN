@@ -1,4 +1,4 @@
-import { MedicalOrderStatus } from '@prisma/client';
+import { MedicalOrderStatus, Prisma } from '@prisma/client';
 
 /** DI token for the medical order repository port. */
 export const MEDICAL_ORDER_REPOSITORY = Symbol('MEDICAL_ORDER_REPOSITORY');
@@ -79,6 +79,12 @@ export type ActiveShiftInfo = {
   staff: { userId: string; departmentId: string | null };
 };
 
+export type CreateResultTransactionPayload = {
+  result: unknown;
+  order: unknown;
+  visitTransition: { visitId: string; status: string } | null;
+};
+
 /**
  * Persistence boundary for the MedicalOrder aggregate. The Prisma implementation
  * keeps the include shapes, code generation, and multi-step transactions
@@ -104,7 +110,11 @@ export interface MedicalOrderRepositoryPort {
   updateStatus(id: string, status: MedicalOrderStatus, completedAt?: Date): Promise<unknown>;
 
   /** Atomic: create result+files, set order RESULT_READY, and transition visit to WAITING_CONCLUSION when all ready. */
-  createResultWithTransitions(command: CreateResultCommand, visitId: string): Promise<unknown>;
+  createResultWithTransitions(
+    command: CreateResultCommand,
+    visitId: string,
+    afterWrite?: (payload: CreateResultTransactionPayload, tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<unknown>;
 
   findResultFileWithOrder(fileId: string): Promise<ResultFileWithOrder>;
 }

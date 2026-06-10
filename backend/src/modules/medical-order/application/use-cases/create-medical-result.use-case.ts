@@ -1,7 +1,13 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { MedicalOrderStatus } from '@prisma/client';
 import { AuthUser } from '../../../../common/types/auth-user.type';
+import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
 import { CreateMedicalResultDto } from '../../dto/medical-order.dto';
+import {
+  buildMedicalOrderStatusAuditSnapshot,
+  buildMedicalResultAuditSnapshot,
+  buildVisitStatusAuditSnapshot,
+} from '../../domain/medical-result-audit-snapshot';
 import { MedicalOrderAccessPolicy } from '../policies/medical-order-access.policy';
 import { MEDICAL_ORDER_REPOSITORY, MedicalOrderRepositoryPort } from '../ports/medical-order.repository.port';
 
@@ -14,6 +20,7 @@ export class CreateMedicalResultUseCase {
   constructor(
     @Inject(MEDICAL_ORDER_REPOSITORY) private readonly repo: MedicalOrderRepositoryPort,
     private readonly accessPolicy: MedicalOrderAccessPolicy,
+    private readonly audit: AuditLoggerService,
   ) {}
 
   async execute(orderId: string, dto: CreateMedicalResultDto, user: AuthUser, demoMode = false): Promise<unknown> {
@@ -44,6 +51,67 @@ export class CreateMedicalResultUseCase {
         })),
       },
       order.visitId,
+      async ({ result, order: updatedOrder, visitTransition }, tx) => {
+        const resultSnapshot = buildMedicalResultAuditSnapshot(
+          result as Parameters<typeof buildMedicalResultAuditSnapshot>[0],
+          order.visitId,
+          MedicalOrderStatus.RESULT_READY,
+        );
+        const { salt: resultSalt, hash: resultHash } = this.audit.hashSnapshot(resultSnapshot);
+        await this.audit.record(
+          {
+            entity: 'MedicalResult',
+            entityId: resultSnapshot.resultId,
+            action: 'CREATE',
+            actorId: user.sub,
+            dataHash: resultHash,
+            dataSalt: resultSalt,
+            before: null,
+            after: resultSnapshot,
+            metadata: { schema: 'KLTN_MEDICAL_RESULT_AUDIT_V1' },
+            onChainStatus: 'PENDING',
+          },
+          tx,
+        );
+
+        const orderSnapshot = buildMedicalOrderStatusAuditSnapshot(orderId, order.visitId, MedicalOrderStatus.RESULT_READY);
+        const { salt: orderSalt, hash: orderHash } = this.audit.hashSnapshot(orderSnapshot);
+        await this.audit.record(
+          {
+            entity: 'MedicalOrder',
+            entityId: orderId,
+            action: 'UPDATE',
+            actorId: user.sub,
+            dataHash: orderHash,
+            dataSalt: orderSalt,
+            before: { orderId, visitId: order.visitId, status: order.status },
+            after: orderSnapshot,
+            metadata: { schema: 'KLTN_MEDICAL_ORDER_STATUS_AUDIT_V1' },
+            onChainStatus: 'PENDING',
+          },
+          tx,
+        );
+
+        if (visitTransition) {
+          const visitSnapshot = buildVisitStatusAuditSnapshot(visitTransition.visitId, visitTransition.status);
+          const { salt: visitSalt, hash: visitHash } = this.audit.hashSnapshot(visitSnapshot);
+          await this.audit.record(
+            {
+              entity: 'Visit',
+              entityId: visitTransition.visitId,
+              action: 'UPDATE',
+              actorId: user.sub,
+              dataHash: visitHash,
+              dataSalt: visitSalt,
+              before: { visitId: visitTransition.visitId, status: order.status },
+              after: visitSnapshot,
+              metadata: { schema: 'KLTN_VISIT_STATUS_AUDIT_V1' },
+              onChainStatus: 'PENDING',
+            },
+            tx,
+          );
+        }
+      },
     );
   }
 

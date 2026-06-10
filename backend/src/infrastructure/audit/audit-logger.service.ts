@@ -8,6 +8,7 @@ import {
   GENESIS_PREV_HASH,
 } from './audit-hash.util';
 import { AuditAnchorService } from './audit-anchor.service';
+import { sanitizeAuditPayload } from './audit-sanitizer.util';
 
 export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'ACCESS' | 'SECURITY';
 
@@ -78,71 +79,99 @@ export class AuditLoggerService {
   /**
    * Persist one change entry to the centralized logger, linked into the hash-chain.
    * Returns the created row (including seq/prevHash/entryHash).
+   *
+   * When `tx` is provided, the audit row is written in the caller's domain transaction.
+   * Without `tx`, the logger opens its own transaction. In both modes we take a PostgreSQL
+   * advisory transaction lock so seq/prevHash assignment is safe across multiple backend instances.
    */
-  async record(params: {
-    entity: string;
-    entityId: string;
-    action: AuditAction | string;
-    actorId?: string | null;
-    dataHash?: string | null;
-    dataSalt?: string | null;
-    before?: unknown;
-    after?: unknown;
-    onChainStatus?: string;
-    txHash?: string | null;
-    blockNumber?: number | null;
-    metadata?: unknown;
-  }) {
-    return this.enqueue(async () => {
-      // 1. Find the current chain tail to derive seq + prevHash.
-      const tail = await this.prisma.blockchainLogger.findFirst({
-        where: { seq: { not: null } },
-        orderBy: { seq: 'desc' },
-        select: { seq: true, entryHash: true },
-      });
-      const seq = (tail?.seq ?? 0) + 1;
-      const prevHash = tail?.entryHash ?? GENESIS_PREV_HASH;
-      const createdAt = new Date();
+  async record(
+    params: {
+      entity: string;
+      entityId: string;
+      action: AuditAction | string;
+      actorId?: string | null;
+      dataHash?: string | null;
+      dataSalt?: string | null;
+      before?: unknown;
+      after?: unknown;
+      onChainStatus?: string;
+      txHash?: string | null;
+      blockNumber?: number | null;
+      metadata?: unknown;
+    },
+    tx?: Prisma.TransactionClient,
+  ) {
+    if (tx) return this.appendRecord(params, tx);
+    return this.enqueue(() => this.prisma.$transaction((transaction) => this.appendRecord(params, transaction)));
+  }
 
-      // 2. Compute this entry's chain leaf.
-      const entryHash = computeEntryHash(
-        {
-          seq,
-          actorId: params.actorId ?? null,
-          action: params.action,
-          entity: params.entity,
-          entityId: params.entityId,
-          dataHash: params.dataHash ?? null,
-          createdAtIso: createdAt.toISOString(),
-        },
-        prevHash,
-      );
+  private async appendRecord(
+    params: {
+      entity: string;
+      entityId: string;
+      action: AuditAction | string;
+      actorId?: string | null;
+      dataHash?: string | null;
+      dataSalt?: string | null;
+      before?: unknown;
+      after?: unknown;
+      onChainStatus?: string;
+      txHash?: string | null;
+      blockNumber?: number | null;
+      metadata?: unknown;
+    },
+    client: Prisma.TransactionClient,
+  ) {
+    await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('blockchain_logger_chain'))`;
 
-      // 3. Build the row, attaching the single relevant entity FK.
-      const fkField = FK_FIELD[params.entity];
-      const data: Record<string, any> = {
+    // 1. Find the current chain tail to derive seq + prevHash.
+    const tail = await client.blockchainLogger.findFirst({
+      where: { seq: { not: null } },
+      orderBy: { seq: 'desc' },
+      select: { seq: true, entryHash: true },
+    });
+    const seq = (tail?.seq ?? 0) + 1;
+    const prevHash = tail?.entryHash ?? GENESIS_PREV_HASH;
+    const createdAt = new Date();
+
+    // 2. Compute this entry's chain leaf.
+    const entryHash = computeEntryHash(
+      {
+        seq,
+        actorId: params.actorId ?? null,
+        action: params.action,
         entity: params.entity,
         entityId: params.entityId,
-        action: params.action,
-        actorId: params.actorId ?? null,
         dataHash: params.dataHash ?? null,
-        dataSalt: params.dataSalt ?? null,
-        beforeJson: (params.before ?? null) as any,
-        afterJson: (params.after ?? null) as any,
-        onChainStatus: params.onChainStatus ?? 'PENDING',
-        txHash: params.txHash ?? null,
-        blockNumber: params.blockNumber ?? null,
-        metadata: (params.metadata ?? null) as any,
-        seq,
-        prevHash,
-        entryHash,
-        createdAt,
-      };
-      if (fkField) data[fkField] = params.entityId;
+        createdAtIso: createdAt.toISOString(),
+      },
+      prevHash,
+    );
 
-      return this.prisma.blockchainLogger.create({
-        data: data as Prisma.BlockchainLoggerUncheckedCreateInput,
-      });
+    // 3. Build the row, attaching the single relevant entity FK.
+    const fkField = FK_FIELD[params.entity];
+    const data: Record<string, any> = {
+      entity: params.entity,
+      entityId: params.entityId,
+      action: params.action,
+      actorId: params.actorId ?? null,
+      dataHash: params.dataHash ?? null,
+      dataSalt: params.dataSalt ?? null,
+      beforeJson: sanitizeAuditPayload(params.entity, params.before) as any,
+      afterJson: sanitizeAuditPayload(params.entity, params.after) as any,
+      onChainStatus: params.onChainStatus ?? 'PENDING',
+      txHash: params.txHash ?? null,
+      blockNumber: params.blockNumber ?? null,
+      metadata: sanitizeAuditPayload(params.entity, params.metadata) as any,
+      seq,
+      prevHash,
+      entryHash,
+      createdAt,
+    };
+    if (fkField) data[fkField] = params.entityId;
+
+    return client.blockchainLogger.create({
+      data: data as Prisma.BlockchainLoggerUncheckedCreateInput,
     });
   }
 

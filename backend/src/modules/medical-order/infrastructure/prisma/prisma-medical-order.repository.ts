@@ -4,6 +4,7 @@ import { PrismaService } from '../../../../infrastructure/prisma/prisma.service'
 import {
   CreateOrderCommand,
   CreateResultCommand,
+  CreateResultTransactionPayload,
   MedicalOrderRepositoryPort,
   OrderListFilter,
   OrderVisitInfo,
@@ -175,7 +176,11 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
     });
   }
 
-  async createResultWithTransitions(command: CreateResultCommand, visitId: string): Promise<unknown> {
+  async createResultWithTransitions(
+    command: CreateResultCommand,
+    visitId: string,
+    afterWrite?: (payload: CreateResultTransactionPayload, tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<unknown> {
     return this.prisma.$transaction(async (tx) => {
       const resultCode = await this.generateResultCode(tx);
       const result = await tx.medicalResult.create({
@@ -203,12 +208,16 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
         include: this.includeRelations(),
       });
 
+      let visitTransition: CreateResultTransactionPayload['visitTransition'] = null;
       if (await this.areAllNonCancelledOrdersReady(tx, visitId)) {
         await tx.visit.update({
           where: { id: visitId },
           data: { status: VisitStatus.WAITING_CONCLUSION },
         });
+        visitTransition = { visitId, status: VisitStatus.WAITING_CONCLUSION };
       }
+
+      await afterWrite?.({ result, order: updatedOrder, visitTransition }, tx);
 
       return { result, order: updatedOrder };
     });

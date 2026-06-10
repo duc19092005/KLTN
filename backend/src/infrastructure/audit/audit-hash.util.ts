@@ -17,22 +17,85 @@ import { createHash, randomBytes } from 'crypto';
 
 /** Recursively produce a deterministic JSON string with object keys sorted. */
 export function canonicalize(value: unknown): string {
-  return JSON.stringify(sortValue(value));
+  return JSON.stringify(toCanonicalJson(value, '$', new WeakSet<object>()));
 }
 
-function sortValue(value: any): any {
-  if (value === null || value === undefined) return null;
-  if (Array.isArray(value)) return value.map(sortValue);
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'object') {
-    return Object.keys(value)
+type CanonicalJson = null | boolean | number | string | CanonicalJson[] | { [key: string]: CanonicalJson };
+
+function toCanonicalJson(value: unknown, path: string, seen: WeakSet<object>): CanonicalJson {
+  if (value === null) return null;
+
+  const valueType = typeof value;
+  if (valueType === 'string' || valueType === 'boolean') return value as string | boolean;
+  if (valueType === 'number') {
+    if (!Number.isFinite(value as number)) {
+      throw new Error(`Unsupported non-finite number at ${path}: NaN/Infinity are not valid audit JSON`);
+    }
+    return value as number;
+  }
+  if (valueType === 'undefined') {
+    throw new Error(`Unsupported undefined at ${path}: use null or omit the field explicitly`);
+  }
+  if (valueType === 'bigint') {
+    throw new Error(`Unsupported BigInt at ${path}: convert to string before audit hashing`);
+  }
+  if (valueType === 'function' || valueType === 'symbol') {
+    throw new Error(`Unsupported ${valueType} at ${path}: audit snapshots must be plain JSON data`);
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      throw new Error(`Unsupported invalid Date at ${path}`);
+    }
+    return value.toISOString();
+  }
+
+  if (value instanceof Map || value instanceof Set) {
+    throw new Error(`Unsupported ${value.constructor.name} at ${path}: convert to a deterministic plain object/array first`);
+  }
+
+  if (isBinaryLike(value)) {
+    throw new Error(`Unsupported binary data at ${path}: convert to a deterministic string digest before audit hashing`);
+  }
+
+  if (Array.isArray(value)) {
+    if (seen.has(value)) throw new Error(`Unsupported cyclic object at ${path}`);
+    seen.add(value);
+    const result = value.map((item, index) => toCanonicalJson(item, `${path}[${index}]`, seen));
+    seen.delete(value);
+    return result;
+  }
+
+  if (valueType === 'object') {
+    const objectValue = value as Record<string, unknown>;
+    if (!isPlainObject(objectValue)) {
+      const constructorName = objectValue.constructor?.name ?? 'Object';
+      throw new Error(`Unsupported non-plain object ${constructorName} at ${path}: convert to plain JSON before audit hashing`);
+    }
+    if (seen.has(objectValue)) throw new Error(`Unsupported cyclic object at ${path}`);
+    seen.add(objectValue);
+
+    const result = Object.keys(objectValue)
       .sort()
       .reduce((acc, key) => {
-        acc[key] = sortValue(value[key]);
+        acc[key] = toCanonicalJson(objectValue[key], `${path}.${key}`, seen);
         return acc;
-      }, {} as Record<string, any>);
+      }, {} as { [key: string]: CanonicalJson });
+
+    seen.delete(objectValue);
+    return result;
   }
-  return value;
+
+  throw new Error(`Unsupported value at ${path}: audit snapshots must be plain JSON data`);
+}
+
+function isPlainObject(value: object): boolean {
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function isBinaryLike(value: unknown): boolean {
+  return Buffer.isBuffer(value) || ArrayBuffer.isView(value) || value instanceof ArrayBuffer;
 }
 
 /** Generate a fresh random salt (hex). */
@@ -40,9 +103,13 @@ export function generateSalt(bytes = 16): string {
   return randomBytes(bytes).toString('hex');
 }
 
-/** The configured global pepper. Empty string if unset (degrades to salt-only hashing). */
+/** The configured global pepper. Required in production. */
 export function getPepper(): string {
-  return process.env.AUDIT_PEPPER || '';
+  const pepper = process.env.AUDIT_PEPPER || '';
+  if (process.env.NODE_ENV === 'production' && !pepper) {
+    throw new Error('AUDIT_PEPPER is required in production for audit hash integrity');
+  }
+  return pepper;
 }
 
 /**

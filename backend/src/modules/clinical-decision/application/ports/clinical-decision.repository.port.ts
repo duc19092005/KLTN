@@ -64,5 +64,8 @@ export interface ClinicalDecisionRepositoryPort {
   findConclusionByVisitId(visitId: string): Promise<any | null>;
 
   /** Atomic: upsert conclusion + transition visit to COMPLETED. */
-  upsertConclusionAndCompleteVisit(data: UpsertConclusionData): Promise<unknown>;
+  upsertConclusionAndCompleteVisit(
+    data: UpsertConclusionData,
+    afterWrite?: (conclusion: unknown, tx: import('@prisma/client').Prisma.TransactionClient) => Promise<void>,
+  ): Promise<unknown>;
 }

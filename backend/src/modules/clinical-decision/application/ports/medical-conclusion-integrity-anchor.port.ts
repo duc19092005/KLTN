@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client';
+
 /** DI token for the MedicalConclusion integrity anchor port. */
 export const MEDICAL_CONCLUSION_INTEGRITY_ANCHOR = Symbol('MEDICAL_CONCLUSION_INTEGRITY_ANCHOR');
 
@@ -13,5 +15,8 @@ export interface MedicalConclusionIntegrityAnchorPort {
     action: MedicalConclusionAnchorAction,
     actorId?: string,
     before?: unknown,
+    tx?: Prisma.TransactionClient,
   ): Promise<void>;
+
+  triggerImmediateAnchor(): Promise<void>;
 }

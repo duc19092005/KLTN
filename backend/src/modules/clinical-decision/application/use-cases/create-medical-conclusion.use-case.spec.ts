@@ -9,14 +9,21 @@ describe('CreateMedicalConclusionUseCase integration rules', () => {
 
   function makeUseCase(pendingOrders: number) {
     const repo = {
-      findDoctorByUserId: jest.fn().mockResolvedValue({ id: 'doctor-1', specialty: 'General' }),
-      findVisitById: jest.fn().mockResolvedValue({ id: visitId, doctorId: 'doctor-1', status: 'WAITING_CONCLUSION' }),
+      findDoctorByUserId: jest.fn().mockResolvedValue({ id: 'doctor-1', staffId: 'staff-1', departmentId: 'dept-1', specialty: 'General' }),
+      findVisitById: jest.fn().mockResolvedValue({ id: visitId, departmentId: 'dept-1', staffId: 'staff-1', status: 'WAITING_CONCLUSION' }),
       countPendingMedicalOrders: jest.fn().mockResolvedValue(pendingOrders),
       findAiDiagnosisById: jest.fn(),
       findConclusionByVisitId: jest.fn(),
-      upsertConclusionAndCompleteVisit: jest.fn().mockResolvedValue({ id: 'conclusion-1', visitId }),
+      upsertConclusionAndCompleteVisit: jest.fn().mockImplementation(async (_data, afterWrite) => {
+        const conclusion = { id: 'conclusion-1', visitId };
+        await afterWrite?.(conclusion, {});
+        return conclusion;
+      }),
     };
-    const integrity = { anchorChange: jest.fn().mockResolvedValue(undefined) };
+    const integrity = {
+      anchorChange: jest.fn().mockResolvedValue(undefined),
+      triggerImmediateAnchor: jest.fn().mockResolvedValue(undefined),
+    };
     const useCase = new CreateMedicalConclusionUseCase(
       repo as any,
       integrity as any,
@@ -73,8 +80,9 @@ describe('CreateMedicalConclusionUseCase integration rules', () => {
   });
 
   it('documents the two-order scenario: one RESULT_READY and one PENDING yields one blocking order', () => {
-    const statuses = [MedicalOrderStatus.RESULT_READY, MedicalOrderStatus.ORDERED];
-    const pending = statuses.filter((status) => ![MedicalOrderStatus.CANCELLED, MedicalOrderStatus.RESULT_READY].includes(status)).length;
+    const statuses: MedicalOrderStatus[] = [MedicalOrderStatus.RESULT_READY, MedicalOrderStatus.ORDERED];
+    const readyStatuses: MedicalOrderStatus[] = [MedicalOrderStatus.CANCELLED, MedicalOrderStatus.RESULT_READY];
+    const pending = statuses.filter((status) => !readyStatuses.includes(status)).length;
     expect(pending).toBe(1);
   });
 });

@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ethers } from 'ethers';
+import { computeBackendActionHash } from './blockchain-action-hash.util';
 
 @Injectable()
 export class BlockchainService implements OnModuleInit {
@@ -234,11 +235,13 @@ export class BlockchainService implements OnModuleInit {
         return { success: false, error: 'Chưa cấu hình IdentityRegistry hoặc khóa ký của Super Admin.' };
       }
       try {
-        const canonicalPayload = JSON.stringify(actionPayload);
-        const actionHash = ethers.keccak256(ethers.toUtf8Bytes(canonicalPayload));
+        const actionHash = computeBackendActionHash(actionPayload);
         const writableContract = this.contract.connect(this.superAdminSigner) as ethers.Contract;
         const tx = await writableContract.recordAction(actionHash);
         const receipt = await tx.wait();
+        if (!receipt || receipt.status !== 1) {
+          return { success: false, error: 'Backend-signed action transaction failed or was not confirmed.' };
+        }
         return {
           success: true,
           signer: this.superAdminSigner.address,
@@ -274,6 +277,9 @@ export class BlockchainService implements OnModuleInit {
         const writable = this.auditAnchor.connect(this.superAdminSigner) as ethers.Contract;
         const tx = await writable.commitRoot(batchId, rootBytes32, leafCount);
         const receipt = await tx.wait();
+        if (!receipt || receipt.status !== 1) {
+          return { success: false, error: 'Audit root transaction failed or was not confirmed.' };
+        }
         return { success: true, batchId, txHash: tx.hash, blockNumber: receipt.blockNumber };
       } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : 'Failed to commit audit root' };

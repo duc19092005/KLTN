@@ -1,7 +1,14 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, OnApplicationBootstrap } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
-import { computeMerkleRoot, buildMerkleProof, rootToBytes32, verifyMerkleProof } from './merkle.util';
+import {
+  MERKLE_SHA256_STRING_V1,
+  MERKLE_SHA256_BYTES32_V2,
+  buildMerkleProofForAlgorithm,
+  computeMerkleRootForAlgorithm,
+  rootToBytes32,
+  verifyMerkleProofForAlgorithm,
+} from './merkle.util';
 import { computeEntryHash, GENESIS_PREV_HASH } from './audit-hash.util';
 
 /**
@@ -29,6 +36,9 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
 
   private readonly intervalMs = Number(process.env.AUDIT_BATCH_INTERVAL_MS ?? 5 * 60 * 1000);
   private readonly maxLeaves = Number(process.env.AUDIT_BATCH_MAX_LEAVES ?? 500);
+  private readonly pendingRecoveryMs = Number(process.env.AUDIT_BATCH_PENDING_RECOVERY_MS ?? 15 * 60 * 1000);
+  private readonly merkleAlgorithm = MERKLE_SHA256_BYTES32_V2;
+  private readonly contractVersion = 'AUDIT_ANCHOR';
 
   constructor(
     private readonly prisma: PrismaService,
@@ -57,6 +67,8 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
     // Automatically trigger Genesis Anchor if the blockchain has zero batches.
     try {
       if (process.env.AUDIT_BATCH_DISABLED === 'true') return;
+
+      await this.recoverPendingBatches();
 
       const onChainLatest = await this.blockchain.getLatestAuditBatchId();
       if (onChainLatest === 0 || onChainLatest === null) {
@@ -120,6 +132,24 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
           THEN
             RAISE EXCEPTION 'BlockchainLogger is append-only: content columns are immutable (seq=%).', OLD."seq";
           END IF;
+
+          IF OLD."batchId" IS NOT NULL AND NEW."batchId" IS DISTINCT FROM OLD."batchId" THEN
+            RAISE EXCEPTION 'BlockchainLogger anchoring metadata is immutable: batchId already set (seq=%).', OLD."seq";
+          END IF;
+          IF OLD."txHash" IS NOT NULL AND NEW."txHash" IS DISTINCT FROM OLD."txHash" THEN
+            RAISE EXCEPTION 'BlockchainLogger anchoring metadata is immutable: txHash already set (seq=%).', OLD."seq";
+          END IF;
+          IF OLD."blockNumber" IS NOT NULL AND NEW."blockNumber" IS DISTINCT FROM OLD."blockNumber" THEN
+            RAISE EXCEPTION 'BlockchainLogger anchoring metadata is immutable: blockNumber already set (seq=%).', OLD."seq";
+          END IF;
+          IF OLD."onChainStatus" = 'ANCHORED' AND NEW."onChainStatus" IS DISTINCT FROM OLD."onChainStatus" THEN
+            RAISE EXCEPTION 'BlockchainLogger anchored status is immutable (seq=%).', OLD."seq";
+          END IF;
+          IF OLD."onChainStatus" IS DISTINCT FROM NEW."onChainStatus"
+             AND NOT (OLD."onChainStatus" = 'PENDING' AND NEW."onChainStatus" IN ('ANCHORED', 'FAILED', 'UNANCHORED'))
+          THEN
+            RAISE EXCEPTION 'BlockchainLogger invalid onChainStatus transition from % to % (seq=%).', OLD."onChainStatus", NEW."onChainStatus", OLD."seq";
+          END IF;
         END IF;
         RETURN NEW;
       END;
@@ -152,6 +182,22 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
     try {
       if (!this.blockchain.isAuditAnchorReady()) {
         return { committed: false, reason: 'Chưa cấu hình AuditAnchor.' };
+      }
+
+      const chainCheck = await this.verifyFullChainBeforeAnchor();
+      if (!chainCheck.ok) {
+        const reason = chainCheck.reason ?? 'Không xác định được lỗi toàn vẹn chuỗi.';
+        this.logger.error(`🚨 FULL CHAIN INTEGRITY FAILURE DETECTED: ${reason}. Aborting commit.`);
+        await this.sendTelegramAlert('Cảnh báo giả mạo Blockchain Logger (Full-Chain)', reason, chainCheck.brokenAtSeq ?? undefined);
+        return { committed: false, reason: `Kiểm tra toàn chuỗi thất bại: ${reason}` };
+      }
+
+      const anchoredCheck = await this.verifyAllAnchoredBatchesAgainstChain();
+      if (!anchoredCheck.ok) {
+        const reason = anchoredCheck.reason ?? 'Không xác định được lỗi batch đã neo.';
+        this.logger.error(`🚨 ANCHORED BATCH INTEGRITY FAILURE DETECTED: ${reason}. Aborting commit.`);
+        await this.sendTelegramAlert('Cảnh báo batch audit đã neo bị lệch', reason);
+        return { committed: false, reason: `Kiểm tra batch đã neo thất bại: ${reason}` };
       }
 
       // Pull unanchored, chained logs in seq order, capped at maxLeaves per batch.
@@ -194,13 +240,22 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
       const batchId = Math.max(localMax._max.batchId ?? 0, onChainLatest) + 1;
 
       const entryHashes = pending.map((p) => p.entryHash!);
-      const merkleRoot = computeMerkleRoot(entryHashes);
+      const merkleRoot = computeMerkleRootForAlgorithm(entryHashes, this.merkleAlgorithm);
       const fromSeq = pending[0].seq!;
       const toSeq = pending[pending.length - 1].seq!;
 
       // Record the batch as PENDING before the tx so a crash mid-commit is recoverable.
       await this.prisma.auditBatch.create({
-        data: { batchId, merkleRoot, leafCount: pending.length, fromSeq, toSeq, status: 'PENDING' },
+        data: {
+          batchId,
+          merkleRoot,
+          leafCount: pending.length,
+          fromSeq,
+          toSeq,
+          status: 'PENDING',
+          algorithmVersion: this.merkleAlgorithm,
+          contractVersion: this.contractVersion,
+        },
       });
 
       const res = await this.blockchain.commitAuditRoot(batchId, rootToBytes32(merkleRoot), pending.length);
@@ -236,6 +291,137 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
     }
   }
 
+  private async recoverPendingBatches(): Promise<void> {
+    const pendingBatches = await this.prisma.auditBatch.findMany({
+      where: { status: 'PENDING' },
+      orderBy: { batchId: 'asc' },
+      select: {
+        batchId: true,
+        merkleRoot: true,
+        leafCount: true,
+        fromSeq: true,
+        toSeq: true,
+        createdAt: true,
+        algorithmVersion: true,
+        contractVersion: true,
+      },
+    });
+
+    if (pendingBatches.length === 0) return;
+
+    this.logger.warn(`Found ${pendingBatches.length} pending audit batch(es). Starting recovery check...`);
+    const now = Date.now();
+
+    for (const batch of pendingBatches) {
+      try {
+        const checkpoint = await this.blockchain.getAuditCheckpoint(batch.batchId);
+        const localRootBytes32 = rootToBytes32(batch.merkleRoot).toLowerCase();
+        const onChainRoot = checkpoint?.root?.toLowerCase();
+
+        if (checkpoint?.committed && onChainRoot === localRootBytes32) {
+          const membership = await this.validateRecoverableBatchMembership(batch);
+          if (!membership.ok) {
+            const reason = membership.reason ?? `Pending batch ${batch.batchId} membership validation failed during recovery.`;
+            await this.prisma.auditBatch.update({
+              where: { batchId: batch.batchId },
+              data: { status: 'FAILED', error: reason },
+            });
+            await this.sendTelegramAlert('Audit batch recovery membership mismatch', reason, batch.fromSeq ?? undefined);
+            continue;
+          }
+
+          await this.prisma.$transaction([
+            this.prisma.auditBatch.update({
+              where: { batchId: batch.batchId },
+              data: { status: 'ANCHORED', anchoredAt: new Date(Number(checkpoint.timestamp) * 1000), recoveredAt: new Date() },
+            }),
+            this.prisma.blockchainLogger.updateMany({
+              where: {
+                seq: { gte: batch.fromSeq!, lte: batch.toSeq! },
+                batchId: null,
+              },
+              data: { batchId: batch.batchId, onChainStatus: 'ANCHORED' },
+            }),
+          ]);
+          this.logger.warn(`Recovered audit batch ${batch.batchId} from on-chain checkpoint.`);
+          continue;
+        }
+
+        if (checkpoint?.committed && onChainRoot !== localRootBytes32) {
+          const reason = `Pending batch ${batch.batchId} root mismatch during recovery.`;
+          await this.prisma.auditBatch.update({
+            where: { batchId: batch.batchId },
+            data: { status: 'FAILED', error: reason },
+          });
+          await this.sendTelegramAlert('Audit batch recovery root mismatch', reason, batch.fromSeq ?? undefined);
+          continue;
+        }
+
+        if (now - batch.createdAt.getTime() >= this.pendingRecoveryMs) {
+          await this.prisma.auditBatch.update({
+            where: { batchId: batch.batchId },
+            data: { status: 'FAILED', error: 'Pending batch was not found on-chain before recovery timeout.' },
+          });
+          this.logger.warn(`Marked stale pending audit batch ${batch.batchId} as FAILED for retry.`);
+        }
+      } catch (err) {
+        this.logger.error(`Failed to recover pending audit batch ${batch.batchId}`, err);
+      }
+    }
+  }
+
+  private async validateRecoverableBatchMembership(batch: {
+    batchId: number;
+    merkleRoot: string;
+    leafCount: number;
+    fromSeq: number | null;
+    toSeq: number | null;
+    algorithmVersion: string | null;
+  }): Promise<{ ok: boolean; reason?: string }> {
+    if (batch.fromSeq == null || batch.toSeq == null) {
+      return { ok: false, reason: `Pending batch ${batch.batchId} thiếu fromSeq/toSeq.` };
+    }
+    if (batch.fromSeq > batch.toSeq) {
+      return { ok: false, reason: `Pending batch ${batch.batchId} có range seq không hợp lệ.` };
+    }
+
+    const logs = await this.prisma.blockchainLogger.findMany({
+      where: { seq: { gte: batch.fromSeq, lte: batch.toSeq } },
+      orderBy: { seq: 'asc' },
+      select: { id: true, seq: true, entryHash: true },
+    });
+
+    if (logs.length !== batch.leafCount) {
+      return { ok: false, reason: `Pending batch ${batch.batchId} leafCount mismatch: expected ${batch.leafCount}, got ${logs.length}.` };
+    }
+
+    const expectedCount = batch.toSeq - batch.fromSeq + 1;
+    if (logs.length !== expectedCount) {
+      return { ok: false, reason: `Pending batch ${batch.batchId} sequence range is not fully covered.` };
+    }
+
+    for (let index = 0; index < logs.length; index += 1) {
+      const expectedSeq = batch.fromSeq + index;
+      const log = logs[index];
+      if (log.seq !== expectedSeq) {
+        return { ok: false, reason: `Pending batch ${batch.batchId} missing seq ${expectedSeq}.` };
+      }
+      if (!log.entryHash) {
+        return { ok: false, reason: `Pending batch ${batch.batchId} log seq ${expectedSeq} missing entryHash.` };
+      }
+    }
+
+    const recomputedRoot = computeMerkleRootForAlgorithm(
+      logs.map((log) => log.entryHash!),
+      batch.algorithmVersion ?? MERKLE_SHA256_STRING_V1,
+    );
+    if (recomputedRoot !== batch.merkleRoot) {
+      return { ok: false, reason: `Pending batch ${batch.batchId} recomputed root does not match stored root.` };
+    }
+
+    return { ok: true };
+  }
+
   /**
    * Build a Merkle inclusion proof for a single log within its committed batch, so an external
    * party can verify the log existed at anchor time without seeing the other logs.
@@ -264,15 +450,109 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
     const index = batchLogs.findIndex((l) => l.seq === seq);
     if (index < 0) return null;
 
-    const proof = buildMerkleProof(entryHashes, index);
-    const merkleRoot = computeMerkleRoot(entryHashes);
+    const batch = await this.prisma.auditBatch.findUnique({
+      where: { batchId: log.batchId },
+      select: { algorithmVersion: true },
+    });
+    const algorithm = batch?.algorithmVersion ?? MERKLE_SHA256_STRING_V1;
+    const proof = buildMerkleProofForAlgorithm(entryHashes, index, algorithm);
+    const merkleRoot = computeMerkleRootForAlgorithm(entryHashes, algorithm);
     const onChainRoot = await this.blockchain.getAuditRoot(log.batchId);
     const verified =
-      verifyMerkleProof(log.entryHash, proof, merkleRoot) &&
+      verifyMerkleProofForAlgorithm(log.entryHash, proof, merkleRoot, algorithm) &&
       onChainRoot != null &&
       rootToBytes32(merkleRoot).toLowerCase() === onChainRoot.toLowerCase();
 
     return { seq, batchId: log.batchId, entryHash: log.entryHash, proof, merkleRoot, onChainRoot, verified };
+  }
+
+  private async verifyFullChainBeforeAnchor(): Promise<{ ok: boolean; brokenAtSeq: number | null; reason: string | null }> {
+    const rows = await this.prisma.blockchainLogger.findMany({
+      where: { seq: { not: null } },
+      orderBy: { seq: 'asc' },
+      select: {
+        seq: true,
+        prevHash: true,
+        entryHash: true,
+        actorId: true,
+        action: true,
+        entity: true,
+        entityId: true,
+        dataHash: true,
+        createdAt: true,
+      },
+    });
+
+    let expectedPrev = GENESIS_PREV_HASH;
+    let expectedSeq = 1;
+    for (const row of rows) {
+      if (row.seq !== expectedSeq) {
+        return { ok: false, brokenAtSeq: row.seq, reason: `Đứt quãng số thứ tự: mong đợi ${expectedSeq}, nhận được ${row.seq}` };
+      }
+      if (row.prevHash !== expectedPrev) {
+        return { ok: false, brokenAtSeq: row.seq, reason: 'prevHash không khớp entryHash liền trước' };
+      }
+      const recomputed = computeEntryHash(
+        {
+          seq: row.seq!,
+          actorId: row.actorId,
+          action: row.action,
+          entity: row.entity,
+          entityId: row.entityId,
+          dataHash: row.dataHash,
+          createdAtIso: row.createdAt.toISOString(),
+        },
+        row.prevHash ?? GENESIS_PREV_HASH,
+      );
+      if (recomputed !== row.entryHash) {
+        return { ok: false, brokenAtSeq: row.seq, reason: 'entryHash không khớp; nội dung bản ghi có thể đã bị sửa' };
+      }
+      expectedPrev = row.entryHash!;
+      expectedSeq += 1;
+    }
+
+    return { ok: true, brokenAtSeq: null, reason: null };
+  }
+
+  async verifyAllAnchoredBatchesAgainstChain(): Promise<{ ok: boolean; checked: number; failedBatchId: number | null; reason: string | null }> {
+    const batches = await this.prisma.auditBatch.findMany({
+      where: { status: 'ANCHORED' },
+      orderBy: { batchId: 'asc' },
+      select: { batchId: true, merkleRoot: true, fromSeq: true, toSeq: true, algorithmVersion: true },
+    });
+
+    for (const batch of batches) {
+      if (batch.fromSeq == null || batch.toSeq == null) {
+        return { ok: false, checked: 0, failedBatchId: batch.batchId, reason: `Batch ${batch.batchId} thiếu fromSeq/toSeq` };
+      }
+
+      const logs = await this.prisma.blockchainLogger.findMany({
+        where: { seq: { gte: batch.fromSeq, lte: batch.toSeq }, entryHash: { not: null } },
+        orderBy: { seq: 'asc' },
+        select: { seq: true, entryHash: true },
+      });
+      if (logs.length === 0) {
+        return { ok: false, checked: 0, failedBatchId: batch.batchId, reason: `Batch ${batch.batchId} không có log để xác minh` };
+      }
+
+      const recomputedRoot = computeMerkleRootForAlgorithm(
+        logs.map((log) => log.entryHash!),
+        batch.algorithmVersion ?? MERKLE_SHA256_STRING_V1,
+      );
+      if (recomputedRoot !== batch.merkleRoot) {
+        return { ok: false, checked: 0, failedBatchId: batch.batchId, reason: `Batch ${batch.batchId} root DB không khớp root tính lại` };
+      }
+
+      const onChainRoot = await this.blockchain.getAuditRoot(batch.batchId);
+      if (!onChainRoot) {
+        return { ok: false, checked: 0, failedBatchId: batch.batchId, reason: `Batch ${batch.batchId} không tồn tại on-chain` };
+      }
+      if (rootToBytes32(recomputedRoot).toLowerCase() !== onChainRoot.toLowerCase()) {
+        return { ok: false, checked: 0, failedBatchId: batch.batchId, reason: `Batch ${batch.batchId} root on-chain không khớp` };
+      }
+    }
+
+    return { ok: true, checked: batches.length, failedBatchId: null, reason: null };
   }
 
   private async validatePendingChain(pending: any[]): Promise<void> {

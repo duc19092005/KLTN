@@ -590,13 +590,17 @@ model AuditBatch {
   fromSeq     Int?              // smallest BlockchainLogger.seq in the batch
   toSeq       Int?              // largest BlockchainLogger.seq in the batch
   status      String    @default("PENDING") // PENDING | ANCHORED | FAILED
+  algorithmVersion String @default("MERKLE_SHA256_STRING_V1")
+  contractVersion  String?
   txHash      String?
   blockNumber Int?
   error       String?
   createdAt   DateTime  @default(now())
   anchoredAt  DateTime?
+  recoveredAt DateTime?
 
   @@index([status])
+  @@index([algorithmVersion])
   @@index([createdAt])
 }
 

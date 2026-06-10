@@ -52,19 +52,24 @@ export class CreateMedicalConclusionUseCase {
     const before = existing ? buildMedicalConclusionSnapshot(existing) : null;
     const action = existing ? 'UPDATE' : 'CREATE';
 
-    const conclusion = await this.repo.upsertConclusionAndCompleteVisit({
-      visitId: visit!.id,
-      doctorId: doctor.id,
-      staffId: doctor.staffId,
-      aiDiagnosisId: dto.aiDiagnosisId || null,
-      finalDiagnosis: dto.finalDiagnosis.trim(),
-      treatmentPlan: dto.treatmentPlan?.trim() || null,
-      prescription: dto.prescription?.trim() || null,
-      followUpNote: dto.followUpNote?.trim() || null,
-      doctorNote: dto.doctorNote?.trim() || null,
-    });
+    const conclusion = await this.repo.upsertConclusionAndCompleteVisit(
+      {
+        visitId: visit!.id,
+        doctorId: doctor.id,
+        staffId: doctor.staffId,
+        aiDiagnosisId: dto.aiDiagnosisId || null,
+        finalDiagnosis: dto.finalDiagnosis.trim(),
+        treatmentPlan: dto.treatmentPlan?.trim() || null,
+        prescription: dto.prescription?.trim() || null,
+        followUpNote: dto.followUpNote?.trim() || null,
+        doctorNote: dto.doctorNote?.trim() || null,
+      },
+      async (savedConclusion, tx) => {
+        await this.integrity.anchorChange(savedConclusion, action, doctorUserId, before, tx);
+      },
+    );
 
-    await this.integrity.anchorChange(conclusion, action, doctorUserId, before);
+    await this.integrity.triggerImmediateAnchor();
 
     return conclusion;
   }

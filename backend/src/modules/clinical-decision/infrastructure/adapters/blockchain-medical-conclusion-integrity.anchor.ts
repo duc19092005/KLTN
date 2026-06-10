@@ -27,54 +27,58 @@ export class BlockchainMedicalConclusionIntegrityAnchor implements MedicalConclu
     action: MedicalConclusionAnchorAction,
     actorId?: string,
     before?: unknown,
+    tx?: import('@prisma/client').Prisma.TransactionClient,
   ): Promise<void> {
-    const snapshot = buildMedicalConclusionSnapshot(conclusion);
-    if (!snapshot) return;
+    const writeAudit = async (client: import('@prisma/client').Prisma.TransactionClient) => {
+      const snapshot = buildMedicalConclusionSnapshot(conclusion);
+      if (!snapshot) {
+        throw new Error('Cannot build MedicalConclusion audit snapshot.');
+      }
 
-    let dataHash: string | null = null;
-    let dataSalt: string | null = null;
-    let onChainStatus = 'PENDING';
-
-    try {
-      // 1. Generate salt and hash the snapshot
       const { salt, hash } = this.audit.hashSnapshot(snapshot);
-      dataHash = hash;
-      dataSalt = salt;
 
-      // 2. Update MedicalConclusion database row with integrity hash data
-      await this.prisma.medicalConclusion.update({
+      await client.medicalConclusion.update({
         where: { id: conclusion.id },
         data: { hash256: hash, dataSalt: salt },
       });
-    } catch (err) {
-      console.error('Error calculating and saving medical conclusion hash:', err);
-      onChainStatus = 'UNANCHORED';
+
+      await this.audit.record(
+        {
+          entity: 'MedicalConclusion',
+          entityId: conclusion.id,
+          action,
+          actorId,
+          dataHash: hash,
+          dataSalt: salt,
+          before: before ?? null,
+          after: snapshot,
+          onChainStatus: 'PENDING',
+        },
+        client,
+      );
+    };
+
+    if (tx) {
+      await writeAudit(tx);
+      return;
     }
 
-    // 3. Record audit entry in BlockchainLogger.
+    await this.prisma.$transaction(async (client) => {
+      await writeAudit(client);
+    });
+
     try {
-      await this.audit.record({
-        entity: 'MedicalConclusion',
-        entityId: conclusion.id,
-        action,
-        actorId,
-        dataHash,
-        dataSalt,
-        before: before ?? null,
-        after: snapshot,
-        onChainStatus,
-      });
+      await this.auditAnchor.anchorNow();
     } catch (err) {
-      console.error('Error writing audit trail for medical conclusion:', err);
+      console.error('[MedicalConclusion] Immediate anchoring failed, will retry in batch cycle:', err);
     }
+  }
 
-    // 4. Trigger immediate Merkle root commit (Tier-A event) to protect the conclusion instantly
-    if (onChainStatus === 'PENDING') {
-      try {
-        await this.auditAnchor.anchorNow();
-      } catch (err) {
-        console.error('[MedicalConclusion] Immediate anchoring failed, will retry in batch cycle:', err);
-      }
+  async triggerImmediateAnchor(): Promise<void> {
+    try {
+      await this.auditAnchor.anchorNow();
+    } catch (err) {
+      console.error('[MedicalConclusion] Immediate anchoring failed, will retry in batch cycle:', err);
     }
   }
 }

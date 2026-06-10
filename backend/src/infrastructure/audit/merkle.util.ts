@@ -3,78 +3,108 @@ import { createHash } from 'crypto';
 /**
  * Merkle tree utilities for batch-anchoring audit logs.
  *
- * The anchoring job collects the entryHash of every not-yet-anchored BlockchainLogger row
- * (already a hash-chained leaf) and builds a binary Merkle tree over them. Only the ROOT is
- * committed on-chain (AuditAnchor.commitRoot), so gas is flat regardless of batch size: 10 or
- * 10,000 logs both cost one transaction storing one 32-byte root.
+ * V1 is preserved for historical batches:
+ *  - leaf = sha256("leaf:" + lowercase entryHash hex as utf8)
+ *  - node = sha256("node:" + min(a,b) + max(a,b))
  *
- * Each log can later be proven to belong to a committed batch with an O(log n) Merkle proof,
- * without revealing the other logs. Verification recomputes the root from the leaf + proof and
- * compares it to the immutable on-chain value.
- *
- * Hashing convention (must stay stable; it defines proof validity):
- *  - leaf  = sha256(hex leaf string as utf8)            -- domain-separated from internal nodes
- *  - node  = sha256( min(a,b) || max(a,b) )             -- sorted pairs => order-independent proofs
- *  - odd node out is promoted (hashed with itself)
+ * V2 is the Solidity-friendly algorithm for new batches:
+ *  - leaf = sha256(DOMAIN_LEAF || bytes32(entryHash))
+ *  - node = sha256(DOMAIN_NODE || min(bytes32 a,b) || max(bytes32 a,b))
  */
 
-const ZERO = '0'.repeat(64);
+export const MERKLE_SHA256_STRING_V1 = 'MERKLE_SHA256_STRING_V1';
+export const MERKLE_SHA256_BYTES32_V2 = 'MERKLE_SHA256_BYTES32_V2';
+export type MerkleAlgorithm = typeof MERKLE_SHA256_STRING_V1 | typeof MERKLE_SHA256_BYTES32_V2;
 
-function sha256Hex(input: string): string {
+const ZERO = '0'.repeat(64);
+const HEX_32_BYTES = /^[0-9a-f]{64}$/i;
+const DOMAIN_LEAF_V2 = Buffer.from('KLTN_AUDIT_LEAF_V2');
+const DOMAIN_NODE_V2 = Buffer.from('KLTN_AUDIT_NODE_V2');
+
+function sha256Hex(input: string | Buffer): string {
   return createHash('sha256').update(input).digest('hex');
 }
 
-/** Hash a raw leaf value (an entryHash hex string) into a Merkle leaf. */
-export function hashLeaf(entryHashHex: string): string {
-  return sha256Hex(`leaf:${entryHashHex.toLowerCase()}`);
+function stripHexPrefix(value: string): string {
+  return value.startsWith('0x') ? value.slice(2) : value;
 }
 
-/** Combine two child hashes into a parent. Sorted so proofs don't need a left/right flag. */
+function normalizeHex32(value: string, label: string): string {
+  if (typeof value !== 'string') {
+    throw new Error(`${label} must be a 32-byte hex string`);
+  }
+  const clean = stripHexPrefix(value).toLowerCase();
+  if (!HEX_32_BYTES.test(clean)) {
+    throw new Error(`${label} must be a 32-byte hex string`);
+  }
+  return clean;
+}
+
+function normalizeEntryHashes(entryHashes: string[]): string[] {
+  return entryHashes.map((entryHash, index) => normalizeHex32(entryHash, `Merkle entryHash[${index}]`));
+}
+
+function bytes32(hex: string): Buffer {
+  return Buffer.from(normalizeHex32(hex, 'Merkle bytes32'), 'hex');
+}
+
+/** Hash a raw leaf value (an entryHash hex string) into a v1 Merkle leaf. */
+export function hashLeaf(entryHashHex: string): string {
+  return sha256Hex(`leaf:${normalizeHex32(entryHashHex, 'Merkle entryHash')}`);
+}
+
 function hashPair(a: string, b: string): string {
-  const [lo, hi] = a.toLowerCase() <= b.toLowerCase() ? [a, b] : [b, a];
+  const left = normalizeHex32(a, 'Merkle left node');
+  const right = normalizeHex32(b, 'Merkle right node');
+  const [lo, hi] = left <= right ? [left, right] : [right, left];
   return sha256Hex(`node:${lo}${hi}`);
 }
 
-/**
- * Build the Merkle root over an ordered list of entryHash hex strings.
- * Returns 64 zero-chars for an empty input (callers must not commit an empty batch).
- */
-export function computeMerkleRoot(entryHashes: string[]): string {
-  if (entryHashes.length === 0) return ZERO;
-  let level = entryHashes.map(hashLeaf);
+export function hashLeafV2(entryHashHex: string): string {
+  return sha256Hex(Buffer.concat([DOMAIN_LEAF_V2, bytes32(entryHashHex)]));
+}
+
+function hashPairV2(a: string, b: string): string {
+  const left = normalizeHex32(a, 'Merkle left node');
+  const right = normalizeHex32(b, 'Merkle right node');
+  const [lo, hi] = left <= right ? [left, right] : [right, left];
+  return sha256Hex(Buffer.concat([DOMAIN_NODE_V2, bytes32(lo), bytes32(hi)]));
+}
+
+function computeMerkleRootWith(entryHashes: string[], leafHasher: (leaf: string) => string, pairHasher: (a: string, b: string) => string, allowEmpty: boolean): string {
+  if (entryHashes.length === 0) {
+    if (allowEmpty) return ZERO;
+    throw new Error('Cannot compute a Merkle root for an empty batch');
+  }
+  let level = normalizeEntryHashes(entryHashes).map(leafHasher);
   while (level.length > 1) {
     const next: string[] = [];
     for (let i = 0; i < level.length; i += 2) {
       const left = level[i];
-      const right = i + 1 < level.length ? level[i + 1] : level[i]; // promote odd leaf
-      next.push(hashPair(left, right));
+      const right = i + 1 < level.length ? level[i + 1] : level[i]; // duplicate odd node
+      next.push(pairHasher(left, right));
     }
     level = next;
   }
   return level[0];
 }
 
-/**
- * Produce a Merkle proof (list of sibling hashes, bottom-up) for the leaf at `index`.
- * Verifiers fold the proof into the leaf with hashPair and compare against the committed root.
- */
-export function buildMerkleProof(entryHashes: string[], index: number): string[] {
+function buildMerkleProofWith(entryHashes: string[], index: number, leafHasher: (leaf: string) => string, pairHasher: (a: string, b: string) => string): string[] {
   if (index < 0 || index >= entryHashes.length) {
     throw new Error('Merkle proof index out of range');
   }
   const proof: string[] = [];
-  let level = entryHashes.map(hashLeaf);
+  let level = normalizeEntryHashes(entryHashes).map(leafHasher);
   let idx = index;
   while (level.length > 1) {
     const isRight = idx % 2 === 1;
     const siblingIdx = isRight ? idx - 1 : idx + 1;
-    const sibling = siblingIdx < level.length ? level[siblingIdx] : level[idx];
-    proof.push(sibling);
+    proof.push(siblingIdx < level.length ? level[siblingIdx] : level[idx]);
     const next: string[] = [];
     for (let i = 0; i < level.length; i += 2) {
       const left = level[i];
       const right = i + 1 < level.length ? level[i + 1] : level[i];
-      next.push(hashPair(left, right));
+      next.push(pairHasher(left, right));
     }
     level = next;
     idx = Math.floor(idx / 2);
@@ -82,18 +112,55 @@ export function buildMerkleProof(entryHashes: string[], index: number): string[]
   return proof;
 }
 
-/** Recompute the root from a single leaf + its proof. Used by independent verifiers. */
-export function verifyMerkleProof(entryHashHex: string, proof: string[], root: string): boolean {
-  let acc = hashLeaf(entryHashHex);
-  for (const sibling of proof) {
-    acc = hashPair(acc, sibling);
+function verifyMerkleProofWith(entryHashHex: string, proof: string[], root: string, leafHasher: (leaf: string) => string, pairHasher: (a: string, b: string) => string): boolean {
+  const expectedRoot = normalizeHex32(root, 'Merkle root');
+  let acc = leafHasher(entryHashHex);
+  for (let index = 0; index < proof.length; index += 1) {
+    acc = pairHasher(acc, normalizeHex32(proof[index], `Merkle proof[${index}]`));
   }
-  return acc.toLowerCase() === root.toLowerCase();
+  return acc === expectedRoot;
+}
+
+/** Build the v1 Merkle root over entryHash hex strings. Empty input returns the legacy zero root. */
+export function computeMerkleRoot(entryHashes: string[]): string {
+  return computeMerkleRootWith(entryHashes, hashLeaf, hashPair, true);
+}
+
+export function computeMerkleRootV2(entryHashes: string[]): string {
+  return computeMerkleRootWith(entryHashes, hashLeafV2, hashPairV2, false);
+}
+
+export function computeMerkleRootForAlgorithm(entryHashes: string[], algorithm: string): string {
+  return algorithm === MERKLE_SHA256_BYTES32_V2 ? computeMerkleRootV2(entryHashes) : computeMerkleRoot(entryHashes);
+}
+
+export function buildMerkleProof(entryHashes: string[], index: number): string[] {
+  return buildMerkleProofWith(entryHashes, index, hashLeaf, hashPair);
+}
+
+export function buildMerkleProofV2(entryHashes: string[], index: number): string[] {
+  return buildMerkleProofWith(entryHashes, index, hashLeafV2, hashPairV2);
+}
+
+export function buildMerkleProofForAlgorithm(entryHashes: string[], index: number, algorithm: string): string[] {
+  return algorithm === MERKLE_SHA256_BYTES32_V2 ? buildMerkleProofV2(entryHashes, index) : buildMerkleProof(entryHashes, index);
+}
+
+export function verifyMerkleProof(entryHashHex: string, proof: string[], root: string): boolean {
+  return verifyMerkleProofWith(entryHashHex, proof, root, hashLeaf, hashPair);
+}
+
+export function verifyMerkleProofV2(entryHashHex: string, proof: string[], root: string): boolean {
+  return verifyMerkleProofWith(entryHashHex, proof, root, hashLeafV2, hashPairV2);
+}
+
+export function verifyMerkleProofForAlgorithm(entryHashHex: string, proof: string[], root: string, algorithm: string): boolean {
+  return algorithm === MERKLE_SHA256_BYTES32_V2
+    ? verifyMerkleProofV2(entryHashHex, proof, root)
+    : verifyMerkleProof(entryHashHex, proof, root);
 }
 
 /** Convert a hex SHA256 digest into a 0x-prefixed bytes32 for AuditAnchor.commitRoot. */
 export function rootToBytes32(hexDigest: string): string {
-  const clean = hexDigest.startsWith('0x') ? hexDigest.slice(2) : hexDigest;
-  if (clean.length !== 64) throw new Error('Expected a 32-byte (64 hex char) Merkle root');
-  return `0x${clean}`;
+  return `0x${normalizeHex32(hexDigest, 'Merkle root')}`;
 }
