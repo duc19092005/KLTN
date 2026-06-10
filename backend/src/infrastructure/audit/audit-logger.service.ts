@@ -90,12 +90,11 @@ export class AuditLoggerService {
   }
 
   /**
-   * Persist one change entry to the centralized logger, linked into the hash-chain.
-   * Returns the created row (including seq/prevHash/entryHash).
+   * Persist one audit entry using the canonical Blockchain Audit V2 format.
    *
-   * When `tx` is provided, the audit row is written in the caller's domain transaction.
-   * Without `tx`, the logger opens its own transaction. In both modes we take a PostgreSQL
-   * advisory transaction lock so seq/prevHash assignment is safe across multiple backend instances.
+   * V1 rows are legacy-only in this dev codebase. All new writes go through the encrypted
+   * before/after + field-diff V2 path so the UI, verification logic and Merkle anchoring operate
+   * on one clean format.
    */
   async record(
     params: {
@@ -114,8 +113,20 @@ export class AuditLoggerService {
     },
     tx?: Prisma.TransactionClient,
   ) {
-    if (tx) return this.appendRecord(params, tx);
-    return this.enqueue(() => this.prisma.$transaction((transaction) => this.appendRecord(params, transaction)));
+    const v2Params = {
+      entity: params.entity,
+      entityId: params.entityId,
+      action: params.action,
+      actorId: params.actorId,
+      before: this.toAuditSnapshot(params.before),
+      after: this.toAuditSnapshot(params.after),
+      onChainStatus: params.onChainStatus,
+      txHash: params.txHash,
+      blockNumber: params.blockNumber,
+      metadata: params.metadata,
+    };
+    if (tx) return this.appendRecordV2(v2Params, tx);
+    return this.enqueue(() => this.prisma.$transaction((transaction) => this.appendRecordV2(v2Params, transaction)));
   }
 
   async recordV2(
@@ -135,6 +146,13 @@ export class AuditLoggerService {
   ) {
     if (tx) return this.appendRecordV2(params, tx);
     return this.enqueue(() => this.prisma.$transaction((transaction) => this.appendRecordV2(params, transaction)));
+  }
+
+  private toAuditSnapshot(value: unknown): Record<string, unknown> | null {
+    if (value == null) return null;
+    if (value instanceof Date) return { value: value.toISOString() };
+    if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+    return { value };
   }
 
   private async appendRecord(

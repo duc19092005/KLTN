@@ -69,7 +69,7 @@ describe('AuditLoggerService V2', () => {
   it('writes encrypted V2 audit rows without hashing ciphertext', async () => {
     const { service, prismaMock } = await createService();
 
-    const row: any = await service.recordV2({
+    const row: any = await service.record({
       entity: 'StaffProfile',
       entityId: 'staff-1',
       action: 'UPDATE',
@@ -127,7 +127,7 @@ describe('AuditLoggerService V2', () => {
     );
   });
 
-  it('keeps the legacy V1 record path available', async () => {
+  it('writes V2 rows through the canonical record path', async () => {
     const { service } = await createService();
 
     const row: any = await service.record({
@@ -140,8 +140,10 @@ describe('AuditLoggerService V2', () => {
       after: { id: 'dept-1', name: 'Cardiology' },
     });
 
-    expect(row.hashVersion).toBeUndefined();
-    expect(row.beforeEncrypted).toBeUndefined();
+    expect(row.hashVersion).toBe(AUDIT_ENTRY_V2);
+    expect(row.beforeEncrypted).toBeDefined();
+    expect(row.afterEncrypted).toBeDefined();
+    expect(row.dataSalt).toBeNull();
     expect(row.entryHash).toMatch(/^[0-9a-f]{64}$/);
   });
 

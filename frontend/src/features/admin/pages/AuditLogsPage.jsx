@@ -68,6 +68,11 @@ function formatTime(value) {
   return value ? new Date(value).toLocaleString('vi-VN') : 'N/A';
 }
 
+function formatHashVersion(version) {
+  if (version === 'KLTN_AUDIT_ENTRY_V2') return 'V2 Encrypted Diff';
+  return version ? `Legacy · ${version}` : 'Legacy';
+}
+
 const VERIFICATION_TONE = {
   VERIFIED: 'border-emerald-200 bg-emerald-50 text-emerald-700',
   PENDING: 'border-amber-200 bg-amber-50 text-amber-700',
@@ -507,7 +512,7 @@ function LogsTable({
                     <td className="px-4 py-3">
                       <span className="font-black text-slate-900">{ENTITY_LABELS[log.entity] || log.entity}</span>
                       <span className="mt-1 inline-flex rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[9px] font-black text-slate-500">
-                        {log.hashVersion || 'V1'}
+                        {formatHashVersion(log.hashVersion)}
                       </span>
                       <span className="block font-mono text-[11px] text-slate-400">{shortHash(log.entityId)}</span>
                     </td>
@@ -676,7 +681,7 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
               <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h3 className="mb-4 inline-flex items-center gap-2 text-sm font-black text-slate-900"><ShieldCheck className="h-4 w-4 text-emerald-600" /> Verification detail</h3>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <DetailField label="Phiên bản hash" value={log.hashVersion || 'V1'} mono />
+                  <DetailField label="Phiên bản hash" value={formatHashVersion(log.hashVersion)} mono />
                   <DetailField label="Trạng thái" value={log.verification?.status || log.blockchainStatus} />
                   <DetailField label="Lý do" value={log.verification?.reason || 'Không phát hiện bất thường'} />
                   <DetailField label="Field nghi vấn" value={(log.verification?.suspiciousFields || []).join(', ') || '—'} />
