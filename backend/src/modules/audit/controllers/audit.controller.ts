@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Query, UseGuards, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query, UseGuards, NotFoundException, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
@@ -45,7 +45,7 @@ export class AuditController {
     @CurrentUser() user?: AuthUser,
   ) {
     const page = Math.max(Number(pageRaw) || 1, 1);
-    const limit = Math.max(Number(limitRaw) || 10, 1);
+    const limit = Math.min(Math.max(Number(limitRaw) || 10, 1), 100);
     const skip = (page - 1) * limit;
     // Display order only — the tamper-evident chain itself is always keyed by the monotonic seq.
     const sort: 'asc' | 'desc' = sortRaw === 'asc' ? 'asc' : 'desc';
@@ -112,7 +112,7 @@ export class AuditController {
     @Query('limit') limitRaw?: string,
   ) {
     const page = Math.max(Number(pageRaw) || 1, 1);
-    const limit = Math.max(Number(limitRaw) || 10, 1);
+    const limit = Math.min(Math.max(Number(limitRaw) || 10, 1), 100);
     const skip = (page - 1) * limit;
 
     const [items, total] = await Promise.all([
@@ -136,7 +136,7 @@ export class AuditController {
   @Get('logs/:seq')
   @RequireFaceStepUp('AUDIT_DETAIL')
   @ApiOperation({ summary: 'Get one audit log with readable diff and V2 verification details' })
-  async logDetail(@Param('seq') seq: string, @CurrentUser() user?: AuthUser) {
+  async logDetail(@Param('seq') seq: string, @CurrentUser() user?: AuthUser, @Req() req?: any) {
     const row = await this.prisma.blockchainLogger.findFirst({ where: { seq: Number(seq) } });
     if (!row) throw new NotFoundException('Không tìm thấy audit log.');
 
@@ -154,7 +154,8 @@ export class AuditController {
         })
       : null;
 
-    return this.presentAuditRow(row, actor, user, true);
+    const faceVerified = req?.stepUp?.verified === true && req?.stepUp?.action === 'AUDIT_DETAIL';
+    return this.presentAuditRow(row, actor, user, true, faceVerified);
   }
 
   @Get('logs/:seq/proof')
@@ -170,13 +171,21 @@ export class AuditController {
     return this.anchor.anchorNow();
   }
 
-  private presentAuditRow(row: any, actor: any, user: AuthUser | undefined, includeDetail: boolean) {
-    const verification = verifyAuditRow(row);
+  private presentAuditRow(row: any, actor: any, user: AuthUser | undefined, includeDetail: boolean, faceVerified = false) {
+    const verification = includeDetail
+      ? verifyAuditRow(row)
+      : {
+          ok: true,
+          status: 'PENDING' as const,
+          version: row.hashVersion ? 'V2' as const : 'V1' as const,
+          reason: 'List view does not decrypt encrypted snapshots; open detail or run chain verification for full integrity status.',
+          suspiciousFields: [],
+        };
     const diff = row.diffJson?.schema === 'KLTN_AUDIT_DIFF_V1'
       ? toDisplayAuditDiff(row.diffJson, {
           role: user?.role,
-          faceVerified: true,
-          clinicalContextAllowed: includeDetail,
+          faceVerified,
+          clinicalContextAllowed: includeDetail && faceVerified,
         })
       : [];
     const base = {
@@ -229,18 +238,10 @@ export class AuditController {
         before: this.describeEncryptedSnapshot(row.beforeEncrypted),
         after: this.describeEncryptedSnapshot(row.afterEncrypted),
       },
-      decryptedSnapshots: this.canExposeDecryptedSnapshots(user)
-        ? {
-            before: verification.decryptedBefore ?? null,
-            after: verification.decryptedAfter ?? null,
-          }
-        : null,
+      sensitiveDetailUnlocked: faceVerified,
     };
   }
 
-  private canExposeDecryptedSnapshots(user?: AuthUser): boolean {
-    return user?.role === 'ADMIN';
-  }
 
   private describeEncryptedSnapshot(value: any) {
     if (!value || typeof value !== 'object') return null;

@@ -81,7 +81,7 @@ const VERIFICATION_TONE = {
 
 const VERIFICATION_LABEL = {
   VERIFIED: 'Đã xác minh',
-  PENDING: 'Chờ xác minh',
+  PENDING: 'Chưa kiểm sâu',
   TAMPERED: 'Nghi sửa đổi',
 };
 
@@ -636,7 +636,7 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
     }
   };
 
-  const hasDecryptedSnapshots = Boolean(log.decryptedSnapshots);
+  const sensitiveDetailUnlocked = Boolean(log.sensitiveDetailUnlocked);
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" onClick={onClose}>
@@ -656,7 +656,7 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
                 <VerificationBadge status={log.blockchainStatus} />
               </div>
               <p className="mt-2 max-w-2xl text-sm font-semibold text-cyan-50/80">
-                Hiển thị diff đã redaction, hash chain, metadata mã hóa và snapshot chỉ sau face step-up.
+                Hiển thị diff theo chính sách, hash chain và metadata mã hóa. Snapshot gốc không được trả qua API mặc định.
               </p>
             </div>
             <button onClick={onClose} className="relative rounded-xl border border-white/15 bg-white/10 p-2 text-cyan-50 hover:bg-white/20">
@@ -729,12 +729,14 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
                     <p>After: {log.encryptedSnapshots.after?.alg || '—'} · key {log.encryptedSnapshots.after?.keyId || '—'}</p>
                   </div>
                 ) : <p className="text-xs font-semibold text-cyan-800">Metadata mã hóa chỉ tải ở chế độ chi tiết.</p>}
-                {!hasDecryptedSnapshots ? (
+                {!sensitiveDetailUnlocked ? (
                   <button onClick={() => setStepUpOpen(true)} disabled={detailLoading} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-cyan-900/10 hover:bg-cyan-700 disabled:opacity-60">
-                    <Fingerprint className="h-4 w-4" /> {detailLoading ? 'Đang tải chi tiết…' : 'Face step-up để xem snapshot'}
+                    <Fingerprint className="h-4 w-4" /> {detailLoading ? 'Đang tải chi tiết…' : 'Face step-up để mở diff nhạy cảm'}
                   </button>
                 ) : (
-                  <SnapshotPreview snapshots={log.decryptedSnapshots} />
+                  <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-bold text-emerald-800">
+                    Đã xác thực khuôn mặt. Hệ thống chỉ hiển thị diff được policy cho phép và metadata mã hóa; snapshot plaintext không được trả ở endpoint này.
+                  </div>
                 )}
               </section>
 
@@ -752,7 +754,7 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
         <FaceStepUpModal
           action="AUDIT_DETAIL"
           title="Mở chi tiết audit đã mã hóa"
-          description="Snapshot audit có thể chứa dữ liệu gốc. Hệ thống yêu cầu quét khuôn mặt để cấp vé xem một lần."
+          description="Chi tiết audit có thể bao gồm diff nhạy cảm. Hệ thống yêu cầu quét khuôn mặt để cấp vé xem một lần; snapshot plaintext vẫn không được trả qua API mặc định."
           onSuccess={loadDetail}
           onClose={() => setStepUpOpen(false)}
         />
@@ -788,20 +790,7 @@ function DiffList({ diff }) {
   );
 }
 
-function SnapshotPreview({ snapshots }) {
-  return (
-    <div className="mt-4 grid gap-3 text-xs">
-      {['before', 'after'].map((side) => (
-        <div key={side} className="rounded-2xl border border-cyan-100 bg-white p-3">
-          <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-cyan-700">{side}</p>
-          <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-slate-950 p-3 font-mono text-[10px] text-cyan-50">
-            {JSON.stringify(snapshots?.[side] ?? null, null, 2)}
-          </pre>
-        </div>
-      ))}
-    </div>
-  );
-}
+
 
 function DetailField({ label, value, mono = false }) {
   return (

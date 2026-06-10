@@ -41,6 +41,7 @@ export class FaceStepUpGuard implements CanActivate {
     if (sessionScope) {
       const token = req.headers?.['x-stepup-session'] as string | undefined;
       await this.stepUp.consumeSession({ userId, scope: sessionScope, token });
+      req.stepUp = { verified: true, mode: 'SESSION', scope: sessionScope, resourceId: null };
       return true;
     }
 
@@ -49,6 +50,7 @@ export class FaceStepUpGuard implements CanActivate {
     const resourceId = req.params?.id ?? req.params?.seq ?? null;
     const ip = String(req.headers?.['x-forwarded-for'] || '').split(',')[0].trim() || req.ip;
     await this.stepUp.consume({ userId, action: action as string, token, resourceId, ip });
+    req.stepUp = { verified: true, mode: 'TICKET', action, resourceId };
     return true;
   }
 }
