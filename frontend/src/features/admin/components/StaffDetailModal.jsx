@@ -64,7 +64,9 @@ export default function StaffDetailModal({ staffId, onClose }) {
 
   if (!staffId) return null;
 
-  const staff = detail?.staffProfile || {};
+  const normalizedStaff = detail?.staffProfile || detail || {};
+  const staff = normalizedStaff;
+  const user = detail?.user || normalizedStaff?.user || {};
   const audit = detail?.audit || {};
   const tone = STATUS_TONE[audit.status] || STATUS_TONE.UNANCHORED;
 
@@ -84,7 +86,7 @@ export default function StaffDetailModal({ staffId, onClose }) {
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-600">Chi tiết nhân sự</p>
               <h3 className="text-2xl font-black text-slate-950">{staff.fullName || 'Nhân viên'}</h3>
-              <p className="text-sm text-slate-500">{ROLE_LABEL[detail?.user?.role] || 'N/A'}</p>
+              <p className="text-sm text-slate-500">{ROLE_LABEL[user?.role] || user?.role || 'N/A'}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -137,7 +139,7 @@ export default function StaffDetailModal({ staffId, onClose }) {
                   <h4 className="text-sm font-black text-slate-900 border-b pb-2 tracking-wide uppercase">Thông tin cá nhân</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <Field label="Mã nhân viên" value={staff.employeeCode} />
-                    <Field label="Vai trò" value={ROLE_LABEL[detail?.user?.role] || detail?.user?.role} />
+                    <Field label="Vai trò" value={ROLE_LABEL[user?.role] || user?.role} />
                     <Field label="Số điện thoại" value={staff.phone} />
                     <Field label="CCCD/CMND" value={staff.citizenId} />
                     <Field label="Giới tính" value={genderLabel(staff.gender)} />
@@ -150,12 +152,12 @@ export default function StaffDetailModal({ staffId, onClose }) {
                 <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm space-y-4">
                   <h4 className="text-sm font-black text-slate-900 border-b pb-2 tracking-wide uppercase">Thông tin tài khoản</h4>
                   <div className="grid grid-cols-2 gap-4">
-                    <Field label="Tên đăng nhập" value={detail?.user?.username} colSpan={2} />
-                    <Field label="Email" value={detail?.user?.email} colSpan={2} />
-                    <Field label="Trạng thái" value={detail?.user?.status === 'ACTIVE' ? 'Đang hoạt động' : 'Ngưng hoạt động'} />
+                    <Field label="Tên đăng nhập" value={user?.username} colSpan={2} />
+                    <Field label="Email" value={user?.email} colSpan={2} />
+                    <Field label="Trạng thái" value={user?.status === 'ACTIVE' ? 'Đang hoạt động' : user?.status === 'INACTIVE' ? 'Ngưng hoạt động' : user?.status} />
                     <Field label="Vị trí" value={staff.position} />
-                    <Field label="Ngày tạo" value={formatTime(detail?.createdAt)} colSpan={2} />
-                    <Field label="Lần cập nhật cuối" value={formatTime(detail?.updatedAt)} colSpan={2} />
+                    <Field label="Ngày tạo" value={formatTime(staff.createdAt || user?.createdAt)} colSpan={2} />
+                    <Field label="Lần cập nhật cuối" value={formatTime(staff.updatedAt || user?.updatedAt)} colSpan={2} />
                   </div>
                 </div>
               </div>

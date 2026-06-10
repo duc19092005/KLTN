@@ -101,6 +101,7 @@ export class PrismaStaffRepository implements StaffRepositoryPort {
           ? { department: { name: { contains: filter.department, mode: 'insensitive' } } }
           : {}),
       ...(filter.role ? { user: { role: filter.role } } : {}),
+      ...(filter.excludeRole ? { NOT: { user: { role: filter.excludeRole } } } : {}),
       // "Is a department head" → the inverse relation managedDepartment is set.
       ...(filter.isManager ? { managedDepartment: { isNot: null } } : {}),
       ...(filter.search

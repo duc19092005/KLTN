@@ -105,6 +105,9 @@ export class StaffQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ enum: UserRole })
   @IsOptional() @IsEnum(UserRole) role?: UserRole;
 
+  @ApiPropertyOptional({ enum: UserRole, description: 'Exclude this role from the staff list' })
+  @IsOptional() @IsEnum(UserRole) excludeRole?: UserRole;
+
   @ApiPropertyOptional({ example: true, description: 'When true, only staff heading a department' })
   @IsOptional() @Transform(({ value }) => value === true || value === 'true') @IsBoolean() isManager?: boolean;
 }

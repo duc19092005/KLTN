@@ -16,8 +16,8 @@ import { Search, X } from 'lucide-react';
 const emptyStaff = { username: '', email: '', fullName: '', avatarUrl: '', departmentId: '', phone: '', gender: '', citizenId: '', birthDate: '', address: '', position: '', role: 'LAB_MANAGER' };
 const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100', INACTIVE: 'bg-rose-50 text-rose-700 border-rose-100', PENDING: 'bg-amber-50 text-amber-700 border-amber-100' };
 const statusLabel = { ACTIVE: 'Đang hoạt động', INACTIVE: 'Ngưng hoạt động', PENDING: 'Chờ kích hoạt' };
-const ROLE_LABEL = { DOCTOR: 'Bác sĩ', RECEPTIONIST: 'Lễ tân', LAB_MANAGER: 'KTV cận lâm sàng', ADMIN: 'Quản trị viên' };
-const ROLE_TONE = { DOCTOR: 'bg-cyan-50 text-cyan-700 border-cyan-100', RECEPTIONIST: 'bg-cyan-50 text-cyan-700 border-cyan-100', LAB_MANAGER: 'bg-cyan-50 text-cyan-700 border-cyan-100', ADMIN: 'bg-slate-100 text-slate-700 border-slate-200' };
+const ROLE_LABEL = { RECEPTIONIST: 'Lễ tân', LAB_MANAGER: 'KTV cận lâm sàng', ADMIN: 'Quản trị viên' };
+const ROLE_TONE = { RECEPTIONIST: 'bg-cyan-50 text-cyan-700 border-cyan-100', LAB_MANAGER: 'bg-cyan-50 text-cyan-700 border-cyan-100', ADMIN: 'bg-slate-100 text-slate-700 border-slate-200' };
 function getError(err) { return err?.response?.data?.message || err.message || 'Thao tác thất bại'; }
 function buildStaffPayload(form) {
   return {
@@ -60,7 +60,7 @@ export default function StaffPage() {
     try {
       const [depRes, staffRes] = await Promise.all([
         departmentService.list(),
-        staffService.search({ ...cleanFilters(activeFilters), page, limit: pagination.limit }),
+        staffService.search({ ...cleanFilters(activeFilters), excludeRole: 'DOCTOR', page, limit: pagination.limit }),
       ]);
       setDepartments(Array.isArray(depRes.data) ? depRes.data : depRes.data?.items || []);
       const data = staffRes.data || {};
@@ -168,7 +168,7 @@ export default function StaffPage() {
   );
 }
 function Hero({ onCreate }) { return <div className="flex justify-end"><button onClick={onCreate} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ Thêm nhân sự</button></div>; }
-const ROLE_OPTIONS = [{ value: 'DOCTOR', label: 'Bác sĩ' }, { value: 'RECEPTIONIST', label: 'Lễ tân' }, { value: 'LAB_MANAGER', label: 'Kỹ thuật viên cận lâm sàng' }];
+const ROLE_OPTIONS = [{ value: 'RECEPTIONIST', label: 'Lễ tân' }, { value: 'LAB_MANAGER', label: 'Kỹ thuật viên cận lâm sàng' }];
 
 // Remove empty/falsey filter values so we never send blank `departmentId` (the backend
 // validates it as a UUID and would 400 on an empty string) or `isManager=false`.
@@ -261,7 +261,7 @@ function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editi
           <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500">Đóng</button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select label="Loại nhân sự" value={form.role} onChange={(v) => setForm({ ...form, role: v })} options={[...(editingStaff?.user?.role === 'DOCTOR' ? [{ value: 'DOCTOR', label: 'Bác sĩ' }] : []), { value: 'RECEPTIONIST', label: 'Lễ tân' }, { value: 'LAB_MANAGER', label: 'Kỹ thuật viên cận lâm sàng' }]} required />
+          <Select label="Loại nhân sự" value={form.role} onChange={(v) => setForm({ ...form, role: v })} options={[{ value: 'RECEPTIONIST', label: 'Lễ tân' }, { value: 'LAB_MANAGER', label: 'Kỹ thuật viên cận lâm sàng' }]} required />
           <Input label="Họ tên" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: v })} required />
           <AvatarUpload value={form.avatarUrl} onChange={(url) => setForm({ ...form, avatarUrl: url })} uploadFn={staffService.uploadAvatar} ringTone="cyan" />
           <Input label="Tên đăng nhập" value={form.username} onChange={(v) => setForm({ ...form, username: v })} required />

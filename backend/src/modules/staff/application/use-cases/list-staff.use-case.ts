@@ -22,6 +22,7 @@ export class ListStaffUseCase {
         department: query.department,
         departmentId: query.departmentId,
         role: query.role,
+        excludeRole: query.excludeRole,
         isManager: query.isManager,
         search: query.search,
       },
