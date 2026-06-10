@@ -20,11 +20,16 @@ export interface AuditDiffViewerContext {
   role?: string | null;
   faceVerified?: boolean;
   clinicalContextAllowed?: boolean;
+  entity?: string | null;
 }
 
 export interface DisplayAuditDiffChange {
   field: string;
+  fieldPath: string;
   label: string;
+  entity?: string | null;
+  entityLabel?: string;
+  changeKind: AuditDiffSensitivity;
   before: unknown;
   after: unknown;
   sensitivity: AuditDiffSensitivity;
@@ -52,6 +57,24 @@ const FIELD_LABELS: Record<string, string> = {
   prescription: 'Đơn thuốc',
   note: 'Ghi chú',
   clinicalNote: 'Ghi chú lâm sàng',
+};
+
+const ENTITY_LABELS: Record<string, string> = {
+  StaffProfile: 'Nhân sự',
+  DoctorProfile: 'Bác sĩ',
+  Patient: 'Bệnh nhân',
+  Visit: 'Lượt khám',
+  MedicalConclusion: 'Kết luận khám',
+  User: 'Người dùng',
+  SecurityEvent: 'Sự kiện bảo mật',
+  Department: 'Phòng ban',
+};
+
+const ENTITY_FIELD_LABELS: Record<string, Record<string, string>> = {
+  StaffProfile: { fullName: 'Họ tên nhân sự', phone: 'Số điện thoại nhân sự', avatarUrl: 'Ảnh đại diện nhân sự' },
+  Patient: { fullName: 'Họ tên bệnh nhân', phone: 'Số điện thoại bệnh nhân', citizenId: 'Số CCCD bệnh nhân' },
+  Visit: { status: 'Trạng thái lượt khám', departmentId: 'Phòng khám', patientId: 'Bệnh nhân' },
+  MedicalConclusion: { finalDiagnosis: 'Chẩn đoán cuối cùng', treatmentPlan: 'Kế hoạch điều trị', prescription: 'Đơn thuốc' },
 };
 
 const PII_FIELDS = new Set([
@@ -94,8 +117,13 @@ function valuesEqual(left: unknown, right: unknown): boolean {
   return canonicalize(left ?? null) === canonicalize(right ?? null);
 }
 
-export function getAuditFieldLabel(field: string): string {
+export function getAuditFieldLabel(field: string, entity?: string | null): string {
+  if (entity && ENTITY_FIELD_LABELS[entity]?.[field]) return ENTITY_FIELD_LABELS[entity][field];
   return FIELD_LABELS[field] ?? field;
+}
+
+export function getAuditEntityLabel(entity?: string | null): string {
+  return entity ? ENTITY_LABELS[entity] ?? entity : 'Đối tượng';
 }
 
 export function classifyAuditField(field: string): AuditDiffSensitivity {
@@ -154,6 +182,11 @@ export function toDisplayAuditDiff(diff: AuditDiffJson, context: AuditDiffViewer
     if (change.sensitivity === 'FILE_URL') {
       return {
         ...change,
+        fieldPath: `${context.entity ?? 'Entity'}.${change.field}`,
+        label: getAuditFieldLabel(change.field, context.entity),
+        entity: context.entity,
+        entityLabel: getAuditEntityLabel(context.entity),
+        changeKind: change.sensitivity,
         before: '[REDACTED]',
         after: '[REDACTED]',
         redacted: true,
@@ -164,6 +197,11 @@ export function toDisplayAuditDiff(diff: AuditDiffJson, context: AuditDiffViewer
     if (change.sensitivity === 'CLINICAL_TEXT' && !canViewClinicalText(context)) {
       return {
         ...change,
+        fieldPath: `${context.entity ?? 'Entity'}.${change.field}`,
+        label: getAuditFieldLabel(change.field, context.entity),
+        entity: context.entity,
+        entityLabel: getAuditEntityLabel(context.entity),
+        changeKind: change.sensitivity,
         before: '[REDACTED]',
         after: '[REDACTED]',
         redacted: true,
@@ -174,6 +212,11 @@ export function toDisplayAuditDiff(diff: AuditDiffJson, context: AuditDiffViewer
     if (change.sensitivity === 'PII' && !canViewPii(context)) {
       return {
         ...change,
+        fieldPath: `${context.entity ?? 'Entity'}.${change.field}`,
+        label: getAuditFieldLabel(change.field, context.entity),
+        entity: context.entity,
+        entityLabel: getAuditEntityLabel(context.entity),
+        changeKind: change.sensitivity,
         before: '[REDACTED]',
         after: '[REDACTED]',
         redacted: true,
@@ -183,8 +226,13 @@ export function toDisplayAuditDiff(diff: AuditDiffJson, context: AuditDiffViewer
 
     return {
       ...change,
+      fieldPath: `${context.entity ?? 'Entity'}.${change.field}`,
+      label: getAuditFieldLabel(change.field, context.entity),
+      entity: context.entity,
+      entityLabel: getAuditEntityLabel(context.entity),
+      changeKind: change.sensitivity,
       redacted: false,
-      summary: `${change.label}: ${String(change.before)} → ${String(change.after)}`,
+      summary: `${getAuditFieldLabel(change.field, context.entity)}: ${String(change.before)} → ${String(change.after)}`,
     };
   });
 }

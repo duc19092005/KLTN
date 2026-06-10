@@ -97,9 +97,22 @@ function getPrimaryDiff(log) {
 }
 
 function summarizeDiff(log) {
-  const fields = log.fieldsChanged || log.diff?.map((item) => item.field) || [];
+  const fields = log.fieldsChanged || log.diff?.map((item) => item.fieldPath || item.field) || [];
   if (!fields.length) return 'Không có thay đổi field-level';
   return fields.slice(0, 3).join(', ') + (fields.length > 3 ? ` +${fields.length - 3}` : '');
+}
+
+function subjectTitle(log) {
+  const subject = log.subject;
+  if (!subject) return ENTITY_LABELS[log.entity] || log.entity || 'Đối tượng';
+  return subject.displayName || subject.code || subject.label || subject.entity || 'Đối tượng';
+}
+
+function subjectSubtitle(log) {
+  const subject = log.subject;
+  if (!subject) return shortHash(log.entityId);
+  const parts = [subject.label || subject.table, subject.code, subject.departmentName].filter(Boolean);
+  return parts.join(' · ') || shortHash(subject.entityId);
 }
 
 // ---- Page -------------------------------------------------------------------
@@ -510,11 +523,11 @@ function LogsTable({
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="font-black text-slate-900">{ENTITY_LABELS[log.entity] || log.entity}</span>
+                      <span className="font-black text-slate-900">{subjectTitle(log)}</span>
                       <span className="mt-1 inline-flex rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[9px] font-black text-slate-500">
-                        {formatHashVersion(log.hashVersion)}
+                        {log.subject?.table || log.entity} · {formatHashVersion(log.hashVersion)}
                       </span>
-                      <span className="block font-mono text-[11px] text-slate-400">{shortHash(log.entityId)}</span>
+                      <span className="block max-w-[220px] truncate text-[11px] font-semibold text-slate-400">{subjectSubtitle(log)}</span>
                     </td>
                     <td className="min-w-[260px] px-4 py-3">
                       <DiffPreview log={log} />
@@ -572,7 +585,7 @@ function DiffPreview({ log }) {
         <div key={item.field} className="rounded-xl border border-slate-100 bg-slate-50/70 px-2.5 py-1.5">
           <div className="flex items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1 text-[11px] font-black text-slate-700">
-              <FileDiff className="h-3 w-3 text-cyan-600" /> {item.field}
+              <FileDiff className="h-3 w-3 text-cyan-600" /> {item.fieldPath || item.field}
             </span>
             {item.redacted && <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-700">REDACTED</span>}
           </div>
@@ -670,6 +683,21 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
 
           <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-5">
+              <section className="rounded-3xl border border-cyan-100 bg-cyan-50/60 p-5 shadow-sm">
+                <p className="mb-2 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-cyan-700">
+                  <Layers className="h-3.5 w-3.5" /> Đối tượng bị thay đổi
+                </p>
+                <div className="space-y-3">
+                  <p className="text-lg font-black text-slate-950">{subjectTitle(log)}</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <DetailField label="Bảng / entity" value={log.subject?.table || log.entity} mono />
+                    <DetailField label="Mã nghiệp vụ" value={log.subject?.code || '—'} mono />
+                    <DetailField label="Phòng ban" value={log.subject?.departmentName || '—'} />
+                    <DetailField label="Linked user" value={log.subject?.linkedUserId || '—'} mono />
+                  </div>
+                </div>
+              </section>
+
               <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <h3 className="inline-flex items-center gap-2 text-sm font-black text-slate-900"><FileDiff className="h-4 w-4 text-cyan-600" /> Readable field diff</h3>
@@ -770,7 +798,7 @@ function DiffList({ diff }) {
       {diff.map((item) => (
         <div key={item.field} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="font-mono text-xs font-black text-slate-800">{item.field}</span>
+            <span className="font-mono text-xs font-black text-slate-800">{item.fieldPath || item.field}</span>
             {item.redacted && <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700">REDACTED</span>}
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -783,6 +811,7 @@ function DiffList({ diff }) {
               <p className="mt-1 break-words text-xs font-bold text-slate-900">{renderDiffValue(item.after, item.redacted)}</p>
             </div>
           </div>
+          <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-cyan-700">{item.label || item.field}</p>
           {item.reason && <p className="mt-2 text-[10px] font-semibold text-amber-700">Policy: {item.reason}</p>}
         </div>
       ))}

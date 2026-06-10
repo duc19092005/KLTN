@@ -84,10 +84,11 @@ export class AuditController {
         })
       : [];
     const actorMap = new Map(actors.map((a) => [a.id, a]));
+    const subjectMap = await this.resolveSubjectContextMap(items);
 
     const itemsWithStatus = items.map((row) => {
       const actor = row.actorId ? actorMap.get(row.actorId) : null;
-      return this.presentAuditRow(row, actor, user, false);
+      return this.presentAuditRow(row, actor, user, false, false, subjectMap.get(this.subjectKey(row)) ?? null);
     });
 
     return {
@@ -155,7 +156,8 @@ export class AuditController {
       : null;
 
     const faceVerified = req?.stepUp?.verified === true && req?.stepUp?.action === 'AUDIT_DETAIL';
-    return this.presentAuditRow(row, actor, user, true, faceVerified);
+    const subject = await this.resolveSubjectContext(row);
+    return this.presentAuditRow(row, actor, user, true, faceVerified, subject);
   }
 
   @Get('logs/:seq/proof')
@@ -171,7 +173,7 @@ export class AuditController {
     return this.anchor.anchorNow();
   }
 
-  private presentAuditRow(row: any, actor: any, user: AuthUser | undefined, includeDetail: boolean, faceVerified = false) {
+  private presentAuditRow(row: any, actor: any, user: AuthUser | undefined, includeDetail: boolean, faceVerified = false, subject: any = null) {
     const verification = includeDetail
       ? verifyAuditRow(row)
       : {
@@ -186,6 +188,7 @@ export class AuditController {
           role: user?.role,
           faceVerified,
           clinicalContextAllowed: includeDetail && faceVerified,
+          entity: row.entity,
         })
       : [];
     const base = {
@@ -220,6 +223,7 @@ export class AuditController {
         : null,
       diff,
       fieldsChanged: row.fieldsChanged ?? row.diffJson?.fieldsChanged ?? [],
+      subject,
       hashes: {
         dataHash: row.dataHash,
         beforeHash: row.beforeHash,
@@ -242,6 +246,84 @@ export class AuditController {
     };
   }
 
+
+  private subjectKey(row: { entity: string; entityId?: string | null }) {
+    return `${row.entity}:${row.entityId ?? ''}`;
+  }
+
+  private async resolveSubjectContextMap(rows: Array<{ entity: string; entityId?: string | null }>) {
+    const map = new Map<string, any>();
+    const uniqueRows = Array.from(new Map(rows.filter((row) => row.entityId).map((row) => [this.subjectKey(row), row])).values());
+    await Promise.all(uniqueRows.map(async (row) => {
+      const subject = await this.resolveSubjectContext(row);
+      if (subject) map.set(this.subjectKey(row), subject);
+    }));
+    return map;
+  }
+
+  private async resolveSubjectContext(row: { entity: string; entityId?: string | null }) {
+    if (!row.entityId) return null;
+    const base = {
+      entity: row.entity,
+      entityId: row.entityId,
+      table: row.entity,
+      label: row.entity,
+      code: null as string | null,
+      displayName: null as string | null,
+      linkedUserId: null as string | null,
+      departmentId: null as string | null,
+      departmentName: null as string | null,
+      patientId: null as string | null,
+      visitId: null as string | null,
+    };
+
+    if (row.entity === 'StaffProfile') {
+      const staff = await this.prisma.staffProfile.findUnique({
+        where: { id: row.entityId },
+        select: { id: true, userId: true, fullName: true, employeeCode: true, departmentId: true, department: { select: { name: true } } },
+      });
+      if (!staff) return base;
+      return { ...base, label: 'Nhân sự', code: staff.employeeCode, displayName: staff.fullName, linkedUserId: staff.userId, departmentId: staff.departmentId, departmentName: staff.department?.name ?? null };
+    }
+
+    if (row.entity === 'Patient') {
+      const patient = await this.prisma.patient.findUnique({
+        where: { id: row.entityId },
+        select: { id: true, patientCode: true, fullName: true },
+      });
+      if (!patient) return base;
+      return { ...base, label: 'Bệnh nhân', code: patient.patientCode, displayName: patient.fullName, patientId: patient.id };
+    }
+
+    if (row.entity === 'Visit') {
+      const visit = await this.prisma.visit.findUnique({
+        where: { id: row.entityId },
+        select: { id: true, visitCode: true, patientId: true, departmentId: true, patient: { select: { fullName: true, patientCode: true } }, department: { select: { name: true } } },
+      });
+      if (!visit) return base;
+      return { ...base, label: 'Lượt khám', code: visit.visitCode, displayName: `${visit.patient?.fullName ?? 'Bệnh nhân'} · ${visit.visitCode}`, departmentId: visit.departmentId, departmentName: visit.department?.name ?? null, patientId: visit.patientId, visitId: visit.id };
+    }
+
+    if (row.entity === 'MedicalConclusion') {
+      const conclusion = await this.prisma.medicalConclusion.findUnique({
+        where: { id: row.entityId },
+        select: { id: true, visitId: true, visit: { select: { visitCode: true, patientId: true, patient: { select: { fullName: true } }, departmentId: true, department: { select: { name: true } } } } },
+      });
+      if (!conclusion) return base;
+      return { ...base, label: 'Kết luận khám', code: conclusion.visit?.visitCode ?? null, displayName: `${conclusion.visit?.patient?.fullName ?? 'Bệnh nhân'} · Kết luận`, departmentId: conclusion.visit?.departmentId ?? null, departmentName: conclusion.visit?.department?.name ?? null, patientId: conclusion.visit?.patientId ?? null, visitId: conclusion.visitId };
+    }
+
+    if (row.entity === 'Department') {
+      const department = await this.prisma.department.findUnique({
+        where: { id: row.entityId },
+        select: { id: true, departmentCode: true, name: true },
+      });
+      if (!department) return base;
+      return { ...base, label: 'Phòng ban', code: department.departmentCode, displayName: department.name, departmentId: department.id, departmentName: department.name };
+    }
+
+    return base;
+  }
 
   private describeEncryptedSnapshot(value: any) {
     if (!value || typeof value !== 'object') return null;
