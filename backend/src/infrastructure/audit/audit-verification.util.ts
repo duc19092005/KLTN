@@ -67,8 +67,14 @@ function isEncryptedSnapshot(value: unknown): value is EncryptedAuditSnapshot {
   );
 }
 
-function normalizeFieldsChanged(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
+function normalizeFieldsChanged(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(String).sort() : [];
+}
+
+function fieldsChangedFromDiff(diffJson: unknown): string[] {
+  if (!diffJson || typeof diffJson !== 'object') return [];
+  const fields = (diffJson as { fieldsChanged?: unknown }).fieldsChanged;
+  return normalizeFieldsChanged(fields);
 }
 
 export function verifyAuditRow(row: AuditRowLike): AuditRowVerificationResult {
@@ -128,13 +134,14 @@ export function verifyAuditRowV2(row: AuditRowLike): AuditRowVerificationResult 
     const recomputedAfterHash = computeAfterHashV2(row.entity, row.entityId, decryptedAfter);
     const recomputedDiffHash = computeDiffHashV2(row.diffJson);
     const fieldsChanged = normalizeFieldsChanged(row.fieldsChanged);
+    const diffFieldsChanged = fieldsChangedFromDiff(row.diffJson);
     const recomputedDataHash = computeDataHashV2({
       entity: row.entity,
       entityId: row.entityId ?? null,
       action: row.action,
-      beforeHash: row.beforeHash,
-      afterHash: row.afterHash,
-      diffHash: row.diffHash,
+      beforeHash: recomputedBeforeHash,
+      afterHash: recomputedAfterHash,
+      diffHash: recomputedDiffHash,
       fieldsChanged,
     });
     const recomputedEntryHash = computeEntryHashV2({
@@ -144,16 +151,17 @@ export function verifyAuditRowV2(row: AuditRowLike): AuditRowVerificationResult 
       entityId: row.entityId ?? null,
       action: row.action,
       actorId: row.actorId ?? null,
-      beforeHash: row.beforeHash,
-      afterHash: row.afterHash,
-      diffHash: row.diffHash,
-      dataHash: row.dataHash!,
+      beforeHash: recomputedBeforeHash,
+      afterHash: recomputedAfterHash,
+      diffHash: recomputedDiffHash,
+      dataHash: recomputedDataHash,
       createdAtIso: createdAtIso(row),
     });
 
     if (recomputedBeforeHash !== row.beforeHash) suspiciousFields.push('beforeEncrypted', 'beforeHash');
     if (recomputedAfterHash !== row.afterHash) suspiciousFields.push('afterEncrypted', 'afterHash');
     if (recomputedDiffHash !== row.diffHash) suspiciousFields.push('diffJson', 'diffHash');
+    if (canonicalize(fieldsChanged) !== canonicalize(diffFieldsChanged)) suspiciousFields.push('fieldsChanged', 'diffJson');
     if (recomputedDataHash !== row.dataHash) suspiciousFields.push('dataHash');
     if (recomputedEntryHash !== row.entryHash) suspiciousFields.push('entryHash');
 

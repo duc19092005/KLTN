@@ -22,6 +22,7 @@ import {
   buildAuditEncryptionAad,
   encryptAuditSnapshot,
 } from './audit-encryption.util';
+import { verifyAuditRow } from './audit-verification.util';
 
 export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'ACCESS' | 'SECURITY';
 
@@ -360,6 +361,15 @@ export class AuditLoggerService {
         entity: true,
         entityId: true,
         dataHash: true,
+        dataSalt: true,
+        beforeHash: true,
+        afterHash: true,
+        diffHash: true,
+        hashVersion: true,
+        beforeEncrypted: true,
+        afterEncrypted: true,
+        diffJson: true,
+        fieldsChanged: true,
         createdAt: true,
       },
     });
@@ -377,20 +387,9 @@ export class AuditLoggerService {
         await this.anchor.sendTelegramAlert('Phát hiện đứt gãy chuỗi nhật ký (kiểm tra chuỗi)', reason, row.seq);
         return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason };
       }
-      const recomputed = computeEntryHash(
-        {
-          seq: row.seq!,
-          actorId: row.actorId,
-          action: row.action,
-          entity: row.entity,
-          entityId: row.entityId,
-          dataHash: row.dataHash,
-          createdAtIso: row.createdAt.toISOString(),
-        },
-        row.prevHash ?? GENESIS_PREV_HASH,
-      );
-      if (recomputed !== row.entryHash) {
-        const reason = 'entryHash không khớp; nội dung bản ghi có thể đã bị sửa';
+      const verification = verifyAuditRow(row);
+      if (!verification.ok) {
+        const reason = verification.reason || 'entryHash không khớp; nội dung bản ghi có thể đã bị sửa';
         await this.anchor.sendTelegramAlert('Phát hiện đứt gãy chuỗi nhật ký (kiểm tra chuỗi)', reason, row.seq);
         return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason };
       }
