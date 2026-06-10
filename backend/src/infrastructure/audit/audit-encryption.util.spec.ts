@@ -5,6 +5,7 @@ import {
   decryptAuditSnapshot,
   encryptAuditSnapshot,
   getAuditEncryptionKey,
+  getAuditEncryptionKeyId,
 } from './audit-encryption.util';
 
 describe('audit-encryption.util', () => {
@@ -86,7 +87,7 @@ describe('audit-encryption.util', () => {
     delete process.env.AUDIT_ENCRYPTION_KEY;
 
     try {
-      expect(() => getAuditEncryptionKey()).toThrow('AUDIT_ENCRYPTION_KEY is required in production for Blockchain Audit V2');
+      expect(() => getAuditEncryptionKey()).toThrow('AUDIT_ENCRYPTION_KEY is required for Blockchain Audit V2');
     } finally {
       process.env.NODE_ENV = originalEnv;
       if (originalKey === undefined) delete process.env.AUDIT_ENCRYPTION_KEY;
@@ -106,6 +107,36 @@ describe('audit-encryption.util', () => {
       process.env.NODE_ENV = originalEnv;
       if (originalKey === undefined) delete process.env.AUDIT_ENCRYPTION_KEY;
       else process.env.AUDIT_ENCRYPTION_KEY = originalKey;
+    }
+  });
+  it('requires explicit opt-in for the local insecure fallback key', () => {
+    const originalEnv = process.env.NODE_ENV;
+    const originalKey = process.env.AUDIT_ENCRYPTION_KEY;
+    const originalAllow = process.env.ALLOW_INSECURE_AUDIT_CRYPTO;
+    process.env.NODE_ENV = 'development';
+    delete process.env.AUDIT_ENCRYPTION_KEY;
+    process.env.ALLOW_INSECURE_AUDIT_CRYPTO = 'true';
+
+    try {
+      expect(getAuditEncryptionKey()).toEqual(Buffer.alloc(32, 0));
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+      if (originalKey === undefined) delete process.env.AUDIT_ENCRYPTION_KEY;
+      else process.env.AUDIT_ENCRYPTION_KEY = originalKey;
+      if (originalAllow === undefined) delete process.env.ALLOW_INSECURE_AUDIT_CRYPTO;
+      else process.env.ALLOW_INSECURE_AUDIT_CRYPTO = originalAllow;
+    }
+  });
+
+  it('validates configured key ids', () => {
+    const originalKeyId = process.env.AUDIT_ENCRYPTION_KEY_ID;
+    process.env.AUDIT_ENCRYPTION_KEY_ID = 'bad key id';
+
+    try {
+      expect(() => getAuditEncryptionKeyId()).toThrow('AUDIT_ENCRYPTION_KEY_ID must be 3-80 safe identifier characters');
+    } finally {
+      if (originalKeyId === undefined) delete process.env.AUDIT_ENCRYPTION_KEY_ID;
+      else process.env.AUDIT_ENCRYPTION_KEY_ID = originalKeyId;
     }
   });
 });

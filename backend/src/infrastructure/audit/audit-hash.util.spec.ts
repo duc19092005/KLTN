@@ -8,6 +8,7 @@ import {
   computeEntryHashV2,
   computeRecordHash,
   GENESIS_PREV_HASH,
+  getAuditHashKey,
 } from './audit-hash.util';
 
 describe('audit-hash.util canonicalize', () => {
@@ -156,7 +157,7 @@ describe('audit-hash.util canonicalize', () => {
 });
 
 describe('audit-hash.util v2 HMAC payloads', () => {
-  const key = 'audit-hash-key-for-tests';
+  const key = 'audit-hash-key-for-tests-with-32-chars';
   const before = { fullName: 'abc', status: 'ACTIVE' };
   const after = { status: 'ACTIVE', fullName: 'def' };
   const diffJson = {
@@ -243,9 +244,40 @@ describe('audit-hash.util v2 HMAC payloads', () => {
     delete process.env.AUDIT_HASH_KEY;
 
     try {
-      expect(() => computeDiffHashV2(diffJson)).toThrow('AUDIT_HASH_KEY is required in production for Blockchain Audit V2');
+      expect(() => computeDiffHashV2(diffJson)).toThrow('AUDIT_HASH_KEY is required for Blockchain Audit V2');
     } finally {
       process.env.NODE_ENV = originalEnv;
+      if (originalKey === undefined) delete process.env.AUDIT_HASH_KEY;
+      else process.env.AUDIT_HASH_KEY = originalKey;
+    }
+  });
+
+  it('requires explicit opt-in for the local insecure HMAC key', () => {
+    const originalEnv = process.env.NODE_ENV;
+    const originalKey = process.env.AUDIT_HASH_KEY;
+    const originalAllow = process.env.ALLOW_INSECURE_AUDIT_CRYPTO;
+    process.env.NODE_ENV = 'development';
+    delete process.env.AUDIT_HASH_KEY;
+    process.env.ALLOW_INSECURE_AUDIT_CRYPTO = 'true';
+
+    try {
+      expect(getAuditHashKey()).toBe('dev-only-insecure-audit-hash-key-change-me-32-bytes');
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+      if (originalKey === undefined) delete process.env.AUDIT_HASH_KEY;
+      else process.env.AUDIT_HASH_KEY = originalKey;
+      if (originalAllow === undefined) delete process.env.ALLOW_INSECURE_AUDIT_CRYPTO;
+      else process.env.ALLOW_INSECURE_AUDIT_CRYPTO = originalAllow;
+    }
+  });
+
+  it('rejects short V2 HMAC keys', () => {
+    const originalKey = process.env.AUDIT_HASH_KEY;
+    process.env.AUDIT_HASH_KEY = 'too-short';
+
+    try {
+      expect(() => getAuditHashKey()).toThrow('AUDIT_HASH_KEY must be at least 32 characters');
+    } finally {
       if (originalKey === undefined) delete process.env.AUDIT_HASH_KEY;
       else process.env.AUDIT_HASH_KEY = originalKey;
     }

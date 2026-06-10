@@ -176,6 +176,16 @@ export const AUDIT_DATA_V2 = 'KLTN_AUDIT_DATA_V2';
 const AUDIT_BEFORE_V1 = 'KLTN_AUDIT_BEFORE_V1';
 const AUDIT_AFTER_V1 = 'KLTN_AUDIT_AFTER_V1';
 const AUDIT_DIFF_V1 = 'KLTN_AUDIT_DIFF_V1';
+const MIN_AUDIT_KEY_CHARS = 32;
+const INSECURE_DEV_HASH_KEY = 'dev-only-insecure-audit-hash-key-change-me-32-bytes';
+
+function allowInsecureAuditCrypto(): boolean {
+  return process.env.ALLOW_INSECURE_AUDIT_CRYPTO === 'true' && process.env.NODE_ENV !== 'production';
+}
+
+function fingerprintSecret(secret: string): string {
+  return createHash('sha256').update(secret).digest('hex').slice(0, 12);
+}
 
 export interface AuditDataHashV2Input {
   entity: string;
@@ -195,13 +205,20 @@ export interface AuditEntryHashV2Input extends AuditDataHashV2Input {
   createdAtIso: string;
 }
 
-/** The configured V2 HMAC key. Required in production for Blockchain Audit V2. */
 export function getAuditHashKey(): string {
   const key = process.env.AUDIT_HASH_KEY || '';
-  if (process.env.NODE_ENV === 'production' && !key) {
-    throw new Error('AUDIT_HASH_KEY is required in production for Blockchain Audit V2');
+  if (!key) {
+    if (allowInsecureAuditCrypto()) return INSECURE_DEV_HASH_KEY;
+    throw new Error('AUDIT_HASH_KEY is required for Blockchain Audit V2. Set ALLOW_INSECURE_AUDIT_CRYPTO=true only for local dev/CI fallback.');
+  }
+  if (key.length < MIN_AUDIT_KEY_CHARS) {
+    throw new Error(`AUDIT_HASH_KEY must be at least ${MIN_AUDIT_KEY_CHARS} characters`);
   }
   return key;
+}
+
+export function getAuditHashKeyFingerprint(): string {
+  return fingerprintSecret(getAuditHashKey());
 }
 
 function hmacSha256Hex(message: string, key = getAuditHashKey()): string {

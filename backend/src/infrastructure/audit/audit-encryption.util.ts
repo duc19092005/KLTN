@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 import { canonicalize } from './audit-hash.util';
 
 export const AUDIT_ENCRYPTION_ALG = 'AES-256-GCM';
@@ -6,8 +6,19 @@ export const AUDIT_ENCRYPTION_VERSION = 'AUDIT_AES_256_GCM_V1';
 export const AUDIT_ENCRYPTION_AAD_V1 = 'KLTN_AUDIT_ENCRYPTION_AAD_V1';
 
 const HEX_32_BYTES = /^[0-9a-f]{64}$/i;
+const KEY_ID_PATTERN = /^[a-zA-Z0-9._:-]{3,80}$/;
 const IV_BYTES = 12;
 const AUTH_TAG_BYTES = 16;
+const INSECURE_DEV_ENCRYPTION_KEY = '0'.repeat(64);
+const INSECURE_DEV_KEY_ID = 'local-dev-insecure-audit-key';
+
+function allowInsecureAuditCrypto(): boolean {
+  return process.env.ALLOW_INSECURE_AUDIT_CRYPTO === 'true' && process.env.NODE_ENV !== 'production';
+}
+
+function fingerprintHexKey(hexKey: string): string {
+  return createHash('sha256').update(Buffer.from(hexKey, 'hex')).digest('hex').slice(0, 12);
+}
 
 export interface AuditEncryptionAadInput {
   seq: number;
@@ -25,22 +36,31 @@ export interface EncryptedAuditSnapshot {
   ciphertext: string;
 }
 
-export function getAuditEncryptionKey(): Buffer {
+export function getAuditEncryptionKeyHex(): string {
   const key = process.env.AUDIT_ENCRYPTION_KEY || '';
-  if (process.env.NODE_ENV === 'production' && !key) {
-    throw new Error('AUDIT_ENCRYPTION_KEY is required in production for Blockchain Audit V2');
-  }
   if (!key) {
-    return Buffer.alloc(32, 0);
+    if (allowInsecureAuditCrypto()) return INSECURE_DEV_ENCRYPTION_KEY;
+    throw new Error('AUDIT_ENCRYPTION_KEY is required for Blockchain Audit V2. Set ALLOW_INSECURE_AUDIT_CRYPTO=true only for local dev/CI fallback.');
   }
   if (!HEX_32_BYTES.test(key)) {
     throw new Error('AUDIT_ENCRYPTION_KEY must be a 32-byte hex string');
   }
-  return Buffer.from(key, 'hex');
+  return key.toLowerCase();
+}
+
+export function getAuditEncryptionKey(): Buffer {
+  return Buffer.from(getAuditEncryptionKeyHex(), 'hex');
 }
 
 export function getAuditEncryptionKeyId(): string {
-  return process.env.AUDIT_ENCRYPTION_KEY_ID || 'local-dev-audit-key';
+  const keyId = process.env.AUDIT_ENCRYPTION_KEY_ID || (allowInsecureAuditCrypto() ? INSECURE_DEV_KEY_ID : '');
+  if (!keyId) throw new Error('AUDIT_ENCRYPTION_KEY_ID is required for Blockchain Audit V2');
+  if (!KEY_ID_PATTERN.test(keyId)) throw new Error('AUDIT_ENCRYPTION_KEY_ID must be 3-80 safe identifier characters');
+  return keyId;
+}
+
+export function getAuditEncryptionKeyFingerprint(): string {
+  return fingerprintHexKey(getAuditEncryptionKeyHex());
 }
 
 export function buildAuditEncryptionAad(input: AuditEncryptionAadInput): string {
