@@ -1,4 +1,4 @@
-import { UserRole, UserStatus } from '@prisma/client';
+import { Prisma, UserRole, UserStatus } from '@prisma/client';
 
 /** DI token for the Staff repository port. */
 export const STAFF_REPOSITORY = Symbol('STAFF_REPOSITORY');
@@ -11,6 +11,8 @@ export type StaffListFilter = {
   /** Exact department UUID; preferred over the name-contains `department` filter when both are set. */
   departmentId?: string;
   role?: UserRole;
+  /** Exclude one account role from the result set, used by UI pages that split doctors into a dedicated module. */
+  excludeRole?: UserRole;
   /** When true, only include staff that head a department (StaffProfile.managedDepartment != null). */
   isManager?: boolean;
   search?: string;
@@ -72,7 +74,11 @@ export interface StaffRepositoryPort {
   findManyPaginated(filter: StaffListFilter, skip: number, take: number): Promise<{ items: unknown[]; total: number }>;
 
   /** Update User (+ nested staffProfile). Returns sanitized user incl. staffProfile. */
-  updateStaffUser(userId: string, data: UpdateStaffData): Promise<any>;
+  updateStaffUser(
+    userId: string,
+    data: UpdateStaffData,
+    afterUpdate?: (updated: any, tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<any>;
 
   /** Update only the User status (+ bump tokenVersion). Returns sanitized user incl. staffProfile. */
   setUserStatus(userId: string, status: UserStatus): Promise<any>;

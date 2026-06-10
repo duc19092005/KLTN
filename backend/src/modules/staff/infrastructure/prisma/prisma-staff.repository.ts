@@ -120,29 +120,37 @@ export class PrismaStaffRepository implements StaffRepositoryPort {
     return { items, total };
   }
 
-  async updateStaffUser(userId: string, data: UpdateStaffData): Promise<any> {
-    const updated = await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        ...(data.username !== undefined ? { username: data.username.trim() } : {}),
-        ...(data.email !== undefined ? { email: data.email.trim().toLowerCase() } : {}),
-        ...(data.role !== undefined ? { role: data.role } : {}),
-        ...(data.status !== undefined ? { status: data.status, tokenVersion: { increment: 1 } } : {}),
-        staffProfile: {
-          update: {
-            ...(data.fullName !== undefined ? { fullName: data.fullName.trim() } : {}),
-            ...(data.phone !== undefined ? { phone: data.phone.trim() } : {}),
-            ...(data.gender !== undefined ? { gender: data.gender.trim() } : {}),
-            ...(data.citizenId !== undefined ? { citizenId: data.citizenId.trim() } : {}),
-            ...(data.birthDate !== undefined ? { birthDate: new Date(data.birthDate) } : {}),
-            ...(data.address !== undefined ? { address: data.address?.trim() } : {}),
-            ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl.trim() } : {}),
-            ...(data.departmentId !== undefined ? { departmentId: data.departmentId || null } : {}),
-            ...(data.position !== undefined ? { position: data.position?.trim() } : {}),
+  async updateStaffUser(
+    userId: string,
+    data: UpdateStaffData,
+    afterUpdate?: (updated: any, tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<any> {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: {
+          ...(data.username !== undefined ? { username: data.username.trim() } : {}),
+          ...(data.email !== undefined ? { email: data.email.trim().toLowerCase() } : {}),
+          ...(data.role !== undefined ? { role: data.role } : {}),
+          ...(data.status !== undefined ? { status: data.status, tokenVersion: { increment: 1 } } : {}),
+          staffProfile: {
+            update: {
+              ...(data.fullName !== undefined ? { fullName: data.fullName.trim() } : {}),
+              ...(data.phone !== undefined ? { phone: data.phone.trim() } : {}),
+              ...(data.gender !== undefined ? { gender: data.gender.trim() } : {}),
+              ...(data.citizenId !== undefined ? { citizenId: data.citizenId.trim() } : {}),
+              ...(data.birthDate !== undefined ? { birthDate: new Date(data.birthDate) } : {}),
+              ...(data.address !== undefined ? { address: data.address?.trim() } : {}),
+              ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl.trim() } : {}),
+              ...(data.departmentId !== undefined ? { departmentId: data.departmentId || null } : {}),
+              ...(data.position !== undefined ? { position: data.position?.trim() } : {}),
+            },
           },
         },
-      },
-      include: this.includeUserStaff(),
+        include: this.includeUserStaff(),
+      });
+      if (afterUpdate) await afterUpdate(user, tx);
+      return user;
     });
     return this.sanitizeUser(updated);
   }

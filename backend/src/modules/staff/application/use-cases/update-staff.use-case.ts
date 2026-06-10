@@ -6,6 +6,7 @@ import { STAFF_INTEGRITY_ANCHOR, StaffIntegrityAnchorPort } from '../ports/staff
 import { StaffValidator } from '../services/staff.validator';
 import { buildStaffSnapshot } from '../../domain/staff-snapshot';
 import { DOCTOR_REANCHOR, DoctorReanchorPort } from '../../../doctor/application/ports/doctor-reanchor.port';
+import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
 
 /**
  * Updates a staff profile + linked user account. Behavior copied verbatim from
@@ -20,6 +21,7 @@ export class UpdateStaffUseCase {
     @Inject(STAFF_INTEGRITY_ANCHOR) private readonly integrity: StaffIntegrityAnchorPort,
     @Inject(DOCTOR_REANCHOR) private readonly doctorReanchor: DoctorReanchorPort,
     private readonly validator: StaffValidator,
+    private readonly audit: AuditLoggerService,
   ) {}
 
   async execute(id: string, dto: UpdateStaffDto, actorId?: string) {
@@ -57,21 +59,40 @@ export class UpdateStaffUseCase {
     const isDoctor = Boolean(staff.doctorProfile);
 
     try {
-      const updated = await this.repo.updateStaffUser(staff.userId, {
-        username: dto.username,
-        email: dto.email,
-        role: dto.role,
-        status: dto.status,
-        fullName: dto.fullName,
-        phone: dto.phone,
-        gender: dto.gender,
-        citizenId: dto.citizenId,
-        birthDate: dto.birthDate,
-        address: dto.address,
-        avatarUrl: dto.avatarUrl,
-        departmentId: dto.departmentId,
-        position: dto.position,
-      });
+      const updated = await this.repo.updateStaffUser(
+        staff.userId,
+        {
+          username: dto.username,
+          email: dto.email,
+          role: dto.role,
+          status: dto.status,
+          fullName: dto.fullName,
+          phone: dto.phone,
+          gender: dto.gender,
+          citizenId: dto.citizenId,
+          birthDate: dto.birthDate,
+          address: dto.address,
+          avatarUrl: dto.avatarUrl,
+          departmentId: dto.departmentId,
+          position: dto.position,
+        },
+        async (updatedUser, tx) => {
+          if (!isDoctor && updatedUser.staffProfile) {
+            await this.audit.recordV2(
+              {
+                entity: 'StaffProfile',
+                entityId: updatedUser.staffProfile.id,
+                action: 'UPDATE',
+                actorId: actorId ?? null,
+                before,
+                after: buildStaffSnapshot(updatedUser.staffProfile),
+                metadata: { source: 'staff.update' },
+              },
+              tx,
+            );
+          }
+        },
+      );
 
       if (isDoctor) {
         // Staff is a doctor → re-anchor the unified doctor hash (staff + doctor)
