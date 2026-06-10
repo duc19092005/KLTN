@@ -44,6 +44,12 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set in .env}
       AUDIT_PEPPER: ${AUDIT_PEPPER:?AUDIT_PEPPER must be set in .env}
+      # Audit V2 crypto. For local Docker dev, default to explicit insecure fallback
+      # when .env does not yet define real AUDIT_HASH_KEY/AUDIT_ENCRYPTION_KEY.
+      AUDIT_HASH_KEY: ${AUDIT_HASH_KEY:-}
+      AUDIT_ENCRYPTION_KEY: ${AUDIT_ENCRYPTION_KEY:-}
+      AUDIT_ENCRYPTION_KEY_ID: ${AUDIT_ENCRYPTION_KEY_ID:-local-dev-audit-key-v1}
+      ALLOW_INSECURE_AUDIT_CRYPTO: ${ALLOW_INSECURE_AUDIT_CRYPTO:-true}
       # --- docker-network overrides ---
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-change-me-local-only}@db:5432/${POSTGRES_DB:-zkp_identity}?schema=public
       BLOCKCHAIN_RPC_URL: http://blockchain:8545
