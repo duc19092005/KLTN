@@ -7,13 +7,15 @@ interface IIdentityRegistry {
 
 /**
  * @title AuditAnchor
- * @notice Append-only Merkle root anchor for audit logs. Individual logs, PII, medical text,
- *         files, PDFs and X-Rays are never stored on-chain. Only batch roots, counts and
- *         timestamps are committed.
+ * @notice Canonical append-only Merkle root anchor for audit logs. Individual logs, PII,
+ *         medical text, files, PDFs and X-Rays are never stored on-chain. Only batch
+ *         roots, counts and timestamps are committed.
  */
 contract AuditAnchor {
     IIdentityRegistry public immutable identityRegistry;
 
+    // Canonical domain labels. Do not change after deployment; backend Merkle utilities use
+    // the same byte strings to produce roots/proofs verified by this contract.
     string private constant LEAF_DOMAIN = "KLTN_AUDIT_LEAF_V2";
     string private constant NODE_DOMAIN = "KLTN_AUDIT_NODE_V2";
 
@@ -69,18 +71,18 @@ contract AuditAnchor {
         emit RootCommitted(batchId, root, leafCount, block.timestamp);
     }
 
-    /// @notice Solidity-side v2 leaf hash. Matches backend MERKLE_SHA256_BYTES32_V2.
+    /// @notice Solidity-side canonical leaf hash. Matches backend MERKLE_SHA256_BYTES32_V2.
     function hashLeaf(bytes32 entryHash) public pure returns (bytes32) {
         return sha256(abi.encodePacked(LEAF_DOMAIN, entryHash));
     }
 
-    /// @notice Solidity-side v2 pair hash. Sorted pairs keep proofs order-independent.
+    /// @notice Solidity-side canonical pair hash. Sorted pairs keep proofs order-independent.
     function hashPair(bytes32 a, bytes32 b) public pure returns (bytes32) {
         (bytes32 lo, bytes32 hi) = a <= b ? (a, b) : (b, a);
         return sha256(abi.encodePacked(NODE_DOMAIN, lo, hi));
     }
 
-    /// @notice Verify that entryHash belongs to an anchored v2 Merkle root.
+    /// @notice Verify that entryHash belongs to an anchored canonical Merkle root.
     function verifyProof(uint256 batchId, bytes32 entryHash, bytes32[] calldata proof) external view returns (bool) {
         Checkpoint storage cp = checkpoints[batchId];
         if (!cp.exists) return false;
