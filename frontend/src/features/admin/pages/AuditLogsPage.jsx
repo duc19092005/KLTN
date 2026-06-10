@@ -69,8 +69,8 @@ function formatTime(value) {
 }
 
 function formatHashVersion(version) {
-  if (version === 'KLTN_AUDIT_ENTRY_V2') return 'V2 Encrypted Diff';
-  return version ? `Legacy · ${version}` : 'Legacy';
+  if (version === 'KLTN_AUDIT_ENTRY_V2') return 'V2 · Diff đã mã hóa';
+  return version ? `Phiên bản cũ · ${version}` : 'Phiên bản cũ';
 }
 
 const VERIFICATION_TONE = {
@@ -392,7 +392,68 @@ const ENTITY_LABELS = {
   AiQuality: 'Chất lượng AI',
   ParaclinicalShift: 'Ca cận lâm sàng',
   HandoverLog: 'Bàn giao ca',
+  Visit: 'Lượt khám',
+  MedicalOrder: 'Chỉ định cận lâm sàng',
+  MedicalResult: 'Kết quả cận lâm sàng',
+  User: 'Tài khoản người dùng',
 };
+
+const FIELD_LABELS = {
+  'Department.canReceiveOrders': 'Có nhận chỉ định cận lâm sàng',
+  'Department.departmentCode': 'Mã phòng ban',
+  'Department.floor': 'Tầng',
+  'Department.name': 'Tên phòng ban',
+  'Department.specialty': 'Chuyên khoa',
+  'Department.type': 'Loại phòng ban',
+  'Department.status': 'Trạng thái phòng ban',
+  'Department.description': 'Mô tả phòng ban',
+  'Department.managerId': 'Người quản lý phòng ban',
+  'StaffProfile.fullName': 'Họ và tên nhân sự',
+  'StaffProfile.phone': 'Số điện thoại nhân sự',
+  'StaffProfile.departmentId': 'Phòng ban công tác',
+  'DoctorProfile.licenseNo': 'Số chứng chỉ hành nghề',
+  'DoctorProfile.specialty': 'Chuyên khoa bác sĩ',
+  'Patient.fullName': 'Họ và tên bệnh nhân',
+  'Patient.phone': 'Số điện thoại bệnh nhân',
+  'Patient.identityNumber': 'Số CCCD/CMND bệnh nhân',
+  'Patient.address': 'Địa chỉ bệnh nhân',
+  'Visit.status': 'Trạng thái lượt khám',
+  'MedicalOrder.status': 'Trạng thái chỉ định',
+  'MedicalResult.note': 'Ghi chú kết quả',
+  'MedicalConclusion.diagnosis': 'Chẩn đoán cuối cùng',
+  'MedicalConclusion.treatmentPlan': 'Phác đồ điều trị',
+};
+
+const FIELD_FALLBACK_LABELS = {
+  canReceiveOrders: 'Có nhận chỉ định cận lâm sàng',
+  departmentCode: 'Mã phòng ban',
+  floor: 'Tầng',
+  name: 'Tên',
+  specialty: 'Chuyên khoa',
+  type: 'Loại',
+  status: 'Trạng thái',
+  description: 'Mô tả',
+  managerId: 'Người quản lý',
+  fullName: 'Họ và tên',
+  phone: 'Số điện thoại',
+  identityNumber: 'Số CCCD/CMND',
+  address: 'Địa chỉ',
+  licenseNo: 'Số chứng chỉ hành nghề',
+  diagnosis: 'Chẩn đoán',
+  treatmentPlan: 'Phác đồ điều trị',
+  note: 'Ghi chú',
+};
+
+function fieldDisplayName(item) {
+  const raw = item?.fieldPath || item?.field || '';
+  if (FIELD_LABELS[raw]) return FIELD_LABELS[raw];
+  const lastSegment = raw.split('.').pop();
+  return FIELD_FALLBACK_LABELS[lastSegment] || item?.label || raw || 'Trường dữ liệu';
+}
+
+function fieldTechnicalName(item) {
+  return item?.fieldPath || item?.field || '';
+}
 
 function LogsTable({
   logs,
@@ -500,7 +561,7 @@ function LogsTable({
                   <th className="px-4 py-3">Seq</th>
                   <th className="px-4 py-3">Hành động</th>
                   <th className="px-4 py-3">Đối tượng</th>
-                  <th className="px-4 py-3">Readable diff</th>
+                  <th className="px-4 py-3">Trường thay đổi</th>
                   <th className="px-4 py-3">Người thực hiện</th>
                   <th className="px-4 py-3">Thời gian</th>
                   <th className="px-4 py-3">Trên chuỗi</th>
@@ -525,7 +586,7 @@ function LogsTable({
                     <td className="px-4 py-3">
                       <span className="font-black text-slate-900">{subjectTitle(log)}</span>
                       <span className="mt-1 inline-flex rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[9px] font-black text-slate-500">
-                        {log.subject?.table || log.entity} · {formatHashVersion(log.hashVersion)}
+                        {ENTITY_LABELS[log.entity] || log.subject?.label || log.entity} · {formatHashVersion(log.hashVersion)}
                       </span>
                       <span className="block max-w-[220px] truncate text-[11px] font-semibold text-slate-400">{subjectSubtitle(log)}</span>
                     </td>
@@ -585,9 +646,9 @@ function DiffPreview({ log }) {
         <div key={item.field} className="rounded-xl border border-slate-100 bg-slate-50/70 px-2.5 py-1.5">
           <div className="flex items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1 text-[11px] font-black text-slate-700">
-              <FileDiff className="h-3 w-3 text-cyan-600" /> {item.fieldPath || item.field}
+              <FileDiff className="h-3 w-3 text-cyan-600" /> {fieldDisplayName(item)}
             </span>
-            {item.redacted && <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-700">REDACTED</span>}
+            {item.redacted && <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-700">ĐÃ ẨN</span>}
           </div>
           <p className="mt-1 line-clamp-1 text-[10px] font-semibold text-slate-500">
             {renderDiffValue(item.before, item.redacted)} → {renderDiffValue(item.after, item.redacted)}
@@ -659,7 +720,7 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
           <div className="relative flex items-start justify-between gap-4">
             <div>
               <p className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.22em] text-cyan-200">
-                <Fingerprint className="h-4 w-4" /> Encrypted Audit V2 Inspector
+                <Fingerprint className="h-4 w-4" /> Trình kiểm tra Audit V2 mã hóa
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span className="font-mono text-lg font-black text-cyan-100">#{log.seq ?? '—'}</span>
@@ -669,7 +730,7 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
                 <VerificationBadge status={log.blockchainStatus} />
               </div>
               <p className="mt-2 max-w-2xl text-sm font-semibold text-cyan-50/80">
-                Hiển thị diff theo chính sách, hash chain và metadata mã hóa. Snapshot gốc không được trả qua API mặc định.
+                Hiển thị trường thay đổi theo chính sách, chuỗi mã kiểm chứng và thông tin mã hóa. Dữ liệu gốc không được trả qua API mặc định.
               </p>
             </div>
             <button onClick={onClose} className="relative rounded-xl border border-white/15 bg-white/10 p-2 text-cyan-50 hover:bg-white/20">
@@ -690,29 +751,29 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
                 <div className="space-y-3">
                   <p className="text-lg font-black text-slate-950">{subjectTitle(log)}</p>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <DetailField label="Bảng / entity" value={log.subject?.table || log.entity} mono />
+                    <DetailField label="Bảng dữ liệu" value={ENTITY_LABELS[log.entity] || log.subject?.label || log.entity} />
                     <DetailField label="Mã nghiệp vụ" value={log.subject?.code || '—'} mono />
                     <DetailField label="Phòng ban" value={log.subject?.departmentName || '—'} />
-                    <DetailField label="Linked user" value={log.subject?.linkedUserId || '—'} mono />
+                    <DetailField label="Tài khoản liên kết" value={log.subject?.linkedUserId || '—'} mono />
                   </div>
                 </div>
               </section>
 
               <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <h3 className="inline-flex items-center gap-2 text-sm font-black text-slate-900"><FileDiff className="h-4 w-4 text-cyan-600" /> Readable field diff</h3>
-                  <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700">Policy redacted</span>
+                  <h3 className="inline-flex items-center gap-2 text-sm font-black text-slate-900"><FileDiff className="h-4 w-4 text-cyan-600" /> Các trường đã thay đổi</h3>
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700">Dữ liệu nhạy cảm đã ẩn</span>
                 </div>
                 <DiffList diff={log.diff || []} />
               </section>
 
               <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h3 className="mb-4 inline-flex items-center gap-2 text-sm font-black text-slate-900"><ShieldCheck className="h-4 w-4 text-emerald-600" /> Verification detail</h3>
+                <h3 className="mb-4 inline-flex items-center gap-2 text-sm font-black text-slate-900"><ShieldCheck className="h-4 w-4 text-emerald-600" /> Chi tiết kiểm chứng</h3>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <DetailField label="Phiên bản hash" value={formatHashVersion(log.hashVersion)} mono />
-                  <DetailField label="Trạng thái" value={log.verification?.status || log.blockchainStatus} />
+                  <DetailField label="Phiên bản kiểm chứng" value={formatHashVersion(log.hashVersion)} />
+                  <DetailField label="Trạng thái" value={VERIFICATION_LABEL[log.verification?.status] || VERIFICATION_LABEL[log.blockchainStatus] || log.verification?.status || log.blockchainStatus} />
                   <DetailField label="Lý do" value={log.verification?.reason || 'Không phát hiện bất thường'} />
-                  <DetailField label="Field nghi vấn" value={(log.verification?.suspiciousFields || []).join(', ') || '—'} />
+                  <DetailField label="Trường nghi vấn" value={(log.verification?.suspiciousFields || []).join(', ') || '—'} />
                 </div>
               </section>
             </div>
@@ -739,22 +800,22 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
               </section>
 
               <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h3 className="mb-4 text-sm font-black text-slate-900">Hash & anchor metadata</h3>
+                <h3 className="mb-4 text-sm font-black text-slate-900">Mã kiểm chứng & thông tin neo blockchain</h3>
                 <div className="space-y-3">
-                  <KV label="Entry hash" value={log.hashes?.entryHash || log.entryHash} mono />
-                  <KV label="Before hash" value={log.hashes?.beforeHash} mono />
-                  <KV label="After hash" value={log.hashes?.afterHash} mono />
-                  <KV label="Diff hash" value={log.hashes?.diffHash} mono />
+                  <KV label="Mã kiểm chứng bản ghi" value={log.hashes?.entryHash || log.entryHash} mono />
+                  <KV label="Mã kiểm chứng dữ liệu trước khi đổi" value={log.hashes?.beforeHash} mono />
+                  <KV label="Mã kiểm chứng dữ liệu sau khi đổi" value={log.hashes?.afterHash} mono />
+                  <KV label="Mã kiểm chứng phần thay đổi" value={log.hashes?.diffHash} mono />
                   <KV label="Lô blockchain" value={log.onChainStatus === 'ANCHORED' ? `#${log.batchId}` : 'Chờ neo'} />
                 </div>
               </section>
 
               <section className="rounded-3xl border border-cyan-200 bg-cyan-50/60 p-5 shadow-sm">
-                <h3 className="mb-3 inline-flex items-center gap-2 text-sm font-black text-cyan-950"><LockKeyhole className="h-4 w-4" /> Encrypted snapshots</h3>
+                <h3 className="mb-3 inline-flex items-center gap-2 text-sm font-black text-cyan-950"><LockKeyhole className="h-4 w-4" /> Ảnh chụp dữ liệu đã mã hóa</h3>
                 {log.encryptedSnapshots ? (
                   <div className="space-y-2 text-[12px] font-bold text-cyan-900">
-                    <p>Before: {log.encryptedSnapshots.before?.alg || '—'} · key {log.encryptedSnapshots.before?.keyId || '—'}</p>
-                    <p>After: {log.encryptedSnapshots.after?.alg || '—'} · key {log.encryptedSnapshots.after?.keyId || '—'}</p>
+                    <p>Trước thay đổi: {log.encryptedSnapshots.before?.alg || '—'} · khóa {log.encryptedSnapshots.before?.keyId || '—'}</p>
+                    <p>Sau thay đổi: {log.encryptedSnapshots.after?.alg || '—'} · khóa {log.encryptedSnapshots.after?.keyId || '—'}</p>
                   </div>
                 ) : <p className="text-xs font-semibold text-cyan-800">Metadata mã hóa chỉ tải ở chế độ chi tiết.</p>}
                 {!sensitiveDetailUnlocked ? (
@@ -763,7 +824,7 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
                   </button>
                 ) : (
                   <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-bold text-emerald-800">
-                    Đã xác thực khuôn mặt. Hệ thống chỉ hiển thị diff được policy cho phép và metadata mã hóa; snapshot plaintext không được trả ở endpoint này.
+                    Đã xác thực khuôn mặt. Hệ thống chỉ hiển thị phần thay đổi được chính sách cho phép và thông tin mã hóa; dữ liệu gốc dạng rõ không được trả ở endpoint này.
                   </div>
                 )}
               </section>
@@ -811,7 +872,10 @@ function DiffList({ diff }) {
               <p className="mt-1 break-words text-xs font-bold text-slate-900">{renderDiffValue(item.after, item.redacted)}</p>
             </div>
           </div>
-          <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-cyan-700">{item.label || item.field}</p>
+          <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-cyan-700">{fieldDisplayName(item)}</p>
+          {fieldTechnicalName(item) && fieldTechnicalName(item) !== fieldDisplayName(item) && (
+            <p className="mt-1 font-mono text-[10px] font-semibold text-slate-400">Tên kỹ thuật: {fieldTechnicalName(item)}</p>
+          )}
           {item.reason && (
             <p className="mt-2 rounded-xl border border-amber-100 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">
               Chính sách {item.policyCode ? `· ${item.policyCode}` : ''}: {item.reason}
