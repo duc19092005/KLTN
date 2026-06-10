@@ -9,7 +9,7 @@ import {
   rootToBytes32,
   verifyMerkleProofForAlgorithm,
 } from './merkle.util';
-import { computeEntryHash, GENESIS_PREV_HASH } from './audit-hash.util';
+import { AUDIT_ENTRY_V2, computeEntryHash, computeEntryHashV2, GENESIS_PREV_HASH } from './audit-hash.util';
 
 /**
  * AuditAnchorService periodically seals a batch of not-yet-anchored audit logs, builds a Merkle
@@ -73,7 +73,7 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
       const onChainLatest = await this.blockchain.getLatestAuditBatchId();
       if (onChainLatest === 0 || onChainLatest === null) {
         this.logger.log('🚀 [Genesis Anchor] Detected empty blockchain state. Checking for seed/initial logs...');
-        
+
         const pendingCount = await this.prisma.blockchainLogger.count({
           where: { batchId: null, seq: { not: null }, entryHash: { not: null } },
         });
@@ -123,12 +123,31 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
              NEW."metadata"   IS DISTINCT FROM OLD."metadata"   OR
              NEW."dataHash"   IS DISTINCT FROM OLD."dataHash"   OR
              NEW."dataSalt"   IS DISTINCT FROM OLD."dataSalt"   OR
-             NEW."beforeJson" IS DISTINCT FROM OLD."beforeJson" OR
-             NEW."afterJson"  IS DISTINCT FROM OLD."afterJson"  OR
-             NEW."seq"        IS DISTINCT FROM OLD."seq"        OR
-             NEW."prevHash"   IS DISTINCT FROM OLD."prevHash"   OR
-             NEW."entryHash"  IS DISTINCT FROM OLD."entryHash"  OR
-             NEW."createdAt"  IS DISTINCT FROM OLD."createdAt"
+             NEW."beforeJson"         IS DISTINCT FROM OLD."beforeJson"         OR
+             NEW."afterJson"          IS DISTINCT FROM OLD."afterJson"          OR
+             NEW."beforeHash"         IS DISTINCT FROM OLD."beforeHash"         OR
+             NEW."afterHash"          IS DISTINCT FROM OLD."afterHash"          OR
+             NEW."diffHash"           IS DISTINCT FROM OLD."diffHash"           OR
+             NEW."hashVersion"        IS DISTINCT FROM OLD."hashVersion"        OR
+             NEW."beforeEncrypted"    IS DISTINCT FROM OLD."beforeEncrypted"    OR
+             NEW."afterEncrypted"     IS DISTINCT FROM OLD."afterEncrypted"     OR
+             NEW."encryptionVersion"  IS DISTINCT FROM OLD."encryptionVersion"  OR
+             NEW."encryptionKeyId"    IS DISTINCT FROM OLD."encryptionKeyId"    OR
+             NEW."diffJson"           IS DISTINCT FROM OLD."diffJson"           OR
+             NEW."fieldsChanged"      IS DISTINCT FROM OLD."fieldsChanged"      OR
+             NEW."departmentId"       IS DISTINCT FROM OLD."departmentId"       OR
+             NEW."staffProfileId"     IS DISTINCT FROM OLD."staffProfileId"     OR
+             NEW."doctorProfileId"    IS DISTINCT FROM OLD."doctorProfileId"    OR
+             NEW."patientId"          IS DISTINCT FROM OLD."patientId"          OR
+             NEW."aiModelRegistryId"  IS DISTINCT FROM OLD."aiModelRegistryId"  OR
+             NEW."medicalConclusionId" IS DISTINCT FROM OLD."medicalConclusionId" OR
+             NEW."aiQualityId"        IS DISTINCT FROM OLD."aiQualityId"        OR
+             NEW."staffShiftId"       IS DISTINCT FROM OLD."staffShiftId"       OR
+             NEW."handoverLogId"      IS DISTINCT FROM OLD."handoverLogId"      OR
+             NEW."seq"                IS DISTINCT FROM OLD."seq"                OR
+             NEW."prevHash"           IS DISTINCT FROM OLD."prevHash"           OR
+             NEW."entryHash"          IS DISTINCT FROM OLD."entryHash"          OR
+             NEW."createdAt"          IS DISTINCT FROM OLD."createdAt"
           THEN
             RAISE EXCEPTION 'BlockchainLogger is append-only: content columns are immutable (seq=%).', OLD."seq";
           END IF;
@@ -215,6 +234,11 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
           entity: true,
           entityId: true,
           dataHash: true,
+          beforeHash: true,
+          afterHash: true,
+          diffHash: true,
+          hashVersion: true,
+          fieldsChanged: true,
           createdAt: true,
         },
       });
@@ -479,6 +503,11 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
         entity: true,
         entityId: true,
         dataHash: true,
+        beforeHash: true,
+        afterHash: true,
+        diffHash: true,
+        hashVersion: true,
+        fieldsChanged: true,
         createdAt: true,
       },
     });
@@ -492,18 +521,7 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
       if (row.prevHash !== expectedPrev) {
         return { ok: false, brokenAtSeq: row.seq, reason: 'prevHash không khớp entryHash liền trước' };
       }
-      const recomputed = computeEntryHash(
-        {
-          seq: row.seq!,
-          actorId: row.actorId,
-          action: row.action,
-          entity: row.entity,
-          entityId: row.entityId,
-          dataHash: row.dataHash,
-          createdAtIso: row.createdAt.toISOString(),
-        },
-        row.prevHash ?? GENESIS_PREV_HASH,
-      );
+      const recomputed = this.recomputeEntryHashForRow(row, row.prevHash ?? GENESIS_PREV_HASH);
       if (recomputed !== row.entryHash) {
         return { ok: false, brokenAtSeq: row.seq, reason: 'entryHash không khớp; nội dung bản ghi có thể đã bị sửa' };
       }
@@ -578,24 +596,67 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
       if (log.prevHash !== expectedPrevHash) {
         throw new Error(`prevHash không khớp: mong đợi ${expectedPrevHash}, nhận được ${log.prevHash}`);
       }
-      const recomputed = computeEntryHash(
-        {
-          seq: log.seq!,
-          actorId: log.actorId,
-          action: log.action,
-          entity: log.entity,
-          entityId: log.entityId,
-          dataHash: log.dataHash,
-          createdAtIso: log.createdAt.toISOString(),
-        },
-        log.prevHash ?? GENESIS_PREV_HASH,
-      );
+      const recomputed = this.recomputeEntryHashForRow(log, log.prevHash ?? GENESIS_PREV_HASH);
       if (recomputed !== log.entryHash) {
         throw new Error(`entryHash không khớp: tính lại ${recomputed}, nhận được ${log.entryHash}`);
       }
       expectedPrevHash = log.entryHash!;
       expectedSeq += 1;
     }
+  }
+
+  private recomputeEntryHashForRow(
+    row: {
+      seq: number | null;
+      actorId: string | null;
+      action: string;
+      entity: string;
+      entityId: string | null;
+      dataHash: string | null;
+      beforeHash?: string | null;
+      afterHash?: string | null;
+      diffHash?: string | null;
+      hashVersion?: string | null;
+      fieldsChanged?: unknown;
+      createdAt: Date;
+    },
+    prevHash: string,
+  ): string {
+    if (row.hashVersion === AUDIT_ENTRY_V2) {
+      if (!row.seq || !row.dataHash || !row.beforeHash || !row.afterHash || !row.diffHash) {
+        throw new Error(`V2 audit row seq ${row.seq ?? 'unknown'} thiếu component hash bắt buộc.`);
+      }
+      return computeEntryHashV2({
+        seq: row.seq,
+        prevHash,
+        entity: row.entity,
+        entityId: row.entityId,
+        action: row.action,
+        actorId: row.actorId,
+        beforeHash: row.beforeHash,
+        afterHash: row.afterHash,
+        diffHash: row.diffHash,
+        dataHash: row.dataHash,
+        createdAtIso: row.createdAt.toISOString(),
+      });
+    }
+
+    if (row.hashVersion) {
+      throw new Error(`Unsupported audit hashVersion at seq ${row.seq ?? 'unknown'}: ${row.hashVersion}`);
+    }
+
+    return computeEntryHash(
+      {
+        seq: row.seq!,
+        actorId: row.actorId,
+        action: row.action,
+        entity: row.entity,
+        entityId: row.entityId,
+        dataHash: row.dataHash,
+        createdAtIso: row.createdAt.toISOString(),
+      },
+      prevHash,
+    );
   }
 
   async sendTelegramAlert(title: string, details: string, brokenSeq?: number): Promise<void> {
