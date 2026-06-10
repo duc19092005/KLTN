@@ -509,10 +509,23 @@ model BlockchainLogger {
   metadata  Json?
 
   // Tamper-evidence integrity fields
-  dataHash      String?  // SHA256(pepper + salt + canonical snapshot) at change time
-  dataSalt      String?  // per-entry salt used for dataHash
-  beforeJson    Json?    // snapshot before the change (null on CREATE)
-  afterJson     Json?    // snapshot after the change (null on DELETE)
+  dataHash      String?  // V1: SHA256/HMAC over sanitized payload; V2: HMAC over before/after/diff hashes
+  dataSalt      String?  // V1 per-entry salt; null for V2 HMAC rows
+  beforeJson    Json?    // V1/safe display snapshot before the change (null on CREATE)
+  afterJson     Json?    // V1/safe display snapshot after the change (null on DELETE)
+
+  // Blockchain Audit V2 encrypted-diff fields. Raw before/after snapshots are encrypted;
+  // hashes are computed from canonical plaintext, never from ciphertext.
+  beforeHash        String?
+  afterHash         String?
+  diffHash          String?
+  hashVersion       String?
+  beforeEncrypted   Json?
+  afterEncrypted    Json?
+  encryptionVersion String?
+  encryptionKeyId   String?
+  diffJson          Json?
+  fieldsChanged     Json?
 
   // On-chain anchoring
   onChainStatus String?  @default("PENDING") // PENDING | ANCHORED | UNANCHORED
@@ -574,6 +587,7 @@ model BlockchainLogger {
   @@index([handoverLogId])
   @@index([batchId])
   @@index([onChainStatus])
+  @@index([hashVersion])
 }
 
 /// One committed Merkle checkpoint over a batch of BlockchainLogger entries.
