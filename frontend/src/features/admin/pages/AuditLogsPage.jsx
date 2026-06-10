@@ -7,7 +7,7 @@ import { auditService } from '../apis/auditService';
 import { FaceStepUpModal } from '../../auth';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { ArrowUp, ArrowDown, Eye, X, Layers, User as UserIcon } from 'lucide-react';
+import { ArrowUp, ArrowDown, Eye, X, Layers, User as UserIcon, ShieldCheck, ShieldAlert, LockKeyhole, FileDiff, Fingerprint } from 'lucide-react';
 
 // ---- Display helpers --------------------------------------------------------
 
@@ -66,6 +66,35 @@ function shortHash(hash) {
 
 function formatTime(value) {
   return value ? new Date(value).toLocaleString('vi-VN') : 'N/A';
+}
+
+const VERIFICATION_TONE = {
+  VERIFIED: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  PENDING: 'border-amber-200 bg-amber-50 text-amber-700',
+  TAMPERED: 'border-rose-200 bg-rose-50 text-rose-700',
+};
+
+const VERIFICATION_LABEL = {
+  VERIFIED: 'Đã xác minh',
+  PENDING: 'Chờ xác minh',
+  TAMPERED: 'Nghi sửa đổi',
+};
+
+function renderDiffValue(value, redacted) {
+  if (redacted) return 'Đã ẩn theo chính sách';
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+function getPrimaryDiff(log) {
+  return Array.isArray(log.diff) && log.diff.length ? log.diff.slice(0, 2) : [];
+}
+
+function summarizeDiff(log) {
+  const fields = log.fieldsChanged || log.diff?.map((item) => item.field) || [];
+  if (!fields.length) return 'Không có thay đổi field-level';
+  return fields.slice(0, 3).join(', ') + (fields.length > 3 ? ` +${fields.length - 3}` : '');
 }
 
 // ---- Page -------------------------------------------------------------------
@@ -453,10 +482,11 @@ function LogsTable({
                   <th className="px-4 py-3">Seq</th>
                   <th className="px-4 py-3">Hành động</th>
                   <th className="px-4 py-3">Đối tượng</th>
+                  <th className="px-4 py-3">Readable diff</th>
                   <th className="px-4 py-3">Người thực hiện</th>
                   <th className="px-4 py-3">Thời gian</th>
                   <th className="px-4 py-3">Trên chuỗi</th>
-                  <th className="px-4 py-3">Blockchain</th>
+                  <th className="px-4 py-3">Toàn vẹn</th>
                   <th className="px-4 py-3 text-right">Bằng chứng</th>
                 </tr>
               </thead>
@@ -475,8 +505,14 @@ function LogsTable({
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="font-black text-slate-900">{log.entity}</span>
+                      <span className="font-black text-slate-900">{ENTITY_LABELS[log.entity] || log.entity}</span>
+                      <span className="mt-1 inline-flex rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[9px] font-black text-slate-500">
+                        {log.hashVersion || 'V1'}
+                      </span>
                       <span className="block font-mono text-[11px] text-slate-400">{shortHash(log.entityId)}</span>
+                    </td>
+                    <td className="min-w-[260px] px-4 py-3">
+                      <DiffPreview log={log} />
                     </td>
                     <td className="px-4 py-3">
                       <ActorCell log={log} />
@@ -488,17 +524,7 @@ function LogsTable({
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {log.blockchainStatus === 'VERIFIED' ? (
-                        <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700">
-                          <span className="h-1 w-1 rounded-full bg-emerald-500" />
-                          Healthy
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-lg border border-rose-100 bg-rose-50 px-2 py-0.5 text-[10px] font-black text-rose-700 animate-pulse">
-                          <span className="h-1 w-1 rounded-full bg-rose-500" />
-                          Unhealthy
-                        </span>
-                      )}
+                      <VerificationBadge status={log.blockchainStatus} />
                     </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       {log.onChainStatus === 'ANCHORED' ? (
@@ -525,8 +551,45 @@ function LogsTable({
         </>
       )}
 
-      {detail && <LogDetailModal log={detail} onClose={() => setDetail(null)} onProof={onProof} />}
+      {detail && <LogDetailModal summaryLog={detail} onClose={() => setDetail(null)} onProof={onProof} />}
     </section>
+  );
+}
+
+function DiffPreview({ log }) {
+  const preview = getPrimaryDiff(log);
+  if (!preview.length) {
+    return <span className="text-[11px] font-bold text-slate-400">{summarizeDiff(log)}</span>;
+  }
+  return (
+    <div className="space-y-1.5">
+      {preview.map((item) => (
+        <div key={item.field} className="rounded-xl border border-slate-100 bg-slate-50/70 px-2.5 py-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1 text-[11px] font-black text-slate-700">
+              <FileDiff className="h-3 w-3 text-cyan-600" /> {item.field}
+            </span>
+            {item.redacted && <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-700">REDACTED</span>}
+          </div>
+          <p className="mt-1 line-clamp-1 text-[10px] font-semibold text-slate-500">
+            {renderDiffValue(item.before, item.redacted)} → {renderDiffValue(item.after, item.redacted)}
+          </p>
+        </div>
+      ))}
+      {(log.diff?.length || 0) > preview.length && (
+        <p className="text-[10px] font-black text-cyan-600">+{log.diff.length - preview.length} field khác</p>
+      )}
+    </div>
+  );
+}
+
+function VerificationBadge({ status }) {
+  const Icon = status === 'VERIFIED' ? ShieldCheck : ShieldAlert;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10px] font-black ${VERIFICATION_TONE[status] || VERIFICATION_TONE.TAMPERED}`}>
+      <Icon className="h-3 w-3" />
+      {VERIFICATION_LABEL[status] || status || 'Không rõ'}
+    </span>
   );
 }
 
@@ -547,77 +610,190 @@ function ActorCell({ log }) {
   );
 }
 
-// Full-detail modal shown when an admin clicks an audit row. Surfaces exactly who did what.
-function LogDetailModal({ log, onClose, onProof }) {
+function LogDetailModal({ summaryLog, onClose, onProof }) {
+  const [log, setLog] = useState(summaryLog);
+  const [stepUpOpen, setStepUpOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
   const actor = log.actor;
+
+  const loadDetail = async (ticket) => {
+    setStepUpOpen(false);
+    setDetailLoading(true);
+    setDetailError('');
+    try {
+      const res = await auditService.detail(summaryLog.seq, ticket);
+      setLog(res.data || summaryLog);
+    } catch (err) {
+      setDetailError(err?.response?.data?.message || err.message || 'Không tải được chi tiết audit đã giải mã.');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const hasDecryptedSnapshots = Boolean(log.decryptedSnapshots);
+
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-sm font-black text-slate-400">#{log.seq ?? '—'}</span>
-            <span className={`inline-flex rounded-lg border px-2 py-1 text-[10px] font-black ${ACTION_TONE[log.action] || 'bg-slate-50 text-slate-600 border-slate-100'}`}>
-              {ACTION_LABEL[log.action] || log.action}
-            </span>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-cyan-100 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="relative overflow-hidden border-b border-cyan-100 bg-slate-950 px-6 py-5 text-white">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.28),transparent_38%),linear-gradient(135deg,rgba(15,23,42,1),rgba(8,47,73,0.95))]" />
+          <div className="relative flex items-start justify-between gap-4">
+            <div>
+              <p className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.22em] text-cyan-200">
+                <Fingerprint className="h-4 w-4" /> Encrypted Audit V2 Inspector
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="font-mono text-lg font-black text-cyan-100">#{log.seq ?? '—'}</span>
+                <span className={`inline-flex rounded-lg border px-2 py-1 text-[10px] font-black ${ACTION_TONE[log.action] || 'border-white/20 bg-white/10 text-white'}`}>
+                  {ACTION_LABEL[log.action] || log.action}
+                </span>
+                <VerificationBadge status={log.blockchainStatus} />
+              </div>
+              <p className="mt-2 max-w-2xl text-sm font-semibold text-cyan-50/80">
+                Hiển thị diff đã redaction, hash chain, metadata mã hóa và snapshot chỉ sau face step-up.
+              </p>
+            </div>
+            <button onClick={onClose} className="relative rounded-xl border border-white/15 bg-white/10 p-2 text-cyan-50 hover:bg-white/20">
+              <X className="h-5 w-5" />
+            </button>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-            <X className="h-5 w-5" />
-          </button>
         </div>
 
-        <div className="space-y-5 px-6 py-5">
-          {/* Actor */}
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
-            <p className="mb-2 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
-              <UserIcon className="h-3.5 w-3.5" /> Người thực hiện
-            </p>
-            {log.actorId ? (
-              actor ? (
-                <div className="space-y-1.5">
-                  <p className="text-sm font-black text-slate-900">{actor.displayName}</p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-black uppercase ${ROLE_TONE[actor.role] || 'bg-slate-50 text-slate-600 border-slate-100'}`}>
-                      {ROLE_LABELS[actor.role] || actor.role}
-                    </span>
-                    <span className="text-[12px] font-semibold text-slate-500">@{actor.username}</span>
-                  </div>
-                  {actor.email && <p className="text-[12px] text-slate-500">{actor.email}</p>}
-                  <p className="font-mono text-[11px] text-slate-400 break-all">ID: {log.actorId}</p>
+        <div className="flex-1 overflow-y-auto bg-slate-50/80 p-6">
+          {detailError && <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700">{detailError}</div>}
+
+          <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="space-y-5">
+              <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <h3 className="inline-flex items-center gap-2 text-sm font-black text-slate-900"><FileDiff className="h-4 w-4 text-cyan-600" /> Readable field diff</h3>
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700">Policy redacted</span>
                 </div>
-              ) : (
-                <p className="font-mono text-[12px] text-slate-500 break-all">ID: {log.actorId} <span className="text-slate-400">(không còn trong hệ thống)</span></p>
-              )
-            ) : (
-              <p className="text-sm font-bold text-slate-500">Hệ thống (tự động)</p>
-            )}
+                <DiffList diff={log.diff || []} />
+              </section>
+
+              <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h3 className="mb-4 inline-flex items-center gap-2 text-sm font-black text-slate-900"><ShieldCheck className="h-4 w-4 text-emerald-600" /> Verification detail</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <DetailField label="Phiên bản hash" value={log.hashVersion || 'V1'} mono />
+                  <DetailField label="Trạng thái" value={log.verification?.status || log.blockchainStatus} />
+                  <DetailField label="Lý do" value={log.verification?.reason || 'Không phát hiện bất thường'} />
+                  <DetailField label="Field nghi vấn" value={(log.verification?.suspiciousFields || []).join(', ') || '—'} />
+                </div>
+              </section>
+            </div>
+
+            <div className="space-y-5">
+              <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="mb-2 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  <UserIcon className="h-3.5 w-3.5" /> Người thực hiện
+                </p>
+                {log.actorId ? (
+                  actor ? (
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-black text-slate-900">{actor.displayName}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-black uppercase ${ROLE_TONE[actor.role] || 'bg-slate-50 text-slate-600 border-slate-100'}`}>
+                          {ROLE_LABELS[actor.role] || actor.role}
+                        </span>
+                        <span className="text-[12px] font-semibold text-slate-500">@{actor.username}</span>
+                      </div>
+                      {actor.email && <p className="text-[12px] text-slate-500">{actor.email}</p>}
+                    </div>
+                  ) : <p className="font-mono text-[12px] text-slate-500 break-all">ID: {log.actorId}</p>
+                ) : <p className="text-sm font-bold text-slate-500">Hệ thống tự động</p>}
+              </section>
+
+              <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h3 className="mb-4 text-sm font-black text-slate-900">Hash & anchor metadata</h3>
+                <div className="space-y-3">
+                  <KV label="Entry hash" value={log.hashes?.entryHash || log.entryHash} mono />
+                  <KV label="Before hash" value={log.hashes?.beforeHash} mono />
+                  <KV label="After hash" value={log.hashes?.afterHash} mono />
+                  <KV label="Diff hash" value={log.hashes?.diffHash} mono />
+                  <KV label="Lô blockchain" value={log.onChainStatus === 'ANCHORED' ? `#${log.batchId}` : 'Chờ neo'} />
+                </div>
+              </section>
+
+              <section className="rounded-3xl border border-cyan-200 bg-cyan-50/60 p-5 shadow-sm">
+                <h3 className="mb-3 inline-flex items-center gap-2 text-sm font-black text-cyan-950"><LockKeyhole className="h-4 w-4" /> Encrypted snapshots</h3>
+                {log.encryptedSnapshots ? (
+                  <div className="space-y-2 text-[12px] font-bold text-cyan-900">
+                    <p>Before: {log.encryptedSnapshots.before?.alg || '—'} · key {log.encryptedSnapshots.before?.keyId || '—'}</p>
+                    <p>After: {log.encryptedSnapshots.after?.alg || '—'} · key {log.encryptedSnapshots.after?.keyId || '—'}</p>
+                  </div>
+                ) : <p className="text-xs font-semibold text-cyan-800">Metadata mã hóa chỉ tải ở chế độ chi tiết.</p>}
+                {!hasDecryptedSnapshots ? (
+                  <button onClick={() => setStepUpOpen(true)} disabled={detailLoading} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-cyan-900/10 hover:bg-cyan-700 disabled:opacity-60">
+                    <Fingerprint className="h-4 w-4" /> {detailLoading ? 'Đang tải chi tiết…' : 'Face step-up để xem snapshot'}
+                  </button>
+                ) : (
+                  <SnapshotPreview snapshots={log.decryptedSnapshots} />
+                )}
+              </section>
+
+              {log.onChainStatus === 'ANCHORED' && (
+                <button onClick={() => { onProof(log.seq); onClose(); }} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white hover:bg-slate-800">
+                  <Eye className="h-4 w-4" /> Xem bằng chứng Merkle
+                </button>
+              )}
+            </div>
           </div>
-
-          {/* Target + meta */}
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
-            <DetailField label="Đối tượng" value={log.entity} />
-            <DetailField label="ID đối tượng" value={shortHash(log.entityId)} mono />
-            <DetailField label="Thời gian" value={formatTime(log.createdAt)} />
-            <DetailField
-              label="Trạng thái neo"
-              value={log.onChainStatus === 'ANCHORED' ? `Đã neo · Lô #${log.batchId}` : 'Chờ neo'}
-            />
-            <DetailField
-              label="Toàn vẹn"
-              value={log.blockchainStatus === 'VERIFIED' ? 'Healthy (khớp chuỗi)' : 'Unhealthy (nghi bị sửa)'}
-            />
-            <DetailField label="Hash chuỗi" value={shortHash(log.entryHash)} mono />
-          </dl>
-
-          {log.onChainStatus === 'ANCHORED' && (
-            <button
-              onClick={() => { onProof(log.seq); onClose(); }}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-black text-white hover:bg-cyan-700"
-            >
-              <Eye className="h-4 w-4" /> Xem bằng chứng Merkle
-            </button>
-          )}
         </div>
       </div>
+
+      {stepUpOpen && (
+        <FaceStepUpModal
+          action="AUDIT_DETAIL"
+          title="Mở chi tiết audit đã mã hóa"
+          description="Snapshot audit có thể chứa dữ liệu gốc. Hệ thống yêu cầu quét khuôn mặt để cấp vé xem một lần."
+          onSuccess={loadDetail}
+          onClose={() => setStepUpOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function DiffList({ diff }) {
+  if (!diff.length) return <p className="text-sm font-semibold text-slate-400">Không có diff field-level cho bản ghi này.</p>;
+  return (
+    <div className="space-y-3">
+      {diff.map((item) => (
+        <div key={item.field} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="font-mono text-xs font-black text-slate-800">{item.field}</span>
+            {item.redacted && <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700">REDACTED</span>}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="rounded-xl bg-white p-2">
+              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Before</p>
+              <p className="mt-1 break-words text-xs font-bold text-slate-700">{renderDiffValue(item.before, item.redacted)}</p>
+            </div>
+            <div className="rounded-xl bg-white p-2">
+              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">After</p>
+              <p className="mt-1 break-words text-xs font-bold text-slate-900">{renderDiffValue(item.after, item.redacted)}</p>
+            </div>
+          </div>
+          {item.reason && <p className="mt-2 text-[10px] font-semibold text-amber-700">Policy: {item.reason}</p>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SnapshotPreview({ snapshots }) {
+  return (
+    <div className="mt-4 grid gap-3 text-xs">
+      {['before', 'after'].map((side) => (
+        <div key={side} className="rounded-2xl border border-cyan-100 bg-white p-3">
+          <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-cyan-700">{side}</p>
+          <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-slate-950 p-3 font-mono text-[10px] text-cyan-50">
+            {JSON.stringify(snapshots?.[side] ?? null, null, 2)}
+          </pre>
+        </div>
+      ))}
     </div>
   );
 }

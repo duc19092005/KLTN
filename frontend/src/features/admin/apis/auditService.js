@@ -12,6 +12,8 @@ export const auditService = {
   logs: (params = {}) => api.get('/audit/logs', { params }),
   verifyChain: () => api.get('/audit/verify-chain'),
   batches: (params = {}) => api.get('/audit/batches', { params }),
+  detail: (seq, stepUpTicket) =>
+    api.get(`/audit/logs/${seq}`, stepUpTicket ? { headers: { 'x-stepup-ticket': stepUpTicket } } : undefined),
   proof: (seq) => api.get(`/audit/logs/${seq}/proof`),
   anchorNow: (stepUpTicket) =>
     api.post('/audit/anchor-now', {}, stepUpTicket ? { headers: { 'x-stepup-ticket': stepUpTicket } } : undefined),
