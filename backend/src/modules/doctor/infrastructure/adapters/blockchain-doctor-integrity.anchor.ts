@@ -25,31 +25,31 @@ export class BlockchainDoctorIntegrityAnchor implements DoctorIntegrityAnchorPor
 
   async anchorChange(doctor: any, action: DoctorAnchorAction, actorId?: string, before?: unknown): Promise<void> {
     const snapshot = buildUnifiedDoctorSnapshot(doctor);
-    let dataHash: string | null = null;
-    let dataSalt: string | null = null;
 
     try {
       if (action !== 'DELETE') {
         const { salt, hash } = this.audit.hashSnapshot(snapshot);
-        dataHash = hash;
-        dataSalt = salt;
         await this.prisma.doctorProfile.update({ where: { id: doctor.id }, data: { hash256: hash, dataSalt: salt } });
       }
     } catch (err) {
       console.error('Error computing doctor hash:', err);
     }
 
-    await this.audit.record({
+    await this.audit.recordV2({
       entity: 'DoctorProfile',
       entityId: doctor.id,
       action,
       actorId,
-      dataHash,
-      dataSalt,
-      before: before ?? null,
+      before: this.toAuditSnapshot(before),
       after: action === 'DELETE' ? null : snapshot,
       onChainStatus: 'PENDING',
     });
+  }
+
+  private toAuditSnapshot(value: unknown): Record<string, unknown> | null {
+    if (value == null) return null;
+    if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+    return { value };
   }
 
   async evaluate(doctor: any): Promise<DoctorIntegrityEvaluation> {

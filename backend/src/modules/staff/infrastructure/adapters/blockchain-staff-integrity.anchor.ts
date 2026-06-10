@@ -29,31 +29,31 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
 
   async anchorChange(staff: any, action: AuditAction, actorId?: string, before?: unknown): Promise<void> {
     const snapshot = buildStaffSnapshot(staff);
-    let dataHash: string | null = null;
-    let dataSalt: string | null = null;
 
     try {
       if (action !== 'DELETE') {
         const { salt, hash } = this.audit.hashSnapshot(snapshot);
-        dataHash = hash;
-        dataSalt = salt;
         await this.prisma.staffProfile.update({ where: { id: staff.id }, data: { hash256: hash, dataSalt: salt } });
       }
     } catch {
       // Hash computation failed; log entry will still be created below with null hashes.
     }
 
-    await this.audit.record({
+    await this.audit.recordV2({
       entity: 'StaffProfile',
       entityId: staff.id,
       action,
       actorId,
-      dataHash,
-      dataSalt,
-      before: before ?? null,
+      before: this.toAuditSnapshot(before),
       after: action === 'DELETE' ? null : snapshot,
       onChainStatus: 'PENDING',
     });
+  }
+
+  private toAuditSnapshot(value: unknown): Record<string, unknown> | null {
+    if (value == null) return null;
+    if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+    return { value };
   }
 
   async evaluate(staff: any): Promise<StaffIntegrityEvaluation> {

@@ -32,12 +32,14 @@ export class DualWriteSecurityEventLogger implements SecurityEventLoggerPort {
     }
 
     try {
-      await this.audit.record({
+      await this.audit.recordV2({
         entity,
         entityId: entityId ?? 'unknown',
         action,
         actorId,
-        metadata,
+        before: null,
+        after: { metadata: metadata ?? null },
+        metadata: { schema: 'KLTN_SECURITY_EVENT_AUDIT_V2' },
       });
     } catch (err) {
       console.error('[BlockchainLogger] failed to write', action, err);

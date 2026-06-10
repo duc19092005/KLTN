@@ -42,15 +42,13 @@ export class BlockchainMedicalConclusionIntegrityAnchor implements MedicalConclu
         data: { hash256: hash, dataSalt: salt },
       });
 
-      await this.audit.record(
+      await this.audit.recordV2(
         {
           entity: 'MedicalConclusion',
           entityId: conclusion.id,
           action,
           actorId,
-          dataHash: hash,
-          dataSalt: salt,
-          before: before ?? null,
+          before: this.toAuditSnapshot(before),
           after: snapshot,
           onChainStatus: 'PENDING',
         },
@@ -72,6 +70,12 @@ export class BlockchainMedicalConclusionIntegrityAnchor implements MedicalConclu
     } catch (err) {
       console.error('[MedicalConclusion] Immediate anchoring failed, will retry in batch cycle:', err);
     }
+  }
+
+  private toAuditSnapshot(value: unknown): Record<string, unknown> | null {
+    if (value == null) return null;
+    if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+    return { value };
   }
 
   async triggerImmediateAnchor(): Promise<void> {

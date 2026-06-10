@@ -37,14 +37,10 @@ export class AuditPatientIntegrityAnchor implements PatientIntegrityAnchorPort {
 
   async anchorChange(patient: any, action: string, actorId?: string, before?: unknown): Promise<void> {
     const snapshot = buildPatientSnapshot(patient);
-    let dataHash: string | null = null;
-    let dataSalt: string | null = null;
 
     try {
       if (action !== 'DELETE') {
         const { salt, hash } = this.audit.hashSnapshot(snapshot);
-        dataHash = hash;
-        dataSalt = salt;
         await this.prisma.patient.update({
           where: { id: patient.id },
           data: { hash256: hash, dataSalt: salt },
@@ -54,17 +50,21 @@ export class AuditPatientIntegrityAnchor implements PatientIntegrityAnchorPort {
       console.error('Error computing patient hash:', err);
     }
 
-    await this.audit.record({
+    await this.audit.recordV2({
       entity: 'Patient',
       entityId: patient.id,
       action,
       actorId,
-      dataHash,
-      dataSalt,
-      before: before ?? null,
+      before: this.toAuditSnapshot(before),
       after: action === 'DELETE' ? null : snapshot,
       onChainStatus: 'PENDING',
     });
+  }
+
+  private toAuditSnapshot(value: unknown): Record<string, unknown> | null {
+    if (value == null) return null;
+    if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+    return { value };
   }
 
   async evaluate(patient: any): Promise<PatientIntegrityEvaluation> {
