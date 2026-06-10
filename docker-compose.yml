@@ -32,29 +32,29 @@ services:
     restart: unless-stopped
     ports:
       - "3001:3001"
-    # Pull every variable from root .env automatically. Adding a new var to
-    # .env is then enough — no need to also list it in `environment:` below.
+    # Tự động nạp toàn bộ biến từ file .env ở thư mục gốc. Khi thêm biến mới
+    # vào .env thì không cần khai báo lại ở `environment:` nếu không cần override.
     env_file:
       - ./.env
-    # Required-vars guard + docker-network overrides. Anything declared here
-    # wins over `env_file` (so DATABASE_URL / BLOCKCHAIN_RPC_URL correctly
-    # point at the in-network service names instead of localhost).
+    # Các biến bắt buộc và override cho mạng Docker. Biến khai báo ở đây sẽ
+    # ưu tiên hơn `env_file`, giúp DATABASE_URL / BLOCKCHAIN_RPC_URL trỏ đúng
+    # vào service nội bộ thay vì localhost của máy host.
     environment:
-      # --- required (fail fast if missing) ---
+      # --- bắt buộc (thiếu thì fail sớm) ---
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set in .env}
       AUDIT_PEPPER: ${AUDIT_PEPPER:?AUDIT_PEPPER must be set in .env}
-      # Audit V2 crypto. For local Docker dev, default to explicit insecure fallback
-      # when .env does not yet define real AUDIT_HASH_KEY/AUDIT_ENCRYPTION_KEY.
+      # Crypto cho Audit V2. Với Docker local, cho phép fallback dev có chủ đích
+      # khi .env chưa khai báo AUDIT_HASH_KEY/AUDIT_ENCRYPTION_KEY thật.
       AUDIT_HASH_KEY: ${AUDIT_HASH_KEY:-}
       AUDIT_ENCRYPTION_KEY: ${AUDIT_ENCRYPTION_KEY:-}
       AUDIT_ENCRYPTION_KEY_ID: ${AUDIT_ENCRYPTION_KEY_ID:-local-dev-audit-key-v1}
       ALLOW_INSECURE_AUDIT_CRYPTO: ${ALLOW_INSECURE_AUDIT_CRYPTO:-true}
-      # --- docker-network overrides ---
+      # --- override cho mạng Docker ---
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-change-me-local-only}@db:5432/${POSTGRES_DB:-zkp_identity}?schema=public
       BLOCKCHAIN_RPC_URL: http://blockchain:8545
       FRONTEND_ORIGIN: http://localhost:5173
-      # --- server config ---
+      # --- cấu hình server ---
       NODE_ENV: development
       PORT: 3001
     volumes:

@@ -799,22 +799,22 @@ function DiffList({ diff }) {
         <div key={item.field} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="font-mono text-xs font-black text-slate-800">{item.fieldPath || item.field}</span>
-            {item.redacted && <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700">REDACTED</span>}
+            {item.redacted && <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700">ĐÃ ẨN</span>}
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="rounded-xl bg-white p-2">
-              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Before</p>
+              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Trước thay đổi</p>
               <p className="mt-1 break-words text-xs font-bold text-slate-700">{renderDiffValue(item.before, item.redacted)}</p>
             </div>
             <div className="rounded-xl bg-white p-2">
-              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">After</p>
+              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Sau thay đổi</p>
               <p className="mt-1 break-words text-xs font-bold text-slate-900">{renderDiffValue(item.after, item.redacted)}</p>
             </div>
           </div>
           <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-cyan-700">{item.label || item.field}</p>
           {item.reason && (
             <p className="mt-2 rounded-xl border border-amber-100 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">
-              Policy {item.policyCode ? `· ${item.policyCode}` : ''}: {item.reason}
+              Chính sách {item.policyCode ? `· ${item.policyCode}` : ''}: {item.reason}
             </p>
           )}
         </div>
