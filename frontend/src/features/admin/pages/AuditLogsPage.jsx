@@ -226,26 +226,16 @@ export default function AuditLogsPage() {
       onLogout={logout}
     >
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Hero */}
-        <section className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-cyan-50 p-8 shadow-sm">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
-            <div>
-              <p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.24em] mb-3">Nhật ký & toàn vẹn</p>
-              <h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">Nhật ký hệ thống</h2>
-              <p className="mt-3 max-w-3xl text-sm sm:text-base text-slate-600 leading-relaxed">
-                Toàn bộ hoạt động (đăng nhập, thay đổi dữ liệu) được ghi bằng chuỗi hash chống giả mạo và neo định kỳ lên blockchain.
-              </p>
-            </div>
-            <button
-              id="audit-anchor-now-button"
-              onClick={handleAnchorNow}
-              disabled={anchoring}
-              className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 disabled:opacity-50"
-            >
-              {anchoring ? 'Đang neo…' : 'Neo lên blockchain ngay'}
-            </button>
-          </div>
-        </section>
+        <div className="flex justify-end">
+          <button
+            id="audit-anchor-now-button"
+            onClick={handleAnchorNow}
+            disabled={anchoring}
+            className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 disabled:opacity-50"
+          >
+            {anchoring ? 'Đang neo…' : 'Neo lên blockchain ngay'}
+          </button>
+        </div>
 
         {/* Integrity banner */}
         <ChainBanner chain={chain} loading={loading} />

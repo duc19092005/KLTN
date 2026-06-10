@@ -222,17 +222,9 @@ export default function AiModelsPage() {
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="aiModels" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
       <div className="mx-auto max-w-5xl space-y-5">
-        <section className="rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-white p-7 shadow-sm">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.28em] font-black text-cyan-600">Danh mục mô hình AI</p>
-              <h1 className="mt-2 text-3xl font-black text-slate-950 tracking-tight">Quản lý mô hình AI</h1>
-              <p className="mt-3 max-w-3xl text-sm text-slate-600">Một luồng duy nhất cho mọi mô hình. Chọn nền tảng đám mây hoặc mô hình tự lưu trữ (Llama, Ollama, vLLM) - chỉ cần dán điểm cuối API là chạy.</p>
-              <span className="mt-4 inline-flex rounded-full bg-cyan-100 px-3 py-1 text-[11px] font-black text-cyan-700">{pagination.total} mô hình</span>
-            </div>
-            <button type="button" onClick={openCreateModal} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 transition-colors">+ Thêm mô hình AI</button>
-          </div>
-        </section>
+        <div className="flex justify-end">
+          <button type="button" onClick={openCreateModal} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 transition-colors">+ Thêm mô hình AI</button>
+        </div>
 
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {stats.map((item) => <div key={item.label} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"><p className="text-[10px] uppercase tracking-wider text-slate-400 font-black">{item.label}</p><strong className="mt-1 block text-2xl font-black text-slate-950">{String(item.value).padStart(2, '0')}</strong></div>)}

@@ -167,7 +167,7 @@ export default function StaffPage() {
     </DashboardLayout>
   );
 }
-function Hero({ onCreate }) { return <section className="rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-cyan-50 p-8 shadow-sm flex flex-col lg:flex-row lg:items-end justify-between gap-5"><div><p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.24em] mb-3">Hệ thống nhân sự</p><h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">Quản lý nhân sự</h2><p className="mt-3 max-w-3xl text-sm sm:text-base text-slate-600 leading-relaxed">Hiển thị toàn bộ nhân sự có phân trang, bộ lọc và thao tác từng dòng. Mã nhân viên được hệ thống tự sinh NV-0001 hoặc BS-0001 cho bác sĩ.</p></div><button onClick={onCreate} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ Thêm nhân sự</button></section>; }
+function Hero({ onCreate }) { return <div className="flex justify-end"><button onClick={onCreate} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ Thêm nhân sự</button></div>; }
 const ROLE_OPTIONS = [{ value: 'DOCTOR', label: 'Bác sĩ' }, { value: 'RECEPTIONIST', label: 'Lễ tân' }, { value: 'LAB_MANAGER', label: 'Kỹ thuật viên cận lâm sàng' }];
 
 // Remove empty/falsey filter values so we never send blank `departmentId` (the backend

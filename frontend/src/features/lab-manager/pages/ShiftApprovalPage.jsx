@@ -74,19 +74,12 @@ export default function ShiftApprovalPage() {
   return (
     <DashboardLayout user={user} navItems={LAB_MANAGER_NAV_ITEMS} activeItem="approvals" onNavigate={(id) => navigate(labManagerRouteFor(id))} onLogout={logout}>
       <div className="mx-auto max-w-7xl space-y-5 pb-12">
-        <section className="overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-white p-6 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-600">Trưởng phòng · Duyệt lịch trực</p>
-              <h1 className="mt-2 text-2xl font-black text-slate-950">Ca trực chờ duyệt</h1>
-              <p className="mt-1 text-sm font-semibold text-slate-500">Bạn đang quản lý {departmentNames}. Ghi chú và lý do từ chối luôn được lưu/hiển thị để minh bạch.</p>
-            </div>
-            <div className="rounded-2xl border border-white/70 bg-white/80 px-5 py-4 text-center shadow-sm backdrop-blur">
-              <strong className="block text-3xl font-black text-cyan-600">{pendingCount}</strong>
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">ca chờ duyệt</span>
-            </div>
+        <div className="flex justify-end">
+          <div className="rounded-2xl border border-slate-100 bg-white px-5 py-4 text-center shadow-sm">
+            <strong className="block text-3xl font-black text-cyan-600">{pendingCount}</strong>
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">ca chờ duyệt</span>
           </div>
-        </section>
+        </div>
 
         {loading ? <LoadingIndicator size="lg" label="Đang tải ca chờ duyệt..." /> : (
           <section className="grid grid-cols-1 gap-3">

@@ -57,25 +57,15 @@ export default function DoctorDashboard() {
   return (
     <DashboardLayout user={user} navItems={DOCTOR_NAV_ITEMS} activeItem="overview" onNavigate={(id) => navigateDoctor(navigate, id)} onLogout={logout}>
       <div className="max-w-7xl mx-auto space-y-6">
-        <section className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-white p-7 shadow-sm sm:p-8">
-          <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-cyan-100/70 blur-3xl" />
-          <div className="relative flex flex-col xl:flex-row xl:items-end justify-between gap-7">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan-600">Tổng quan bác sĩ</p>
-              <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">Tổng quan bác sĩ</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base">
-                Theo dõi nhanh khối lượng bệnh nhân, trạng thái xử lý trong ca trực và truy cập riêng sang hàng đợi khám khi cần thao tác lâm sàng.
-              </p>
-            </div>
-            <button
-              id="doctor-open-queue-button"
-              onClick={() => navigate('/doctor/queue')}
-              className="w-fit rounded-xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-cyan-700"
-            >
-              Mở hàng đợi khám
-            </button>
-          </div>
-        </section>
+        <div className="flex justify-end">
+          <button
+            id="doctor-open-queue-button"
+            onClick={() => navigate('/doctor/queue')}
+            className="w-fit rounded-xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-cyan-700"
+          >
+            Mở hàng đợi khám
+          </button>
+        </div>
 
         {loading ? <LoadingIndicator size="lg" label="Đang tải tổng quan bác sĩ..." /> : (
           <>

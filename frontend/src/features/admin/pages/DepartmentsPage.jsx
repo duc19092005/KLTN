@@ -190,10 +190,15 @@ export default function DepartmentsPage() {
       <div className="max-w-7xl mx-auto space-y-6">
         <Hero onCreate={openCreate} />
         {loading ? <LoadingIndicator size="lg" label="Đang tải phòng ban..." /> : (
-          <section className="grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-6 items-start">
-            <DepartmentDirectory departments={departments} staffs={staffs} busy={busy} selectedDepartment={selectedDepartment} onSelect={setSelectedDepartment} onAssignManager={assignManager} onEdit={openEdit} onDelete={removeDepartment} pagination={pagination} onPageChange={load} />
-            <DepartmentDetail department={selectedDepartment} staffs={selectedStaffs} onGoStaff={() => navigate('/admin/staff')} />
-          </section>
+          <DepartmentDirectory departments={departments} staffs={staffs} busy={busy} selectedDepartment={selectedDepartment} onSelect={setSelectedDepartment} onAssignManager={assignManager} onEdit={openEdit} onDelete={removeDepartment} pagination={pagination} onPageChange={load} />
+        )}
+        {selectedDepartment && (
+          <DepartmentDetail
+            department={selectedDepartment}
+            staffs={selectedStaffs}
+            onGoStaff={() => navigate('/admin/staff')}
+            onClose={() => setSelectedDepartment(null)}
+          />
         )}
         {isModalOpen && <DepartmentModal form={form} setForm={setForm} onSubmit={submitDepartment} onClose={closeModal} busy={busy} editing={Boolean(editingDepartment)} />}
         {pendingDelete && (
@@ -211,9 +216,187 @@ export default function DepartmentsPage() {
   );
 }
 
-function Hero({ onCreate }) { return <section className="rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-cyan-50 p-8 shadow-sm flex flex-col lg:flex-row lg:items-end justify-between gap-5"><div><p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.24em] mb-3">Hệ thống phòng ban</p><h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">Quản lý phòng ban</h2><p className="mt-3 max-w-3xl text-sm sm:text-base text-slate-600 leading-relaxed">Quản lý mã phòng ban, tầng, trạng thái, phụ trách và nhân sự trực thuộc.</p></div><div className="flex flex-wrap gap-3"><button onClick={onCreate} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 transition-colors">+ Tạo phòng ban</button></div></section>; }
-function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, onSelect, onAssignManager, onEdit, onDelete, pagination, onPageChange }) { return <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm"><div className="mb-5 flex items-center justify-between"><div><h3 className="text-xl font-black text-slate-950">Tất cả phòng ban</h3><p className="text-sm text-slate-500">Quản lý phân loại, quyền nhận chỉ định, tầng hoạt động và phụ trách.</p></div><span className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-1 text-xs font-black text-slate-600">{pagination.total} phòng</span></div><div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">{departments.map((dep) => { const depStaffs = staffs.filter((s) => s.departmentId === dep.id); const active = selectedDepartment?.id === dep.id; return <article key={dep.id} onClick={() => onSelect(dep)} className={`cursor-pointer rounded-2xl border p-5 transition-colors ${active ? 'border-cyan-200 bg-cyan-50 shadow-sm' : 'border-slate-100 bg-slate-50/70 hover:bg-white hover:shadow-sm'}`}><div className="flex items-start justify-between gap-4"><div><p className="text-[11px] font-black uppercase tracking-wider text-cyan-600">{dep.departmentCode}</p><h4 className="font-black text-slate-950">{dep.name}</h4><div className="mt-2 flex flex-wrap gap-2"><span className="rounded-lg border border-cyan-100 bg-cyan-50 px-2 py-1 text-[10px] font-black text-cyan-700">{getTypeLabel(dep.type)}</span>{dep.specialty && <span className="rounded-lg border border-cyan-100 bg-cyan-50 px-2 py-1 text-[10px] font-black text-cyan-700">{dep.specialty}</span>}<span className={`rounded-lg border px-2 py-1 text-[10px] font-black ${orderTone[String(Boolean(dep.canReceiveOrders))]}`}>{dep.canReceiveOrders ? 'Nhận chỉ định' : 'Không nhận chỉ định'}</span></div><p className="mt-2 text-sm text-slate-500">{dep.description || 'Chưa có mô tả'}</p></div><div className="flex flex-col items-end gap-2 shrink-0"><span className={`rounded-xl border px-3 py-1 text-xs font-black ${statusTone[dep.status] || statusTone.ACTIVE}`}>{getStatusLabel(dep.status)}</span><BlockchainStatusBadge status={dep.blockchainStatus} size="xs" /></div></div><div className="mt-4 grid grid-cols-2 gap-3"><InfoBox label="Tầng" value={dep.floor || 'Chưa gán'} /><InfoBox label="Nhân sự" value={`${depStaffs.length} NV`} /></div><div className="mt-4 rounded-xl bg-white border border-slate-100 p-3"><p className="text-[11px] uppercase tracking-wider font-black text-slate-400">Phụ trách</p><p className="mt-1 text-sm font-bold text-slate-800">{dep.manager?.fullName || 'Chưa gán'}</p></div><div className="mt-4 flex gap-2" onClick={(e) => e.stopPropagation()}><select disabled={busy} value={dep.managerId || ''} onChange={(e) => onAssignManager(dep.id, e.target.value)} className="min-w-0 flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-cyan-100"><option value="">Chọn phụ trách</option>{depStaffs.map((staff) => <option key={staff.id} value={staff.id}>{staff.fullName}</option>)}</select><SmallButton onClick={() => onEdit(dep)} disabled={busy}>Sửa</SmallButton><SmallButton danger onClick={() => onDelete(dep.id)} disabled={busy}>Xóa</SmallButton></div></article>; })}{!departments.length && <Empty title="Chưa có phòng ban" desc="Bấm nút Tạo phòng ban để bắt đầu." />}</div><Pagination pagination={pagination} onPageChange={onPageChange} /></section>; }
-function DepartmentDetail({ department, staffs, onGoStaff }) { return <aside className="xl:sticky xl:top-6 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm"><p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.18em]">Chi tiết phòng ban</p>{!department ? <Empty title="Chọn một phòng ban" desc="Bấm vào thẻ phòng ban để xem nhân sự thuộc phòng đó." /> : <><div className="mt-2 flex items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-wider text-cyan-600">{department.departmentCode}</p><h3 className="text-2xl font-black text-slate-950">{department.name}</h3><p className="mt-1 text-sm text-slate-500">{department.description || 'Chưa có mô tả'}</p></div><div className="flex flex-col items-end gap-2 shrink-0"><span className={`rounded-xl border px-3 py-1 text-xs font-black ${statusTone[department.status] || statusTone.ACTIVE}`}>{getStatusLabel(department.status)}</span><BlockchainStatusBadge status={department.blockchainStatus} prefix="Blockchain: " /></div></div><div className="mt-4 flex flex-wrap gap-2"><span className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-1.5 text-xs font-black text-cyan-700">{getTypeLabel(department.type)}</span>{department.specialty && <span className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-1.5 text-xs font-black text-cyan-700">{department.specialty}</span>}<span className={`rounded-xl border px-3 py-1.5 text-xs font-black ${orderTone[String(Boolean(department.canReceiveOrders))]}`}>{department.canReceiveOrders ? 'Có thể nhận phiếu chỉ định' : 'Không nhận phiếu chỉ định'}</span></div><div className="mt-5 grid grid-cols-2 gap-3"><InfoBox label="Tầng" value={department.floor || 'Chưa gán'} /><InfoBox label="Nhân sự" value={`${staffs.length} NV`} /></div><div className="mt-5 space-y-3"><h4 className="text-sm font-black text-slate-700">Nhân sự trong phòng ban</h4>{staffs.map((staff) => <div key={staff.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><strong className="block text-slate-950">{staff.fullName}</strong><span className="mt-1 block text-xs text-slate-500">{staff.employeeCode}</span></div>)}{!staffs.length && <Empty title="Chưa có nhân sự" desc="Phòng ban này chưa được gán nhân sự." />}</div><DepartmentHistory departmentId={department.id} /><button onClick={onGoStaff} className="mt-5 w-full rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-3 text-sm font-black text-cyan-700 hover:bg-cyan-100">Đi tới quản lý nhân sự</button></>}</aside>; }
+function Hero({ onCreate }) {
+  return (
+    <div className="flex justify-end">
+      <button
+        onClick={onCreate}
+        className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-cyan-700"
+      >
+        + Tạo phòng ban
+      </button>
+    </div>
+  );
+}
+
+function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, onSelect, onAssignManager, onEdit, onDelete, pagination, onPageChange }) {
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [orderFilter, setOrderFilter] = useState('');
+
+  const visibleDepartments = departments.filter((dep) => {
+    const keyword = search.trim().toLowerCase();
+    const matchesKeyword = !keyword || [dep.name, dep.departmentCode, dep.specialty, dep.manager?.fullName]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(keyword));
+    const matchesType = !typeFilter || dep.type === typeFilter;
+    const matchesOrder = !orderFilter || String(Boolean(dep.canReceiveOrders)) === orderFilter;
+    return matchesKeyword && matchesType && matchesOrder;
+  });
+
+  return (
+    <div className="space-y-5">
+      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex items-start gap-3">
+          <div className="grid h-9 w-9 place-items-center rounded-2xl bg-cyan-50 text-cyan-600">⌕</div>
+          <div>
+            <h3 className="text-base font-black text-slate-950">Bộ lọc phòng ban</h3>
+            <p className="text-xs font-semibold text-slate-400">Lọc theo mã, tên phòng ban, phân loại hoặc quyền nhận chỉ định...</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_1fr_1fr_auto] md:items-end">
+          <label className="space-y-1.5">
+            <span className="text-xs font-black text-slate-600">Tên / Mã phòng ban</span>
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nhập tên hoặc mã phòng ban..." className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100" />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-black text-slate-600">Phân loại</span>
+            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100">
+              <option value="">Tất cả phân loại</option>
+              {DEPARTMENT_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+            </select>
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-black text-slate-600">Chỉ định</span>
+            <select value={orderFilter} onChange={(e) => setOrderFilter(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100">
+              <option value="">Tất cả</option>
+              <option value="true">Nhận chỉ định</option>
+              <option value="false">Không nhận chỉ định</option>
+            </select>
+          </label>
+          <button type="button" onClick={() => { setSearch(''); setTypeFilter(''); setOrderFilter(''); }} className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600 hover:bg-slate-50">Xóa lọc</button>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+          <div>
+            <h3 className="text-xl font-black text-slate-950">Danh sách phòng ban</h3>
+            <p className="mt-1 text-sm font-semibold text-slate-500">Theo dõi phân loại, phụ trách, số nhân sự và trạng thái dữ liệu.</p>
+          </div>
+          <span className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-1 text-xs font-black text-slate-600">{visibleDepartments.length} / {pagination.total} phòng</span>
+        </div>
+
+        <div className="divide-y divide-slate-100">
+          {visibleDepartments.map((dep) => {
+            const depStaffs = staffs.filter((s) => s.departmentId === dep.id);
+            const active = selectedDepartment?.id === dep.id;
+            return (
+              <article key={dep.id} onClick={() => onSelect(dep)} className={`cursor-pointer px-5 py-4 transition-colors hover:bg-cyan-50/40 ${active ? 'bg-cyan-50/60' : 'bg-white'}`}>
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.35fr_1fr_0.8fr_1fr_220px] lg:items-center">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-cyan-600">{dep.departmentCode}</span>
+                      <span className={`rounded-lg border px-2 py-0.5 text-[10px] font-black ${statusTone[dep.status] || statusTone.ACTIVE}`}>{getStatusLabel(dep.status)}</span>
+                    </div>
+                    <h4 className="mt-1 truncate text-base font-black text-slate-950">{dep.name}</h4>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <span className="rounded-lg bg-cyan-50 px-2 py-1 text-[10px] font-black text-cyan-700">{getTypeLabel(dep.type)}</span>
+                      {dep.specialty && <span className="rounded-lg bg-cyan-50 px-2 py-1 text-[10px] font-black text-cyan-700">{dep.specialty}</span>}
+                      <span className={`rounded-lg border px-2 py-1 text-[10px] font-black ${orderTone[String(Boolean(dep.canReceiveOrders))]}`}>{dep.canReceiveOrders ? 'Nhận chỉ định' : 'Không nhận chỉ định'}</span>
+                    </div>
+                    <p className="mt-2 line-clamp-1 text-xs font-semibold text-slate-400">{dep.description || 'Chưa có mô tả'}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Phụ trách</p>
+                    <p className="mt-1 truncate text-sm font-black text-slate-800">{dep.manager?.fullName || 'Chưa gán'}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 lg:block lg:space-y-2">
+                    <MiniMetric label="Tầng" value={dep.floor || '—'} />
+                    <MiniMetric label="Nhân sự" value={`${depStaffs.length} NV`} />
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Trạng thái dữ liệu</p>
+                    <div className="mt-1"><BlockchainStatusBadge status={dep.blockchainStatus} size="xs" /></div>
+                  </div>
+
+                  <div className="flex flex-wrap justify-start gap-2 lg:justify-end" onClick={(e) => e.stopPropagation()}>
+                    <select disabled={busy} value={dep.managerId || ''} onChange={(e) => onAssignManager(dep.id, e.target.value)} className="min-w-[150px] flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 lg:flex-none">
+                      <option value="">Chọn phụ trách</option>
+                      {depStaffs.map((staff) => <option key={staff.id} value={staff.id}>{staff.fullName}</option>)}
+                    </select>
+                    <SmallButton onClick={() => onEdit(dep)} disabled={busy}>Sửa</SmallButton>
+                    <SmallButton danger onClick={() => onDelete(dep.id)} disabled={busy}>Xóa</SmallButton>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+          {!visibleDepartments.length && <div className="p-6"><Empty title="Không có phòng ban phù hợp" desc="Thử đổi bộ lọc hoặc tạo phòng ban mới." /></div>}
+        </div>
+
+        <Pagination pagination={pagination} onPageChange={onPageChange} />
+      </section>
+    </div>
+  );
+}
+
+function DepartmentDetail({ department, staffs, onGoStaff, onClose }) {
+  if (!department) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm" onClick={onClose}>
+      <aside className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-white/70 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-cyan-600">Chi tiết phòng ban</p>
+            <h3 className="mt-2 text-2xl font-black text-slate-950">{department.name}</h3>
+            <p className="mt-1 text-sm font-semibold text-slate-500">{department.departmentCode} · {department.description || 'Chưa có mô tả'}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 hover:bg-slate-50">Đóng</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`rounded-xl border px-3 py-1 text-xs font-black ${statusTone[department.status] || statusTone.ACTIVE}`}>{getStatusLabel(department.status)}</span>
+            <BlockchainStatusBadge status={department.blockchainStatus} prefix="Blockchain: " />
+            <span className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-1.5 text-xs font-black text-cyan-700">{getTypeLabel(department.type)}</span>
+            {department.specialty && <span className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-1.5 text-xs font-black text-cyan-700">{department.specialty}</span>}
+            <span className={`rounded-xl border px-3 py-1.5 text-xs font-black ${orderTone[String(Boolean(department.canReceiveOrders))]}`}>{department.canReceiveOrders ? 'Có thể nhận phiếu chỉ định' : 'Không nhận phiếu chỉ định'}</span>
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <InfoBox label="Tầng" value={department.floor || 'Chưa gán'} />
+            <InfoBox label="Nhân sự" value={`${staffs.length} NV`} />
+            <InfoBox label="Phụ trách" value={department.manager?.fullName || 'Chưa gán'} />
+          </div>
+
+          <div className="mt-6 space-y-3">
+            <h4 className="text-sm font-black text-slate-700">Nhân sự trong phòng ban</h4>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {staffs.map((staff) => (
+                <div key={staff.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <strong className="block text-slate-950">{staff.fullName}</strong>
+                  <span className="mt-1 block text-xs font-semibold text-slate-500">{staff.employeeCode}</span>
+                </div>
+              ))}
+            </div>
+            {!staffs.length && <Empty title="Chưa có nhân sự" desc="Phòng ban này chưa được gán nhân sự." />}
+          </div>
+
+          <DepartmentHistory departmentId={department.id} />
+        </div>
+
+        <div className="border-t border-slate-100 bg-slate-50/70 p-5">
+          <button onClick={onGoStaff} className="w-full rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-3 text-sm font-black text-cyan-700 hover:bg-cyan-100">Đi tới quản lý nhân sự</button>
+        </div>
+      </aside>
+    </div>
+  );
+}
 
 // Audit history for one department. Pulls the BlockchainLogger entries for this entityId and
 // renders them newest-first with a colored action chip + an "on-chain" indicator. The list
@@ -282,6 +465,7 @@ function DepartmentHistory({ departmentId }) {
 }
 function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing }) { const canReceiveOrders = canDepartmentReceiveOrders(form.type); return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm"><form onSubmit={onSubmit} className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl space-y-4"><div className="flex items-start justify-between"><div><p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.18em]">Thiết lập phòng ban</p><h3 className="text-2xl font-black text-slate-950">{editing ? 'Cập nhật phòng ban' : 'Tạo phòng ban'}</h3><p className="text-sm text-slate-500">Khai báo mã, phân loại, quyền nhận chỉ định và nhiệm vụ.</p></div><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500">Đóng</button></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Input label="Mã phòng ban" value={form.departmentCode} onChange={(v) => setForm({ ...form, departmentCode: v })} placeholder="PB-XRAY" required /><Input label="Tên phòng ban" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="X-Ray, MRI, Lễ tân..." required /><Input label="Tầng" value={form.floor} onChange={(v) => setForm({ ...form, floor: v })} placeholder="VD: 2" /><Select label="Loại phòng ban" value={form.type} onChange={(v) => setForm({ ...form, type: v, canReceiveOrders: canDepartmentReceiveOrders(v) ? form.canReceiveOrders : false, specialty: ['EXAMINATION', 'CLINICAL', 'LABORATORY', 'IMAGING'].includes(v) ? form.specialty : '' })} options={DEPARTMENT_TYPES} />{['EXAMINATION', 'CLINICAL'].includes(form.type) && <Select label="Chuyên khoa" value={form.specialty} onChange={(v) => setForm({ ...form, specialty: v })} options={[{ value: '', label: 'Chọn chuyên khoa' }, ...SPECIALTIES.map(s => ({ value: s, label: s }))]} required />}{form.type === 'LABORATORY' && <Select label="Loại xét nghiệm" value={form.specialty} onChange={(v) => setForm({ ...form, specialty: v })} options={[{ value: '', label: 'Chọn loại xét nghiệm' }, ...LAB_TEST_TYPES.map(l => ({ value: l, label: l }))]} required />}{form.type === 'IMAGING' && <Select label="Loại chẩn đoán hình ảnh" value={form.specialty} onChange={(v) => setForm({ ...form, specialty: v })} options={[{ value: '', label: 'Chọn loại chẩn đoán hình ảnh' }, ...IMAGING_DIAGNOSIS_TYPES.map(i => ({ value: i, label: i }))]} required />}{canReceiveOrders && <label className="rounded-2xl border border-cyan-100 bg-cyan-50/60 p-4 flex items-start gap-3"><input type="checkbox" checked={Boolean(form.canReceiveOrders)} onChange={(e) => setForm({ ...form, canReceiveOrders: e.target.checked })} className="mt-1 h-4 w-4" /><span><strong className="block text-sm text-cyan-800">Nhận phiếu chỉ định</strong><small className="mt-1 block text-xs font-semibold text-cyan-600">Bật cho Xét nghiệm, X-Ray, MRI, Siêu âm, Nhà thuốc để hiện trong biểu mẫu bác sĩ.</small></span></label>}</div><Textarea label="Mô tả nhiệm vụ" value={form.description} onChange={(v) => setForm({ ...form, description: v })} placeholder="Mô tả chức năng phòng ban" /><button disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 disabled:opacity-70">{busy && <LoadingIndicator size="sm" tone="white" />}{editing ? 'Lưu thay đổi' : 'Tạo phòng ban'}</button></form></div>; }
 function InfoBox({ label, value }) { return <div className="rounded-xl bg-white border border-slate-100 p-3"><p className="text-[11px] uppercase tracking-wider font-black text-slate-400">{label}</p><p className="mt-1 text-sm font-bold text-slate-800">{value}</p></div>; }
+function MiniMetric({ label, value }) { return <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className="mt-0.5 text-sm font-black text-slate-800">{value}</p></div>; }
 function Alert({ children }) { return <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">{children}</div>; }
 function Empty({ title, desc }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><strong>{title}</strong><p className="mt-1 text-sm text-slate-500">{desc}</p></div>; }
 function SmallButton({ children, onClick, disabled, danger }) { return <button type="button" disabled={disabled} onClick={onClick} className={`rounded-xl border px-3 py-2 text-xs font-black disabled:opacity-50 ${danger ? 'border-rose-100 bg-rose-50 text-rose-600 hover:bg-rose-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-cyan-50 hover:text-cyan-600'}`}>{children}</button>; }

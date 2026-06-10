@@ -173,19 +173,8 @@ export default function BackupPage() {
       onLogout={logout}
     >
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Hero */}
-        <section className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-cyan-50 p-8 shadow-sm">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
-            <div>
-              <p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.24em] mb-3">Sao lưu & khôi phục</p>
-              <h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">Backup tự xác thực</h2>
-              <p className="mt-3 max-w-3xl text-sm sm:text-base text-slate-600 leading-relaxed">
-                Mỗi bản backup được băm (SHA256) và neo manifest lên blockchain ngay khi tạo, nên có thể chứng minh tệp
-                không bị sửa và biết được nó "sạch" tới mốc nào. Khi phát hiện giả mạo, có thể khôi phục phẫu thuật chỉ
-                những bản ghi bị sửa — giữ nguyên dữ liệu hợp lệ khác.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex justify-end">
+          <div className="flex flex-col gap-2 sm:flex-row">
               <button
                 id="backup-scan-button"
                 onClick={handleScan}
@@ -202,9 +191,8 @@ export default function BackupPage() {
               >
                 {creating ? 'Đang tạo...' : 'Tạo backup ngay'}
               </button>
-            </div>
           </div>
-        </section>
+        </div>
 
         {/* Stats */}
         <section className="grid grid-cols-2 xl:grid-cols-4 gap-4">

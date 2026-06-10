@@ -128,16 +128,6 @@ export default function ReceptionistShiftPage() {
   return (
     <DashboardLayout user={user} navItems={RECEPTIONIST_NAV_ITEMS} activeItem="shifts" onNavigate={(id) => navigate(receptionistRouteFor(id))} onLogout={logout}>
       <div className="mx-auto max-w-7xl space-y-5 pb-12">
-        <section className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-white p-6 shadow-sm">
-          <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-cyan-100/70 blur-3xl" />
-          <p className="relative text-[11px] font-black uppercase tracking-[0.22em] text-cyan-600">Lễ tân · Ca làm việc chuẩn</p>
-          <h1 className="relative mt-2 text-3xl font-black text-slate-950">Đăng ký Ca A / Ca B</h1>
-          <p className="relative mt-2 max-w-2xl text-sm font-semibold text-slate-600">Lễ tân đăng ký ca theo ngày. Quản lý duyệt trước khi ca có hiệu lực cho vận hành quầy tiếp nhận.</p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            {Object.entries(SHIFT_WINDOWS).map(([code, shift]) => <div key={code} className="rounded-2xl border border-cyan-100 bg-white/80 p-4 shadow-sm"><p className="text-xs font-black text-cyan-700">{shift.label}</p><p className="text-2xl font-black text-slate-950">{shift.time}</p></div>)}
-          </div>
-        </section>
-
         <section className="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={prevMonth} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-600">←</button>

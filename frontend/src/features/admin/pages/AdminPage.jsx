@@ -47,13 +47,6 @@ export default function AdminPage() {
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="overview" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
       <div className="max-w-7xl mx-auto space-y-6">
-        <section className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-cyan-50 p-8 shadow-sm">
-          <p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.24em] mb-3">Phân tích hệ thống</p>
-          <h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">Tổng quan hệ thống</h2>
-          <p className="mt-3 max-w-3xl text-sm sm:text-base text-slate-600 leading-relaxed">
-            Trang thống kê nhanh tình trạng phòng ban, nhân sự, tài khoản hoạt động và các hồ sơ đang chờ kích hoạt trong hệ thống bệnh viện.
-          </p>
-        </section>
 
         {loading ? <LoadingIndicator size="lg" label="Đang tải thống kê..." /> : (
           <>

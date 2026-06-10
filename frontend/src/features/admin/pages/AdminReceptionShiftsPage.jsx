@@ -30,11 +30,6 @@ export default function AdminShiftsPage() {
 
   return <DashboardLayout user={user} navItems={roleNav.items} activeItem={user?.role === 'ADMIN' ? 'shifts' : 'approveShifts'} onNavigate={(id) => navigate(roleNav.routeFor(id))} onLogout={logout}>
     <div className="mx-auto max-w-7xl space-y-4">
-      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-600">Duyệt và quản lý ca trực</p>
-        <h1 className="mt-1 text-2xl font-black text-slate-950">Phê duyệt ca làm việc</h1>
-        <p className="mt-1 text-xs font-semibold text-slate-500">Quản lý ca A/B cho lễ tân và ca trực cận lâm sàng theo đúng phân quyền.</p>
-      </section>
       <section className="flex gap-2 rounded-2xl border border-slate-100 bg-white p-2 shadow-sm">
         {showReception && <button onClick={() => setTab('reception')} className={`rounded-2xl px-4 py-2 text-xs font-black ${tab === 'reception' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Ca lễ tân</button>}
         {showParaclinical && <button onClick={() => setTab('paraclinical')} className={`rounded-2xl px-4 py-2 text-xs font-black ${tab === 'paraclinical' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Ca cận lâm sàng</button>}

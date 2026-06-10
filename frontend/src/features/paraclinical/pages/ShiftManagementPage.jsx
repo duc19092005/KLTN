@@ -198,28 +198,6 @@ export default function ShiftManagementPage() {
   return (
     <DashboardLayout user={user} navItems={LAB_MANAGER_NAV_ITEMS} activeItem="shifts" onNavigate={(id) => navigate(labManagerRouteFor(id))} onLogout={logout}>
       <div className="mx-auto max-w-7xl space-y-5 pb-12">
-        <section className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-white p-6 shadow-sm">
-          <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-cyan-100/70 blur-3xl" />
-          <div className="absolute bottom-0 left-1/3 h-32 w-32 rounded-full bg-cyan-100/60 blur-3xl" />
-          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan-600">Lịch trực cận lâm sàng · Ca chuẩn</p>
-              <h1 className="mt-2 text-3xl font-black text-slate-950">Đăng ký Ca A / Ca B</h1>
-              <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-slate-600">
-                Nhân viên đăng ký ca theo ngày, quản lý duyệt trước khi ca có hiệu lực. Chỉ ca <b>Đã duyệt</b> mới được tính là đang trực để xử lý chỉ định.
-              </p>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {Object.entries(SHIFT_WINDOWS).map(([code, meta]) => (
-                <div key={code} className="rounded-2xl border border-cyan-100 bg-white/80 p-3 shadow-sm">
-                  <p className="text-xs font-black text-cyan-700">{meta.label}</p>
-                  <p className="text-lg font-black text-slate-950">{meta.time}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
         <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-2">
