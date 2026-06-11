@@ -180,7 +180,7 @@ export class AuditController {
           ok: true,
           status: 'PENDING' as const,
           version: row.hashVersion ? 'V2' as const : 'V1' as const,
-          reason: 'List view does not decrypt encrypted snapshots; open detail or run chain verification for full integrity status.',
+          reason: 'Danh sách chỉ hiển thị kiểm tra nhanh và không giải mã dữ liệu audit đã mã hóa. Mở chi tiết bản ghi hoặc chạy kiểm tra toàn chuỗi để xem trạng thái toàn vẹn đầy đủ.',
           suspiciousFields: [],
         };
     const diff = row.diffJson?.schema === 'KLTN_AUDIT_DIFF_V1'

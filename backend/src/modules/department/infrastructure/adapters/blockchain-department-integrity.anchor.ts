@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
 import { AuditAnchorService } from '../../../../infrastructure/audit/audit-anchor.service';
+import { computeAfterHashV2 } from '../../../../infrastructure/audit/audit-hash.util';
 import {
   DepartmentAnchorAction,
   DepartmentIntegrityAnchorPort,
@@ -57,12 +58,13 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
     const recomputed = dept.dataSalt ? this.audit.recompute(snapshot, dept.dataSalt) : null;
     const dbHash = dept.hash256 || null;
     const dbMatches = recomputed !== null && recomputed === dbHash;
+    const currentAfterHash = computeAfterHashV2('Department', dept.id, snapshot);
 
     // Latest anchored log (batchId set ⇒ already in a Merkle batch on-chain).
     const latestAnchored = await this.prisma.blockchainLogger.findFirst({
       where: { entity: 'Department', entityId: dept.id, batchId: { not: null } },
       orderBy: { seq: 'desc' },
-      select: { seq: true, dataHash: true, batchId: true },
+      select: { seq: true, afterHash: true, batchId: true },
     });
 
     // Latest log entry overall (regardless of anchor status). Used to detect the
@@ -70,7 +72,7 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
     const latestAny = await this.prisma.blockchainLogger.findFirst({
       where: { entity: 'Department', entityId: dept.id },
       orderBy: { seq: 'desc' },
-      select: { seq: true, dataHash: true, batchId: true },
+      select: { seq: true, afterHash: true, batchId: true },
     });
 
     let chainMatches = false;
@@ -78,7 +80,7 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
       try {
         const proof = await this.auditAnchor.getInclusionProof(latestAnchored.seq);
         if (proof && proof.verified) {
-          chainMatches = latestAnchored.dataHash === recomputed;
+          chainMatches = latestAnchored.afterHash === currentAfterHash;
         }
       } catch {
         // Proof verification failed; chainMatches stays false
@@ -89,9 +91,9 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
     if (!latestAny) {
       // No log at all → never been anchored.
       status = 'UNANCHORED';
-    } else if (!latestAnchored || (latestAny.seq !== latestAnchored.seq && latestAny.dataHash === recomputed)) {
+    } else if (!latestAnchored || (latestAny.seq !== latestAnchored.seq && latestAny.afterHash === currentAfterHash)) {
       // There is a newer log than the last anchored one (or no anchored log yet),
-      // and that newest log's hash matches the current DB hash → write happened
+      // and that newest log's afterHash matches the current DB snapshot → write happened
       // and is just waiting for the next Merkle batch. Not tampering.
       status = dbMatches ? 'PENDING_ANCHOR' : 'TAMPERED';
     } else if (dbMatches && chainMatches) {
@@ -105,7 +107,7 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
         'Phát hiện giả mạo phòng ban',
         `Phòng ban: ${dept.name} (Mã: ${dept.departmentCode}, ID: ${dept.id})\n` +
         `• Hash CSDL: ${dbHash}\n` +
-        `• Hash On-Chain: ${latestAnchored?.dataHash}\n` +
+        `• Hash Audit đã neo: ${latestAnchored?.afterHash}\n` +
         `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}\n` +
         `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`
       );
@@ -120,7 +122,7 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
       chainMatches,
       recomputedHash: recomputed,
       storedHash: dbHash,
-      onChainHash: latestAnchored?.dataHash ?? null,
+      onChainHash: latestAnchored?.afterHash ?? null,
     };
   }
 

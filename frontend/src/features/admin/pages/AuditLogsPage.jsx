@@ -88,8 +88,15 @@ const VERIFICATION_LABEL = {
 function renderDiffValue(value, redacted) {
   if (redacted) return 'Đã ẩn theo chính sách';
   if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'boolean') return value ? 'Có' : 'Không';
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
+}
+
+function renderFieldList(fields) {
+  if (!fields.length) return 'Không có thay đổi field-level';
+  const labels = fields.map((field) => fieldDisplayName({ fieldPath: field, field }));
+  return labels.slice(0, 3).join(', ') + (labels.length > 3 ? ` +${labels.length - 3}` : '');
 }
 
 function getPrimaryDiff(log) {
@@ -98,8 +105,7 @@ function getPrimaryDiff(log) {
 
 function summarizeDiff(log) {
   const fields = log.fieldsChanged || log.diff?.map((item) => item.fieldPath || item.field) || [];
-  if (!fields.length) return 'Không có thay đổi field-level';
-  return fields.slice(0, 3).join(', ') + (fields.length > 3 ? ` +${fields.length - 3}` : '');
+  return renderFieldList(fields);
 }
 
 function subjectTitle(log) {
@@ -811,20 +817,21 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
               </section>
 
               <section className="rounded-3xl border border-cyan-200 bg-cyan-50/60 p-5 shadow-sm">
-                <h3 className="mb-3 inline-flex items-center gap-2 text-sm font-black text-cyan-950"><LockKeyhole className="h-4 w-4" /> Ảnh chụp dữ liệu đã mã hóa</h3>
+                <h3 className="mb-3 inline-flex items-center gap-2 text-sm font-black text-cyan-950"><LockKeyhole className="h-4 w-4" /> Dữ liệu chi tiết được bảo vệ</h3>
                 {log.encryptedSnapshots ? (
-                  <div className="space-y-2 text-[12px] font-bold text-cyan-900">
+                  <div className="space-y-3 rounded-2xl border border-cyan-100 bg-white/80 p-3 text-[12px] font-bold text-cyan-900">
+                    <p className="font-black text-emerald-700">Đã tải metadata mã hóa sau khi xác thực khuôn mặt.</p>
                     <p>Trước thay đổi: {log.encryptedSnapshots.before?.alg || '—'} · khóa {log.encryptedSnapshots.before?.keyId || '—'}</p>
                     <p>Sau thay đổi: {log.encryptedSnapshots.after?.alg || '—'} · khóa {log.encryptedSnapshots.after?.keyId || '—'}</p>
                   </div>
-                ) : <p className="text-xs font-semibold text-cyan-800">Metadata mã hóa chỉ tải ở chế độ chi tiết.</p>}
+                ) : <p className="text-xs font-semibold text-cyan-800">Danh sách chỉ hiển thị tên trường thay đổi. Xác thực khuôn mặt để tải trạng thái chi tiết và metadata mã hóa của bản ghi này.</p>}
                 {!sensitiveDetailUnlocked ? (
                   <button onClick={() => setStepUpOpen(true)} disabled={detailLoading} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-cyan-900/10 hover:bg-cyan-700 disabled:opacity-60">
-                    <Fingerprint className="h-4 w-4" /> {detailLoading ? 'Đang tải chi tiết…' : 'Face step-up để mở diff nhạy cảm'}
+                    <Fingerprint className="h-4 w-4" /> {detailLoading ? 'Đang tải chi tiết…' : 'Xác thực khuôn mặt để tải chi tiết bảo mật'}
                   </button>
                 ) : (
                   <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-bold text-emerald-800">
-                    Đã xác thực khuôn mặt. Hệ thống chỉ hiển thị phần thay đổi được chính sách cho phép và thông tin mã hóa; dữ liệu gốc dạng rõ không được trả ở endpoint này.
+                    Đã xác thực khuôn mặt. Các trường an toàn được hiển thị ở mục “Các trường đã thay đổi”; giá trị PII/lâm sàng/tệp vẫn bị ẩn theo chính sách và chỉ đối chiếu qua quy trình break-glass có kiểm soát.
                   </div>
                 )}
               </section>
@@ -842,6 +849,7 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
       {stepUpOpen && (
         <FaceStepUpModal
           action="AUDIT_DETAIL"
+          resourceId={String(log.seq)}
           title="Mở chi tiết audit đã mã hóa"
           description="Chi tiết audit có thể bao gồm diff nhạy cảm. Hệ thống yêu cầu quét khuôn mặt để cấp vé xem một lần; snapshot plaintext vẫn không được trả qua API mặc định."
           onSuccess={loadDetail}
@@ -858,9 +866,14 @@ function DiffList({ diff }) {
     <div className="space-y-3">
       {diff.map((item) => (
         <div key={item.field} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="font-mono text-xs font-black text-slate-800">{item.fieldPath || item.field}</span>
-            {item.redacted && <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700">ĐÃ ẨN</span>}
+          <div className="mb-2 flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-black text-slate-900">{fieldDisplayName(item)}</p>
+              {fieldTechnicalName(item) && fieldTechnicalName(item) !== fieldDisplayName(item) && (
+                <p className="mt-0.5 font-mono text-[10px] font-semibold text-slate-400">Tên kỹ thuật: {fieldTechnicalName(item)}</p>
+              )}
+            </div>
+            {item.redacted && <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700">ĐÃ ẨN</span>}
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="rounded-xl bg-white p-2">
@@ -872,10 +885,6 @@ function DiffList({ diff }) {
               <p className="mt-1 break-words text-xs font-bold text-slate-900">{renderDiffValue(item.after, item.redacted)}</p>
             </div>
           </div>
-          <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-cyan-700">{fieldDisplayName(item)}</p>
-          {fieldTechnicalName(item) && fieldTechnicalName(item) !== fieldDisplayName(item) && (
-            <p className="mt-1 font-mono text-[10px] font-semibold text-slate-400">Tên kỹ thuật: {fieldTechnicalName(item)}</p>
-          )}
           {item.reason && (
             <p className="mt-2 rounded-xl border border-amber-100 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">
               Chính sách {item.policyCode ? `· ${item.policyCode}` : ''}: {item.reason}

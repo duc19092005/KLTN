@@ -63,7 +63,7 @@ export class CreateDepartmentUseCase {
     });
 
     await this.integrity.anchorChange(department, 'CREATE', actorId, null);
-    return department;
+    return this.repo.findByIdOrThrow(department.id);
   }
 }
 
