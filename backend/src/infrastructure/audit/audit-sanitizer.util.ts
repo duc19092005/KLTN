@@ -59,8 +59,6 @@ const GLOBAL_SAFE_KEYS = new Set([
   'aiModelId',
   'aiModelRegistryId',
   'aiQualityId',
-  'staffShiftId',
-  'handoverLogId',
   'batchId',
   'seq',
   'prevHash',

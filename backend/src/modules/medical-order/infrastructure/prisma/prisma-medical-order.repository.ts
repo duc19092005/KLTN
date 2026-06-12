@@ -58,49 +58,6 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
     });
   }
 
-  async findActiveApprovedShift(shiftId: string, now: Date, includeOutOfWindow = false) {
-    return this.prisma.staffShift.findFirst({
-      where: {
-        id: shiftId,
-        shiftType: 'PARACLINICAL',
-        status: 'APPROVED',
-        isActive: true,
-        ...(includeOutOfWindow ? {} : {
-          startTime: { lte: now },
-          endTime: { gte: now },
-        }),
-      },
-      select: {
-        id: true,
-        staffId: true,
-        departmentId: true,
-        staff: { select: { userId: true, departmentId: true } },
-      },
-    });
-  }
-
-  async findActiveApprovedShiftForStaffDepartment(staffId: string, departmentId: string, now: Date, includeOutOfWindow = false) {
-    return this.prisma.staffShift.findFirst({
-      where: {
-        staffId,
-        departmentId,
-        shiftType: 'PARACLINICAL',
-        status: 'APPROVED',
-        isActive: true,
-        ...(includeOutOfWindow ? {} : {
-          startTime: { lte: now },
-          endTime: { gte: now },
-        }),
-      },
-      select: {
-        id: true,
-        staffId: true,
-        departmentId: true,
-        staff: { select: { userId: true, departmentId: true } },
-      },
-    });
-  }
-
   async departmentExists(id: string): Promise<boolean> {
     const department = await this.prisma.department.findUnique({ where: { id }, select: { id: true } });
     return Boolean(department);
@@ -163,7 +120,7 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
   async findOrderForManage(id: string) {
     const order = await this.prisma.medicalOrder.findUnique({
       where: { id },
-      select: { id: true, targetDepartmentId: true, status: true, visitId: true },
+      select: { id: true, targetDepartmentId: true, status: true, visitId: true, orderType: true },
     });
     return order;
   }

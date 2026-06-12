@@ -24,7 +24,6 @@ import StepUpSessionBadge from './StepUpSessionBadge';
 import SleepButton from './SleepButton';
 import NotificationBell from './NotificationBell';
 import LiveClock from './LiveClock';
-import DemoModeToggle from './DemoModeToggle';
 
 const defaultNavItems = [
   { id: 'overview', label: 'Tổng quan', icon: 'grid' },
@@ -98,12 +97,7 @@ export default function DashboardLayout({
     setIsSidebarOpen(false);
   };
 
-  const filteredNavItems = navItems.filter((item) => {
-    if (item.id === 'approveShifts') {
-      return user?.role === 'ADMIN' || user?.isManager === true;
-    }
-    return true;
-  });
+  const filteredNavItems = navItems;
 
   const activeLabel = filteredNavItems.find(item => item.id === activeItem)?.label || 'Tổng quan';
   const roleLabel = ROLE_LABELS[user?.role] || user?.role || 'Quản trị viên';
@@ -266,10 +260,6 @@ export default function DashboardLayout({
               <LiveClock />
             </div>
 
-            {/* Demo mode toggle */}
-            <div className="hidden sm:flex">
-              <DemoModeToggle />
-            </div>
 
             {/* Step-up privilege session countdown + lock */}
             <StepUpSessionBadge />

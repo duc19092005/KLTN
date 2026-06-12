@@ -37,8 +37,31 @@ export default function LabOrdersPage() {
     } finally { setLoading(false); }
   };
 
+  const loadSilently = async () => {
+    try {
+      const res = await medicalOrderService.list(filter ? { status: filter } : {});
+      const items = getItems(res.data);
+      setOrders(items);
+      if (activeOrder) setActiveOrder(items.find((o) => o.id === activeOrder.id) || null);
+    } catch (err) {
+      console.error('Failed to silently reload orders:', err);
+    }
+  };
+
   useEffect(() => { load(); }, [filter]);
   useEffect(() => { setForm(emptyResult); }, [activeOrder?.id]);
+
+  useEffect(() => {
+    const handleNotification = (e) => {
+      const payload = e.detail;
+      if (payload.title === 'Chỉ định cận lâm sàng mới') {
+        loadSilently();
+      }
+    };
+
+    window.addEventListener('app:notification-received', handleNotification);
+    return () => window.removeEventListener('app:notification-received', handleNotification);
+  }, [filter, activeOrder?.id]);
 
   const filteredOrders = useMemo(() => {
     const text = query.trim().toLowerCase();

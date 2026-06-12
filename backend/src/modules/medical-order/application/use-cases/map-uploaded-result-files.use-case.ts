@@ -27,6 +27,47 @@ export class MapUploadedResultFilesUseCase {
       throw new BadRequestException('Không thể tải file cho phiếu đã sẵn sàng, hoàn tất hoặc đã hủy.');
     }
 
+    const upperType = order.orderType.toUpperCase();
+    const isLabOrMri =
+      upperType.includes('LAB') ||
+      upperType.includes('MÁU') ||
+      upperType.includes('BLOOD') ||
+      upperType.includes('XÉT NGHIỆM') ||
+      upperType.includes('MRI') ||
+      upperType.includes('CỘNG HƯỞNG TỪ');
+
+    const isOnlyImage =
+      upperType.includes('XRAY') ||
+      upperType.includes('X-QUANG') ||
+      upperType.includes('X QUANG') ||
+      upperType.includes('CT') ||
+      upperType.includes('CẮT LỚP') ||
+      upperType.includes('SIÊU ÂM') ||
+      upperType.includes('ULTRASOUND');
+
+    const isOnlyPdf =
+      upperType.includes('PDF') ||
+      upperType.includes('ECG') ||
+      upperType.includes('ĐIỆN TÂM ĐỒ') ||
+      upperType.includes('BÁO CÁO') ||
+      upperType.includes('REPORT');
+
+    for (const file of files) {
+      const isPdf = file.mimetype === 'application/pdf';
+
+      if (isLabOrMri) {
+        // Allow both
+      } else if (isOnlyImage) {
+        if (isPdf) {
+          throw new BadRequestException('Chỉ chấp nhận file hình ảnh cho chỉ định này.');
+        }
+      } else if (isOnlyPdf) {
+        if (!isPdf) {
+          throw new BadRequestException('Chỉ chấp nhận file PDF cho chỉ định này.');
+        }
+      }
+    }
+
     return this.storage.uploadResultFiles(orderId, files);
   }
 }

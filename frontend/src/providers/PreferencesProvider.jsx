@@ -37,7 +37,6 @@ export const DEFAULT_PREFERENCES = {
   soundAlerts: true, // audible cue for new queue / results
   lockOnHidden: false, // lock the screen the moment the tab/window loses focus
   showGreeting: true, // friendly greeting banner on dashboards
-  demoMode: false, // bypass date/time constraints for demo / presentation
   clockFace: 'digital', // 'digital' | 'analog' | 'minimal'
 };
 

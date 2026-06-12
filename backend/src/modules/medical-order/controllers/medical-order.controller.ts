@@ -39,14 +39,14 @@ export class MedicalOrderController {
 
   @Roles('ADMIN', 'LAB_MANAGER')
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateMedicalOrderStatusDto, @CurrentUser() user: AuthUser, @Headers('x-demo-mode') demoMode?: string) {
-    return this.service.updateStatus(id, dto.status, user, isDemoModeHeader(demoMode));
+  updateStatus(@Param('id') id: string, @Body() dto: UpdateMedicalOrderStatusDto, @CurrentUser() user: AuthUser) {
+    return this.service.updateStatus(id, dto.status, user);
   }
 
   @Roles('LAB_MANAGER')
   @Post(':id/results')
-  createResult(@Param('id') id: string, @Body() dto: CreateMedicalResultDto, @CurrentUser() user: AuthUser, @Headers('x-demo-mode') demoMode?: string) {
-    return this.service.createResult(id, dto, user, isDemoModeHeader(demoMode));
+  createResult(@Param('id') id: string, @Body() dto: CreateMedicalResultDto, @CurrentUser() user: AuthUser) {
+    return this.service.createResult(id, dto, user);
   }
 
   @Roles('LAB_MANAGER')
@@ -64,6 +64,4 @@ export class MedicalOrderController {
   }
 }
 
-function isDemoModeHeader(value?: string) {
-  return value === 'true' || value === '1';
-}
+

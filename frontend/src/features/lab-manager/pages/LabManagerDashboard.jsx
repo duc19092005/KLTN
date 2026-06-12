@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { useAuth } from '../../../providers/AuthProvider';
-import { shiftService } from '../../paraclinical/apis/paraclinicalService';
+import { medicalOrderService } from '../../medical-order/apis/medicalOrderService';
 import { LAB_MANAGER_NAV_ITEMS, labManagerRouteFor } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import api from '../../../shared/apis/api';
 
 function getItems(data) { return Array.isArray(data) ? data : data?.items || []; }
 
@@ -14,70 +13,42 @@ export default function LabManagerDashboardPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
-  const [shifts, setShifts] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [rooms, setRooms] = useState([]);
-  const [selectedRoomId, setSelectedRoomId] = useState('');
   const isManager = user?.isManager || false;
 
-  useEffect(() => {
-    let mounted = true;
-    async function loadRooms() {
-      try {
-        // 1. Load departments (LABORATORY + IMAGING only)
-        const deptRes = await api.get('/departments', { params: { limit: 100 } });
-        const allDepts = deptRes.data?.data?.items || deptRes.data?.items || deptRes.data?.data || [];
-        const labDepts = allDepts.filter(d => d.type === 'LABORATORY' || d.type === 'IMAGING');
-        const list = labDepts.map(d => ({
-          id: d.id,
-          roomName: `[${d.type === 'LABORATORY' ? 'XN' : 'CDHA'}] ${d.name}`,
-          roomCode: d.departmentCode,
-          _deptId: d.id,
-        }));
-
-        if (mounted && list.length > 0) {
-          setRooms(list);
-          setSelectedRoomId(list[0].id);
-        }
-      } catch { /* ignore */ }
+  const loadOrders = async () => {
+    setLoading(true);
+    try {
+      const res = await medicalOrderService.list({});
+      setOrders(getItems(res.data));
+    } catch (err) {
+      toast.error('Không tải được danh sách chỉ định cận lâm sàng');
+    } finally {
+      setLoading(false);
     }
-    loadRooms();
-    return () => { mounted = false; };
+  };
+
+  useEffect(() => {
+    loadOrders();
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-    async function load() {
-      setLoading(true);
-      try {
-        const today = new Date();
-        const from = new Date(today.getFullYear(), today.getMonth(), 1);
-        const to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        const roomId = selectedRoomId;
-        if (roomId) {
-          const res = await shiftService.listByDepartment(roomId, from.toISOString(), to.toISOString());
-          if (mounted) setShifts(getItems(res.data));
-        }
-      } catch {
-        if (mounted) { /* silent */ }
-      } finally { if (mounted) setLoading(false); }
-    }
-    load();
-    return () => { mounted = false; };
-  }, [selectedRoomId]);
-
   const analytics = useMemo(() => {
-    const total = shifts.length || 1;
-    const statuses = [
-      { status: 'APPROVED', label: 'Đã duyệt', key: 'approved' },
-      { status: 'PENDING', label: 'Chờ duyệt', key: 'pending' },
-      { status: 'REJECTED', label: 'Từ chối', key: 'rejected' },
-    ].map(({ status, label, key }) => {
-      const count = shifts.filter(s => s.status === status).length;
-      return { key, label, count, percent: Math.round((count / total) * 100) };
-    });
-    return { statuses, total };
-  }, [shifts]);
+    const total = orders.length || 1;
+    const ordered = orders.filter(o => o.status === 'ORDERED').length;
+    const inProgress = orders.filter(o => o.status === 'IN_PROGRESS').length;
+    const ready = orders.filter(o => o.status === 'RESULT_READY').length;
+
+    return {
+      total,
+      ordered,
+      inProgress,
+      ready,
+      orderedPercent: Math.round((ordered / total) * 100),
+      inProgressPercent: Math.round((inProgress / total) * 100),
+      readyPercent: Math.round((ready / total) * 100),
+    };
+  }, [orders]);
 
   return (
     <DashboardLayout user={user} navItems={LAB_MANAGER_NAV_ITEMS} activeItem="overview" onNavigate={(id) => navigate(labManagerRouteFor(id))} onLogout={logout}>
@@ -89,25 +60,11 @@ export default function LabManagerDashboardPage() {
                 {isManager && <span className="inline-block mr-2 rounded-full bg-amber-100 px-2 py-0.5 text-amber-700 text-[9px]">Trưởng khoa</span>}
                 Bảng điều khiển
               </p>
-              <h1 className="mt-1 text-2xl font-black text-slate-950">Tổng quan</h1>
+              <h1 className="mt-1 text-2xl font-black text-slate-950">Tổng quan xét nghiệm</h1>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              {rooms.length > 0 && (
-                <select
-                  value={selectedRoomId}
-                  onChange={(e) => setSelectedRoomId(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-colors"
-                >
-                  {rooms.map((r) => (
-                    <option key={r.id} value={r.id}>{r.roomName || r.roomCode || r.id.slice(0, 8)}</option>
-                  ))}
-                </select>
-              )}
-              <button onClick={() => navigate('/lab-manager/shifts')} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white hover:bg-cyan-700 shadow-sm">Đăng ký ca</button>
+              <button onClick={loadOrders} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 hover:bg-slate-50">Làm mới</button>
               <button onClick={() => navigate('/lab-manager/orders')} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white shadow-sm hover:bg-cyan-700">Vào phòng xét nghiệm</button>
-              {isManager && (
-                <button onClick={() => navigate('/admin/shifts')} className="rounded-xl border border-cyan-200 bg-white px-4 py-2.5 text-xs font-black text-cyan-700 hover:bg-cyan-50">Duyệt ca</button>
-              )}
             </div>
           </div>
         </section>
@@ -115,20 +72,13 @@ export default function LabManagerDashboardPage() {
         {loading ? <LoadingIndicator size="lg" label="Đang tải thống kê..." /> : (
           <>
             <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {analytics.statuses.map(row => (
-                <Kpi key={row.key} label={row.label} value={row.count} percent={row.percent} tone={row.key === 'approved' ? 'emerald' : row.key === 'pending' ? 'amber' : 'red'} />
-              ))}
+              <Kpi label="Chờ tiếp nhận" value={analytics.ordered} percent={analytics.orderedPercent} tone="amber" />
+              <Kpi label="Đang tiến hành" value={analytics.inProgress} percent={analytics.inProgressPercent} tone="cyan" />
+              <Kpi label="Đã có kết quả" value={analytics.ready} percent={analytics.readyPercent} tone="emerald" />
             </section>
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Shortcut title="Đăng ký lịch trực" desc="Xem lịch tháng, kéo thả chọn giờ làm việc." onClick={() => navigate('/lab-manager/shifts')} />
-              <Shortcut title="Lịch sử ca trực" desc="Xem tất cả ca đã đăng ký, trạng thái duyệt." onClick={() => {
-                navigate('/lab-manager/shifts');
-                setTimeout(() => {
-                  const btn = document.querySelector('[data-history-btn]');
-                  if (btn) btn.click();
-                }, 300);
-              }} />
-              <Shortcut title="Phiếu CLS" desc="Nhận xử lý, tải lên và trả kết quả chỉ định." onClick={() => navigate('/lab-manager/orders')} />
+            <section className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Shortcut title="Phiếu chỉ định cận lâm sàng" desc="Danh sách chỉ định đang chờ kỹ thuật viên tiếp nhận và xử lý tệp." onClick={() => navigate('/lab-manager/orders')} />
+              <Shortcut title="Lịch sử trả kết quả" desc="Xem và đối chiếu các kết quả cận lâm sàng đã gửi lên hệ thống." onClick={() => navigate('/lab-manager/results')} />
             </section>
           </>
         )}
@@ -141,7 +91,7 @@ function Kpi({ label, value, percent, tone }) {
   const colors = {
     emerald: { dot: 'bg-emerald-500', bg: 'bg-white border-slate-100', text: 'text-emerald-700' },
     amber:   { dot: 'bg-amber-400',   bg: 'bg-white border-slate-100', text: 'text-amber-700' },
-    red:     { dot: 'bg-rose-400',    bg: 'bg-white border-slate-100', text: 'text-rose-600' },
+    cyan:    { dot: 'bg-cyan-500',    bg: 'bg-white border-slate-100', text: 'text-cyan-700' },
   };
   const c = colors[tone] || colors.emerald;
 

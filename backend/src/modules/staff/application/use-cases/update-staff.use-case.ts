@@ -30,8 +30,8 @@ export class UpdateStaffUseCase {
       const dept = await this.repo.findDepartment(dto.departmentId);
       if (!dept) throw new NotFoundException('Không tìm thấy phòng ban.');
       if (staff.doctorProfile) {
-        if (dept.type !== 'CLINICAL') {
-          throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng ban lâm sàng.');
+        if (dept.type !== 'EXAMINATION' && dept.type !== 'CLINICAL') {
+          throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng khám hoặc lâm sàng.');
         }
         if (dept.specialty && dept.specialty !== staff.doctorProfile.specialty) {
           throw new BadRequestException(`Bác sĩ chuyên khoa "${staff.doctorProfile.specialty}" không thể được xếp vào phòng ban chuyên khoa "${dept.specialty}"`);

@@ -53,10 +53,44 @@ export default function NotificationBell() {
   useEffect(() => {
     fetchNotifications();
 
-    // Poll for notifications every 20 seconds (re-runs when filters change).
-    const interval = setInterval(fetchNotifications, 20000);
-    return () => clearInterval(interval);
-  }, [fetchNotifications]);
+    // Setup real-time updates via Server-Sent Events (SSE)
+    const sseUrl = `${api.defaults.baseURL || '/api'}/notifications/sse`;
+    const eventSource = new EventSource(sseUrl, { withCredentials: true });
+
+    eventSource.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload?.type === 'ping') {
+          return; // ignore ping
+        }
+
+        // Add the notification to local state if it's not a duplicate
+        setNotifications((prev) => {
+          if (prev.some((n) => n.id === payload.id)) {
+            return prev;
+          }
+          return [payload, ...prev];
+        });
+
+        // Trigger visual toast notification
+        toast.info(payload.message || 'Có thông báo mới');
+
+        // Dispatch global CustomEvent for real-time page updates
+        const customEvent = new CustomEvent('app:notification-received', { detail: payload });
+        window.dispatchEvent(customEvent);
+      } catch (err) {
+        console.error('Failed to parse real-time notification:', err);
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      console.error('SSE connection error:', err);
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [fetchNotifications, toast]);
 
   // Close dropdown on clicking outside
   useEffect(() => {

@@ -4,13 +4,13 @@ import { UpdateMedicalOrderStatusUseCase } from './update-medical-order-status.u
 import { MedicalOrderAccessPolicy } from '../policies/medical-order-access.policy';
 import { AuthUser } from '../../../../common/types/auth-user.type';
 
-describe('UpdateMedicalOrderStatusUseCase shift enforcement and DEMO_MODE', () => {
-  const originalDemoMode = process.env.DEMO_MODE;
+describe('UpdateMedicalOrderStatusUseCase', () => {
   const order = {
     id: 'order-1',
     targetDepartmentId: 'dept-lab-1',
     status: MedicalOrderStatus.ORDERED,
     visitId: 'visit-1',
+    orderType: 'LAB_TEST',
   };
   const actualStaffUserId = 'actual-staff-user-1';
   const authUser: AuthUser = {
@@ -18,28 +18,12 @@ describe('UpdateMedicalOrderStatusUseCase shift enforcement and DEMO_MODE', () =
     role: UserRole.LAB_MANAGER,
     verified: true,
     staffId: 'staff-1',
-    shiftId: 'shift-1',
   };
 
-  afterEach(() => {
-    process.env.DEMO_MODE = originalDemoMode;
-    jest.restoreAllMocks();
-  });
-
-  function makeUseCase(options: { shiftFound: boolean }) {
+  function makeUseCase(options: { departmentId: string }) {
     const repo = {
       findOrderForManage: jest.fn().mockResolvedValue(order),
-      findStaffByUserId: jest.fn().mockResolvedValue({ id: 'staff-1', userId: actualStaffUserId, departmentId: 'dept-lab-1' }),
-      findActiveApprovedShiftForStaffDepartment: jest.fn().mockResolvedValue(
-        options.shiftFound
-          ? {
-              id: 'shift-1',
-              staffId: 'staff-1',
-              departmentId: 'dept-lab-1',
-              staff: { userId: actualStaffUserId, departmentId: 'dept-lab-1' },
-            }
-          : null,
-      ),
+      findStaffByUserId: jest.fn().mockResolvedValue({ id: 'staff-1', userId: actualStaffUserId, departmentId: options.departmentId }),
       updateStatus: jest.fn().mockResolvedValue({ ...order, status: MedicalOrderStatus.IN_PROGRESS }),
     };
 
@@ -47,26 +31,21 @@ describe('UpdateMedicalOrderStatusUseCase shift enforcement and DEMO_MODE', () =
     return { useCase, repo };
   }
 
-  it('DEMO_MODE=false: rejects status update outside approved shift time window', async () => {
-    process.env.DEMO_MODE = 'false';
-    const { useCase, repo } = makeUseCase({ shiftFound: false });
-
-    await expect(useCase.execute(order.id, MedicalOrderStatus.IN_PROGRESS, authUser)).rejects.toThrow(ForbiddenException);
-
-    expect(repo.findActiveApprovedShiftForStaffDepartment).toHaveBeenCalledWith('staff-1', 'dept-lab-1', expect.any(Date), false);
-    expect(repo.updateStatus).not.toHaveBeenCalled();
-  });
-
-  it('DEMO_MODE=true: bypasses time window constraints and allows approved inactive-time shift to update status', async () => {
-    process.env.DEMO_MODE = 'true';
-    const { useCase, repo } = makeUseCase({ shiftFound: true });
+  it('allows status update when staff department matches order target department', async () => {
+    const { useCase, repo } = makeUseCase({ departmentId: 'dept-lab-1' });
 
     await expect(useCase.execute(order.id, MedicalOrderStatus.IN_PROGRESS, authUser)).resolves.toEqual({
       ...order,
       status: MedicalOrderStatus.IN_PROGRESS,
     });
 
-    expect(repo.findActiveApprovedShiftForStaffDepartment).toHaveBeenCalledWith('staff-1', 'dept-lab-1', expect.any(Date), true);
     expect(repo.updateStatus).toHaveBeenCalledWith(order.id, MedicalOrderStatus.IN_PROGRESS, undefined);
+  });
+
+  it('rejects status update when staff department does not match order target department', async () => {
+    const { useCase, repo } = makeUseCase({ departmentId: 'dept-lab-different' });
+
+    await expect(useCase.execute(order.id, MedicalOrderStatus.IN_PROGRESS, authUser)).rejects.toThrow(ForbiddenException);
+    expect(repo.updateStatus).not.toHaveBeenCalled();
   });
 });

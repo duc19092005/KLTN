@@ -6,6 +6,8 @@ import { WalletChallengeService } from '../services/wallet-challenge.service';
 import { WALLET_PURPOSE_LOGIN } from '../../domain/auth.constants';
 import { normalizeWalletAddress } from '../../domain/wallet.util';
 import { toPublicUser } from '../../domain/public-user';
+import { STEPUP_TICKET_ISSUER, StepUpTicketIssuerPort } from '../ports/stepup-ticket-issuer.port';
+import { SECURITY_EVENT_LOGGER, SecurityEventLoggerPort } from '../ports/security-event-logger.port';
 
 /**
  * Admin wallet login (signature step). Behavior copied verbatim from the former
@@ -19,6 +21,8 @@ export class WalletLoginUseCase {
     @Inject(AUTH_REPOSITORY) private readonly repo: AuthRepositoryPort,
     @Inject(ACCESS_TOKEN_SIGNER) private readonly tokenSigner: AccessTokenSignerPort,
     @Inject(AUTH_CHAIN_GATEWAY) private readonly chain: AuthChainGatewayPort,
+    @Inject(STEPUP_TICKET_ISSUER) private readonly stepUp: StepUpTicketIssuerPort,
+    @Inject(SECURITY_EVENT_LOGGER) private readonly audit: SecurityEventLoggerPort,
     private readonly walletChallenge: WalletChallengeService,
   ) {}
 
@@ -38,12 +42,21 @@ export class WalletLoginUseCase {
       throw new UnauthorizedException('Ví chưa được cấp quyền trên blockchain.');
     }
 
+    let stepUpSession: unknown = null;
+    try {
+      stepUpSession = await this.stepUp.issueSession(adminProfile.userId, 'SENSITIVE_WRITE');
+      await this.audit.write(adminProfile.userId, 'FACE_STEPUP_SESSION_OPEN', 'User', adminProfile.userId, { scope: 'SENSITIVE_WRITE', context: 'LOGIN' });
+    } catch (err) {
+      console.warn(`[WalletLogin] auto step-up session open failed for userId=${adminProfile.userId}:`, (err as Error)?.message);
+    }
+
     return {
-      access_token: this.tokenSigner.sign(adminProfile.user, { verified: false, walletAddress: normalizedWalletAddress }),
-      requireVerification: true,
+      access_token: this.tokenSigner.sign(adminProfile.user, { verified: true, walletAddress: normalizedWalletAddress }),
+      requireVerification: false,
+      stepUpSession,
       user: toPublicUser(
         { ...adminProfile.user, adminProfile: { ...adminProfile, walletAddress: normalizedWalletAddress } },
-        false,
+        true,
       ),
     };
   }

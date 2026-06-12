@@ -18,6 +18,7 @@ import { useAuth } from '../../../providers/AuthProvider';
 import { authService } from '../apis/authService';
 import { getDashboardRoute } from '../../../shared/constants/roleRoutes';
 import { useToast } from '../../../providers/ToastProvider';
+import { stepUpSession } from '../../../shared/stepup/sessionStore';
 import { Button, FormField, Input } from '../../../shared/components/ui';
 
 const MODES = [
@@ -43,6 +44,12 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
   const isFormDisabled = busy || loading;
 
   const routeAfterLogin = (result) => {
+    if (result.stepUpSession?.session) {
+      stepUpSession.setSession(result.stepUpSession.session, {
+        idleExpiresAt: result.stepUpSession.idleExpiresAt,
+        absoluteExpiresAt: result.stepUpSession.absoluteExpiresAt,
+      });
+    }
     if (!result.user?.hasFace) return navigate('/authenticate', { replace: true });
     if (result.requirePasswordChange) return navigate('/change-password', { replace: true });
     if (result.requireVerification || result.requireFaceRegistration || result.requireFaceVerification) {

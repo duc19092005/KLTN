@@ -15,7 +15,6 @@ import {
   Watch,
   Smartphone,
   Minimize2,
-  FlaskConical,
 } from 'lucide-react';
 import { usePreferences, ACCENTS } from '../../../providers/PreferencesProvider';
 import { useToast } from '../../../providers/ToastProvider';
@@ -187,28 +186,6 @@ export default function PreferencesPanel() {
             id="pref-lock-hidden"
             checked={prefs.lockOnHidden}
             onChange={(v) => setPreference('lockOnHidden', v)}
-            accent={accentHex}
-          />
-        </SettingRow>
-      </SettingsCard>
-
-      {/* Demo / Presentation mode */}
-      <SettingsCard
-        icon={FlaskConical}
-        title="Chế độ trình diễn"
-        description="Bật chế độ demo để bỏ qua kiểm tra ngày/giờ khi đăng ký ca trực — hữu ích khi thuyết trình cho giảng viên."
-        accent={accentHex}
-      >
-        <SettingRow
-          htmlFor="pref-demo-mode"
-          icon={FlaskConical}
-          title="Demo Mode"
-          description="Khi bật: có thể chọn ngày quá khứ hoặc tương lai không giới hạn. Tắt: tuân theo ràng buộc thời gian thực."
-        >
-          <Toggle
-            id="pref-demo-mode"
-            checked={prefs.demoMode}
-            onChange={(v) => setPreference('demoMode', v)}
             accent={accentHex}
           />
         </SettingRow>

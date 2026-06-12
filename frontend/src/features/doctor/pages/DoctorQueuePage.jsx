@@ -183,6 +183,21 @@ export default function DoctorQueuePage() {
     } finally { setLoading(false); }
   };
 
+  const reloadVisitsSilently = async () => {
+    try {
+      const res = await doctorVisitService.list(filter ? { status: filter, limit: 50 } : { limit: 50 });
+      const items = getItems(res.data);
+      setVisits(items);
+      setActiveVisit((current) => {
+        if (!current) return items[0] || null;
+        const found = items.find((v) => v.id === current.id);
+        return found ? { ...current, ...found } : current;
+      });
+    } catch (err) {
+      console.error('Failed to silently reload queue:', err);
+    }
+  };
+
   const loadDecision = async (visitId) => {
     if (!visitId) return;
     setDetailLoading(true);
@@ -214,6 +229,21 @@ export default function DoctorQueuePage() {
 
   useEffect(() => { loadVisits(); }, [filter]);
   useEffect(() => { if (activeVisit?.id) { loadDecision(activeVisit.id); setShowWorkflowModal(false); } }, [activeVisit?.id]);
+
+  useEffect(() => {
+    const handleNotification = (e) => {
+      const payload = e.detail;
+      if (payload.title === 'Lượt khám mới' || payload.title === 'Có kết quả cận lâm sàng') {
+        reloadVisitsSilently();
+        if (activeVisit?.id) {
+          loadDecision(activeVisit.id);
+        }
+      }
+    };
+
+    window.addEventListener('app:notification-received', handleNotification);
+    return () => window.removeEventListener('app:notification-received', handleNotification);
+  }, [filter, activeVisit?.id]);
   useEffect(() => {
     (async () => {
       try {

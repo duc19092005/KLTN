@@ -24,8 +24,8 @@ export class CreateDoctorUseCase {
     if (staff.departmentId) {
       const dept = await this.repo.findDepartment(staff.departmentId);
       if (dept) {
-        if (dept.type !== 'CLINICAL') {
-          throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng ban lâm sàng.');
+        if (dept.type !== 'EXAMINATION' && dept.type !== 'CLINICAL') {
+          throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng khám hoặc lâm sàng.');
         }
         if (dept.specialty && dept.specialty !== dto.specialty) {
           throw new BadRequestException(`Bác sĩ chuyên khoa "${dto.specialty}" không thể được xếp vào phòng ban chuyên khoa "${dept.specialty}"`);

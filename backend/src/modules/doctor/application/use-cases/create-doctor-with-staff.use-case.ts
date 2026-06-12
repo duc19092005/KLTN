@@ -26,7 +26,7 @@ export class CreateDoctorWithStaffUseCase {
     const dept = await this.repo.findDepartment(dto.departmentId);
     if (!dept) throw new NotFoundException('Không tìm thấy phòng ban.');
     if (dept.type !== 'EXAMINATION' && dept.type !== 'CLINICAL') {
-      throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng ban khám.');
+      throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng khám hoặc lâm sàng.');
     }
     if (dept.specialty && dept.specialty !== dto.specialty) {
       throw new BadRequestException(`Bác sĩ chuyên khoa "${dto.specialty}" không thể được xếp vào phòng ban chuyên khoa "${dept.specialty}"`);

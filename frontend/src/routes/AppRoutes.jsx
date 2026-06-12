@@ -6,14 +6,11 @@ import { ReceptionistDashboard, DoctorDashboard, LabManagerDashboard } from '../
 import ReceptionistIntakePage from '../features/receptionist/pages/ReceptionistIntakePage';
 import ReceptionistQueuePage from '../features/receptionist/pages/ReceptionistQueuePage';
 import ReceptionistRecordsPage from '../features/receptionist/pages/ReceptionistRecordsPage';
-import ReceptionistShiftPage from '../features/receptionist/pages/ReceptionistShiftPage';
-import AdminShiftsPage from '../features/admin/pages/AdminReceptionShiftsPage';
+
 import LabOrdersPage from '../features/lab-manager/pages/LabOrdersPage';
 import LabResultsPage from '../features/lab-manager/pages/LabResultsPage';
 import DoctorQueuePage from '../features/doctor/pages/DoctorQueuePage';
-import ShiftManagementPage from '../features/paraclinical/pages/ShiftManagementPage';
 import LabManagerDashboardPage from '../features/lab-manager/pages/LabManagerDashboard';
-import ShiftApprovalPage from '../features/lab-manager/pages/ShiftApprovalPage';
 import LoadingIndicator from '../shared/components/LoadingIndicator';
 import { getDashboardRoute } from '../shared/constants/roleRoutes';
 import { PatientVerificationPage } from '../features/verification';
@@ -55,7 +52,6 @@ export default function App() {
         <Route path="/admin/departments" element={<ProtectedRoute requireVerified roles={['ADMIN']}><DepartmentsPage /></ProtectedRoute>} />
         <Route path="/admin/staff" element={<ProtectedRoute requireVerified roles={['ADMIN']}><StaffPage /></ProtectedRoute>} />
         <Route path="/admin/doctors" element={<ProtectedRoute requireVerified roles={['ADMIN']}><DoctorsPage /></ProtectedRoute>} />
-        <Route path="/admin/shifts" element={<ProtectedRoute requireVerified roles={['ADMIN', 'RECEPTIONIST', 'LAB_MANAGER']} requireManager><AdminShiftsPage /></ProtectedRoute>} />
         <Route path="/admin/ai-models" element={<ProtectedRoute requireVerified roles={['ADMIN']}><AiModelsPage /></ProtectedRoute>} />
         <Route path="/admin/audit" element={<ProtectedRoute requireVerified roles={['ADMIN']}><AuditLogsPage /></ProtectedRoute>} />
         <Route path="/admin/backup" element={<ProtectedRoute requireVerified roles={['ADMIN']}><BackupPage /></ProtectedRoute>} />
@@ -63,14 +59,10 @@ export default function App() {
         <Route path="/receptionist/intake" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST']}><ReceptionistIntakePage /></ProtectedRoute>} />
         <Route path="/receptionist/queue" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST']}><ReceptionistQueuePage /></ProtectedRoute>} />
         <Route path="/receptionist/records" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST']}><ReceptionistRecordsPage /></ProtectedRoute>} />
-        <Route path="/receptionist/shifts" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST']}><ReceptionistShiftPage /></ProtectedRoute>} />
         <Route path="/doctor" element={<ProtectedRoute requireVerified roles={['DOCTOR']}><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/doctor/queue" element={<ProtectedRoute requireVerified roles={['DOCTOR']}><DoctorQueuePage /></ProtectedRoute>} />
         <Route path="/lab-manager" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><LabManagerDashboardPage /></ProtectedRoute>} />
         <Route path="/lab-manager/work" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><Navigate to="/lab-manager/orders" replace /></ProtectedRoute>} />
-        <Route path="/lab-manager/shifts" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><ShiftManagementPage /></ProtectedRoute>} />
-        <Route path="/lab-manager/history" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><ShiftManagementPage /></ProtectedRoute>} />
-        <Route path="/lab-manager/approvals" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']} requireManager><ShiftApprovalPage /></ProtectedRoute>} />
         <Route path="/lab-manager/orders" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><LabOrdersPage /></ProtectedRoute>} />
         <Route path="/lab-manager/results" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><LabResultsPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute requireVerified roles={['ADMIN', 'RECEPTIONIST', 'DOCTOR', 'LAB_MANAGER']}><ProfilePage /></ProtectedRoute>} />

@@ -1,16 +1,23 @@
-import { Controller, Delete, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Patch, Query, UseGuards, Sse, MessageEvent } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
 import { NotificationService, NotificationFilter } from '../services/notification.service';
 import { NotificationQueryDto } from '../dto/notification-query.dto';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Observable } from 'rxjs';
 
 @ApiTags('Notifications')
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
+
+  @Sse('sse')
+  @ApiOperation({ summary: 'Stream notifications to current user in real-time' })
+  streamNotifications(@CurrentUser() user: AuthUser): Observable<MessageEvent> {
+    return this.notificationService.getNotificationStream(user.sub);
+  }
 
   @Get()
   @ApiOperation({ summary: 'Get notifications for current user (filter by read state / date range)' })

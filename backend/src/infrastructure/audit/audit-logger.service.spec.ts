@@ -99,13 +99,15 @@ describe('AuditLoggerService V2', () => {
         before: '[REDACTED]',
         after: '[REDACTED]',
         sensitivity: 'FILE_URL',
+        storedRedacted: true,
       },
       {
         field: 'fullName',
         label: 'Họ tên',
-        before: 'abc',
-        after: 'def',
+        before: '[REDACTED]',
+        after: '[REDACTED]',
         sensitivity: 'PII',
+        storedRedacted: true,
       },
     ]);
     expect(JSON.stringify(row.diffJson)).not.toContain('cdn.example');

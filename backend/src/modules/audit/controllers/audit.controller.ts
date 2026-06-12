@@ -12,6 +12,7 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
 import { toDisplayAuditDiff } from '../../../infrastructure/audit/audit-diff.util';
 import { verifyAuditRow } from '../../../infrastructure/audit/audit-verification.util';
+import { buildAuditEncryptionAad, decryptAuditSnapshot } from '../../../infrastructure/audit/audit-encryption.util';
 
 /**
  * Admin-only audit + integrity API. Surfaces the tamper-evidence machinery so it can be
@@ -242,8 +243,32 @@ export class AuditController {
         before: this.describeEncryptedSnapshot(row.beforeEncrypted),
         after: this.describeEncryptedSnapshot(row.afterEncrypted),
       },
+      decryptedSnapshots: faceVerified
+        ? {
+            before: this.decryptAndParse(row.beforeEncrypted, row),
+            after: this.decryptAndParse(row.afterEncrypted, row),
+          }
+        : null,
       sensitiveDetailUnlocked: faceVerified,
     };
+  }
+
+  private decryptAndParse(encrypted: any, row: any): any {
+    if (!encrypted) return null;
+    try {
+      const aad = buildAuditEncryptionAad({
+        seq: row.seq,
+        entity: row.entity,
+        entityId: row.entityId,
+        action: row.action,
+        createdAtIso: row.createdAt instanceof Date ? row.createdAt.toISOString() : new Date(row.createdAt).toISOString(),
+      });
+      const decrypted = decryptAuditSnapshot(encrypted, aad);
+      return JSON.parse(decrypted);
+    } catch (err) {
+      console.warn(`[AuditController] Decryption failed for seq=${row.seq}:`, err);
+      return null;
+    }
   }
 
 

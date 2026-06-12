@@ -38,7 +38,7 @@ export class UpdateDoctorUseCase {
         throw new NotFoundException('Không tìm thấy phòng ban.');
       }
       if (dept.type !== 'EXAMINATION' && dept.type !== 'CLINICAL') {
-        throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng ban lâm sàng.');
+        throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng khám hoặc lâm sàng.');
       }
       if (dept.specialty && dept.specialty !== targetSpecialty) {
         throw new BadRequestException(`Bác sĩ chuyên khoa "${targetSpecialty}" không thể được xếp vào phòng ban chuyên khoa "${dept.specialty}"`);

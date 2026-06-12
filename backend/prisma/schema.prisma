@@ -35,21 +35,7 @@ enum OperationalStatus {
   INACTIVE
 }
 
-enum ShiftStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
 
-enum ShiftCode {
-  A
-  B
-}
-
-enum StaffShiftType {
-  RECEPTION
-  PARACLINICAL
-}
 
 enum LabSpecialty {
   LABORATORY
@@ -96,7 +82,7 @@ model User {
   performedResults  MedicalResult[]
   stepUpTickets     StepUpTicket[]
   stepUpSessions    StepUpSession[]
-  approvedShifts    StaffShift[] @relation("ApprovedStaffShifts")
+
   notifications     Notification[]
 
   @@index([role])
@@ -119,8 +105,7 @@ model Department {
   staffs         StaffProfile[] @relation("DepartmentStaffs")
   visits         Visit[]
   medicalOrders  MedicalOrder[]
-  staffShifts    StaffShift[]
-  handoverLogs   HandoverLog[]
+
   blockchainLogs BlockchainLogger[]
 
   // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain
@@ -163,9 +148,7 @@ model StaffProfile {
   doctorProfile     DoctorProfile?
   assignedVisits    Visit[] @relation("VisitAssignedStaff")
   blockchainLogs    BlockchainLogger[]
-  staffShifts       StaffShift[]
-  handoversFrom     HandoverLog[] @relation("HandoverFrom")
-  handoversTo       HandoverLog[] @relation("HandoverTo")
+
 
   // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
   hash256        String?
@@ -565,11 +548,7 @@ model BlockchainLogger {
   aiQualityId         String?
   aiQuality           AiQuality?         @relation(fields: [aiQualityId], references: [id])
 
-  staffShiftId       String?
-  staffShift         StaffShift? @relation(fields: [staffShiftId], references: [id])
 
-  handoverLogId       String?
-  handoverLog         HandoverLog?       @relation(fields: [handoverLogId], references: [id])
 
   createdAt DateTime @default(now())
 
@@ -583,8 +562,7 @@ model BlockchainLogger {
   @@index([aiModelRegistryId])
   @@index([medicalConclusionId])
   @@index([aiQualityId])
-  @@index([staffShiftId])
-  @@index([handoverLogId])
+
   @@index([batchId])
   @@index([onChainStatus])
   @@index([hashVersion])
@@ -705,72 +683,7 @@ model StepUpSession {
   @@index([idleExpiresAt])
 }
 
-/// A scheduled staff shift. Business APIs stay role-specific, but persistence is shared.
-/// `shiftType` separates reception shifts from paraclinical shifts while keeping one
-/// source of truth for staff/day/shift uniqueness.
-model StaffShift {
-  id              String         @id @default(uuid())
-  staffId         String
-  staff           StaffProfile   @relation(fields: [staffId], references: [id])
-  departmentId    String
-  department      Department     @relation(fields: [departmentId], references: [id])
-  shiftType       StaffShiftType
-  workDate        DateTime
-  shiftCode       ShiftCode
-  startTime       DateTime
-  endTime         DateTime
-  status          ShiftStatus    @default(PENDING)
-  note            String?
-  rejectionReason String?
-  approvedById    String?
-  approvedBy      User?          @relation("ApprovedStaffShifts", fields: [approvedById], references: [id])
-  isActive        Boolean        @default(true)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
 
-  // Tamper-evidence fields are populated only for PARACLINICAL shifts.
-  hash256         String?
-  dataSalt        String?
-
-  blockchainLogs  BlockchainLogger[]
-
-  @@unique([staffId, workDate, shiftCode])
-  @@index([shiftType])
-  @@index([staffId])
-  @@index([departmentId])
-  @@index([departmentId, workDate, shiftCode])
-  @@index([shiftType, departmentId, workDate, shiftCode])
-  @@index([workDate, shiftCode, status])
-  @@index([status])
-  @@index([startTime, endTime])
-  @@index([isActive])
-}
-
-/// Records one completed handover ceremony between two staff members.
-/// Both parties must pass biometric face verification before the handover is finalized.
-/// The completed handover is IMMEDIATELY anchored on-chain (Tier-A event) because it
-/// demarcates a legal responsibility boundary in clinical operations.
-model HandoverLog {
-  id             String       @id @default(uuid())
-  departmentId   String
-  department     Department   @relation(fields: [departmentId], references: [id])
-  fromStaffId    String
-  fromStaff      StaffProfile @relation("HandoverFrom", fields: [fromStaffId], references: [id])
-  toStaffId      String
-  toStaff        StaffProfile @relation("HandoverTo", fields: [toStaffId], references: [id])
-  reason         String?
-  timestamp      DateTime     @default(now())
-  faceVerifiedA  Boolean      @default(false)
-  faceVerifiedB  Boolean      @default(false)
-  isCompleted    Boolean      @default(false)
-
-  blockchainLogs BlockchainLogger[]
-
-  @@index([departmentId])
-  @@index([fromStaffId])
-  @@index([toStaffId])
-  @@index([isCompleted])
-}
 
 model Notification {
   id        String   @id @default(uuid())

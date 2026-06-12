@@ -2,6 +2,8 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 import { VisitStatus } from '@prisma/client';
 import { CreateMedicalOrderDto } from '../../dto/medical-order.dto';
 import { MEDICAL_ORDER_REPOSITORY, MedicalOrderRepositoryPort } from '../ports/medical-order.repository.port';
+import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
+import { NotificationService } from '../../../notification/services/notification.service';
 
 /**
  * Doctor creates a lab/imaging order for a visit in their examination
@@ -10,7 +12,11 @@ import { MEDICAL_ORDER_REPOSITORY, MedicalOrderRepositoryPort } from '../ports/m
  */
 @Injectable()
 export class CreateMedicalOrderUseCase {
-  constructor(@Inject(MEDICAL_ORDER_REPOSITORY) private readonly repo: MedicalOrderRepositoryPort) {}
+  constructor(
+    @Inject(MEDICAL_ORDER_REPOSITORY) private readonly repo: MedicalOrderRepositoryPort,
+    private readonly prisma: PrismaService,
+    private readonly notificationService: NotificationService,
+  ) {}
 
   async execute(dto: CreateMedicalOrderDto, doctorUserId: string): Promise<unknown> {
     const visit = await this.repo.findVisitForOrder(dto.visitId);
@@ -38,7 +44,7 @@ export class CreateMedicalOrderUseCase {
       }
     }
 
-    return this.repo.createOrderWithVisitTransition({
+    const result = await this.repo.createOrderWithVisitTransition({
       visitId: visit.id,
       patientId: visit.patientId,
       doctorId: currentDoctor.doctorId,
@@ -48,5 +54,35 @@ export class CreateMedicalOrderUseCase {
       priority: dto.priority?.trim() || 'NORMAL',
       clinicalNote: dto.clinicalNote?.trim() || undefined,
     });
+
+    try {
+      const order = result as any;
+      if (order && order.targetDepartmentId) {
+        const managers = await this.prisma.staffProfile.findMany({
+          where: {
+            departmentId: order.targetDepartmentId,
+            user: {
+              role: 'LAB_MANAGER',
+              status: 'ACTIVE',
+            },
+          },
+          select: {
+            userId: true,
+          },
+        });
+
+        for (const manager of managers) {
+          await this.notificationService.createNotification(
+            manager.userId,
+            'Chỉ định cận lâm sàng mới',
+            `Có chỉ định ${order.orderType} mới (Mã: ${order.orderCode}) cho bệnh nhân ${order.patient?.fullName || 'N/A'}.`,
+          );
+        }
+      }
+    } catch (err) {
+      console.error('Failed to send medical order notifications:', err);
+    }
+
+    return result;
   }
 }

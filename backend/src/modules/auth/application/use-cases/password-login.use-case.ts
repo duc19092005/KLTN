@@ -4,6 +4,7 @@ import { ACCESS_TOKEN_SIGNER, AccessTokenSignerPort } from '../ports/access-toke
 import { SECURITY_EVENT_LOGGER, SecurityEventLoggerPort } from '../ports/security-event-logger.port';
 import { verifyPassword } from '../../domain/credential.util';
 import { toPublicUser } from '../../domain/public-user';
+import { STEPUP_TICKET_ISSUER, StepUpTicketIssuerPort } from '../ports/stepup-ticket-issuer.port';
 
 /**
  * Password login for non-admin staff. Behavior copied verbatim from the former
@@ -16,6 +17,7 @@ export class PasswordLoginUseCase {
     @Inject(AUTH_REPOSITORY) private readonly repo: AuthRepositoryPort,
     @Inject(ACCESS_TOKEN_SIGNER) private readonly tokenSigner: AccessTokenSignerPort,
     @Inject(SECURITY_EVENT_LOGGER) private readonly audit: SecurityEventLoggerPort,
+    @Inject(STEPUP_TICKET_ISSUER) private readonly stepUp: StepUpTicketIssuerPort,
   ) {}
 
   async execute(usernameOrEmail: string, password: string) {
@@ -42,12 +44,21 @@ export class PasswordLoginUseCase {
 
     await this.audit.write(user.id, 'LOGIN_PASSWORD', 'User', user.id, { method: 'PASSWORD', role: user.role });
 
+    let stepUpSession: unknown = null;
+    try {
+      stepUpSession = await this.stepUp.issueSession(user.id, 'SENSITIVE_WRITE');
+      await this.audit.write(user.id, 'FACE_STEPUP_SESSION_OPEN', 'User', user.id, { scope: 'SENSITIVE_WRITE', context: 'LOGIN' });
+    } catch (err) {
+      console.warn(`[PasswordLogin] auto step-up session open failed for userId=${user.id}:`, (err as Error)?.message);
+    }
+
     return {
-      access_token: this.tokenSigner.sign(user, { verified: false }),
+      access_token: this.tokenSigner.sign(user, { verified: true }),
       requirePasswordChange: user.firstLogin,
       requireFaceRegistration: user.firstLogin || !user.faceEmbedding,
-      requireFaceVerification: Boolean(user.faceEmbedding),
-      user: toPublicUser(user, false),
+      requireFaceVerification: false,
+      stepUpSession,
+      user: toPublicUser(user, true),
     };
   }
 }

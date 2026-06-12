@@ -38,6 +38,10 @@ describe('audit-diff.util', () => {
         reason: 'PII không được lưu plaintext trong diff; xem snapshot mã hóa qua quy trình break-glass nếu cần.',
         policyCode: 'AUDIT_REDACT_PII_STORED',
         summary: 'Họ tên đã thay đổi',
+        changeKind: 'PII',
+        entity: undefined,
+        entityLabel: 'Đối tượng',
+        fieldPath: 'Entity.fullName',
       },
     ]);
     expect(toDisplayAuditDiff(diff, { role: 'RECEPTIONIST', faceVerified: true })[0]).toMatchObject({

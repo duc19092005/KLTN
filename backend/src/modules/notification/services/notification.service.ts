@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { Subject, interval, merge, Observable } from 'rxjs';
+import { filter, map } from 'rxjs/operators';
 
 export interface NotificationFilter {
   /** When defined, filters by read state. */
@@ -13,10 +15,12 @@ export interface NotificationFilter {
 
 @Injectable()
 export class NotificationService {
+  private readonly notification$ = new Subject<{ userId: string; notification: any }>();
+
   constructor(private readonly prisma: PrismaService) {}
 
   async createNotification(userId: string, title: string, message: string) {
-    return this.prisma.notification.create({
+    const notification = await this.prisma.notification.create({
       data: {
         userId,
         title,
@@ -24,6 +28,19 @@ export class NotificationService {
         isRead: false,
       },
     });
+    this.notification$.next({ userId, notification });
+    return notification;
+  }
+
+  getNotificationStream(userId: string): Observable<any> {
+    const keepAlive$ = interval(30000).pipe(
+      map(() => ({ data: { type: 'ping' } }))
+    );
+    const notifications$ = this.notification$.asObservable().pipe(
+      filter((event) => event.userId === userId),
+      map((event) => ({ data: event.notification })),
+    );
+    return merge(keepAlive$, notifications$);
   }
 
   /**

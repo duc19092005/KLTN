@@ -6,8 +6,8 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { getJwtSecret } from '../constants/auth-security';
 
 const cookieExtractor = (req: Request): string | null => {
-  const token = req?.cookies?.token;
-  return token || ExtractJwt.fromAuthHeaderAsBearerToken()(req);
+  const token = req?.cookies?.token || req?.query?.token;
+  return (token as string) || ExtractJwt.fromAuthHeaderAsBearerToken()(req);
 };
 
 @Injectable()

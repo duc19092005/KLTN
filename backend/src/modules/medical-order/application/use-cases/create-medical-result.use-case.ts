@@ -10,6 +10,7 @@ import {
 } from '../../domain/medical-result-audit-snapshot';
 import { MedicalOrderAccessPolicy } from '../policies/medical-order-access.policy';
 import { MEDICAL_ORDER_REPOSITORY, MedicalOrderRepositoryPort } from '../ports/medical-order.repository.port';
+import { NotificationService } from '../../../notification/services/notification.service';
 
 /**
  * LAB_MANAGER returns a result for an order in their department during an
@@ -21,6 +22,7 @@ export class CreateMedicalResultUseCase {
     @Inject(MEDICAL_ORDER_REPOSITORY) private readonly repo: MedicalOrderRepositoryPort,
     private readonly accessPolicy: MedicalOrderAccessPolicy,
     private readonly audit: AuditLoggerService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async execute(orderId: string, dto: CreateMedicalResultDto, user: AuthUser, demoMode = false): Promise<unknown> {
@@ -28,7 +30,7 @@ export class CreateMedicalResultUseCase {
     if (!order) throw new NotFoundException('Không tìm thấy phiếu chỉ định.');
 
     await this.accessPolicy.assertCanManageOrder(order, user, () => this.resolveStaff(user.sub));
-    await this.assertActiveApprovedShiftForOrder(order.targetDepartmentId, user, demoMode);
+    await this.assertDepartmentMatch(order.targetDepartmentId, user);
 
     if (([MedicalOrderStatus.RESULT_READY, MedicalOrderStatus.CANCELLED] as MedicalOrderStatus[]).includes(order.status)) {
       throw new BadRequestException('Không thể trả kết quả cho phiếu đã sẵn sàng hoặc đã hủy.');
@@ -37,7 +39,7 @@ export class CreateMedicalResultUseCase {
       throw new BadRequestException('Vui lòng cung cấp ít nhất một file kết quả PDF hoặc hình ảnh.');
     }
 
-    return this.repo.createResultWithTransitions(
+    const resultPayload = await this.repo.createResultWithTransitions(
       {
         orderId,
         performedById: user.sub,
@@ -104,6 +106,22 @@ export class CreateMedicalResultUseCase {
         }
       },
     );
+
+    try {
+      const resData = resultPayload as any;
+      const orderData = resData?.order;
+      if (orderData && orderData.doctor?.staffProfile?.userId) {
+        await this.notificationService.createNotification(
+          orderData.doctor.staffProfile.userId,
+          'Có kết quả cận lâm sàng',
+          `Đã có kết quả chỉ định ${orderData.orderType} (Mã: ${orderData.orderCode}) của bệnh nhân ${orderData.patient?.fullName || 'N/A'}.`,
+        );
+      }
+    } catch (err) {
+      console.error('Failed to send result creation notifications:', err);
+    }
+
+    return resultPayload;
   }
 
   private async resolveStaff(userId: string) {
@@ -112,29 +130,11 @@ export class CreateMedicalResultUseCase {
     return staff;
   }
 
-  private async assertActiveApprovedShiftForOrder(targetDepartmentId: string | null, user: AuthUser, demoMode = false) {
+  private async assertDepartmentMatch(targetDepartmentId: string | null, user: AuthUser) {
     if (user.role === 'ADMIN') return;
-    if (!user.verified) {
-      throw new ForbiddenException('Chỉ nhân viên đã xác thực khuôn mặt và đang có ca trực được duyệt mới được trả kết quả.');
-    }
-
     const staff = await this.resolveStaff(user.sub);
     if (!targetDepartmentId || staff.departmentId !== targetDepartmentId) {
       throw new ForbiddenException('Nhân viên hiện tại không thuộc phòng ban nhận phiếu chỉ định này.');
     }
-
-    const shift = await this.repo.findActiveApprovedShiftForStaffDepartment(
-      staff.id,
-      targetDepartmentId,
-      new Date(),
-      this.isDemoMode(demoMode),
-    );
-    if (!shift || shift.staff.userId !== user.sub) {
-      throw new ForbiddenException('Ca trực đã hết hiệu lực hoặc không khớp với nhân viên đang đăng nhập.');
-    }
-  }
-
-  private isDemoMode(demoMode = false) {
-    return demoMode || process.env.DEMO_MODE === 'true';
   }
 }

@@ -1,6 +1,8 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateVisitDto } from '../../dto/visit.dto';
 import { VISIT_REPOSITORY, VisitRepositoryPort } from '../ports/visit.repository.port';
+import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
+import { NotificationService } from '../../../notification/services/notification.service';
 
 /**
  * Intake workflow: reception selects an active examination department, then the
@@ -8,7 +10,11 @@ import { VISIT_REPOSITORY, VisitRepositoryPort } from '../ports/visit.repository
  */
 @Injectable()
 export class CreateVisitUseCase {
-  constructor(@Inject(VISIT_REPOSITORY) private readonly repo: VisitRepositoryPort) {}
+  constructor(
+    @Inject(VISIT_REPOSITORY) private readonly repo: VisitRepositoryPort,
+    private readonly prisma: PrismaService,
+    private readonly notificationService: NotificationService,
+  ) {}
 
   async execute(dto: CreateVisitDto): Promise<unknown> {
     if (!dto.patientId && !dto.patient) {
@@ -21,7 +27,7 @@ export class CreateVisitUseCase {
       throw new BadRequestException('Lễ tân chỉ có thể chọn phòng ban loại phòng khám đang hoạt động.');
     }
 
-    return this.repo.createVisitWithOptionalPatient({
+    const result = await this.repo.createVisitWithOptionalPatient({
       patientId: dto.patientId,
       patient: dto.patient
         ? {
@@ -37,5 +43,35 @@ export class CreateVisitUseCase {
         : undefined,
       departmentId: dto.departmentId,
     });
+
+    try {
+      const visit = result as any;
+      if (visit && visit.patient && visit.department) {
+        const doctors = await this.prisma.staffProfile.findMany({
+          where: {
+            departmentId: visit.departmentId,
+            user: {
+              role: 'DOCTOR',
+              status: 'ACTIVE',
+            },
+          },
+          select: {
+            userId: true,
+          },
+        });
+
+        for (const doc of doctors) {
+          await this.notificationService.createNotification(
+            doc.userId,
+            'Lượt khám mới',
+            `Bệnh nhân ${visit.patient.fullName} đang chờ khám tại ${visit.department.name}.`,
+          );
+        }
+      }
+    } catch (err) {
+      console.error('Failed to send visit creation notifications:', err);
+    }
+
+    return result;
   }
 }

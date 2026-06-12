@@ -142,8 +142,6 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
              NEW."aiModelRegistryId"  IS DISTINCT FROM OLD."aiModelRegistryId"  OR
              NEW."medicalConclusionId" IS DISTINCT FROM OLD."medicalConclusionId" OR
              NEW."aiQualityId"        IS DISTINCT FROM OLD."aiQualityId"        OR
-             NEW."staffShiftId"       IS DISTINCT FROM OLD."staffShiftId"       OR
-             NEW."handoverLogId"      IS DISTINCT FROM OLD."handoverLogId"      OR
              NEW."seq"                IS DISTINCT FROM OLD."seq"                OR
              NEW."prevHash"           IS DISTINCT FROM OLD."prevHash"           OR
              NEW."entryHash"          IS DISTINCT FROM OLD."entryHash"          OR

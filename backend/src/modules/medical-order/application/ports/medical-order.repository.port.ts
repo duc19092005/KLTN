@@ -72,12 +72,7 @@ export type OrderDepartmentInfo = {
   canReceiveOrders: boolean;
 };
 
-export type ActiveShiftInfo = {
-  id: string;
-  staffId: string;
-  departmentId: string;
-  staff: { userId: string; departmentId: string | null };
-};
+
 
 export type CreateResultTransactionPayload = {
   result: unknown;
@@ -96,8 +91,7 @@ export interface MedicalOrderRepositoryPort {
   findDoctorStaffByUserId(userId: string): Promise<DoctorStaffIdentity | null>;
   findStaffByUserId(userId: string): Promise<StaffIdentity | null>;
   findOrderDepartment(id: string): Promise<OrderDepartmentInfo | null>;
-  findActiveApprovedShift(shiftId: string, now: Date, includeOutOfWindow?: boolean): Promise<ActiveShiftInfo | null>;
-  findActiveApprovedShiftForStaffDepartment(staffId: string, departmentId: string, now: Date, includeOutOfWindow?: boolean): Promise<ActiveShiftInfo | null>;
+
   departmentExists(id: string): Promise<boolean>;
 
   /** Atomic: generate unique order code, create order, transition visit to WAITING_TEST_RESULT (with retry). */
@@ -105,7 +99,7 @@ export interface MedicalOrderRepositoryPort {
 
   findAll(filter: OrderListFilter): Promise<unknown[]>;
 
-  findOrderForManage(id: string): Promise<({ id: string } & OrderForAccess & { status: MedicalOrderStatus; visitId: string }) | null>;
+  findOrderForManage(id: string): Promise<({ id: string } & OrderForAccess & { status: MedicalOrderStatus; visitId: string; orderType: string }) | null>;
 
   updateStatus(id: string, status: MedicalOrderStatus, completedAt?: Date): Promise<unknown>;
 

@@ -11,7 +11,6 @@ import { VisitService } from './modules/visit/services/visit.service';
 import { MedicalOrderService } from './modules/medical-order/services/medical-order.service';
 import { ClinicalDecisionService } from './modules/clinical-decision/services/clinical-decision.service';
 import { PatientService } from './modules/patient/services/patient.service';
-import { ParaclinicalShiftService } from './modules/paraclinical-shift/services/paraclinical-shift.service';
 
 // A representative port token from each refactored module: resolving these proves
 // the Clean Architecture DI wiring (provide: TOKEN, useClass: Adapter) is complete.
@@ -40,7 +39,6 @@ import { AUTH_CHAIN_GATEWAY } from './modules/auth/application/ports/auth-chain-
 import { ENCRYPTION_PORT } from './modules/auth/application/ports/encryption.port';
 import { STEPUP_TICKET_ISSUER } from './modules/auth/application/ports/stepup-ticket-issuer.port';
 import { PATIENT_REPOSITORY } from './modules/patient/application/ports/patient.repository.port';
-import { PARACLINICAL_SHIFT_REPOSITORY } from './modules/paraclinical-shift/application/ports/paraclinical-shift.repository.port';
 
 /**
  * DI smoke test for the Clean Architecture refactor. Compiling AppModule forces
@@ -70,7 +68,6 @@ describe('AppModule dependency injection (Clean Architecture wiring)', () => {
     expect(moduleRef.get(MedicalOrderService)).toBeDefined();
     expect(moduleRef.get(ClinicalDecisionService)).toBeDefined();
     expect(moduleRef.get(PatientService)).toBeDefined();
-    expect(moduleRef.get(ParaclinicalShiftService)).toBeDefined();
   });
 
   it('resolves every repository/gateway/policy port to a concrete adapter', () => {
@@ -100,7 +97,6 @@ describe('AppModule dependency injection (Clean Architecture wiring)', () => {
       ENCRYPTION_PORT,
       STEPUP_TICKET_ISSUER,
       PATIENT_REPOSITORY,
-      PARACLINICAL_SHIFT_REPOSITORY,
     ];
     for (const token of tokens) {
       expect(moduleRef.get(token as any, { strict: false })).toBeDefined();

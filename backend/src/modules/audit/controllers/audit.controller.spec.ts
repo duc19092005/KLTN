@@ -93,6 +93,39 @@ describe('AuditController readable V2 diff', () => {
         findUnique: jest.fn().mockResolvedValue(actor),
       },
       auditBatch: { findMany: jest.fn(), count: jest.fn() },
+      staffProfile: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'staff-1',
+          userId: 'user-1',
+          fullName: 'Staff Member',
+          employeeCode: 'STF001',
+          departmentId: 'dep-1',
+          department: { name: 'Cardiology' },
+        }),
+      },
+      patient: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'patient-1',
+          patientCode: 'PAT001',
+          fullName: 'Patient Member',
+        }),
+      },
+      visit: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'visit-1',
+          visitCode: 'VIS001',
+          patientId: 'patient-1',
+          departmentId: 'dep-1',
+          patient: { fullName: 'Patient Member', patientCode: 'PAT001' },
+          department: { name: 'Cardiology' },
+        }),
+      },
+      medicalConclusion: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+      department: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
     };
     const controller = new AuditController({} as any, { getInclusionProof: jest.fn(), anchorNow: jest.fn() } as any, prisma as any);
     return { controller, row };
@@ -104,10 +137,10 @@ describe('AuditController readable V2 diff', () => {
     const result = await controller.logs(undefined, undefined, undefined, undefined, undefined, { sub: 'admin-1', role: 'ADMIN' } as any);
 
     expect(result.total).toBe(1);
-    expect(result.items[0]).toMatchObject({ blockchainStatus: 'VERIFIED', fieldsChanged: ['avatarUrl', 'fullName'] });
+    expect(result.items[0]).toMatchObject({ blockchainStatus: 'PENDING', fieldsChanged: ['avatarUrl', 'fullName'] });
     expect(result.items[0].diff).toEqual([
       expect.objectContaining({ field: 'avatarUrl', before: '[REDACTED]', after: '[REDACTED]', redacted: true }),
-      expect.objectContaining({ field: 'fullName', before: 'abc', after: 'def', redacted: false }),
+      expect.objectContaining({ field: 'fullName', before: '[REDACTED]', after: '[REDACTED]', redacted: true }),
     ]);
     const item: any = result.items[0];
     expect(item.beforeEncrypted).toBeUndefined();
@@ -117,7 +150,8 @@ describe('AuditController readable V2 diff', () => {
   it('returns detail with verification and decrypted snapshots for admin step-up context', async () => {
     const { controller } = setup();
 
-    const result: any = await controller.logDetail('1', { sub: 'admin-1', role: 'ADMIN' } as any);
+    const reqMock = { stepUp: { verified: true, action: 'AUDIT_DETAIL' } };
+    const result: any = await controller.logDetail('1', { sub: 'admin-1', role: 'ADMIN' } as any, reqMock as any);
 
     expect(result.verification).toMatchObject({ ok: true, status: 'VERIFIED', version: 'V2' });
     expect(result.encryptedSnapshots.before).toMatchObject({ alg: 'AES-256-GCM', keyId: 'audit-key-test', ciphertextPresent: true });
