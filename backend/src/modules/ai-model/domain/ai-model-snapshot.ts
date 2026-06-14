@@ -4,7 +4,7 @@
  * integrity evaluation hash exactly the same projection.
  */
 export function buildAiModelSnapshot(m: any) {
-  return {
+  const snapshot: Record<string, unknown> = {
     modelName: m.modelName,
     modelVersion: m.modelVersion,
     recommendedSpecialty: m.recommendedSpecialty ?? null,
@@ -15,4 +15,6 @@ export function buildAiModelSnapshot(m: any) {
     description: m.description ?? null,
     createdBy: m.createdBy,
   };
+  if (m.isDeleted === true) snapshot.isDeleted = true;
+  return snapshot;
 }

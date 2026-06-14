@@ -8,6 +8,7 @@ import {
   DoctorIntegrityEvaluation,
 } from '../../application/ports/doctor-integrity-anchor.port';
 import { buildUnifiedDoctorSnapshot } from '../../domain/doctor-snapshot';
+import { computeAfterHashV2 } from '../../../../infrastructure/audit/audit-hash.util';
 
 /**
  * Tamper-evidence adapter for doctors. Uses the centralized AuditAnchor
@@ -57,19 +58,20 @@ export class BlockchainDoctorIntegrityAnchor implements DoctorIntegrityAnchorPor
     const recomputed = doctor.dataSalt ? this.audit.recompute(snapshot, doctor.dataSalt) : null;
     const dbHash = doctor.hash256 || null;
     const dbMatches = recomputed !== null && recomputed === dbHash;
+    const currentAfterHash = computeAfterHashV2('DoctorProfile', doctor.id, snapshot);
 
-    const latestLog = await this.prisma.blockchainLogger.findFirst({
+    const latestAnchored = await this.prisma.blockchainLogger.findFirst({
       where: { entity: 'DoctorProfile', entityId: doctor.id, batchId: { not: null } },
       orderBy: { seq: 'desc' },
-      select: { seq: true, dataHash: true, batchId: true },
+      select: { seq: true, afterHash: true, batchId: true },
     });
 
     let chainMatches = false;
-    if (latestLog?.seq) {
+    if (latestAnchored?.seq) {
       try {
-        const proof = await this.auditAnchor.getInclusionProof(latestLog.seq);
+        const proof = await this.auditAnchor.getInclusionProof(latestAnchored.seq);
         if (proof && proof.verified) {
-          chainMatches = latestLog.dataHash === recomputed;
+          chainMatches = latestAnchored.afterHash === currentAfterHash;
         }
       } catch { /* proof verification failed */ }
     }
@@ -80,15 +82,15 @@ export class BlockchainDoctorIntegrityAnchor implements DoctorIntegrityAnchorPor
     const latestAny = await this.prisma.blockchainLogger.findFirst({
       where: { entity: 'DoctorProfile', entityId: doctor.id },
       orderBy: { seq: 'desc' },
-      select: { seq: true, dataHash: true, batchId: true },
+      select: { seq: true, afterHash: true, batchId: true },
     });
 
     let status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR';
     if (!latestAny) {
       status = 'UNANCHORED';
-    } else if (!latestLog || (latestAny.seq !== latestLog.seq && latestAny.dataHash === recomputed)) {
-      // A newer (or first-ever) log exists that isn't anchored yet, and its hash matches the
-      // current DB row → the write is just waiting for the next Merkle batch. Not tampering.
+    } else if (!latestAnchored || (latestAny.seq !== latestAnchored.seq && latestAny.afterHash === currentAfterHash)) {
+      // A newer (or first-ever) log exists that isn't anchored yet, and its
+      // audited after-snapshot matches the current DB row.
       status = dbMatches ? 'PENDING_ANCHOR' : 'TAMPERED';
     } else if (dbMatches && chainMatches) {
       status = 'VERIFIED';
@@ -101,7 +103,7 @@ export class BlockchainDoctorIntegrityAnchor implements DoctorIntegrityAnchorPor
         'Phát hiện giả mạo thông tin bác sĩ',
         `Bác sĩ ID: ${doctor.id} (Chuyên khoa: ${doctor.specialty}, Số CCHN: ${doctor.licenseNumber})\n` +
         `• Hash CSDL: ${dbHash}\n` +
-        `• Hash On-Chain: ${latestLog?.dataHash}\n` +
+        `• Hash Audit đã neo: ${latestAnchored?.afterHash}\n` +
         `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}\n` +
         `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`
       );
@@ -117,7 +119,7 @@ export class BlockchainDoctorIntegrityAnchor implements DoctorIntegrityAnchorPor
       chainMatches,
       recomputedHash: recomputed,
       storedHash: dbHash,
-      onChainHash: latestLog?.dataHash ?? null,
+      onChainHash: latestAnchored?.afterHash ?? null,
     };
   }
 

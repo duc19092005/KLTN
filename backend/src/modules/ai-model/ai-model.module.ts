@@ -3,6 +3,8 @@ import { AiModelController } from './controllers/ai-model.controller';
 import { AiModelService } from './services/ai-model.service';
 import { BlockchainModule } from '../../infrastructure/blockchain/blockchain.module';
 import { CreateAiModelUseCase } from './application/use-cases/create-ai-model.use-case';
+import { UpdateAiModelUseCase } from './application/use-cases/update-ai-model.use-case';
+import { DeleteAiModelUseCase } from './application/use-cases/delete-ai-model.use-case';
 import { ListAiModelsUseCase } from './application/use-cases/list-ai-models.use-case';
 import { FindAiModelUseCase } from './application/use-cases/find-ai-model.use-case';
 import { TestAiModelApiUseCase } from './application/use-cases/test-ai-model-api.use-case';
@@ -25,6 +27,8 @@ import { GetAiModelStatsUseCase } from './application/use-cases/get-ai-model-sta
   providers: [
     AiModelService,
     CreateAiModelUseCase,
+    UpdateAiModelUseCase,
+    DeleteAiModelUseCase,
     ListAiModelsUseCase,
     FindAiModelUseCase,
     TestAiModelApiUseCase,

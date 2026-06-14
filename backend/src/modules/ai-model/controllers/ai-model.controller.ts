@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
@@ -6,8 +6,9 @@ import { AuthUser } from '../../../common/types/auth-user.type';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
+import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
 import { RequireStepUpSession } from '../../../common/stepup/require-stepup-session.decorator';
-import { AiModelQueryDto, CreateAiModelDto, TestAiModelApiDto, RateAiModelDto } from '../dto/ai-model.dto';
+import { AiModelQueryDto, CreateAiModelDto, TestAiModelApiDto, RateAiModelDto, UpdateAiModelDto } from '../dto/ai-model.dto';
 import { AiModelService } from '../services/ai-model.service';
 
 @ApiTags('AI Model Registry')
@@ -28,6 +29,20 @@ export class AiModelController {
   @Post('test-api')
   testApi(@Body() dto: TestAiModelApiDto) {
     return this.service.testApi(dto);
+  }
+
+  @Roles('ADMIN')
+  @Patch(':id')
+  @RequireStepUpSession()
+  update(@Param('id') id: string, @Body() dto: UpdateAiModelDto, @CurrentUser() user: AuthUser) {
+    return this.service.update(id, dto, user.sub);
+  }
+
+  @Roles('ADMIN')
+  @Delete(':id')
+  @RequireFaceStepUp('DELETE_AI_MODEL')
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.service.remove(id, user.sub);
   }
 
   @Roles('ADMIN')

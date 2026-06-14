@@ -14,7 +14,7 @@ export class RateAiModelUseCase {
     const model = await this.prisma.aiModelRegistry.findUnique({
       where: { id: aiModelId },
     });
-    if (!model) {
+    if (!model || model.isDeleted) {
       throw new NotFoundException('Mô hình AI không tồn tại.');
     }
 

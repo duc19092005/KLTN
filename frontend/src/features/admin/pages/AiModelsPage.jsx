@@ -7,6 +7,8 @@ import { useAuth } from '../../../providers/AuthProvider';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { aiModelService } from '../apis/aiModelService';
 import { useToast } from '../../../providers/ToastProvider';
+import { FaceStepUpModal } from '../../auth';
+import AiModelDetailModal from '../components/AiModelDetailModal';
 
 // A provider is either a managed cloud API (endpoint auto-filled, key required) or a
 // self-hosted / custom endpoint (admin types the URL, key optional). "local" covers
@@ -96,6 +98,9 @@ export default function AiModelsPage() {
   const [search, setSearch] = useState('');
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingModel, setEditingModel] = useState(null);
+  const [detailModelId, setDetailModelId] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -158,7 +163,23 @@ export default function AiModelsPage() {
   };
 
   const openCreateModal = () => {
+    setEditingModel(null);
     setForm(emptyForm);
+    setTestResult(null);
+    setShowCreateModal(true);
+  };
+
+  const openEditModal = (model) => {
+    setEditingModel(model);
+    setForm({
+      modelName: model.modelName || '',
+      modelVersion: model.modelVersion || defaultModelForProvider(model.provider || 'chatgpt'),
+      recommendedSpecialty: model.recommendedSpecialty || '',
+      provider: model.provider || 'chatgpt',
+      apiEndpoint: model.apiEndpoint || '',
+      secretOrIpHash: '',
+      description: model.description || '',
+    });
     setTestResult(null);
     setShowCreateModal(true);
   };
@@ -166,6 +187,7 @@ export default function AiModelsPage() {
   const closeCreateModal = () => {
     if (saving || testing) return;
     setShowCreateModal(false);
+    setEditingModel(null);
     setTestResult(null);
   };
 
@@ -211,12 +233,35 @@ export default function AiModelsPage() {
         secretOrIpHash: form.secretOrIpHash || undefined,
         description: form.description || undefined,
       };
-      const res = await aiModelService.create(payload);
-      toast.success(`Đã thêm mô hình ${res.data.modelName}.`);
-      setForm(emptyForm); setTestResult(null); setShowCreateModal(false);
-      await load(1);
-    } catch (err) { toast.error(err.response?.data?.message || 'Không thêm được mô hình AI'); }
+      if (editingModel) {
+        const res = await aiModelService.update(editingModel.id, payload);
+        toast.success(`Đã cập nhật mô hình ${res.data.modelName}.`);
+      } else {
+        const res = await aiModelService.create(payload);
+        toast.success(`Đã thêm mô hình ${res.data.modelName}.`);
+      }
+      setForm(emptyForm); setTestResult(null); setShowCreateModal(false); setEditingModel(null);
+      await load(editingModel ? pagination.page : 1);
+    } catch (err) { toast.error(err.response?.data?.message || (editingModel ? 'Không cập nhật được mô hình AI' : 'Không thêm được mô hình AI')); }
     finally { setSaving(false); }
+  };
+
+  const requestDelete = (model) => setPendingDelete(model);
+
+  const handleDeleteStepUp = async (ticket) => {
+    const model = pendingDelete;
+    setPendingDelete(null);
+    if (!model?.id) return;
+    setSaving(true);
+    try {
+      await aiModelService.remove(model.id, ticket);
+      toast.success(`Đã xóa mềm mô hình ${model.modelName}.`);
+      await load(pagination.page);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Không xóa được mô hình AI');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -250,7 +295,7 @@ export default function AiModelsPage() {
           </div>
           <div className="p-5 space-y-3 max-h-[760px] overflow-y-auto">
             {loading && <LoadingIndicator size="lg" label="Đang tải mô hình AI..." />}
-            {!loading && visibleModels.map((model) => <ModelCard key={model.id} model={model} />)}
+            {!loading && visibleModels.map((model) => <ModelCard key={model.id} model={model} onViewDetails={setDetailModelId} onEdit={openEditModal} onDelete={requestDelete} busy={saving} />)}
             {!loading && !visibleModels.length && <Empty title="Chưa có mô hình AI" desc="Bấm + Thêm mô hình AI để mở cửa sổ đăng ký mô hình." />}
           </div>
           <Pagination pagination={pagination} onPageChange={load} />
@@ -376,16 +421,28 @@ export default function AiModelsPage() {
           </section>
         )}
       </div>
-      {showCreateModal && <CreateModelModal form={form} updateForm={updateForm} onSubmit={submit} onClose={closeCreateModal} saving={saving} testing={testing} testApi={testApi} testResult={testResult} />}
+      {showCreateModal && <CreateModelModal form={form} updateForm={updateForm} onSubmit={submit} onClose={closeCreateModal} saving={saving} testing={testing} testApi={testApi} testResult={testResult} editing={Boolean(editingModel)} />}
+      {detailModelId && <AiModelDetailModal modelId={detailModelId} onClose={() => setDetailModelId(null)} />}
+      {pendingDelete && (
+        <FaceStepUpModal
+          action="DELETE_AI_MODEL"
+          resourceId={pendingDelete.id}
+          title="Xác nhận xóa mô hình AI"
+          description={`Xóa mềm mô hình "${pendingDelete.modelName || pendingDelete.id}" sẽ ẩn khỏi luồng bác sĩ và được ghi audit blockchain. Vui lòng quét khuôn mặt để xác nhận.`}
+          onSuccess={handleDeleteStepUp}
+          onClose={() => setPendingDelete(null)}
+        />
+      )}
     </DashboardLayout>
   );
 }
 
-function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing, testApi, testResult }) {
+function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing, testApi, testResult, editing = false }) {
   const endpoint = resolvedEndpoint(form);
   const selectedProvider = providerInfo(form.provider);
   const manualEndpoint = needsManualEndpoint(form.provider);
   const keyRequired = requiresKey(form.provider);
+  const keyRequiredForSubmit = keyRequired && !editing;
   const canTest = Boolean(form.provider && form.modelVersion && (manualEndpoint ? form.apiEndpoint : true) && (keyRequired ? form.secretOrIpHash : true));
 
   return (
@@ -394,9 +451,9 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
         <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 p-6 backdrop-blur">
           <div className="flex items-start justify-between gap-4">
             <div>
-	              <p className="text-[10px] uppercase tracking-[0.24em] font-black text-cyan-500">Tạo mô hình AI</p>
-              <h2 className="mt-1 text-2xl font-black text-slate-950">Thêm mô hình AI</h2>
-	              <p className="mt-1 text-sm text-slate-500">Chọn nền tảng. Nền tảng đám mây tự điền điểm cuối API; mô hình tự lưu trữ chỉ cần dán điểm cuối API.</p>
+	              <p className="text-[10px] uppercase tracking-[0.24em] font-black text-cyan-500">{editing ? 'Cập nhật mô hình AI' : 'Tạo mô hình AI'}</p>
+              <h2 className="mt-1 text-2xl font-black text-slate-950">{editing ? 'Sửa mô hình AI' : 'Thêm mô hình AI'}</h2>
+	              <p className="mt-1 text-sm text-slate-500">{editing ? 'Cập nhật cấu hình. Để trống khóa API nếu muốn giữ khóa đang mã hóa.' : 'Chọn nền tảng. Nền tảng đám mây tự điền điểm cuối API; mô hình tự lưu trữ chỉ cần dán điểm cuối API.'}</p>
             </div>
             <button type="button" onClick={onClose} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-black text-slate-600">Đóng</button>
           </div>
@@ -444,14 +501,14 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
 
           <label className="block">
             <span className="text-xs font-black text-slate-600">
-	              Khóa API / Token {keyRequired ? <span className="text-rose-500">*</span> : <span className="font-bold text-slate-400">(tùy chọn)</span>}
+	              Khóa API / Token {keyRequiredForSubmit ? <span className="text-rose-500">*</span> : <span className="font-bold text-slate-400">(tùy chọn)</span>}
             </span>
             <textarea
-              required={keyRequired}
+              required={keyRequiredForSubmit}
               value={form.secretOrIpHash}
               onChange={(event) => updateForm('secretOrIpHash', event.target.value)}
               rows={2}
-	              placeholder={keyRequired ? 'sk-... / token nhà cung cấp' : 'Mô hình tự lưu trữ thường không cần khóa - để trống nếu vậy'}
+	              placeholder={editing ? 'Để trống để giữ khóa hiện tại, nhập giá trị mới nếu cần đổi' : keyRequired ? 'sk-... / token nhà cung cấp' : 'Mô hình tự lưu trữ thường không cần khóa - để trống nếu vậy'}
               className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100"
             />
             <p className="mt-1 text-[11px] font-semibold text-emerald-600">Nếu nhập, giá trị sẽ được mã hóa AES-256 bằng ENCRYPTION_KEY trước khi lưu.</p>
@@ -469,7 +526,7 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
 
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600">Hủy</button>
-            <button disabled={saving} className="flex-1 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-cyan-700 disabled:opacity-60">{saving ? 'Đang lưu...' : 'Thêm mô hình AI'}</button>
+            <button disabled={saving} className="flex-1 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-cyan-700 disabled:opacity-60">{saving ? 'Đang lưu...' : editing ? 'Lưu thay đổi' : 'Thêm mô hình AI'}</button>
           </div>
         </form>
       </div>
@@ -500,7 +557,7 @@ function ModelPicker({ form, updateForm }) {
 }
 
 function Field({ label, value, onChange, required = false, placeholder = '' }) { return <label className="block"><span className="text-xs font-black text-slate-600">{label}{required && <span className="text-rose-500"> *</span>}</span><input required={required} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100" /></label>; }
-function ModelCard({ model }) {
+function ModelCard({ model, onViewDetails, onEdit, onDelete, busy }) {
   const isLocal = model.provider === 'local';
   const badgeCls = isLocal ? 'bg-cyan-50 text-cyan-700 border-cyan-100' : 'bg-cyan-50 text-cyan-700 border-cyan-100';
   const badge = isLocal ? 'TỰ LƯU TRỮ' : (providerLabel(model.provider) || model.provider || 'API').toUpperCase();
@@ -536,6 +593,11 @@ function ModelCard({ model }) {
       <div className="mt-3 rounded-xl bg-white border border-slate-100 p-3">
         <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">Dấu vân tay SHA-256</p>
         <p className="mt-1 break-all text-xs font-mono text-slate-600">{model.ipHashPlain || 'Không hiển thị'}</p>
+      </div>
+      <div className="mt-3 flex flex-wrap justify-end gap-2">
+        <button type="button" onClick={() => onViewDetails(model.id)} className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-100">Chi tiết</button>
+        <button type="button" disabled={busy} onClick={() => onEdit(model)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-700 disabled:opacity-50">Sửa</button>
+        <button type="button" disabled={busy} onClick={() => onDelete(model)} className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-100 disabled:opacity-50">Xóa</button>
       </div>
     </article>
   );

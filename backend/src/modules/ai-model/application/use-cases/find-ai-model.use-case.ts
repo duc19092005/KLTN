@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { AI_MODEL_REPOSITORY, AiModelRepositoryPort } from '../ports/ai-model.repository.port';
 import { AI_MODEL_INTEGRITY_ANCHOR, AiModelIntegrityAnchorPort } from '../ports/ai-model-integrity-anchor.port';
 
@@ -15,6 +15,7 @@ export class FindAiModelUseCase {
 
   async execute(id: string) {
     const model = await this.repo.findByIdOrThrow(id);
+    if (model.isDeleted) throw new NotFoundException('Không tìm thấy mô hình AI.');
     const integrity = await this.integrity.evaluate(model);
     
     const totalRatings = model.aiQualities?.length || 0;

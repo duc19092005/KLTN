@@ -5,6 +5,7 @@ import {
   AiModelRepositoryPort,
   buildAiModelWhere,
   CreateAiModelData,
+  UpdateAiModelData,
 } from '../../application/ports/ai-model.repository.port';
 
 /**
@@ -29,6 +30,32 @@ export class PrismaAiModelRepository implements AiModelRepositoryPort {
         description: data.description ?? null,
         createdBy: data.createdBy,
       },
+      include: this.includeRelations(),
+    });
+  }
+
+  async update(id: string, data: UpdateAiModelData): Promise<any> {
+    return this.prisma.aiModelRegistry.update({
+      where: { id },
+      data: {
+        ...(data.modelName !== undefined ? { modelName: data.modelName } : {}),
+        ...(data.modelVersion !== undefined ? { modelVersion: data.modelVersion } : {}),
+        ...(data.recommendedSpecialty !== undefined ? { recommendedSpecialty: data.recommendedSpecialty } : {}),
+        ...(data.type !== undefined ? { type: data.type } : {}),
+        ...(data.provider !== undefined ? { provider: data.provider } : {}),
+        ...(data.apiEndpoint !== undefined ? { apiEndpoint: data.apiEndpoint } : {}),
+        ...(data.ipHashEncrypted !== undefined ? { ipHashEncrypted: data.ipHashEncrypted } : {}),
+        ...(data.ipHashPlain !== undefined ? { ipHashPlain: data.ipHashPlain } : {}),
+        ...(data.description !== undefined ? { description: data.description } : {}),
+      },
+      include: this.includeRelations(),
+    });
+  }
+
+  async softDelete(id: string): Promise<any> {
+    return this.prisma.aiModelRegistry.update({
+      where: { id },
+      data: { isDeleted: true },
       include: this.includeRelations(),
     });
   }

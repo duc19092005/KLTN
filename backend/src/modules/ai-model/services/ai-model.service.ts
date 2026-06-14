@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { AiModelQueryDto, CreateAiModelDto, TestAiModelApiDto } from '../dto/ai-model.dto';
+import { AiModelQueryDto, CreateAiModelDto, TestAiModelApiDto, UpdateAiModelDto } from '../dto/ai-model.dto';
 import { CreateAiModelUseCase } from '../application/use-cases/create-ai-model.use-case';
+import { UpdateAiModelUseCase } from '../application/use-cases/update-ai-model.use-case';
+import { DeleteAiModelUseCase } from '../application/use-cases/delete-ai-model.use-case';
 import { ListAiModelsUseCase } from '../application/use-cases/list-ai-models.use-case';
 import { FindAiModelUseCase } from '../application/use-cases/find-ai-model.use-case';
 import { TestAiModelApiUseCase } from '../application/use-cases/test-ai-model-api.use-case';
@@ -16,6 +18,8 @@ import { GetAiModelStatsUseCase } from '../application/use-cases/get-ai-model-st
 export class AiModelService {
   constructor(
     private readonly createAiModelUseCase: CreateAiModelUseCase,
+    private readonly updateAiModelUseCase: UpdateAiModelUseCase,
+    private readonly deleteAiModelUseCase: DeleteAiModelUseCase,
     private readonly listAiModelsUseCase: ListAiModelsUseCase,
     private readonly findAiModelUseCase: FindAiModelUseCase,
     private readonly testAiModelApiUseCase: TestAiModelApiUseCase,
@@ -26,6 +30,14 @@ export class AiModelService {
 
   create(dto: CreateAiModelDto, adminUserId: string) {
     return this.createAiModelUseCase.execute(dto, adminUserId);
+  }
+
+  update(id: string, dto: UpdateAiModelDto, adminUserId: string) {
+    return this.updateAiModelUseCase.execute(id, dto, adminUserId);
+  }
+
+  remove(id: string, adminUserId: string) {
+    return this.deleteAiModelUseCase.execute(id, adminUserId);
   }
 
   findAll(query: AiModelQueryDto) {

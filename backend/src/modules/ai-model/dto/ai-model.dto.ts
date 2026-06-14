@@ -56,6 +56,55 @@ export class CreateAiModelDto {
   description?: string;
 }
 
+export class UpdateAiModelDto {
+  @ApiPropertyOptional({ example: 'GPT-4o Medical Assistant' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(180)
+  modelName?: string;
+
+  @ApiPropertyOptional({ example: '2026.05' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(80)
+  modelVersion?: string;
+
+  @ApiPropertyOptional({ example: 'Tim mạch' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  recommendedSpecialty?: string;
+
+  @ApiPropertyOptional({ enum: AI_MODEL_TYPES })
+  @IsOptional()
+  @IsIn(AI_MODEL_TYPES)
+  type?: 'API' | 'IP';
+
+  @ApiPropertyOptional({ enum: AI_API_PROVIDERS })
+  @IsOptional()
+  @IsIn(AI_API_PROVIDERS)
+  provider?: string;
+
+  @ApiPropertyOptional({ example: 'https://api.openai.com/v1/chat/completions' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  apiEndpoint?: string;
+
+  @ApiPropertyOptional({ description: 'New API key/token. Leave blank/omit to keep the current encrypted secret.' })
+  @IsOptional()
+  @IsString()
+  secretOrIpHash?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  description?: string;
+}
+
 export class AiModelQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ enum: AI_MODEL_TYPES })
   @IsOptional()

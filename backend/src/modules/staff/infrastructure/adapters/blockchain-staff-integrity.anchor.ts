@@ -7,6 +7,7 @@ import {
   StaffIntegrityEvaluation,
 } from '../../application/ports/staff-integrity-anchor.port';
 import { AuditAction } from '../../../../infrastructure/audit/audit-logger.service';
+import { computeAfterHashV2 } from '../../../../infrastructure/audit/audit-hash.util';
 import { buildStaffSnapshot } from '../../domain/staff-snapshot';
 import { buildUnifiedDoctorSnapshot } from '../../../doctor/domain/doctor-snapshot';
 
@@ -66,11 +67,12 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
     const recomputed = staff.dataSalt ? this.audit.recompute(snapshot, staff.dataSalt) : null;
     const dbHash = staff.hash256 || null;
     const dbMatches = recomputed !== null && recomputed === dbHash;
+    const currentAfterHash = computeAfterHashV2('StaffProfile', staff.id, snapshot);
 
-    const latestLog = await this.prisma.blockchainLogger.findFirst({
+    const latestAnchored = await this.prisma.blockchainLogger.findFirst({
       where: { entity: 'StaffProfile', entityId: staff.id, batchId: { not: null } },
       orderBy: { seq: 'desc' },
-      select: { seq: true, dataHash: true, batchId: true },
+      select: { seq: true, afterHash: true, batchId: true },
     });
 
     // Latest log entry overall (regardless of anchor status). Used to detect the window
@@ -79,15 +81,15 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
     const latestAny = await this.prisma.blockchainLogger.findFirst({
       where: { entity: 'StaffProfile', entityId: staff.id },
       orderBy: { seq: 'desc' },
-      select: { seq: true, dataHash: true, batchId: true },
+      select: { seq: true, afterHash: true, batchId: true },
     });
 
     let chainMatches = false;
-    if (latestLog?.seq) {
+    if (latestAnchored?.seq) {
       try {
-        const proof = await this.auditAnchor.getInclusionProof(latestLog.seq);
+        const proof = await this.auditAnchor.getInclusionProof(latestAnchored.seq);
         if (proof && proof.verified) {
-          chainMatches = latestLog.dataHash === recomputed;
+          chainMatches = latestAnchored.afterHash === currentAfterHash;
         }
       } catch { /* proof verification failed */ }
     }
@@ -95,9 +97,9 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
     let status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR';
     if (!latestAny) {
       status = 'UNANCHORED';
-    } else if (!latestLog || (latestAny.seq !== latestLog.seq && latestAny.dataHash === recomputed)) {
-      // A newer (or first-ever) log exists that isn't anchored yet, and its hash matches the
-      // current DB row → the write is just waiting for the next Merkle batch. Not tampering.
+    } else if (!latestAnchored || (latestAny.seq !== latestAnchored.seq && latestAny.afterHash === currentAfterHash)) {
+      // A newer (or first-ever) log exists that isn't anchored yet, and its
+      // audited after-snapshot matches the current DB row.
       status = dbMatches ? 'PENDING_ANCHOR' : 'TAMPERED';
     } else if (dbMatches && chainMatches) {
       status = 'VERIFIED';
@@ -110,7 +112,7 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
         'Phát hiện giả mạo thông tin nhân viên',
         `Nhân viên: ${staff.fullName} (Mã: ${staff.employeeCode}, ID: ${staff.id})\n` +
         `• Hash CSDL: ${dbHash}\n` +
-        `• Hash On-Chain: ${latestLog?.dataHash}\n` +
+        `• Hash Audit đã neo: ${latestAnchored?.afterHash}\n` +
         `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}\n` +
         `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`
       );
@@ -125,7 +127,7 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
       chainMatches,
       recomputedHash: recomputed,
       storedHash: dbHash,
-      onChainHash: latestLog?.dataHash ?? null,
+      onChainHash: latestAnchored?.afterHash ?? null,
     };
   }
 
@@ -143,25 +145,26 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
     const recomputed = doctor.dataSalt ? this.audit.recompute(snapshot, doctor.dataSalt) : null;
     const dbHash = doctor.hash256 || null;
     const dbMatches = recomputed !== null && recomputed === dbHash;
+    const currentAfterHash = computeAfterHashV2('DoctorProfile', doctor.id, snapshot);
 
-    const latestLog = await this.prisma.blockchainLogger.findFirst({
+    const latestAnchored = await this.prisma.blockchainLogger.findFirst({
       where: { entity: 'DoctorProfile', entityId: doctor.id, batchId: { not: null } },
       orderBy: { seq: 'desc' },
-      select: { seq: true, dataHash: true, batchId: true },
+      select: { seq: true, afterHash: true, batchId: true },
     });
 
     const latestAny = await this.prisma.blockchainLogger.findFirst({
       where: { entity: 'DoctorProfile', entityId: doctor.id },
       orderBy: { seq: 'desc' },
-      select: { seq: true, dataHash: true, batchId: true },
+      select: { seq: true, afterHash: true, batchId: true },
     });
 
     let chainMatches = false;
-    if (latestLog?.seq) {
+    if (latestAnchored?.seq) {
       try {
-        const proof = await this.auditAnchor.getInclusionProof(latestLog.seq);
+        const proof = await this.auditAnchor.getInclusionProof(latestAnchored.seq);
         if (proof && proof.verified) {
-          chainMatches = latestLog.dataHash === recomputed;
+          chainMatches = latestAnchored.afterHash === currentAfterHash;
         }
       } catch { /* proof verification failed */ }
     }
@@ -169,7 +172,7 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
     let status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR';
     if (!latestAny) {
       status = 'UNANCHORED';
-    } else if (!latestLog || (latestAny.seq !== latestLog.seq && latestAny.dataHash === recomputed)) {
+    } else if (!latestAnchored || (latestAny.seq !== latestAnchored.seq && latestAny.afterHash === currentAfterHash)) {
       status = dbMatches ? 'PENDING_ANCHOR' : 'TAMPERED';
     } else if (dbMatches && chainMatches) {
       status = 'VERIFIED';
@@ -182,7 +185,7 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
         'Phát hiện giả mạo thông tin bác sĩ (Staff)',
         `Bác sĩ: ${staff.fullName} (Mã: ${staff.employeeCode}, ID: ${staff.id})\n` +
         `• Hash CSDL: ${dbHash}\n` +
-        `• Hash On-Chain: ${latestLog?.dataHash}\n` +
+        `• Hash Audit đã neo: ${latestAnchored?.afterHash}\n` +
         `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}\n` +
         `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`
       );
@@ -197,7 +200,7 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
       chainMatches,
       recomputedHash: recomputed,
       storedHash: dbHash,
-      onChainHash: latestLog?.dataHash ?? null,
+      onChainHash: latestAnchored?.afterHash ?? null,
     };
   }
 

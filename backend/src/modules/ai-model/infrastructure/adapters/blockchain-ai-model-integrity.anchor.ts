@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
 import { AuditAnchorService } from '../../../../infrastructure/audit/audit-anchor.service';
+import { computeAfterHashV2 } from '../../../../infrastructure/audit/audit-hash.util';
 import {
   AiModelAnchorAction,
   AiModelIntegrityAnchorPort,
@@ -28,12 +29,10 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
     let dataSalt: string | null = null;
 
     try {
-      if (action !== 'DELETE') {
-        const { salt, hash } = this.audit.hashSnapshot(snapshot);
-        dataHash = hash;
-        dataSalt = salt;
-        await this.prisma.aiModelRegistry.update({ where: { id: model.id }, data: { hash256: hash, dataSalt: salt } });
-      }
+      const { salt, hash } = this.audit.hashSnapshot(snapshot);
+      dataHash = hash;
+      dataSalt = salt;
+      await this.prisma.aiModelRegistry.update({ where: { id: model.id }, data: { hash256: hash, dataSalt: salt } });
     } catch {
       // Hash computation failed; log entry will still be created below with null hashes.
     }
@@ -46,7 +45,7 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
       dataHash,
       dataSalt,
       before: before ?? null,
-      after: action === 'DELETE' ? null : snapshot,
+      after: snapshot,
       onChainStatus: 'PENDING',
     });
   }
@@ -56,19 +55,20 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
     const recomputed = model.dataSalt ? this.audit.recompute(snapshot, model.dataSalt) : null;
     const dbHash = model.hash256 || null;
     const dbMatches = recomputed !== null && recomputed === dbHash;
+    const currentAfterHash = computeAfterHashV2('AiModelRegistry', model.id, snapshot);
 
-    const latestLog = await this.prisma.blockchainLogger.findFirst({
+    const latestAnchored = await this.prisma.blockchainLogger.findFirst({
       where: { entity: 'AiModelRegistry', entityId: model.id, batchId: { not: null } },
       orderBy: { seq: 'desc' },
-      select: { seq: true, dataHash: true, batchId: true },
+      select: { seq: true, afterHash: true, batchId: true },
     });
 
     let chainMatches = false;
-    if (latestLog?.seq) {
+    if (latestAnchored?.seq) {
       try {
-        const proof = await this.auditAnchor.getInclusionProof(latestLog.seq);
+        const proof = await this.auditAnchor.getInclusionProof(latestAnchored.seq);
         if (proof && proof.verified) {
-          chainMatches = latestLog.dataHash === recomputed;
+          chainMatches = latestAnchored.afterHash === currentAfterHash;
         }
       } catch { /* proof verification failed */ }
     }
@@ -79,15 +79,15 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
     const latestAny = await this.prisma.blockchainLogger.findFirst({
       where: { entity: 'AiModelRegistry', entityId: model.id },
       orderBy: { seq: 'desc' },
-      select: { seq: true, dataHash: true, batchId: true },
+      select: { seq: true, afterHash: true, batchId: true },
     });
 
     let status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR';
     if (!latestAny) {
       status = 'UNANCHORED';
-    } else if (!latestLog || (latestAny.seq !== latestLog.seq && latestAny.dataHash === recomputed)) {
-      // A newer (or first-ever) log exists that isn't anchored yet, and its hash matches the
-      // current DB row → the write is just waiting for the next Merkle batch. Not tampering.
+    } else if (!latestAnchored || (latestAny.seq !== latestAnchored.seq && latestAny.afterHash === currentAfterHash)) {
+      // A newer (or first-ever) log exists that isn't anchored yet, and its
+      // audited after-snapshot matches the current DB row.
       status = dbMatches ? 'PENDING_ANCHOR' : 'TAMPERED';
     } else if (dbMatches && chainMatches) {
       status = 'VERIFIED';
@@ -100,7 +100,7 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
         'Phát hiện giả mạo mô hình AI',
         `Mô hình: ${model.modelName} (Phiên bản: ${model.modelVersion}, ID: ${model.id})\n` +
         `• Hash CSDL: ${dbHash}\n` +
-        `• Hash On-Chain: ${latestLog?.dataHash}\n` +
+        `• Hash Audit đã neo: ${latestAnchored?.afterHash}\n` +
         `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}\n` +
         `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`
       );
@@ -115,7 +115,7 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
       chainMatches,
       recomputedHash: recomputed,
       storedHash: dbHash,
-      onChainHash: latestLog?.dataHash ?? null,
+      onChainHash: latestAnchored?.afterHash ?? null,
     };
   }
 

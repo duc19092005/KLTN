@@ -16,10 +16,23 @@ export type CreateAiModelData = {
   createdBy: string;
 };
 
+export type UpdateAiModelData = {
+  modelName?: string;
+  modelVersion?: string;
+  recommendedSpecialty?: string | null;
+  type?: string;
+  provider?: string;
+  apiEndpoint?: string | null;
+  ipHashEncrypted?: string;
+  ipHashPlain?: string;
+  description?: string | null;
+};
+
 export type AiModelListFilter = {
   type?: string;
   search?: string;
   provider?: string;
+  includeDeleted?: boolean;
 };
 
 /**
@@ -28,6 +41,8 @@ export type AiModelListFilter = {
  */
 export interface AiModelRepositoryPort {
   create(data: CreateAiModelData): Promise<any>;
+  update(id: string, data: UpdateAiModelData): Promise<any>;
+  softDelete(id: string): Promise<any>;
   findAll(filter: AiModelListFilter): Promise<any[]>;
   findManyPaginated(filter: AiModelListFilter, skip: number, take: number): Promise<{ items: any[]; total: number }>;
   findByIdOrThrow(id: string): Promise<any>;
@@ -38,6 +53,7 @@ export interface AiModelRepositoryPort {
 /** Builds the where clause for AI model listing, shared by repo internals. */
 export function buildAiModelWhere(filter: AiModelListFilter): Prisma.AiModelRegistryWhereInput {
   return {
+    ...(filter.includeDeleted ? {} : { isDeleted: false }),
     ...(filter.type ? { type: filter.type } : {}),
     ...(filter.provider
       ? filter.provider === 'cloud'

@@ -377,6 +377,7 @@ model AiModelRegistry {
   description          String?
   createdBy            String
   type                 String?
+  isDeleted            Boolean  @default(false)
 
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
@@ -391,6 +392,7 @@ model AiModelRegistry {
 
   @@index([modelId])
   @@index([isActiveOnChain])
+  @@index([isDeleted])
   @@index([type])
   @@index([provider])
 }

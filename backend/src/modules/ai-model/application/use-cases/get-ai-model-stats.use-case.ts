@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
 import { AuditAnchorService } from '../../../../infrastructure/audit/audit-anchor.service';
+import { computeAfterHashV2 } from '../../../../infrastructure/audit/audit-hash.util';
 
 @Injectable()
 export class GetAiModelStatsUseCase {
@@ -14,6 +15,7 @@ export class GetAiModelStatsUseCase {
   async execute() {
     // 1. Fetch all models and their associated qualities (ratings)
     const models = await this.prisma.aiModelRegistry.findMany({
+      where: { isDeleted: false },
       include: {
         aiQualities: {
           include: {
@@ -106,11 +108,12 @@ export class GetAiModelStatsUseCase {
     const recomputed = quality.dataSalt ? this.audit.recompute(snapshot, quality.dataSalt) : null;
     const dbHash = quality.hash256 || null;
     const dbMatches = recomputed !== null && recomputed === dbHash;
+    const currentAfterHash = computeAfterHashV2('AiQuality', quality.id, snapshot);
 
     const latestLog = await this.prisma.blockchainLogger.findFirst({
       where: { entity: 'AiQuality', entityId: quality.id, batchId: { not: null } },
       orderBy: { seq: 'desc' },
-      select: { seq: true, dataHash: true, batchId: true },
+      select: { seq: true, afterHash: true, batchId: true },
     });
 
     let chainMatches = false;
@@ -118,7 +121,7 @@ export class GetAiModelStatsUseCase {
       try {
         const proof = await this.auditAnchor.getInclusionProof(latestLog.seq);
         if (proof && proof.verified) {
-          chainMatches = latestLog.dataHash === recomputed;
+          chainMatches = latestLog.afterHash === currentAfterHash;
         }
       } catch { /* proof verification failed */ }
     }
@@ -133,7 +136,7 @@ export class GetAiModelStatsUseCase {
       dbMatches,
       chainMatches,
       storedHash: dbHash,
-      onChainHash: latestLog?.dataHash ?? null,
+      onChainHash: latestLog?.afterHash ?? null,
       recomputedHash: recomputed,
     };
   }

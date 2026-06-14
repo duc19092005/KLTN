@@ -45,12 +45,13 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
   }
 
   async findAiModelById(id: string): Promise<AiModelRegistry | null> {
-    return this.prisma.aiModelRegistry.findUnique({ where: { id } });
+    return this.prisma.aiModelRegistry.findFirst({ where: { id, isDeleted: false } });
   }
 
   async findDefaultAiModelForSpecialty(specialty: string): Promise<AiModelRegistry | null> {
     return this.prisma.aiModelRegistry.findFirst({
       where: {
+        isDeleted: false,
         type: 'API',
         apiEndpoint: { not: null },
         OR: [{ recommendedSpecialty: { contains: specialty, mode: 'insensitive' } }, { recommendedSpecialty: null }],
