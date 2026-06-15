@@ -22,6 +22,8 @@ services:
       context: ./blockchain
     container_name: admin-auth-blockchain
     restart: unless-stopped
+    env_file:
+      - ./.env
     ports:
       - "8545:8545"
 

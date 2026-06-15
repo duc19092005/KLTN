@@ -28,6 +28,18 @@ A hospital management system that combines **biometric authentication**, **AI-as
 - **Blockchain anchoring:** only hashes + Merkle roots are anchored, **never medical data**
 - **Out-of-band recovery:** Web3 signing off-server when the DB is compromised
 
+### Blockchain signer model
+
+The blockchain layer now separates three roles:
+
+| Role | Configuration | Responsibility |
+|---|---|---|
+| **Owner / root governance** | `BLOCKCHAIN_OWNER_PRIVATE_KEY` for local/dev; cold wallet or multisig for production | Authorize/revoke Admin wallets, add/remove relayers, transfer ownership |
+| **Relayer / backend writer** | `BLOCKCHAIN_RELAYER_PRIVATE_KEY` | Sign routine backend transactions such as `AuditAnchor.commitRoot()` and `FaceRegistry.setFaceHash()` |
+| **Admin wallet** | User-controlled MetaMask/hardware wallet | Login, step-up approval, emergency restore challenges |
+
+Admin wallets prove human authority. The backend relayer pays gas and writes routine audit/hash transactions. The owner governs who is allowed to act as admin or relayer.
+
 ---
 
 ## Architecture

@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 interface IIdentityRegistry {
     function owner() external view returns (address);
+    function isRelayerOrOwner(address wallet) external view returns (bool);
 }
 
 /**
@@ -20,7 +21,8 @@ interface IIdentityRegistry {
  *
  *         This integrity gate is SEPARATE from biometric matching (Euclidean distance of a
  *         live scan vs the stored template); both are required. Ownership defers to
- *         IdentityRegistry so the super-admin relayer is the only writer.
+ *         IdentityRegistry so an authorized backend relayer can write operational hashes
+ *         without holding the root owner key.
  */
 contract FaceRegistry {
     IIdentityRegistry public immutable identityRegistry;
@@ -37,8 +39,8 @@ contract FaceRegistry {
     event FaceHashSet(bytes32 indexed key, bytes32 value, uint256 timestamp);
     event FaceHashRemoved(bytes32 indexed key, uint256 timestamp);
 
-    modifier onlyOwner() {
-        require(msg.sender == identityRegistry.owner(), "FaceRegistry: caller is not owner");
+    modifier onlyWriter() {
+        require(identityRegistry.isRelayerOrOwner(msg.sender), "FaceRegistry: caller is not writer");
         _;
     }
 
@@ -53,7 +55,7 @@ contract FaceRegistry {
     }
 
     /// @notice Create or update the face-template integrity hash for a user (on enrollment).
-    function setFaceHash(bytes32 key, bytes32 value) external onlyOwner {
+    function setFaceHash(bytes32 key, bytes32 value) external onlyWriter {
         require(key != bytes32(0), "FaceRegistry: empty key");
         require(value != bytes32(0), "FaceRegistry: empty value");
         records[key] = FaceRecord({ hash: value, isActive: true, updatedAt: block.timestamp });
@@ -61,7 +63,7 @@ contract FaceRegistry {
     }
 
     /// @notice Remove the face hash (e.g. when biometric enrollment is reset).
-    function removeFaceHash(bytes32 key) external onlyOwner {
+    function removeFaceHash(bytes32 key) external onlyWriter {
         require(records[key].isActive, "FaceRegistry: key not found");
         records[key].hash = bytes32(0);
         records[key].isActive = false;

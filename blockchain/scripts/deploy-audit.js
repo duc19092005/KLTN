@@ -1,9 +1,10 @@
 const hre = require('hardhat');
 
 /**
- * Deploys the new registry contracts (DepartmentRegistry + FaceRegistry + AuditAnchor) to an
- * already-running node, leaving the existing IdentityRegistry untouched. All three derive
- * their owner from IdentityRegistry, so its address must be supplied.
+ * Deploys the auxiliary registry contracts (FaceRegistry + AuditAnchor) to an
+ * already-running node, leaving the existing IdentityRegistry untouched. Both
+ * contracts read owner/relayer authorization from IdentityRegistry, so its
+ * address must be supplied.
  *   IDENTITY_REGISTRY_ADDRESS=0x... npx hardhat run scripts/deploy-audit.js --network localhost
  */
 async function main() {
@@ -13,11 +14,6 @@ async function main() {
   const identityRegistryAddress =
     process.env.IDENTITY_REGISTRY_ADDRESS || '0x5FbDB2315678afecb367f032d93F642f64180aa3';
   console.log('Using IdentityRegistry:', identityRegistryAddress);
-
-  const DepartmentRegistry = await hre.ethers.getContractFactory('DepartmentRegistry');
-  const departmentRegistry = await DepartmentRegistry.deploy(identityRegistryAddress);
-  await departmentRegistry.waitForDeployment();
-  const departmentRegistryAddress = await departmentRegistry.getAddress();
 
   const FaceRegistry = await hre.ethers.getContractFactory('FaceRegistry');
   const faceRegistry = await FaceRegistry.deploy(identityRegistryAddress);
@@ -30,7 +26,6 @@ async function main() {
   const auditAnchorAddress = await auditAnchor.getAddress();
 
   // Machine-parseable markers so the caller can extract addresses reliably.
-  console.log(`DEPLOYED DEPARTMENT_REGISTRY_ADDRESS=${departmentRegistryAddress}`);
   console.log(`DEPLOYED FACE_REGISTRY_ADDRESS=${faceRegistryAddress}`);
   console.log(`DEPLOYED AUDIT_ANCHOR_ADDRESS=${auditAnchorAddress}`);
 }

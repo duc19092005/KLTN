@@ -13,7 +13,10 @@ export class BootstrapAdminUseCase {
   constructor(@Inject(AUTH_REPOSITORY) private readonly repo: AuthRepositoryPort) {}
 
   async execute(username: string, email: string, superAdminSecret: string) {
-    const bootstrapSecret = process.env.BOOTSTRAP_ADMIN_SECRET || process.env.SUPER_ADMIN_PRIVATE_KEY;
+    const bootstrapSecret =
+      process.env.BOOTSTRAP_ADMIN_SECRET ||
+      process.env.BLOCKCHAIN_OWNER_PRIVATE_KEY ||
+      process.env.SUPER_ADMIN_PRIVATE_KEY;
     if (!bootstrapSecret || bootstrapSecret === 'your_super_admin_private_key_here') {
       throw new ForbiddenException('Chưa cấu hình khóa khởi tạo quản trị viên.');
     }

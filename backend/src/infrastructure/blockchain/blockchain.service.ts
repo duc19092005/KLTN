@@ -2,9 +2,11 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ethers } from 'ethers';
 import { computeBackendActionHash } from './blockchain-action-hash.util';
 
+const LEGACY_SUPER_ADMIN_PLACEHOLDER = 'your_super_admin_private_key_here';
+
 @Injectable()
 export class BlockchainService implements OnModuleInit {
-  private writeMutex: Promise<any> = Promise.resolve();
+  private writeMutex: Promise<unknown> = Promise.resolve();
 
   private async enqueueWrite<T>(fn: () => Promise<T>): Promise<T> {
     const next = this.writeMutex.then(async () => {
@@ -21,7 +23,14 @@ export class BlockchainService implements OnModuleInit {
   private provider: ethers.JsonRpcProvider;
   private contract: ethers.Contract | null = null;
   private contractAddress = '';
-  private superAdminSigner: ethers.Wallet | null = null;
+
+  // Governance signer: root contract authority. For production, this should be
+  // a cold wallet or multisig and must not live on the backend host.
+  private ownerSigner: ethers.Wallet | null = null;
+
+  // Operational signer: backend hot wallet used for routine on-chain writes.
+  // It is intentionally separate from owner so it can be revoked/rotated.
+  private relayerSigner: ethers.Wallet | null = null;
 
   // FaceRegistry: on-chain key-value store of face-template integrity hashes.
   private faceRegistry: ethers.Contract | null = null;
@@ -36,6 +45,10 @@ export class BlockchainService implements OnModuleInit {
     'function authorizeAdmin(address wallet) external',
     'function revokeAdmin(address wallet) external',
     'function isAuthorized(address wallet) external view returns (bool)',
+    'function addRelayer(address wallet) external',
+    'function removeRelayer(address wallet) external',
+    'function isRelayer(address wallet) external view returns (bool)',
+    'function isRelayerOrOwner(address wallet) external view returns (bool)',
     'function owner() external view returns (address)',
     'function pendingOwner() external view returns (address)',
     'function transferOwnership(address newOwner) external',
@@ -65,39 +78,67 @@ export class BlockchainService implements OnModuleInit {
     this.contractAddress = process.env.IDENTITY_REGISTRY_ADDRESS || '';
     this.provider = new ethers.JsonRpcProvider(rpcUrl);
 
-    const superAdminKey = process.env.SUPER_ADMIN_PRIVATE_KEY;
-    if (superAdminKey && superAdminKey !== 'your_super_admin_private_key_here') {
-      this.superAdminSigner = new ethers.Wallet(superAdminKey, this.provider);
-      console.log(`Super Admin relayer initialized: ${this.superAdminSigner.address}`);
+    const legacyKey = this.validPrivateKey(process.env.SUPER_ADMIN_PRIVATE_KEY);
+    const ownerKey = this.validPrivateKey(process.env.BLOCKCHAIN_OWNER_PRIVATE_KEY) || legacyKey;
+    const relayerKey =
+      this.validPrivateKey(process.env.BLOCKCHAIN_RELAYER_PRIVATE_KEY) ||
+      this.validPrivateKey(process.env.BLOCKCHAIN_OWNER_PRIVATE_KEY) ||
+      legacyKey;
+
+    if (ownerKey) {
+      this.ownerSigner = new ethers.Wallet(ownerKey, this.provider);
+      console.log(`Blockchain owner signer initialized: ${this.ownerSigner.address}`);
+      if (!process.env.BLOCKCHAIN_OWNER_PRIVATE_KEY && process.env.SUPER_ADMIN_PRIVATE_KEY) {
+        console.warn('SUPER_ADMIN_PRIVATE_KEY is deprecated. Use BLOCKCHAIN_OWNER_PRIVATE_KEY for governance.');
+      }
     } else {
-      console.warn('SUPER_ADMIN_PRIVATE_KEY not set. On-chain admin authorization disabled.');
+      console.warn('BLOCKCHAIN_OWNER_PRIVATE_KEY not set. On-chain governance writes are disabled.');
+    }
+
+    if (relayerKey) {
+      this.relayerSigner = new ethers.Wallet(relayerKey, this.provider);
+      console.log(`Blockchain relayer signer initialized: ${this.relayerSigner.address}`);
+      if (!process.env.BLOCKCHAIN_RELAYER_PRIVATE_KEY) {
+        console.warn('BLOCKCHAIN_RELAYER_PRIVATE_KEY not set. Falling back to owner/legacy key for local development.');
+      }
+    } else {
+      console.warn('BLOCKCHAIN_RELAYER_PRIVATE_KEY not set. On-chain operational writes are disabled.');
+    }
+
+    if (this.ownerSigner && this.relayerSigner && this.ownerSigner.address === this.relayerSigner.address) {
+      console.warn('Blockchain owner and relayer are the same address. This is acceptable for local dev only.');
     }
 
     if (this.contractAddress) {
-      const runner = this.superAdminSigner || this.provider;
-      this.contract = new ethers.Contract(this.contractAddress, this.abi, runner);
-      console.log(`✅ Connected to IdentityRegistry at ${this.contractAddress}`);
+      this.contract = new ethers.Contract(this.contractAddress, this.abi, this.provider);
+      console.log(`Connected to IdentityRegistry at ${this.contractAddress}`);
     } else {
-      console.warn('⚠️ IDENTITY_REGISTRY_ADDRESS not set. Blockchain checks disabled.');
+      console.warn('IDENTITY_REGISTRY_ADDRESS not set. Blockchain checks disabled.');
     }
 
     this.faceRegistryAddress = process.env.FACE_REGISTRY_ADDRESS || '';
     if (this.faceRegistryAddress) {
-      const runner = this.superAdminSigner || this.provider;
-      this.faceRegistry = new ethers.Contract(this.faceRegistryAddress, this.faceRegistryAbi, runner);
-      console.log(`✅ Connected to FaceRegistry at ${this.faceRegistryAddress}`);
+      this.faceRegistry = new ethers.Contract(this.faceRegistryAddress, this.faceRegistryAbi, this.provider);
+      console.log(`Connected to FaceRegistry at ${this.faceRegistryAddress}`);
     } else {
-      console.warn('⚠️ FACE_REGISTRY_ADDRESS not set. Face integrity anchoring disabled.');
+      console.warn('FACE_REGISTRY_ADDRESS not set. Face integrity anchoring disabled.');
     }
 
     this.auditAnchorAddress = process.env.AUDIT_ANCHOR_ADDRESS || '';
     if (this.auditAnchorAddress) {
-      const runner = this.superAdminSigner || this.provider;
-      this.auditAnchor = new ethers.Contract(this.auditAnchorAddress, this.auditAnchorAbi, runner);
-      console.log(`✅ Connected to AuditAnchor at ${this.auditAnchorAddress}`);
+      this.auditAnchor = new ethers.Contract(this.auditAnchorAddress, this.auditAnchorAbi, this.provider);
+      console.log(`Connected to AuditAnchor at ${this.auditAnchorAddress}`);
     } else {
-      console.warn('⚠️ AUDIT_ANCHOR_ADDRESS not set. Audit Merkle-root anchoring disabled.');
+      console.warn('AUDIT_ANCHOR_ADDRESS not set. Audit Merkle-root anchoring disabled.');
     }
+  }
+
+  private validPrivateKey(value: string | undefined): string | null {
+    if (!value || value === LEGACY_SUPER_ADMIN_PLACEHOLDER) return null;
+    const trimmed = value.trim();
+    if (/^0x[0-9a-fA-F]{64}$/.test(trimmed)) return trimmed;
+    if (/^[0-9a-fA-F]{64}$/.test(trimmed)) return `0x${trimmed}`;
+    return null;
   }
 
   // ---- FaceRegistry: face-template integrity anchoring ------------------------
@@ -109,7 +150,7 @@ export class BlockchainService implements OnModuleInit {
 
   /** Whether the FaceRegistry contract is available for writes. */
   isFaceRegistryReady(): boolean {
-    return Boolean(this.faceRegistry && this.superAdminSigner);
+    return Boolean(this.faceRegistry && this.relayerSigner);
   }
 
   /**
@@ -119,12 +160,12 @@ export class BlockchainService implements OnModuleInit {
    */
   async setFaceHash(userId: string, valueBytes32: string) {
     return this.enqueueWrite(async () => {
-      if (!this.faceRegistry || !this.superAdminSigner) {
-        return { success: false, error: 'Chưa cấu hình FaceRegistry hoặc khóa ký của Super Admin.' };
+      if (!this.faceRegistry || !this.relayerSigner) {
+        return { success: false, error: 'FaceRegistry or blockchain relayer key is not configured.' };
       }
       try {
         const key = this.faceKey(userId);
-        const writable = this.faceRegistry.connect(this.superAdminSigner) as ethers.Contract;
+        const writable = this.faceRegistry.connect(this.relayerSigner) as ethers.Contract;
         const tx = await writable.setFaceHash(key, valueBytes32);
         const receipt = await tx.wait();
         return { success: true, key, txHash: tx.hash, blockNumber: receipt.blockNumber };
@@ -137,14 +178,14 @@ export class BlockchainService implements OnModuleInit {
   /** Remove a user's face hash on-chain (used on biometric reset). */
   async removeFaceHash(userId: string) {
     return this.enqueueWrite(async () => {
-      if (!this.faceRegistry || !this.superAdminSigner) {
-        return { success: false, error: 'Chưa cấu hình FaceRegistry hoặc khóa ký của Super Admin.' };
+      if (!this.faceRegistry || !this.relayerSigner) {
+        return { success: false, error: 'FaceRegistry or blockchain relayer key is not configured.' };
       }
       try {
         const key = this.faceKey(userId);
         const exists = await this.faceRegistry.hasFaceHash(key);
         if (!exists) return { success: true, alreadyAbsent: true, key };
-        const writable = this.faceRegistry.connect(this.superAdminSigner) as ethers.Contract;
+        const writable = this.faceRegistry.connect(this.relayerSigner) as ethers.Contract;
         const tx = await writable.removeFaceHash(key);
         const receipt = await tx.wait();
         return { success: true, key, txHash: tx.hash, blockNumber: receipt.blockNumber };
@@ -181,17 +222,66 @@ export class BlockchainService implements OnModuleInit {
     }
   }
 
+  async isRelayer(walletAddress: string): Promise<boolean> {
+    if (!this.contract) return false;
+    try {
+      return await this.contract.isRelayer(ethers.getAddress(walletAddress));
+    } catch {
+      return false;
+    }
+  }
+
+  async addRelayer(walletAddress: string) {
+    return this.enqueueWrite(async () => {
+      if (!this.contract || !this.ownerSigner) {
+        return { success: false, error: 'IdentityRegistry or blockchain owner key is not configured.' };
+      }
+      try {
+        const normalizedWalletAddress = ethers.getAddress(walletAddress);
+        if (await this.isRelayer(normalizedWalletAddress)) {
+          return { success: true, alreadyAuthorized: true };
+        }
+        const writableContract = this.contract.connect(this.ownerSigner) as ethers.Contract;
+        const tx = await writableContract.addRelayer(normalizedWalletAddress);
+        const receipt = await tx.wait();
+        return { success: true, txHash: tx.hash, blockNumber: receipt.blockNumber };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to authorize relayer' };
+      }
+    });
+  }
+
+  async removeRelayer(walletAddress: string) {
+    return this.enqueueWrite(async () => {
+      if (!this.contract || !this.ownerSigner) {
+        return { success: false, error: 'IdentityRegistry or blockchain owner key is not configured.' };
+      }
+      try {
+        const normalizedWalletAddress = ethers.getAddress(walletAddress);
+        if (!(await this.isRelayer(normalizedWalletAddress))) {
+          return { success: true, alreadyRevoked: true };
+        }
+        const writableContract = this.contract.connect(this.ownerSigner) as ethers.Contract;
+        const tx = await writableContract.removeRelayer(normalizedWalletAddress);
+        const receipt = await tx.wait();
+        return { success: true, txHash: tx.hash, blockNumber: receipt.blockNumber };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to revoke relayer' };
+      }
+    });
+  }
+
   async authorizeAdmin(walletAddress: string) {
     return this.enqueueWrite(async () => {
-      if (!this.contract || !this.superAdminSigner) {
-        return { success: false, error: 'Chưa cấu hình IdentityRegistry hoặc khóa ký của Super Admin.' };
+      if (!this.contract || !this.ownerSigner) {
+        return { success: false, error: 'IdentityRegistry or blockchain owner key is not configured.' };
       }
       try {
         const normalizedWalletAddress = ethers.getAddress(walletAddress);
         if (await this.isAuthorized(normalizedWalletAddress)) {
           return { success: true, alreadyAuthorized: true };
         }
-        const writableContract = this.contract.connect(this.superAdminSigner) as ethers.Contract;
+        const writableContract = this.contract.connect(this.ownerSigner) as ethers.Contract;
         const tx = await writableContract.authorizeAdmin(normalizedWalletAddress);
         const receipt = await tx.wait();
         return {
@@ -207,15 +297,15 @@ export class BlockchainService implements OnModuleInit {
 
   async revokeAdmin(walletAddress: string) {
     return this.enqueueWrite(async () => {
-      if (!this.contract || !this.superAdminSigner) {
-        return { success: false, error: 'Chưa cấu hình IdentityRegistry hoặc khóa ký của Super Admin.' };
+      if (!this.contract || !this.ownerSigner) {
+        return { success: false, error: 'IdentityRegistry or blockchain owner key is not configured.' };
       }
       try {
         const normalizedWalletAddress = ethers.getAddress(walletAddress);
         if (!(await this.isAuthorized(normalizedWalletAddress))) {
           return { success: true, alreadyRevoked: true };
         }
-        const writableContract = this.contract.connect(this.superAdminSigner) as ethers.Contract;
+        const writableContract = this.contract.connect(this.ownerSigner) as ethers.Contract;
         const tx = await writableContract.revokeAdmin(normalizedWalletAddress);
         const receipt = await tx.wait();
         return {
@@ -231,12 +321,12 @@ export class BlockchainService implements OnModuleInit {
 
   async recordActionAsSuperAdmin(actionPayload: unknown) {
     return this.enqueueWrite(async () => {
-      if (!this.contract || !this.superAdminSigner) {
-        return { success: false, error: 'Chưa cấu hình IdentityRegistry hoặc khóa ký của Super Admin.' };
+      if (!this.contract || !this.relayerSigner) {
+        return { success: false, error: 'IdentityRegistry or blockchain relayer key is not configured.' };
       }
       try {
         const actionHash = computeBackendActionHash(actionPayload);
-        const writableContract = this.contract.connect(this.superAdminSigner) as ethers.Contract;
+        const writableContract = this.contract.connect(this.relayerSigner) as ethers.Contract;
         const tx = await writableContract.recordAction(actionHash);
         const receipt = await tx.wait();
         if (!receipt || receipt.status !== 1) {
@@ -244,7 +334,7 @@ export class BlockchainService implements OnModuleInit {
         }
         return {
           success: true,
-          signer: this.superAdminSigner.address,
+          signer: this.relayerSigner.address,
           actionHash,
           txHash: tx.hash,
           blockNumber: receipt.blockNumber,
@@ -259,7 +349,7 @@ export class BlockchainService implements OnModuleInit {
 
   /** Whether the AuditAnchor contract is available for writes. */
   isAuditAnchorReady(): boolean {
-    return Boolean(this.auditAnchor && this.superAdminSigner);
+    return Boolean(this.auditAnchor && this.relayerSigner);
   }
 
   /**
@@ -270,11 +360,11 @@ export class BlockchainService implements OnModuleInit {
    */
   async commitAuditRoot(batchId: number, rootBytes32: string, leafCount: number) {
     return this.enqueueWrite(async () => {
-      if (!this.auditAnchor || !this.superAdminSigner) {
-        return { success: false, error: 'Chưa cấu hình AuditAnchor hoặc khóa ký của Super Admin.' };
+      if (!this.auditAnchor || !this.relayerSigner) {
+        return { success: false, error: 'AuditAnchor or blockchain relayer key is not configured.' };
       }
       try {
-        const writable = this.auditAnchor.connect(this.superAdminSigner) as ethers.Contract;
+        const writable = this.auditAnchor.connect(this.relayerSigner) as ethers.Contract;
         const tx = await writable.commitRoot(batchId, rootBytes32, leafCount);
         const receipt = await tx.wait();
         if (!receipt || receipt.status !== 1) {
@@ -332,7 +422,16 @@ export class BlockchainService implements OnModuleInit {
     return this.contractAddress;
   }
 
+  getOwnerAddress(): string | null {
+    return this.ownerSigner?.address || null;
+  }
+
+  getRelayerAddress(): string | null {
+    return this.relayerSigner?.address || null;
+  }
+
+  /** @deprecated Use getOwnerAddress() and getRelayerAddress() to avoid role confusion. */
   getSuperAdminAddress(): string | null {
-    return this.superAdminSigner?.address || null;
+    return this.getOwnerAddress();
   }
 }

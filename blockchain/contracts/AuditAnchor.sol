@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 interface IIdentityRegistry {
     function owner() external view returns (address);
+    function isRelayerOrOwner(address wallet) external view returns (bool);
 }
 
 /**
@@ -33,8 +34,8 @@ contract AuditAnchor {
 
     event RootCommitted(uint256 indexed batchId, bytes32 root, uint256 leafCount, uint256 timestamp);
 
-    modifier onlyOwner() {
-        require(msg.sender == identityRegistry.owner(), "AuditAnchor: caller is not owner");
+    modifier onlyWriter() {
+        require(identityRegistry.isRelayerOrOwner(msg.sender), "AuditAnchor: caller is not writer");
         _;
     }
 
@@ -52,7 +53,7 @@ contract AuditAnchor {
     /// @param batchId Monotonic batch identifier assigned off-chain.
     /// @param root Merkle root over the batch's leaves.
     /// @param leafCount Number of leaves included.
-    function commitRoot(uint256 batchId, bytes32 root, uint256 leafCount) external onlyOwner {
+    function commitRoot(uint256 batchId, bytes32 root, uint256 leafCount) external onlyWriter {
         require(root != bytes32(0), "AuditAnchor: empty root");
         require(leafCount > 0, "AuditAnchor: empty batch");
         require(!checkpoints[batchId].exists, "AuditAnchor: batch already committed");

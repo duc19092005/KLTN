@@ -1,120 +1,178 @@
-**🌐 Language:** [🇻🇳 Tiếng Việt](./README.md) · [🇬🇧 English](./README.en.md) · [🇷🇺 Русский](./README.ru.md)
-
 # KLTN Hospital Management System
 
-> A modern, full-stack healthcare platform pursuing the **Triple Aim**: better patient experience, sharper clinical outcomes, and unassailable data integrity.
+Hệ thống quản lý bệnh viện full-stack với NestJS, React, PostgreSQL, AI hỗ trợ chẩn đoán, xác thực sinh trắc học và blockchain audit trail. Blockchain chỉ dùng để neo hash/Merkle root phục vụ kiểm chứng toàn vẹn; tuyệt đối không lưu PII, nội dung bệnh án, PDF, X-Ray hay file y tế on-chain.
 
-## Tổng quan
-
-Hệ thống quản lý bệnh viện kết hợp **xác thực sinh trắc học**, **AI hỗ trợ chẩn đoán**, và **blockchain audit trail** để đảm bảo mỗi bản ghi y tế đều có thể chứng minh tính nguyên vẹn — cả khi server bị xâm nhập.
-
-### Tính năng cốt lõi
-
-| Workflow | Mô tả |
-|---|---|
-| **Lễ tân** | Tiếp nhận bệnh nhân, hàng đợi khám, xác minh CCCD |
-| **Bác sĩ** | Hồ sơ bệnh án + AI gợi ý chẩn đoán + kết luận neo on-chain |
-| **Phòng xét nghiệm** | Xử lý medical orders, upload kết quả lên Cloudinary |
-| **Admin** | Quản lý phòng ban, nhân sự, mô hình AI, audit logs, backup |
-
-### Cơ chế bảo mật khác biệt
-
-- **Biometric Authentication:** xác thực mặt cho cả nhân sự và bệnh nhân
-- **Step-up Sessions ("sudo mode"):** quét mặt 1 lần mở phiên đặc quyền, tránh "quét gãy cổ" mỗi thao tác
-- **Auto-Lock màn hình:** kiểu iPhone, người dùng tự chỉnh 1–15 phút
-- **Blockchain anchoring:** chỉ neo hash + Merkle root, **không bao giờ neo dữ liệu y tế**
-- **Out-of-band recovery:** ký Web3 ngoại băng khi DB bị xâm nhập
-
----
-
-## Kiến trúc
-
-Monorepo với 3 thành phần độc lập:
+## Cấu trúc monorepo
 
 ```text
 KLTN/
 ├── backend/      NestJS + Prisma + PostgreSQL
-├── frontend/     React + Vite + Tailwind
-├── blockchain/   Solidity + Hardhat
-├── docs/         Tài liệu kỹ thuật theo chủ đề
-└── tools/        Công cụ HTML khẩn cấp (offline)
+├── frontend/     React + Vite + Tailwind CSS
+├── blockchain/   Solidity + Hardhat + Ethers.js
+├── docs/         Tài liệu kiến trúc, audit, backup/recovery
+├── tools/        Công cụ khẩn cấp chạy offline
+└── .env.example  Mẫu cấu hình môi trường an toàn để copy ra .env
 ```
 
-| Layer | Stack | Vai trò |
+## Luồng blockchain hiện tại
+
+Blockchain trong dự án có 3 vai trò tách biệt:
+
+| Vai trò | Nằm ở đâu | Dùng để làm gì | Có nên nằm trong backend env không? |
+|---|---|---|---|
+| Owner / Root Governance | `BLOCKCHAIN_OWNER_PRIVATE_KEY` trong dev; production nên là cold wallet/multisig | `authorizeAdmin`, `revokeAdmin`, `addRelayer`, `removeRelayer`, `transferOwnership` | Dev được; production không nên |
+| Relayer / Backend Writer | `BLOCKCHAIN_RELAYER_PRIVATE_KEY` | Ký giao dịch tự động: `AuditAnchor.commitRoot`, `FaceRegistry.setFaceHash`, `recordAction` | Có, nhưng phải rotate được |
+| Admin Wallet | Ví MetaMask/hardware của admin | Login, step-up, emergency restore, ký challenge chứng minh danh tính | Không, ví nằm phía người dùng |
+
+Điểm quan trọng: backend không dùng ví Admin để trả gas cho từng audit transaction. Admin ký challenge để chứng minh danh tính hoặc phê duyệt thao tác nhạy cảm; backend relayer mới là ví gửi giao dịch vận hành lên chain.
+
+## Contract authority model
+
+`IdentityRegistry` là nguồn quyền trung tâm:
+
+```text
+IdentityRegistry.owner()
+├── quản trị Admin wallets
+├── quản trị backend relayers
+└── chuyển ownership
+
+IdentityRegistry.isRelayerOrOwner(address)
+├── cho phép FaceRegistry ghi face hash
+├── cho phép AuditAnchor commit Merkle root
+└── cho phép recordAction
+```
+
+`FaceRegistry` và `AuditAnchor` không tự giữ danh sách owner/relayer riêng. Hai contract này luôn hỏi `IdentityRegistry`, nhờ vậy khi rotate relayer chỉ cần cập nhật một nơi.
+
+## Nếu mất key thì sao?
+
+| Sự cố | Hậu quả | Cách xử lý |
 |---|---|---|
-| **[Backend](./backend/README.md)** | NestJS, TypeScript, Prisma, PostgreSQL | Logic nghiệp vụ, AI integration (Python child process), biometric processing |
-| **[Frontend](./frontend/README.md)** | React (Vite), Tailwind, React Router v6 | SPA cho 4 role: Admin, Receptionist, Doctor, Lab Manager |
-| **[Blockchain](./blockchain/README.md)** | Solidity, Hardhat, Ethers.js v6 | Audit trails + integrity verification (chỉ hash + Merkle, không có PII) |
-| **AI/ML** | Python 3.12, TensorFlow, InsightFace | Diagnostic suggestions, face embedding 128D |
+| Mất `BLOCKCHAIN_RELAYER_PRIVATE_KEY` | Không ghi được audit root/face hash mới; log có thể dồn `UNANCHORED`/failed | Owner gọi `removeRelayer(old)` và `addRelayer(new)`, backend đổi relayer key |
+| Relayer bị lộ | Kẻ xấu có thể gửi giao dịch operational trong quyền relayer | Owner revoke relayer cũ, add relayer mới, audit lại batch trong khoảng nghi ngờ |
+| Mất Admin wallet | Admin đó không login/step-up/recovery được | Owner revoke ví cũ, authorize ví mới |
+| Mất Owner key đơn lẻ | Governance bị kẹt; sau này không rotate relayer/admin được | Không có cách cứu nếu contract không có recovery. Production phải dùng multisig/cold wallet |
 
----
+## Cấu hình môi trường
 
-## Bắt đầu nhanh
+Copy file mẫu:
 
-### Yêu cầu
+```bash
+cp .env.example .env
+```
 
-- Docker + Docker Compose
-- Node.js 20+
-- (Tùy chọn) MetaMask để test wallet flow
+Các biến blockchain chính:
 
-### Chạy đầy đủ qua Docker
+```env
+BLOCKCHAIN_RPC_URL=http://blockchain:8545
+
+IDENTITY_REGISTRY_ADDRESS=0x...
+FACE_REGISTRY_ADDRESS=0x...
+AUDIT_ANCHOR_ADDRESS=0x...
+
+BLOCKCHAIN_OWNER_ADDRESS=0x...
+BLOCKCHAIN_OWNER_PRIVATE_KEY=0x...
+
+BLOCKCHAIN_RELAYER_ADDRESS=0x...
+BLOCKCHAIN_RELAYER_PRIVATE_KEY=0x...
+```
+
+Ghi chú:
+
+- `BLOCKCHAIN_OWNER_PRIVATE_KEY` hiện được hỗ trợ trong env để dev/local chạy nhanh. Production nên chuyển owner sang multisig hoặc cold wallet.
+- `BLOCKCHAIN_RELAYER_PRIVATE_KEY` là hot key của backend. Key này phải có thể revoke/rotate.
+- `SUPER_ADMIN_PRIVATE_KEY` là biến cũ, chỉ còn fallback tương thích ngược. Cấu hình mới không nên dùng.
+- Không commit `.env`; chỉ commit `.env.example`.
+
+## Chạy nhanh bằng Docker
 
 ```bash
 docker compose up -d
-# Backend:  http://localhost:3001/api
-# Frontend: http://localhost:5173
-# Postgres: localhost:5432
-# Hardhat:  http://localhost:8545
 ```
 
-### Hoặc chạy từng phần
+Mặc định:
+
+```text
+Backend:  http://localhost:3001/api
+Frontend: http://localhost:5173
+Postgres: localhost:5432
+Hardhat:  http://localhost:8545
+```
+
+## Chạy blockchain local thủ công
 
 ```bash
-# Backend
-cd backend && npm install && npm run start:dev
-
-# Frontend
-cd frontend && npm install && npm run dev
-
-# Blockchain (local node + deploy)
-cd blockchain && npm install
-npx hardhat node                          # terminal 1
-npx hardhat run scripts/deploy.js --network localhost  # terminal 2
+cd blockchain
+npm install
+npx hardhat node
 ```
 
----
+Terminal khác:
 
-## Tài liệu
+```bash
+cd blockchain
+npx hardhat run scripts/deploy.js --network localhost
+```
 
-Mục lục đầy đủ tại [`docs/README.md`](./docs/README.md).
+`scripts/deploy.js` sẽ:
 
-### Theo chủ đề
+1. Deploy `IdentityRegistry`.
+2. Cấp quyền relayer từ `BLOCKCHAIN_RELAYER_ADDRESS` hoặc private key tương ứng.
+3. Deploy `FaceRegistry` và `AuditAnchor`.
+4. Chuyển ownership sang `BLOCKCHAIN_OWNER_ADDRESS` nếu cấu hình khác deployer.
+5. Tự `acceptOwnership()` nếu `BLOCKCHAIN_OWNER_PRIVATE_KEY` có sẵn trong env.
 
-| Chủ đề | Tài liệu |
-|---|---|
-| **Kiến trúc** | [Backend Clean Architecture](./docs/architecture/backend.md) · [File Structure](./docs/architecture/backend-file-structure.md) · [Frontend UI](./docs/architecture/frontend-ui-guidelines.md) |
-| **Bảo mật** | [Tiers & Anchoring Policy](./docs/security/tiers-and-anchoring.md) · [Audit Logging](./docs/security/audit-logging.md) |
-| **Backup & DR** | [Overview](./docs/backup-recovery/overview.md) · [Backup CLI](./docs/backup-recovery/backup-restore-cli.md) · [Emergency Restore](./docs/backup-recovery/emergency-restore.md) |
-| **Standalone Tools** | [Break-Glass Viewer](./tools/break-glass-viewer/README.md) · [Recovery Signer](./tools/recovery-signer/README.md) |
-| **Cho AI/Agents** | [AGENTS.md](./AGENTS.md) |
+## Luồng nghiệp vụ ví Admin
 
-### Câu hỏi thường gặp
+```text
+Admin login/step-up
+→ Backend tạo challenge
+→ Admin ký bằng MetaMask/hardware wallet
+→ Backend recover address từ signature
+→ Backend kiểm tra IdentityRegistry.isAuthorized(address)
+→ Nếu hợp lệ thì cấp session/JWT hoặc cho phép thao tác nhạy cảm
+```
 
-| Câu hỏi | Trả lời |
-|---|---|
-| Tier A vs Tier B step-up là gì? | [docs/security/tiers-and-anchoring.md](./docs/security/tiers-and-anchoring.md) |
-| Khi nào neo blockchain ngay, khi nào gom 5 phút? | [docs/security/tiers-and-anchoring.md](./docs/security/tiers-and-anchoring.md) |
-| Backup tự động chạy khi nào? Admin tự backup thế nào? | [docs/backup-recovery/overview.md](./docs/backup-recovery/overview.md) |
-| 2 công cụ HTML khác nhau ra sao? | [tools/README.md](./tools/README.md) |
-| DB bị xóa hoàn toàn, làm sao restore? | [docs/backup-recovery/emergency-restore.md](./docs/backup-recovery/emergency-restore.md) |
+Ví Admin không thay thế relayer. Nó là human identity/recovery key.
 
----
+## Luồng audit khi thêm/sửa dữ liệu
+
+Ví dụ Admin thêm phòng ban:
+
+```text
+Admin thao tác trên UI
+→ Backend kiểm tra JWT/RBAC/step-up nếu cần
+→ Backend ghi dữ liệu vào PostgreSQL
+→ Backend ghi BlockchainLogger
+→ AuditAnchorService gom batch và tính Merkle root
+→ Backend relayer ký commitRoot()
+→ AuditAnchor hỏi IdentityRegistry.isRelayerOrOwner(msg.sender)
+→ Root được neo on-chain
+```
+
+On-chain chỉ có hash/root/timestamp/metadata kỹ thuật, không có dữ liệu y tế.
+
+## Thành phần chính
+
+| Thành phần | Công nghệ | Vai trò |
+|---|---|---|
+| Backend | NestJS, Prisma, PostgreSQL | API, nghiệp vụ, auth, audit, Cloudinary, AI child process |
+| Frontend | React, Vite, Tailwind CSS | SPA cho Admin, Receptionist, Doctor, Lab Manager |
+| Blockchain | Solidity, Hardhat, Ethers.js v6 | Integrity anchor, wallet authorization, audit root |
+| AI/ML | Python, TensorFlow, InsightFace | Diagnostic suggestions, face embedding |
+
+## Tài liệu liên quan
+
+- [AGENTS.md](./AGENTS.md)
+- [docs/security/audit-logging.md](./docs/security/audit-logging.md)
+- [docs/security/tiers-and-anchoring.md](./docs/security/tiers-and-anchoring.md)
+- [docs/backup-recovery/overview.md](./docs/backup-recovery/overview.md)
+- [tools/recovery-signer/README.md](./tools/recovery-signer/README.md)
 
 ## Quy ước phát triển
 
-- **Backend:** Feature-based modules (`modules/visit`, `modules/department`...). Validation bằng `class-validator`. Multi-step workflow dùng `prisma.$transaction`.
-- **Frontend:** Feature-based folders (`features/admin`, `features/receptionist`). Tailwind cyan-600 palette. Soft delete cho business entities.
-- **Blockchain:** Chỉ neo hash + Merkle root + metadata. **Không bao giờ** lưu PII, file y tế, X-Ray.
-- **Commit:** Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`...).
-
-Chi tiết hơn trong [AGENTS.md](./AGENTS.md).
+- Backend dùng feature-based modules, DTO validation bằng `class-validator`, business logic nằm ở service/use case.
+- Multi-step workflow phải dùng transaction.
+- Entity quan trọng phải ghi audit và anchor hash/root.
+- Blockchain không lưu PII, file y tế, nội dung chẩn đoán hoặc dữ liệu lớn.
+- `.env` không được commit; cập nhật `.env.example` khi thêm biến mới.
