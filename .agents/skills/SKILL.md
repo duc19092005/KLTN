@@ -191,6 +191,24 @@ KLTN/
 └── docker-compose.yml # Multi-service orchestration
 ```
 
+## Mobile NFC Addendum
+
+**Directory:** `mobile/`
+
+Use this routing for NFC mobile work:
+
+| Task Type | Primary Skill | Secondary Skills |
+|-----------|--------------|-----------------|
+| Mobile NFC app/screen | `@hospital-management-system` | `@react-patterns`, `@ui-ux-designer` |
+
+Key mobile patterns:
+
+- One Expo React Native codebase with two app surfaces: `src/apps/receptionist-scanner/` and `src/apps/patient-portal/`.
+- Shared NFC parsing and API client live under `src/shared/`.
+- Blank cards use NDEF Text JSON with `type: "KLTN_CCCD"` and `version: 1`.
+- Mobile env uses `EXPO_PUBLIC_BACKEND_URL`; never commit `mobile/.env`.
+- Real NFC scans require a native dev build/prebuild because `react-native-nfc-manager` is not an Expo Go-only flow.
+
 ## When to Use This Skill
 
 - At the start of any task related to this project

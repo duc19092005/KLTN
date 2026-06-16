@@ -41,6 +41,13 @@ The system is built on a strictly defined technology stack. **Do not propose dev
 - **Stack**: Python, TensorFlow, InsightFace.
 - **Integration**: Python scripts integrated as child processes via the backend.
 
+**Mobile NFC:**
+- **Framework**: Expo React Native in `mobile/`.
+- **Purpose**: NFC demo surfaces for receptionist intake and patient portal access.
+- **NFC Library**: `react-native-nfc-manager`.
+- **Environment**: `EXPO_PUBLIC_BACKEND_URL` in `mobile/.env`; never commit `.env`.
+- **Card Format**: Blank NFC cards are NDEF Text records containing `KLTN_CCCD` version `1` JSON.
+
 ## 3. Project Conventions & Coding Standards
 
 When writing code for this project, adhere to the following standards:
@@ -78,6 +85,38 @@ Patient
       ├─ MedicalConclusion (The final, doctor-approved outcome)
       └─ BlockchainLogger (Integrity anchors for the Visit and its children)
 ```
+
+### NFC Identification Flow
+
+The NFC feature does not replace the Patient or Visit aggregate. It only changes how CCCD data enters the system.
+
+```text
+Blank NFC card
+ └─ KLTN_CCCD v1 JSON
+      ├─ Receptionist scanner app
+      │    └─ Backend NFC session
+      │         └─ SSE result to receptionist web intake form
+      └─ Patient portal app
+           └─ Backend finds Patient by citizenId
+                └─ Existing patient verification use case checks DB + blockchain
+```
+
+The canonical demo payload is:
+
+```json
+{
+  "type": "KLTN_CCCD",
+  "version": 1,
+  "citizenId": "079203000001",
+  "fullName": "Nguyen Van An",
+  "dateOfBirth": "2003-04-12",
+  "gender": "MALE",
+  "address": "Ho Chi Minh City",
+  "issuedAt": "2024-01-15"
+}
+```
+
+The NFC card is a demo data carrier, not a cryptographic proof. Never store CCCD, patient PII, or raw NFC payloads on-chain.
 
 ### 5. Medical Result Definitions
 

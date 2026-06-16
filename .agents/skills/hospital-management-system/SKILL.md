@@ -30,6 +30,13 @@ These are strict, unbreakable rules. If your code violates these, it is incorrec
 2. **Assignment**: Assign the Patient to a `ClinicalRoom` (which maps to a `DoctorProfile`).
 3. **State Management**: Initialize the `Visit` state to `WAITING`.
 
+### NFC CCCD Demo Workflow
+1. **Card format**: Blank NFC cards are NDEF Text records containing `KLTN_CCCD` version `1` JSON with `citizenId`, `fullName`, `dateOfBirth`, `gender`, `address`, and optional `issuedAt`.
+2. **Receptionist scanner**: The web creates a one-time NFC session; the mobile app scans the card and submits the payload with `sessionId` + `mobileToken`; backend streams the result to the web over SSE.
+3. **Patient portal**: The patient mobile app scans the card; backend finds `Patient` by `citizenId` and reuses the existing public patient verification use case so blockchain integrity checks remain identical to the Home flow.
+4. **Security boundary**: The blank NFC card is a demo data carrier, not a trusted identity proof. Production must add a second factor or signed card payload.
+5. **Blockchain boundary**: Never store CCCD, patient PII, or raw NFC JSON on-chain. Only hashes/timestamps/audit metadata may be anchored.
+
 ### Clinical Diagnostic Workflow (Doctor)
 1. **Review**: The Doctor reviews the Patient's history, current `Visit` details, and any `MedicalResult`s from `MedicalOrder`s.
 2. **AI Assistance**: The Doctor reviews `AiDiagnosis` suggestions based on the clinical data.

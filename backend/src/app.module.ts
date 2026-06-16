@@ -22,6 +22,7 @@ import { ApiResponseInterceptor } from './common/interceptors/api-response.inter
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { StepUpModule } from './common/stepup/stepup.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { NfcModule } from './modules/nfc/nfc.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { NotificationModule } from './modules/notification/notification.module';
     AuditApiModule,
     BackupModule,
     NotificationModule,
+    NfcModule,
   ],
   controllers: [AppController],
   providers: [

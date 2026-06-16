@@ -25,6 +25,6 @@ import { AuditPatientIntegrityAnchor } from './infrastructure/adapters/audit-pat
     { provide: PATIENT_REPOSITORY, useClass: PrismaPatientRepository },
     { provide: PATIENT_INTEGRITY_ANCHOR, useClass: AuditPatientIntegrityAnchor },
   ],
-  exports: [PatientService],
+  exports: [PatientService, VerifyPatientPublicUseCase],
 })
 export class PatientModule {}

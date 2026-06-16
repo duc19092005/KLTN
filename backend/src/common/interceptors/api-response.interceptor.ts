@@ -8,6 +8,9 @@ export class ApiResponseInterceptor implements NestInterceptor {
     if (request.url?.startsWith('/api/auth') || request.url?.startsWith('/auth')) {
       return next.handle();
     }
+    if (request.headers?.accept?.includes('text/event-stream')) {
+      return next.handle();
+    }
 
     const message = this.resolveMessage(request.method);
     return next.handle().pipe(map((data) => ({ success: true, message, data })));

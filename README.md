@@ -8,11 +8,43 @@ Hệ thống quản lý bệnh viện full-stack với NestJS, React, PostgreSQL
 KLTN/
 ├── backend/      NestJS + Prisma + PostgreSQL
 ├── frontend/     React + Vite + Tailwind CSS
+├── mobile/       Expo React Native NFC apps for receptionist and patient flows
 ├── blockchain/   Solidity + Hardhat + Ethers.js
 ├── docs/         Tài liệu kiến trúc, audit, backup/recovery
 ├── tools/        Công cụ khẩn cấp chạy offline
 └── .env.example  Mẫu cấu hình môi trường an toàn để copy ra .env
 ```
+
+## NFC mobile flow
+
+The repo includes `mobile/`, an Expo React Native codebase with two app surfaces:
+
+- Receptionist scanner: pairs with `POST /api/nfc-sessions`, scans a blank NFC CCCD card, and submits the result to `POST /api/mobile/receptionist/nfc-sessions/:sessionId/result`.
+- Patient portal: scans a blank NFC CCCD card and calls `POST /api/mobile/patient/nfc-login`, which reuses the existing patient verification use case so DB and blockchain checks stay consistent with the old Home flow.
+
+Blank NFC cards must be NDEF Text records containing:
+
+```json
+{
+  "type": "KLTN_CCCD",
+  "version": 1,
+  "citizenId": "079203000001",
+  "fullName": "Nguyen Van An",
+  "dateOfBirth": "2003-04-12",
+  "gender": "MALE",
+  "address": "Ho Chi Minh City",
+  "issuedAt": "2024-01-15"
+}
+```
+
+Mobile environment lives in `mobile/.env` and is intentionally ignored by git:
+
+```env
+EXPO_PUBLIC_BACKEND_URL=http://localhost:3001/api
+EXPO_PUBLIC_SCANNER_DEVICE_LABEL=Reception Desk NFC Phone
+```
+
+See [docs/nfc-mobile-flow.md](./docs/nfc-mobile-flow.md) and [mobile/README.md](./mobile/README.md).
 
 ## Luồng blockchain hiện tại
 
