@@ -42,6 +42,7 @@ Mục lục tài liệu KLTN Hospital Management System, sắp xếp theo chủ 
 | [backend/README.md](../backend/README.md) | Hướng dẫn chạy backend |
 | [frontend/README.md](../frontend/README.md) | Hướng dẫn chạy frontend |
 | [blockchain/README.md](../blockchain/README.md) | Hardhat, deploy contract |
+| [mobile/README.md](../mobile/README.md) | NFC mobile setup, APK build, card payload |
 
 ## 🤝 Agents Guidelines
 

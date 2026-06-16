@@ -15,36 +15,20 @@ KLTN/
 └── .env.example  Mẫu cấu hình môi trường an toàn để copy ra .env
 ```
 
-## NFC mobile flow
+## NFC mobile
 
-The repo includes `mobile/`, an Expo React Native codebase with two app surfaces:
+`mobile/` is the single source for NFC mobile setup, APK build, and card payload docs. It contains two app surfaces:
 
-- Receptionist scanner: pairs with `POST /api/nfc-sessions`, scans a blank NFC CCCD card, and submits the result to `POST /api/mobile/receptionist/nfc-sessions/:sessionId/result`.
-- Patient portal: scans a blank NFC CCCD card and calls `POST /api/mobile/patient/nfc-login`, which reuses the existing patient verification use case so DB and blockchain checks stay consistent with the old Home flow.
+- Receptionist scanner: pairs with the web intake flow through NFC sessions and SSE.
+- Patient portal: scans the NFC CCCD card, then reuses backend patient verification with DB and blockchain checks.
 
-Blank NFC cards must be NDEF Text records containing:
-
-```json
-{
-  "type": "KLTN_CCCD",
-  "version": 1,
-  "citizenId": "079203000001",
-  "fullName": "Nguyen Van An",
-  "dateOfBirth": "2003-04-12",
-  "gender": "MALE",
-  "address": "Ho Chi Minh City",
-  "issuedAt": "2024-01-15"
-}
-```
-
-Mobile environment lives in `mobile/.env` and is intentionally ignored by git:
+Current demo backend URL:
 
 ```env
-EXPO_PUBLIC_BACKEND_URL=http://localhost:3001/api
-EXPO_PUBLIC_SCANNER_DEVICE_LABEL=Reception Desk NFC Phone
+EXPO_PUBLIC_BACKEND_URL=http://192.168.1.13:3001/api
 ```
 
-See [docs/nfc-mobile-flow.md](./docs/nfc-mobile-flow.md) and [mobile/README.md](./mobile/README.md).
+See [mobile/README.md](./mobile/README.md).
 
 ## Luồng blockchain hiện tại
 
