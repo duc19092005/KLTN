@@ -38,7 +38,7 @@ copy .env.example .env
 Edit `mobile/.env`:
 
 ```env
-EXPO_PUBLIC_BACKEND_URL=http://192.168.1.10:3001/api
+EXPO_PUBLIC_BACKEND_URL=http://192.168.1.13:3001/api
 EXPO_PUBLIC_SCANNER_DEVICE_LABEL=Reception Desk NFC Phone
 ```
 
@@ -48,7 +48,7 @@ Examples:
 
 ```env
 # Android phone and laptop on the same WiFi
-EXPO_PUBLIC_BACKEND_URL=http://192.168.1.10:3001/api
+EXPO_PUBLIC_BACKEND_URL=http://192.168.1.13:3001/api
 
 # Public tunnel for demo
 EXPO_PUBLIC_BACKEND_URL=https://your-ngrok-domain.ngrok-free.app/api
