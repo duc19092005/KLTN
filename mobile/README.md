@@ -185,6 +185,8 @@ The APK will be here:
 mobile/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
+Debug APKs are for development only. They expect Metro to be running and can show `Unable to load script` if installed as a standalone app.
+
 Build release APK:
 
 ```bash
@@ -197,6 +199,8 @@ The unsigned release APK will be here:
 ```text
 mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
 ```
+
+For demo installs without Metro, use the release APK because it packages `index.android.bundle` inside the app.
 
 For a signed production APK, configure an Android keystore first. For demo/internal testing, EAS cloud build is usually simpler because it can manage credentials.
 
