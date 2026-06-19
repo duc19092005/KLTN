@@ -114,14 +114,6 @@ export class S3StorageService {
     return this.client.send(new HeadObjectCommand({ Bucket: resolvedBucket, Key: objectKey }));
   }
 
-  buildAvatarUrl(objectKey: string) {
-    return `/api/storage/avatars/${this.encodeObjectKey(objectKey)}`;
-  }
-
-  decodeAvatarToken(token: string) {
-    return Buffer.from(token, 'base64url').toString('utf8');
-  }
-
   getPresignedTtlSeconds() {
     const parsed = Number.isFinite(this.ttlSeconds) && this.ttlSeconds > 0 ? this.ttlSeconds : 300;
     return Math.min(parsed, 3600);
@@ -148,10 +140,6 @@ export class S3StorageService {
   private contentDisposition(originalName: string) {
     const asciiName = this.safeFileName(originalName).replace(/"/g, '');
     return `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(originalName)}`;
-  }
-
-  private encodeObjectKey(objectKey: string) {
-    return Buffer.from(objectKey, 'utf8').toString('base64url');
   }
 
   private async streamToBuffer(body: unknown): Promise<Buffer> {

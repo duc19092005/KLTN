@@ -13,7 +13,7 @@ import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.de
 import { RequireStepUpSession } from '../../../common/stepup/require-stepup-session.decorator';
 import { CreateStaffDto, StaffQueryDto, UpdateStaffDto } from '../dto/staff.dto';
 import { StaffService } from '../services/staff.service';
-import { S3StorageService } from '../../../infrastructure/storage/s3-storage.service';
+import { uploadAvatarToCloudinary } from '../../../infrastructure/storage/cloudinary-avatar-uploader';
 
 @UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
 @Roles('ADMIN')
@@ -21,10 +21,7 @@ import { S3StorageService } from '../../../infrastructure/storage/s3-storage.ser
 @ApiBearerAuth()
 @Controller('staff')
 export class StaffController {
-  constructor(
-    private readonly service: StaffService,
-    private readonly storage: S3StorageService,
-  ) {}
+  constructor(private readonly service: StaffService) {}
 
   @Post()
   @RequireStepUpSession()
@@ -109,20 +106,13 @@ export class StaffController {
       },
     }),
   )
-  @ApiOperation({ summary: 'Upload avatar to private S3 storage' })
+  @ApiOperation({ summary: 'Upload avatar to Cloudinary' })
   async uploadAvatar(@UploadedFile() file: { buffer: Buffer; originalname: string; mimetype: string; size: number }) {
     if (!file) {
       throw new BadRequestException('Vui lòng chọn ảnh hợp lệ (PNG, JPG, WEBP).');
     }
-    const stored = await this.storage.uploadObject({
-      buffer: file.buffer,
-      originalName: file.originalname,
-      mimeType: file.mimetype,
-      size: file.size,
-      keyPrefix: 'avatars/staff',
-      metadata: { usage: 'staff-avatar' },
-    });
-    return { url: this.storage.buildAvatarUrl(stored.objectKey) };
+    const url = await uploadAvatarToCloudinary(file);
+    return { url };
   }
 }
 

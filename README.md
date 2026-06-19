@@ -172,22 +172,23 @@ On-chain chỉ có hash/root/timestamp/metadata kỹ thuật, không có dữ li
 
 | Thành phần | Công nghệ | Vai trò |
 |---|---|---|
-| Backend | NestJS, Prisma, PostgreSQL | API, nghiệp vụ, auth, audit, AWS S3 private storage, AI child process |
+| Backend | NestJS, Prisma, PostgreSQL | API, nghiệp vụ, auth, audit, AWS S3 medical storage, Cloudinary avatars, AI child process |
 | Frontend | React, Vite, Tailwind CSS | SPA cho Admin, Receptionist, Doctor, Lab Manager |
 | Blockchain | Solidity, Hardhat, Ethers.js v6 | Integrity anchor, wallet authorization, audit root |
 | AI/ML | Python, TensorFlow, InsightFace | Diagnostic suggestions, face embedding |
 
 ## Lưu trữ file y tế
 
-Upload mới dùng AWS S3 private bucket:
+Medical result upload mới dùng AWS S3 private bucket:
 
 - Medical result files: PDF, X-Ray/MRI/CT/Ultrasound image, ECG, lab attachments.
-- Staff/doctor avatars.
 - AI image attachments: backend tải ảnh private từ S3, convert base64 và gửi vào AI provider.
+
+Staff/doctor avatar không đi qua S3 private. Avatar dùng Cloudinary public/static URL để frontend render trực tiếp bằng `<img src={avatarUrl}>`.
 
 PostgreSQL giữ metadata/quyền truy cập (`storageProvider`, `bucket`, `objectKey`, `sha256`, `etag`). S3 chỉ giữ blob. Blockchain chỉ anchor audit hash/Merkle root đã sanitize; không đưa S3 URL, object key, PDF, ảnh, PII hoặc nội dung bệnh án lên chain.
 
-Download vẫn đi qua endpoint backend `/api/medical-orders/results/files/:fileId/download`; backend kiểm tra RBAC rồi mới trả pre-signed URL ngắn hạn. File Cloudinary cũ không migrate trong phase này; nếu DB còn `url` legacy và URL đó còn sống thì endpoint vẫn mở được.
+Medical file download vẫn đi qua endpoint backend `/api/medical-orders/results/files/:fileId/download`; backend kiểm tra RBAC rồi mới trả pre-signed URL ngắn hạn. File Cloudinary medical cũ không migrate trong phase này; nếu DB còn `url` legacy và URL đó còn sống thì endpoint vẫn mở được.
 
 ## Tài liệu liên quan
 

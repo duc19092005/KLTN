@@ -24,7 +24,7 @@ The system is built on a strictly defined technology stack. **Do not propose dev
 - **Architecture**: Feature-based modules (e.g., `patient`, `visit`, `clinical-decision`).
 - **Database**: PostgreSQL.
 - **ORM**: Prisma ORM (Canonical schema is at `backend/prisma/schema.prisma`).
-- **File Storage**: AWS S3 private bucket (medical files, avatars, PDFs/images). Cloudinary is legacy read-only compatibility only.
+- **File Storage**: AWS S3 private bucket for medical files/PDFs/images; Cloudinary for non-sensitive staff/doctor avatars.
 
 **Frontend:**
 - **Framework**: React (SPA) initialized with Vite.

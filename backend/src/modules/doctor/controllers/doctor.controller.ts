@@ -11,7 +11,7 @@ import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
 import { RequireStepUpSession } from '../../../common/stepup/require-stepup-session.decorator';
 import { CreateDoctorDto, CreateDoctorWithStaffDto, DoctorQueryDto, UpdateDoctorDto } from '../dto/doctor.dto';
 import { DoctorService } from '../services/doctor.service';
-import { S3StorageService } from '../../../infrastructure/storage/s3-storage.service';
+import { uploadAvatarToCloudinary } from '../../../infrastructure/storage/cloudinary-avatar-uploader';
 
 @UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
 @Roles('ADMIN')
@@ -19,10 +19,7 @@ import { S3StorageService } from '../../../infrastructure/storage/s3-storage.ser
 @ApiBearerAuth()
 @Controller('doctors')
 export class DoctorController {
-  constructor(
-    private readonly service: DoctorService,
-    private readonly storage: S3StorageService,
-  ) { }
+  constructor(private readonly service: DoctorService) { }
 
   @Post('upload-avatar')
   @UseInterceptors(
@@ -35,20 +32,13 @@ export class DoctorController {
       },
     }),
   )
-  @ApiOperation({ summary: 'Upload doctor/staff avatar to private S3 storage' })
+  @ApiOperation({ summary: 'Upload doctor/staff avatar to Cloudinary' })
   async uploadAvatar(@UploadedFile() file: { buffer: Buffer; originalname: string; mimetype: string; size: number }) {
     if (!file) {
       throw new BadRequestException('Vui lòng chọn ảnh hợp lệ (PNG, JPG, WEBP).');
     }
-    const stored = await this.storage.uploadObject({
-      buffer: file.buffer,
-      originalName: file.originalname,
-      mimeType: file.mimetype,
-      size: file.size,
-      keyPrefix: 'avatars/staff',
-      metadata: { usage: 'staff-avatar' },
-    });
-    return { url: this.storage.buildAvatarUrl(stored.objectKey) };
+    const url = await uploadAvatarToCloudinary(file);
+    return { url };
   }
 
   @Post()
