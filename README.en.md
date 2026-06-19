@@ -17,7 +17,7 @@ A hospital management system that combines **biometric authentication**, **AI-as
 |---|---|
 | **Reception** | Patient intake, queue management, ID verification |
 | **Doctor** | Medical records + AI diagnostic suggestions + on-chain anchored conclusions |
-| **Laboratory** | Process medical orders, upload results to Cloudinary |
+| **Laboratory** | Process medical orders, upload results to private AWS S3 |
 | **Admin** | Manage departments, staff, AI models, audit logs, backups |
 
 ### Distinctive security mechanisms

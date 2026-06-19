@@ -18,6 +18,7 @@ import { MedicalOrderModule } from './modules/medical-order/medical-order.module
 import { ClinicalDecisionModule } from './modules/clinical-decision/clinical-decision.module';
 import { AuditApiModule } from './modules/audit/audit-api.module';
 import { BackupModule } from './modules/backup/backup.module';
+import { StorageModule } from './infrastructure/storage/storage.module';
 import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { StepUpModule } from './common/stepup/stepup.module';
@@ -27,6 +28,7 @@ import { NfcModule } from './modules/nfc/nfc.module';
 @Module({
   imports: [
     PrismaModule,
+    StorageModule,
     BlockchainModule,
     AuditModule,
     StepUpModule,

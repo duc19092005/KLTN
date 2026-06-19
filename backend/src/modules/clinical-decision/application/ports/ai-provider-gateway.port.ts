@@ -4,7 +4,7 @@ import { AiModelRegistry } from '@prisma/client';
 export const AI_PROVIDER_GATEWAY = Symbol('AI_PROVIDER_GATEWAY');
 
 /**
- * A medical image downloaded from (private) Cloudinary storage and inlined as
+ * A medical image downloaded from private object storage and inlined as
  * base64 so it can be sent as real multimodal input to the AI provider instead
  * of an unreachable text URL.
  */

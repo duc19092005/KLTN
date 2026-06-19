@@ -11,7 +11,7 @@ import { GetResultFileDownloadUrlUseCase } from './application/use-cases/get-res
 import { MEDICAL_ORDER_REPOSITORY } from './application/ports/medical-order.repository.port';
 import { MEDICAL_RESULT_STORAGE } from './application/ports/medical-result-storage.port';
 import { PrismaMedicalOrderRepository } from './infrastructure/prisma/prisma-medical-order.repository';
-import { CloudinaryMedicalResultStorageAdapter } from './infrastructure/adapters/cloudinary-medical-result-storage.adapter';
+import { S3MedicalResultStorageAdapter } from './infrastructure/adapters/s3-medical-result-storage.adapter';
 
 @Module({
   controllers: [MedicalOrderController],
@@ -25,7 +25,7 @@ import { CloudinaryMedicalResultStorageAdapter } from './infrastructure/adapters
     GetResultFileDownloadUrlUseCase,
     MedicalOrderAccessPolicy,
     { provide: MEDICAL_ORDER_REPOSITORY, useClass: PrismaMedicalOrderRepository },
-    { provide: MEDICAL_RESULT_STORAGE, useClass: CloudinaryMedicalResultStorageAdapter },
+    { provide: MEDICAL_RESULT_STORAGE, useClass: S3MedicalResultStorageAdapter },
   ],
   exports: [MedicalOrderService],
 })

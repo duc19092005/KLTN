@@ -113,6 +113,10 @@ const FILE_URL_FIELDS = new Set([
   'downloadUrl',
   'cloudinaryUrl',
   'cloudinaryPublicId',
+  'bucket',
+  'objectKey',
+  'etag',
+  'sha256',
 ]);
 
 const CLINICAL_TEXT_FIELDS = new Set([
@@ -234,7 +238,7 @@ export function toDisplayAuditDiff(diff: AuditDiffJson, context: AuditDiffViewer
     }
 
     if (change.sensitivity === 'FILE_URL') {
-      return redactedDisplay(change, context, 'Đường dẫn tệp/Cloudinary không hiển thị trong audit UI.', 'AUDIT_REDACT_FILE_URL');
+      return redactedDisplay(change, context, 'Đường dẫn tệp/object storage không hiển thị trong audit UI.', 'AUDIT_REDACT_FILE_URL');
     }
 
     if (change.sensitivity === 'CLINICAL_TEXT') {

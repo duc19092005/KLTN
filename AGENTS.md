@@ -24,7 +24,7 @@ The system is built on a strictly defined technology stack. **Do not propose dev
 - **Architecture**: Feature-based modules (e.g., `patient`, `visit`, `clinical-decision`).
 - **Database**: PostgreSQL.
 - **ORM**: Prisma ORM (Canonical schema is at `backend/prisma/schema.prisma`).
-- **File Storage**: Cloudinary (Medical files, avatars, etc.).
+- **File Storage**: AWS S3 private bucket (medical files, avatars, PDFs/images). Cloudinary is legacy read-only compatibility only.
 
 **Frontend:**
 - **Framework**: React (SPA) initialized with Vite.
@@ -80,7 +80,7 @@ Patient
       ├─ Doctor (Who is responsible)
       ├─ MedicalOrder (Tests ordered during visit)
       │    └─ MedicalResult (Results of the tests)
-      │         └─ MedicalResultFile (Cloudinary URLs)
+      │         └─ MedicalResultFile (S3 metadata; legacy Cloudinary URLs remain readable)
       ├─ AiDiagnosis (AI suggestions based on data)
       ├─ MedicalConclusion (The final, doctor-approved outcome)
       └─ BlockchainLogger (Integrity anchors for the Visit and its children)
@@ -138,6 +138,7 @@ The `MedicalResult` entity represents the outcome of a `MedicalOrder`. Because `
 - `note`: Textual conclusion or observation.
 - `files`: Array of `MedicalResultFile` relations containing:
   - `fileName`, `originalName`, `mimeType`, `size`
-  - `url` (Cloudinary URL).
+  - `storageProvider`, `bucket`, `objectKey`, `sha256`, `etag`
+  - `url` (legacy provider URL only; S3 uploads do not use public URLs).
 
 *Note: Verification by a doctor occurs when the Doctor finalizes the overall `MedicalConclusion` for the Visit.*

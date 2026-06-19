@@ -18,7 +18,7 @@ export class ClinicalPromptBuilder {
         orderType: order.orderType,
         targetDepartment: order.targetDepartment?.name || null,
         note: result.note || null,
-        // URLs are private (authenticated Cloudinary) and unreachable by the model, so we only
+        // URLs are private object-storage links and unreachable by the model, so we only
         // describe the files here; image bytes are attached separately as multimodal input.
         files:
           result.files?.map((file: any) => ({

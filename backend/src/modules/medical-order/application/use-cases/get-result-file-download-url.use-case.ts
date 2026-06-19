@@ -31,6 +31,10 @@ export class GetResultFileDownloadUrlUseCase {
       fileName: file.fileName,
       originalName: file.originalName,
       mimeType: file.mimeType,
+      url: file.url,
+      storageProvider: file.storageProvider,
+      bucket: file.bucket,
+      objectKey: file.objectKey,
     });
   }
 

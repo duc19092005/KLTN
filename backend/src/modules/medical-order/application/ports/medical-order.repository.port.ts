@@ -41,7 +41,12 @@ export type CreateResultFileData = {
   originalName: string;
   mimeType: string;
   size: number;
-  url: string;
+  url?: string | null;
+  storageProvider: string;
+  bucket?: string | null;
+  objectKey?: string | null;
+  sha256?: string | null;
+  etag?: string | null;
 };
 
 export type CreateResultCommand = {
@@ -60,6 +65,10 @@ export type ResultFileWithOrder = {
   fileName: string;
   originalName: string;
   mimeType: string;
+  url: string | null;
+  storageProvider: string;
+  bucket: string | null;
+  objectKey: string | null;
   order: { id: string; doctorId: string; targetDepartmentId: string | null };
 } | null;
 

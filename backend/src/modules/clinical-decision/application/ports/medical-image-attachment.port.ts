@@ -12,8 +12,8 @@ export type AttachableResultFile = {
 
 /**
  * Boundary for turning a visit's private medical-result images into base64
- * attachments for multimodal AI input. The adapter owns Cloudinary signing,
- * download, and the count/size caps.
+ * attachments for multimodal AI input. The adapter owns S3 download access
+ * and the count/size caps.
  */
 export interface MedicalImageAttachmentPort {
   collectImageAttachments(visit: any): Promise<AiImageAttachment[]>;

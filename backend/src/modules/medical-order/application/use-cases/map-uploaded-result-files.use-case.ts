@@ -8,7 +8,7 @@ import {
 import { MEDICAL_ORDER_REPOSITORY, MedicalOrderRepositoryPort } from '../ports/medical-order.repository.port';
 
 /**
- * Uploads result files (multipart) to private Cloudinary storage and returns
+ * Uploads result files (multipart) to private S3 storage and returns
  * descriptors for the subsequent createResult call. Validation copied verbatim
  * from the former MedicalOrderService.mapUploadedResultFiles().
  */

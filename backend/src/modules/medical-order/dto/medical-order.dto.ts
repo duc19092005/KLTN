@@ -72,10 +72,35 @@ export class MedicalResultFileDto {
   @IsNumber()
   size!: number;
 
-  @ApiProperty()
+  @ApiPropertyOptional({ description: 'Legacy public/provider URL for pre-S3 files only.' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  url!: string;
+  url?: string;
+
+  @ApiPropertyOptional({ example: 'S3' })
+  @IsOptional()
+  @IsString()
+  storageProvider?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  bucket?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  objectKey?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  sha256?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  etag?: string;
 }
 
 export class CreateMedicalResultDto {

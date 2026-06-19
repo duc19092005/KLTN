@@ -347,11 +347,17 @@ model MedicalResultFile {
   originalName   String
   mimeType       String
   size           Int
-  url            String
+  url            String?
+  storageProvider String      @default("CLOUDINARY")
+  bucket         String?
+  objectKey      String?
+  sha256         String?
+  etag           String?
 
   createdAt      DateTime      @default(now())
 
   @@index([resultId])
+  @@index([storageProvider])
 }
 
 enum MedicalOrderStatus {

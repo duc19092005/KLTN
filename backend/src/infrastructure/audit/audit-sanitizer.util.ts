@@ -25,6 +25,10 @@ const SENSITIVE_KEYS = new Set([
   'secureUrl',
   'downloadUrl',
   'cloudinaryPublicId',
+  'bucket',
+  'objectKey',
+  'etag',
+  'sha256',
   'fileName',
   'originalName',
   'avatarUrl',
@@ -143,6 +147,7 @@ function shouldRedactByName(key: string): boolean {
     normalized.includes('url') ||
     normalized.includes('filename') ||
     normalized.includes('cloudinary') ||
+    normalized.includes('objectkey') ||
     normalized.includes('download') ||
     normalized.includes('email') ||
     normalized.includes('username') ||
