@@ -28,7 +28,7 @@
 
 - **Backend** — clean architecture, разбитая по фичам (`modules/visit`, `modules/department`, `modules/backup` и т.д.). Все многошаговые сценарии используют `prisma.$transaction` для атомарности. Контроллеры тонкие, бизнес-логика — в сервисах.
 - **Frontend** повторяет ту же топологию по фичам (`features/admin`, `features/doctor`, ...). Своя «Hospital OS» дизайн-система на Tailwind. 4 роли: Admin, Receptionist, Doctor, Lab Manager.
-- **Blockchain** хранит **только** хеши целостности и Merkle-корни — никогда PII или медицинские файлы. Шесть контрактов (`IdentityRegistry`, `DepartmentRegistry`, `FaceRegistry`, `AuditAnchor`, `StaffRegistry`, `AiModelRegistry`).
+- **Blockchain** хранит **только** хеши целостности и Merkle-корни — никогда PII или медицинские файлы. Активные контракты: `IdentityRegistry`, `FaceRegistry`, `AuditAnchor`; целостность Department/Staff/AI model теперь проходит через `BlockchainLogger` + `AuditAnchor`.
 - **AI** работает как Python child-process, вызываемый backend (TensorFlow + InsightFace для face-эмбеддингов, плюс pluggable диагностический провайдер).
 
 ## Модель безопасности

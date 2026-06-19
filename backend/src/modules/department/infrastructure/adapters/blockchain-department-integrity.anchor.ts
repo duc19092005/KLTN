@@ -11,10 +11,9 @@ import {
 import { buildDepartmentSnapshot } from '../../domain/department-snapshot';
 
 /**
- * Tamper-evidence adapter for departments. Uses the centralized AuditAnchor
- * (Merkle batch) for on-chain integrity verification instead of a dedicated
- * DepartmentRegistry contract. Each change is recorded in BlockchainLogger and
- * periodically anchored on-chain via a Merkle root.
+ * Tamper-evidence adapter for departments. Each change is recorded in
+ * BlockchainLogger and periodically anchored on-chain through AuditAnchor
+ * Merkle batches.
  */
 @Injectable()
 export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityAnchorPort {

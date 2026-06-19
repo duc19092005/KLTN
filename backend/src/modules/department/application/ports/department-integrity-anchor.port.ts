@@ -16,9 +16,9 @@ export type DepartmentIntegrityEvaluation = {
 };
 
 /**
- * Tamper-evidence boundary for departments: salted hash, on-chain mirror via
- * DepartmentRegistry, hash256/dataSalt persistence, BlockchainLogger audit
- * entry, and integrity evaluation. Only the salted hash goes on-chain.
+ * Tamper-evidence boundary for departments: salted hash, hash256/dataSalt
+ * persistence, BlockchainLogger audit entry, AuditAnchor Merkle anchoring, and
+ * integrity evaluation. Only hashes/Merkle roots go on-chain.
  */
 export interface DepartmentIntegrityAnchorPort {
   anchorChange(department: any, action: DepartmentAnchorAction, actorId?: string, before?: unknown): Promise<void>;

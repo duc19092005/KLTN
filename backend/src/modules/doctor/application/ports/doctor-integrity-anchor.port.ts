@@ -18,7 +18,7 @@ export type DoctorIntegrityEvaluation = {
 
 /**
  * Tamper-evidence boundary for doctors. The unified hash (staff + doctor) is
- * mirrored on-chain via StaffRegistry under doctor.id, hash256/dataSalt
+ * recorded through BlockchainLogger + AuditAnchor under doctor.id, hash256/dataSalt
  * persisted on DoctorProfile, and a BlockchainLogger entry written. Only the
  * salted hash goes on-chain.
  */

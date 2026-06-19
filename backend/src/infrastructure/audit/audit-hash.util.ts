@@ -11,8 +11,8 @@ import { createHash, createHmac, randomBytes } from 'crypto';
  *  - canonicalData: a deterministic JSON serialization of the business fields (keys sorted),
  *    so logically-equal objects always hash identically regardless of key order.
  *
- * The resulting hex digest is mirrored on-chain (DepartmentRegistry). Verification recomputes
- * this hash from the current DB row and compares it with the immutable on-chain value.
+ * The resulting hex digest is stored with the row and included in BlockchainLogger
+ * snapshots that are anchored through AuditAnchor Merkle roots.
  */
 
 /** Recursively produce a deterministic JSON string with object keys sorted. */
@@ -122,8 +122,8 @@ export function computeRecordHash(data: unknown, salt: string, pepper = getPeppe
 }
 
 /**
- * Convert a hex SHA256 digest into a 0x-prefixed bytes32 string for on-chain storage.
- * DepartmentRegistry stores values as bytes32, and SHA256 is exactly 32 bytes.
+ * Convert a hex SHA256 digest into a 0x-prefixed bytes32 string.
+ * SHA256 is exactly 32 bytes.
  */
 export function hashToBytes32(hexDigest: string): string {
   const clean = hexDigest.startsWith('0x') ? hexDigest.slice(2) : hexDigest;

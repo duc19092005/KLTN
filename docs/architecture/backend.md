@@ -461,15 +461,15 @@ Mỗi module theo cùng một khuôn: `application/ports/*` (interface + DI toke
 ### C5. `department`
 - Use cases: `create`, `list`, `update`, `assignManager`, `remove`, `verify`/`history`.
 - Validator: `DepartmentValidator` (unique name/code, manager availability).
-- Ports: `DEPARTMENT_REPOSITORY` -> Prisma (giữ transaction create + gán manager, detach FK `BlockchainLogger` khi xóa); `DEPARTMENT_INTEGRITY_ANCHOR` -> DepartmentRegistry.
+- Ports: `DEPARTMENT_REPOSITORY` -> Prisma (giữ transaction create + gán manager, detach FK `BlockchainLogger` khi xóa); `DEPARTMENT_INTEGRITY_ANCHOR` -> AuditLogger + AuditAnchor.
 
 ### C6. `doctor`
 - Use cases: `create`, `createWithStaff`, `list`, `findOne`, `update`, `assignRoom`, `verify`/`history`, `reanchorForStaffUpdate`.
-- Ports: `DOCTOR_REPOSITORY` -> Prisma (giữ transaction tạo user+staff+doctor, gán phòng); `DOCTOR_INTEGRITY_ANCHOR` -> StaffRegistry (hash hợp nhất staff+doctor); `DOCTOR_REANCHOR` (seam hẹp export ra ngoài).
+- Ports: `DOCTOR_REPOSITORY` -> Prisma (giữ transaction tạo user+staff+doctor, gán phòng); `DOCTOR_INTEGRITY_ANCHOR` -> AuditLogger + AuditAnchor (hash hợp nhất staff+doctor); `DOCTOR_REANCHOR` (seam hẹp export ra ngoài).
 
 ### C7. `staff`
 - Use cases: `create`, `list`, `findOne`, `update`, `setStatus` (lock/unlock), `remove`, `verify`/`history`.
-- Ports: `STAFF_REPOSITORY` -> Prisma; `STAFF_INTEGRITY_ANCHOR` -> StaffRegistry; `PASSWORD_HASHER` -> bcrypt(12).
+- Ports: `STAFF_REPOSITORY` -> Prisma; `STAFF_INTEGRITY_ANCHOR` -> AuditLogger + AuditAnchor; `PASSWORD_HASHER` -> bcrypt(12).
 - **Gỡ `forwardRef`:** trước đây `StaffService` phụ thuộc trực tiếp `DoctorService` qua `forwardRef`. Nay `staff` chỉ phụ thuộc cổng hẹp `DOCTOR_REANCHOR` mà `DoctorModule` export; `DoctorModule` không phụ thuộc ngược `StaffModule` nên không còn vòng lặp. `staff.module.ts` import `DoctorModule` bình thường.
 
 ### C8. `auth` (nhạy cảm nhất — tách cẩn thận)
@@ -482,17 +482,14 @@ Mỗi module theo cùng một khuôn: `application/ports/*` (interface + DI toke
 
 Refactor KHÔNG đổi cơ chế on-chain; chỉ chuyển code vào các adapter. Vẫn đúng chính sách: **chỉ hash + metadata lên chain, KHÔNG PII/medical content**.
 
-| Smart contract (registry) | Dữ liệu được ghi | Trigger |
+| Smart contract | Dữ liệu được ghi | Trigger |
 |---|---|---|
-| `DepartmentRegistry` | `bytes32` hash bản ghi khoa | Create/Update/Delete department |
-| `StaffRegistry` | `bytes32` hash hợp nhất staff (và staff+doctor) | Create/Update/lock/unlock staff & doctor |
-| `AIModelRegistry` | `bytes32` hash bản ghi AI model | Create/Delete AI model |
 | `FaceRegistry` | `bytes32` hash template khuôn mặt | Đăng ký khuôn mặt; cổng kiểm tra trước khi match |
 | `AuditAnchor` | Merkle root theo lô log | Khi neo lô `BlockchainLogger` |
 | `IdentityRegistry` | Ủy quyền địa chỉ ví admin | Bind/login ví admin |
 
 - Mỗi thay đổi nhạy cảm vẫn ghi `BlockchainLogger` (hash-chain, append-only) qua `AuditLoggerService`; on-chain thất bại là non-fatal và bị đánh dấu `UNANCHORED` để lộ ra khi verify.
-- Chi phí ước tính: thao tác `setHash`/`removeHash`/`authorizeAdmin` là một giao dịch ghi 1 slot `bytes32` (~một lần SSTORE, cỡ ~5e4 gas/giao dịch tùy mạng). `AuditAnchor` ghi 1 Merkle root mỗi lô nên gas phẳng bất kể số log trong lô. Trên mạng dev/PoA (Hardhat) chi phí thực tế bằng 0; trên mạng phí gas thực, chi phí tỉ lệ số lần thay đổi bản ghi chứ không theo dung lượng dữ liệu (vì dữ liệu nằm ở DB/Cloudinary, on-chain chỉ có hash).
+- Chi phí ước tính: `AuditAnchor` ghi 1 Merkle root mỗi lô nên gas phẳng bất kể số log trong lô. Trên mạng dev/PoA (Hardhat) chi phí thực tế bằng 0; trên mạng phí gas thực, chi phí tỉ lệ số lô audit được neo chứ không theo dung lượng dữ liệu (vì dữ liệu nằm ở DB/storage, on-chain chỉ có root/hash).
 
 ## E. Bất biến nghiệp vụ được bảo toàn (verbatim)
 

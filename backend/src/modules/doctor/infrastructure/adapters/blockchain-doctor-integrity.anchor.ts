@@ -12,9 +12,9 @@ import { computeAfterHashV2 } from '../../../../infrastructure/audit/audit-hash.
 
 /**
  * Tamper-evidence adapter for doctors. Uses the centralized AuditAnchor
- * (Merkle batch) for on-chain integrity verification instead of a dedicated
- * StaffRegistry contract. Unified staff+doctor snapshot is hashed, persisted
- * on DoctorProfile, and recorded in BlockchainLogger.
+ * Merkle batch for on-chain integrity verification. Unified staff+doctor
+ * snapshot is hashed, persisted on DoctorProfile, and recorded in
+ * BlockchainLogger.
  */
 @Injectable()
 export class BlockchainDoctorIntegrityAnchor implements DoctorIntegrityAnchorPort {

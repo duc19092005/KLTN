@@ -57,18 +57,15 @@ graph LR
 
 ## 3. Smart contract nào ghi dữ liệu gì
 
-Hệ thống dùng nhiều registry, mỗi cái neo **chỉ HASH** (không bao giờ là dữ liệu y tế/PII):
+Hệ thống chỉ dùng các contract active bên dưới. Department/Staff/AI model không còn registry contract riêng; thay đổi của chúng đi qua `BlockchainLogger` và được neo Merkle root bằng `AuditAnchor`.
 
 | Smart contract | Ghi dữ liệu gì on-chain | Khi nào ghi | Hàm |
 |---|---|---|---|
 | **`AuditAnchor.sol`** | **1 Merkle root / lô log** (`batchId`, `root`, `leafCount`, `timestamp`) | Cron 5 phút hoặc `anchorNow()` | `commitRoot()` |
-| `DepartmentRegistry.sol` | Hash toàn vẹn của 1 khoa | Khi tạo/sửa/xóa khoa | `setHash` / `removeHash` |
-| `StaffRegistry.sol` | Hash của nhân viên / bác sĩ | Khi tạo/sửa staff, doctor | `setHash` / `removeHash` |
-| `AIModelRegistry.sol` | Hash của model AI | Khi đăng ký/sửa model | `setHash` / `removeHash` |
 | `FaceRegistry.sol` | Hash của face-template | Khi enroll khuôn mặt | `setFaceHash` |
 | `IdentityRegistry.sol` | Quyền admin on-chain | Khi bind/authorize ví admin | `authorizeAdmin` |
 
-> **`AuditAnchor` là contract trung tâm của tính năng logger này.** Các log khối lượng lớn (login, CRUD) đi qua đường Merkle batch của `AuditAnchor`. Các registry còn lại neo hash riêng cho từng bản ghi quan trọng (giữ nguyên như cũ).
+> **`AuditAnchor` là contract trung tâm của tính năng logger này.** Các log khối lượng lớn (login, CRUD) đi qua đường Merkle batch của `AuditAnchor`.
 
 **Dữ liệu KHÔNG BAO GIỜ lên chain:** nội dung bệnh án, PII, mật khẩu, embedding khuôn mặt, file/ảnh. Chỉ có hash 32 byte.
 

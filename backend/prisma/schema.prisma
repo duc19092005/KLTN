@@ -108,9 +108,9 @@ model Department {
 
   blockchainLogs BlockchainLogger[]
 
-  // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain
-  // in DepartmentRegistry. dataSalt is a per-record random salt. A mismatch between the
-  // recomputed hash and the on-chain value proves the row was tampered with.
+  // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)).
+  // Changes are recorded in BlockchainLogger and anchored through AuditAnchor
+  // Merkle batches. dataSalt is a per-record random salt.
   hash256        String?
   dataSalt       String?
 

@@ -28,7 +28,7 @@ A modern, full-stack hospital platform pursuing the **Triple Aim**: better patie
 
 - **Backend** is feature-based clean architecture (`modules/visit`, `modules/department`, `modules/backup`, etc.). All multi-step workflows use `prisma.$transaction` for atomicity. Controllers are thin; services hold business logic.
 - **Frontend** mirrors the same feature topology (`features/admin`, `features/doctor`, ...). Custom "Hospital OS" Tailwind theme. 4 roles: Admin, Receptionist, Doctor, Lab Manager.
-- **Blockchain** stores **only** integrity hashes and Merkle roots — never PII or medical files. Six contracts (`IdentityRegistry`, `DepartmentRegistry`, `FaceRegistry`, `AuditAnchor`, `StaffRegistry`, `AiModelRegistry`).
+- **Blockchain** stores **only** integrity hashes and Merkle roots — never PII or medical files. Active contracts are `IdentityRegistry`, `FaceRegistry`, and `AuditAnchor`; Department/Staff/AI model integrity now flows through `BlockchainLogger` + `AuditAnchor`.
 - **AI** runs as a Python child process called from the backend (TensorFlow + InsightFace for face embeddings, plus a pluggable diagnostic provider).
 
 ## Security model

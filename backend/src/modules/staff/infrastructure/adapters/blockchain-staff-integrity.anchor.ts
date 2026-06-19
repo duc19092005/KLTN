@@ -13,8 +13,7 @@ import { buildUnifiedDoctorSnapshot } from '../../../doctor/domain/doctor-snapsh
 
 /**
  * Tamper-evidence adapter for staff profiles. Uses the centralized AuditAnchor
- * (Merkle batch) for on-chain integrity verification instead of a dedicated
- * StaffRegistry contract.
+ * Merkle batch for on-chain integrity verification.
  *
  * When evaluating a staff profile that has a linked doctorProfile, this adapter
  * delegates to the unified doctor snapshot so that the hash matches the one

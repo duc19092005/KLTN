@@ -16,9 +16,9 @@ export type IntegrityEvaluation = {
 };
 
 /**
- * Boundary for AI model tamper-evidence: hashing a snapshot, mirroring it
- * on-chain (AIModelRegistry), persisting hash256/dataSalt, writing the
- * BlockchainLogger audit entry, and recomputing/verifying integrity.
+ * Boundary for AI model tamper-evidence: hashing a snapshot, persisting
+ * hash256/dataSalt, writing the BlockchainLogger audit entry, anchoring through
+ * AuditAnchor, and recomputing/verifying integrity.
  *
  * Keeps the append-only audit + on-chain anchor behavior; never sends PII or
  * model content on-chain (only the salted hash).

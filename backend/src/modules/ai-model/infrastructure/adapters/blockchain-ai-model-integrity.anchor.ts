@@ -12,8 +12,7 @@ import { buildAiModelSnapshot } from '../../domain/ai-model-snapshot';
 
 /**
  * Tamper-evidence adapter for AI models. Uses the centralized AuditAnchor
- * (Merkle batch) for on-chain integrity verification instead of a dedicated
- * AIModelRegistry contract.
+ * Merkle batch for on-chain integrity verification.
  */
 @Injectable()
 export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorPort {

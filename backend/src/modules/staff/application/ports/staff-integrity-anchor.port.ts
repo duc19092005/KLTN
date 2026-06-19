@@ -16,9 +16,10 @@ export type StaffIntegrityEvaluation = {
 };
 
 /**
- * Tamper-evidence boundary for (non-doctor) staff: salted hash, on-chain mirror
- * via StaffRegistry, hash256/dataSalt persistence, BlockchainLogger audit entry,
- * and integrity evaluation. Only the salted hash goes on-chain.
+ * Tamper-evidence boundary for (non-doctor) staff: salted hash,
+ * hash256/dataSalt persistence, BlockchainLogger audit entry, AuditAnchor
+ * Merkle anchoring, and integrity evaluation. Only hashes/Merkle roots go
+ * on-chain.
  *
  * action is the AuditAction so DELETE/UPDATE semantics (used by setStatus) are
  * preserved exactly.
