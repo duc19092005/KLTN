@@ -104,10 +104,7 @@ async function main() {
   console.log(`BLOCKCHAIN_RELAYER_ADDRESS=${relayerAddress}`);
   console.log('BLOCKCHAIN_RELAYER_PRIVATE_KEY=<backend relayer private key>');
 
-  console.log('\nAdd/update these in frontend/.env:');
-  console.log(`VITE_IDENTITY_REGISTRY_ADDRESS=${identityRegistryAddress}`);
-  console.log(`VITE_NETWORK_RPC_URL=${hre.network.name === 'localhost' ? 'http://localhost:8545' : rpcUrl || ''}`);
-  console.log(`VITE_CHAIN_ID=${Number((await hre.ethers.provider.getNetwork()).chainId)}`);
+  console.log('\nFrontend does not need blockchain env; wallet authorization is checked by backend.');
 }
 
 main()

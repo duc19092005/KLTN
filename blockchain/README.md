@@ -147,13 +147,7 @@ BLOCKCHAIN_RELAYER_ADDRESS=0x...
 BLOCKCHAIN_RELAYER_PRIVATE_KEY=0x...
 ```
 
-Copy frontend public output vao `frontend/.env`:
-
-```env
-VITE_IDENTITY_REGISTRY_ADDRESS=0x...
-VITE_NETWORK_RPC_URL=http://localhost:8545
-VITE_CHAIN_ID=31337
-```
+Frontend khong can blockchain env. FE chi ky message bang MetaMask; backend moi verify authorization voi contract.
 
 Luu y: Hardhat local chain mat state khi terminal node bi tat/reset. Neu reset node, phai deploy lai va cap nhat address moi trong `blockchain/.env`.
 
@@ -179,12 +173,10 @@ Compose khong chay blockchain. Backend container chi doc `./backend/.env`. Neu b
 BLOCKCHAIN_RPC_URL=https://your-production-rpc.example
 ```
 
-Frontend container chi doc `./frontend/.env`. Dat wallet public config trong `frontend/.env`:
+Frontend container chi doc `./frontend/.env`. Hien tai frontend chi can API URL:
 
 ```env
-VITE_IDENTITY_REGISTRY_ADDRESS=0x...
-VITE_NETWORK_RPC_URL=https://your-production-rpc.example
-VITE_CHAIN_ID=<chain-id>
+VITE_API_URL=http://localhost:3001/api
 ```
 
 ### 5. Run App Natively
@@ -338,7 +330,6 @@ Truoc deploy, cac address contract co the de trong hoac de gia tri cu; sau deplo
 IDENTITY_REGISTRY_ADDRESS=0x...
 FACE_REGISTRY_ADDRESS=0x...
 AUDIT_ANCHOR_ADDRESS=0x...
-VITE_IDENTITY_REGISTRY_ADDRESS=0x...
 ```
 
 ### 4. Compile And Test
@@ -387,13 +378,7 @@ BLOCKCHAIN_RELAYER_ADDRESS=0x...
 BLOCKCHAIN_RELAYER_PRIVATE_KEY=0x...
 ```
 
-Copy public frontend values vao `frontend/.env`:
-
-```env
-VITE_IDENTITY_REGISTRY_ADDRESS=0x...
-VITE_NETWORK_RPC_URL=https://...
-VITE_CHAIN_ID=<chain-id>
-```
+Frontend khong can copy blockchain values; frontend wallet flow chi ky challenge, backend verify contract authorization.
 
 ### 6. Accept Ownership If Needed
 
@@ -447,9 +432,7 @@ Owner key khong nen nam trong backend production.
 Frontend build/runtime env can co:
 
 ```env
-VITE_IDENTITY_REGISTRY_ADDRESS=0x...
-VITE_NETWORK_RPC_URL=https://your-rpc-provider.example
-VITE_CHAIN_ID=<chain-id>
+VITE_API_URL=https://your-backend.example/api
 ```
 
 ### 9. Production Verification
@@ -547,7 +530,7 @@ npm run deploy:audit:custom
 | Backend log `AUDIT_ANCHOR_ADDRESS not set` | Chua deploy/copy address | Chay deploy va cap nhat ca `blockchain/.env` lan `backend/.env` |
 | Transaction fail `not authorized` | Relayer chua duoc add vao `IdentityRegistry` | Owner goi `addRelayer(relayer)` |
 | Transaction fail do gas | Relayer het native token | Nap gas cho relayer |
-| Frontend wallet doc sai contract | `VITE_IDENTITY_REGISTRY_ADDRESS` sai/chua rebuild | Cap nhat `frontend/.env` va rebuild frontend |
+| Frontend khong goi duoc API | `VITE_API_URL` sai/chua rebuild | Cap nhat `frontend/.env` va rebuild frontend |
 | Docker backend khong connect Hardhat | Hardhat node chua chay tren host hoac port 8545 bi chan | Chay `npm run node`, kiem tra port 8545 |
 | Reset Hardhat node xong app fail | Local chain mat state/address cu | Deploy lai va update `blockchain/.env` |
 
