@@ -23,7 +23,7 @@ Root `.env` khong con la env tong de Docker Compose bom vao moi service.
 
 - `backend/.env`: backend runtime, database, JWT, encryption, audit crypto, S3, Cloudinary avatar, backend blockchain RPC/contract/relayer runtime.
 - `frontend/.env`: public `VITE_*` config cho frontend.
-- `blockchain/.env`: deploy/governance/contract config cho Hardhat scripts.
+- `blockchain/.env`: deploy/governance config cho Hardhat scripts.
 
 Setup co ban:
 

@@ -88,9 +88,6 @@ async function main() {
   if (rpcUrl) {
     console.log(`NETWORK_RPC_URL=${rpcUrl}`);
   }
-  console.log(`IDENTITY_REGISTRY_ADDRESS=${identityRegistryAddress}`);
-  console.log(`FACE_REGISTRY_ADDRESS=${faceRegistryAddress}`);
-  console.log(`AUDIT_ANCHOR_ADDRESS=${auditAnchorAddress}`);
   console.log(`BLOCKCHAIN_OWNER_ADDRESS=${ownerAddress}`);
   console.log(`BLOCKCHAIN_RELAYER_ADDRESS=${relayerAddress}`);
 

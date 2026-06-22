@@ -36,7 +36,7 @@ Project da tach env theo tung folder:
 ```text
 KLTN/backend/.env      # backend runtime: DB, auth, S3, audit, blockchain RPC/relayer runtime
 KLTN/frontend/.env     # frontend public VITE_* config
-KLTN/blockchain/.env   # blockchain deploy/governance/contract config
+KLTN/blockchain/.env   # blockchain deploy/governance config
 ```
 
 Root `.env` khong con la env tong cho app. Moi service doc env trong folder cua no.
@@ -54,11 +54,6 @@ Bien quan trong trong `blockchain/.env` chi danh cho deploy/governance:
 # Deploy target
 NETWORK_RPC_URL=https://your-production-rpc.example
 PRIVATE_KEY=0x...
-
-# Contract addresses
-IDENTITY_REGISTRY_ADDRESS=0x...
-FACE_REGISTRY_ADDRESS=0x...
-AUDIT_ANCHOR_ADDRESS=0x...
 
 # Governance / deploy
 BLOCKCHAIN_OWNER_ADDRESS=0x...
@@ -125,13 +120,10 @@ Script `deploy:local` se:
 5. Transfer ownership sang `BLOCKCHAIN_OWNER_ADDRESS` neu owner khac deployer.
 6. In ra cac bien can copy lai theo dung folder env.
 
-Sau deploy, copy contract/governance output vao `blockchain/.env`:
+Sau deploy, copy deploy/governance output vao `blockchain/.env`:
 
 ```env
 NETWORK_RPC_URL=http://127.0.0.1:8545
-IDENTITY_REGISTRY_ADDRESS=0x...
-FACE_REGISTRY_ADDRESS=0x...
-AUDIT_ANCHOR_ADDRESS=0x...
 BLOCKCHAIN_OWNER_ADDRESS=0x...
 BLOCKCHAIN_RELAYER_ADDRESS=0x...
 ```
@@ -149,7 +141,7 @@ BLOCKCHAIN_RELAYER_PRIVATE_KEY=0x...
 
 Frontend khong can blockchain env. FE chi ky message bang MetaMask; backend moi verify authorization voi contract.
 
-Luu y: Hardhat local chain mat state khi terminal node bi tat/reset. Neu reset node, phai deploy lai va cap nhat address moi trong `blockchain/.env`.
+Luu y: Hardhat local chain mat state khi terminal node bi tat/reset. Neu reset node, phai deploy lai va cap nhat address moi trong `backend/.env`.
 
 ### 4. Run App With Docker Compose
 
@@ -324,7 +316,7 @@ BLOCKCHAIN_RELAYER_ADDRESS=0xBACKEND_RELAYER_ADDRESS
 # BLOCKCHAIN_OWNER_PRIVATE_KEY=0xOWNER_PRIVATE_KEY
 ```
 
-Truoc deploy, cac address contract co the de trong hoac de gia tri cu; sau deploy phai cap nhat:
+Sau deploy, cap nhat contract addresses vao `backend/.env`:
 
 ```env
 IDENTITY_REGISTRY_ADDRESS=0x...
@@ -356,13 +348,10 @@ Hardhat `custom` network lay:
 - Deployer key tu `PRIVATE_KEY`.
 - Neu `PRIVATE_KEY` thieu, fallback sang `BLOCKCHAIN_OWNER_PRIVATE_KEY`, roi fallback Hardhat dev key. Production phai dat `PRIVATE_KEY` ro rang de tranh deploy sai signer.
 
-Sau deploy, script in output theo tung folder env. Copy cac dong nay vao `blockchain/.env`:
+Sau deploy, script in output theo tung folder env. Copy deploy/governance values vao `blockchain/.env`:
 
 ```env
 NETWORK_RPC_URL=https://...
-IDENTITY_REGISTRY_ADDRESS=0x...
-FACE_REGISTRY_ADDRESS=0x...
-AUDIT_ANCHOR_ADDRESS=0x...
 BLOCKCHAIN_OWNER_ADDRESS=0x...
 BLOCKCHAIN_RELAYER_ADDRESS=0x...
 ```
@@ -527,12 +516,12 @@ npm run deploy:audit:custom
 | Trieu chung | Nguyen nhan thuong gap | Cach xu ly |
 |---|---|---|
 | Backend log `IDENTITY_REGISTRY_ADDRESS not set` | Thieu backend runtime config | Kiem tra `backend/.env` |
-| Backend log `AUDIT_ANCHOR_ADDRESS not set` | Chua deploy/copy address | Chay deploy va cap nhat ca `blockchain/.env` lan `backend/.env` |
+| Backend log `AUDIT_ANCHOR_ADDRESS not set` | Chua deploy/copy address | Chay deploy va cap nhat `backend/.env` |
 | Transaction fail `not authorized` | Relayer chua duoc add vao `IdentityRegistry` | Owner goi `addRelayer(relayer)` |
 | Transaction fail do gas | Relayer het native token | Nap gas cho relayer |
 | Frontend khong goi duoc API | `VITE_API_URL` sai/chua rebuild | Cap nhat `frontend/.env` va rebuild frontend |
 | Docker backend khong connect Hardhat | Hardhat node chua chay tren host hoac port 8545 bi chan | Chay `npm run node`, kiem tra port 8545 |
-| Reset Hardhat node xong app fail | Local chain mat state/address cu | Deploy lai va update `blockchain/.env` |
+| Reset Hardhat node xong app fail | Local chain mat state/address cu | Deploy lai va update `backend/.env` |
 
 ## Security Rules
 
