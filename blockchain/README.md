@@ -47,6 +47,14 @@ cd blockchain
 cp .env.example .env
 ```
 
+Trong `.env.example`, block dang active la local Hardhat only:
+
+```env
+VITE_CHAIN_ID=31337
+```
+
+Production khong duoc dung mac dinh nay. Production phai set `VITE_CHAIN_ID` theo network that, vi du Sepolia `11155111`, Polygon `137`, Base `8453`, Arbitrum One `42161`, Ethereum mainnet `1`.
+
 Bien quan trong trong `blockchain/.env`:
 
 ```env
@@ -69,7 +77,7 @@ BLOCKCHAIN_RELAYER_PRIVATE_KEY=0x...
 # Frontend wallet config
 VITE_IDENTITY_REGISTRY_ADDRESS=0x...
 VITE_NETWORK_RPC_URL=http://localhost:8545
-VITE_CHAIN_ID=31337
+VITE_CHAIN_ID=31337 # local only; production must use the real chain ID
 ```
 
 ## Case 1: Deploy Local Development
