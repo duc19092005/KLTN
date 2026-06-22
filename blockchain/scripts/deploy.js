@@ -14,7 +14,19 @@ function addressFromPrivateKey(value) {
 }
 
 async function main() {
+  if (hre.network.name === 'custom') {
+    if (!process.env.NETWORK_RPC_URL) {
+      throw new Error('NETWORK_RPC_URL is required for custom deploys.');
+    }
+    if (!normalizePrivateKey(process.env.PRIVATE_KEY || process.env.BLOCKCHAIN_OWNER_PRIVATE_KEY || process.env.SUPER_ADMIN_PRIVATE_KEY)) {
+      throw new Error('PRIVATE_KEY or BLOCKCHAIN_OWNER_PRIVATE_KEY is required for custom deploys.');
+    }
+  }
+
   const [deployer] = await hre.ethers.getSigners();
+  if (!deployer) {
+    throw new Error(`No deployer signer configured for network "${hre.network.name}".`);
+  }
   console.log('Deploying contracts with account:', deployer.address);
   console.log('Account balance:', (await hre.ethers.provider.getBalance(deployer.address)).toString());
 
