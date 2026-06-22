@@ -24,33 +24,15 @@ services:
     restart: unless-stopped
     ports:
       - "3001:3001"
-    # Root .env keeps app/database/secrets. Blockchain deploy/runtime variables
-    # live in ./blockchain/.env and are loaded separately.
+    # Backend owns its runtime env. Do not load root, frontend, or blockchain env here.
     env_file:
-      - ./.env
-      - ./blockchain/.env
-    # Values declared here override env_file values for Docker networking.
+      - ./backend/.env
+    # Docker-only overrides. Secrets and app config stay in backend/.env.
     environment:
-      # --- required; fail fast if missing ---
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set in .env}
-      AUDIT_PEPPER: ${AUDIT_PEPPER:?AUDIT_PEPPER must be set in .env}
-      # Audit V2 crypto. Docker local may use explicit dev fallback.
-      AUDIT_HASH_KEY: ${AUDIT_HASH_KEY:-}
-      AUDIT_ENCRYPTION_KEY: ${AUDIT_ENCRYPTION_KEY:-}
-      AUDIT_ENCRYPTION_KEY_ID: ${AUDIT_ENCRYPTION_KEY_ID:-local-dev-audit-key-v1}
-      ALLOW_INSECURE_AUDIT_CRYPTO: ${ALLOW_INSECURE_AUDIT_CRYPTO:-true}
-      # --- Docker network overrides ---
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-change-me-local-only}@db:5432/${POSTGRES_DB:-zkp_identity}?schema=public
-      # The Hardhat node is now run from ./blockchain on the host, not as a
-      # docker-compose service. Start it with: cd blockchain && npm run node
-      BLOCKCHAIN_RPC_URL: http://host.docker.internal:8545
       FRONTEND_ORIGIN: http://localhost:5173
-      # --- server config ---
       NODE_ENV: development
       PORT: 3001
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -63,18 +45,13 @@ services:
     build:
       context: ./frontend
       args:
-        # Vite reads VITE_* at build time. For custom deployments, export these
-        # values in the shell or pass --env-file blockchain/.env to compose.
         VITE_API_URL: http://localhost:3001/api
-        VITE_IDENTITY_REGISTRY_ADDRESS: ${VITE_IDENTITY_REGISTRY_ADDRESS:-0x5FbDB2315678afecb367f032d93F642f64180aa3}
-        VITE_NETWORK_RPC_URL: ${VITE_NETWORK_RPC_URL:-http://localhost:8545}
-        VITE_CHAIN_ID: ${VITE_CHAIN_ID:-31337}
     container_name: admin-auth-frontend
     restart: unless-stopped
     ports:
       - "5173:5173"
     env_file:
-      - ./blockchain/.env
+      - ./frontend/.env
     environment:
       VITE_API_URL: http://localhost:3001/api
       CHOKIDAR_USEPOLLING: "true"

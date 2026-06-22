@@ -75,10 +75,12 @@ KLTN/
 ### Run app services via Docker
 
 ```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
 cd blockchain && cp .env.example .env
 npm install
 npm run node                              # terminal 1
-npm run deploy:local                      # terminal 2, then copy output to blockchain/.env
+npm run deploy:local                      # terminal 2, then copy output to each folder env
 
 cd ..
 docker compose up -d
@@ -88,9 +90,9 @@ docker compose up -d
 # Hardhat:  http://localhost:8545
 ```
 
-Docker Compose no longer starts a blockchain container. The backend container
-loads `./blockchain/.env` and reaches the host Hardhat node through
-`http://host.docker.internal:8545`.
+Docker Compose no longer starts a blockchain container. It reads `backend/.env`
+for backend runtime config and `frontend/.env` for frontend public config. It
+does not load `blockchain/.env`.
 
 ### Or run each part separately
 

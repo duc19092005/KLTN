@@ -87,13 +87,24 @@ async function main() {
   console.log('\nAdd/update these in blockchain/.env:');
   if (rpcUrl) {
     console.log(`NETWORK_RPC_URL=${rpcUrl}`);
-    console.log(`BLOCKCHAIN_RPC_URL=${rpcUrl}`);
   }
   console.log(`IDENTITY_REGISTRY_ADDRESS=${identityRegistryAddress}`);
   console.log(`FACE_REGISTRY_ADDRESS=${faceRegistryAddress}`);
   console.log(`AUDIT_ANCHOR_ADDRESS=${auditAnchorAddress}`);
   console.log(`BLOCKCHAIN_OWNER_ADDRESS=${ownerAddress}`);
   console.log(`BLOCKCHAIN_RELAYER_ADDRESS=${relayerAddress}`);
+
+  console.log('\nAdd/update these in backend/.env:');
+  if (rpcUrl) {
+    console.log(`BLOCKCHAIN_RPC_URL=${rpcUrl}`);
+  }
+  console.log(`IDENTITY_REGISTRY_ADDRESS=${identityRegistryAddress}`);
+  console.log(`FACE_REGISTRY_ADDRESS=${faceRegistryAddress}`);
+  console.log(`AUDIT_ANCHOR_ADDRESS=${auditAnchorAddress}`);
+  console.log(`BLOCKCHAIN_RELAYER_ADDRESS=${relayerAddress}`);
+  console.log('BLOCKCHAIN_RELAYER_PRIVATE_KEY=<backend relayer private key>');
+
+  console.log('\nAdd/update these in frontend/.env:');
   console.log(`VITE_IDENTITY_REGISTRY_ADDRESS=${identityRegistryAddress}`);
   console.log(`VITE_NETWORK_RPC_URL=${hre.network.name === 'localhost' ? 'http://localhost:8545' : rpcUrl || ''}`);
   console.log(`VITE_CHAIN_ID=${Number((await hre.ethers.provider.getNetwork()).chainId)}`);

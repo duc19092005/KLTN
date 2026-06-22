@@ -30,7 +30,7 @@ async function main() {
   // Machine-parseable markers so the caller can extract addresses reliably.
   console.log(`DEPLOYED FACE_REGISTRY_ADDRESS=${faceRegistryAddress}`);
   console.log(`DEPLOYED AUDIT_ANCHOR_ADDRESS=${auditAnchorAddress}`);
-  console.log('\nAdd/update these in blockchain/.env:');
+  console.log('\nAdd/update these in blockchain/.env and backend/.env:');
   console.log(`FACE_REGISTRY_ADDRESS=${faceRegistryAddress}`);
   console.log(`AUDIT_ANCHOR_ADDRESS=${auditAnchorAddress}`);
 }

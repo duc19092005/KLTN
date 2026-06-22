@@ -14,21 +14,22 @@ KLTN/
 |-- blockchain/   Solidity + Hardhat + Ethers.js
 |-- docs/         Tai lieu kien truc, audit, backup/recovery
 |-- tools/        Cong cu khoi phuc/khan cap offline
-|-- .env.example  Mau env root cho app/backend/frontend/database
+|-- .env.example  Legacy/reference env checklist
 ```
 
 ## Environment Model
 
-Root `.env` khong con chua blockchain address/key nua.
+Root `.env` khong con la env tong de Docker Compose bom vao moi service.
 
-- Root `.env`: database, JWT, encryption, audit crypto, S3, Cloudinary avatar, server config.
-- `blockchain/.env`: RPC, contract addresses, owner key, relayer key, frontend wallet config.
-- `blockchain/.env.example`: mau va lenh deploy blockchain.
+- `backend/.env`: backend runtime, database, JWT, encryption, audit crypto, S3, Cloudinary avatar, backend blockchain RPC/contract/relayer runtime.
+- `frontend/.env`: public `VITE_*` config cho frontend.
+- `blockchain/.env`: deploy/governance/contract config cho Hardhat scripts.
 
 Setup co ban:
 
 ```bash
-cp .env.example .env
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
 cd blockchain
 cp .env.example .env
 ```
@@ -41,8 +42,8 @@ Co 3 vai tro tach biet:
 
 | Vai tro | Nam o dau | Lam gi |
 |---|---|---|
-| Owner / root governance | `BLOCKCHAIN_OWNER_PRIVATE_KEY` trong `blockchain/.env` cho dev; production nen la cold wallet/multisig | Authorize/revoke Admin wallets, add/remove relayers, transfer ownership |
-| Relayer / backend writer | `BLOCKCHAIN_RELAYER_PRIVATE_KEY` trong `blockchain/.env` | Ky giao dich tu dong: `AuditAnchor.commitRoot`, `FaceRegistry.setFaceHash`, `recordAction` |
+| Owner / root governance | `BLOCKCHAIN_OWNER_PRIVATE_KEY` trong `blockchain/.env` cho deploy/governance; production nen la cold wallet/multisig | Authorize/revoke Admin wallets, add/remove relayers, transfer ownership |
+| Relayer / backend writer | `BLOCKCHAIN_RELAYER_PRIVATE_KEY` trong `backend/.env` hoac secret manager backend | Ky giao dich tu dong: `AuditAnchor.commitRoot`, `FaceRegistry.setFaceHash`, `recordAction` |
 | Admin wallet | Vi nguoi dung nhu MetaMask/hardware wallet | Login, step-up, emergency restore challenge |
 
 Backend khong dung vi Admin de tra gas cho audit transaction. Admin ky challenge de chung minh danh tinh; backend relayer moi la vi gui giao dich van hanh len chain.
@@ -89,7 +90,7 @@ cd blockchain
 npm run deploy:local
 ```
 
-Sau khi deploy, copy cac dong script in ra vao `blockchain/.env`.
+Sau khi deploy, copy dung phan script in ra vao tung file: `blockchain/.env`, `backend/.env`, `frontend/.env`.
 
 Lenh huu ich:
 
@@ -118,11 +119,7 @@ Postgres: localhost:5432
 Hardhat:  http://localhost:8545
 ```
 
-Trong compose, backend container ket noi Hardhat node tren host qua:
-
-```text
-http://host.docker.internal:8545
-```
+Trong compose, backend chi doc `backend/.env`; frontend chi doc `frontend/.env`; compose khong doc `blockchain/.env`.
 
 ## Luu Tru File Y Te
 
