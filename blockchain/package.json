@@ -5,8 +5,11 @@
   "scripts": {
     "compile": "npx hardhat compile",
     "test": "npx hardhat test",
-    "node": "npx hardhat node",
+    "node": "npx hardhat node --hostname 0.0.0.0",
     "deploy:local": "npx hardhat run scripts/deploy.js --network localhost",
+    "deploy:custom": "npx hardhat run scripts/deploy.js --network custom",
+    "deploy:audit:local": "npx hardhat run scripts/deploy-audit.js --network localhost",
+    "deploy:audit:custom": "npx hardhat run scripts/deploy-audit.js --network custom",
     "compile-circuit": "node scripts/compile-circuit.js"
   },
   "devDependencies": {

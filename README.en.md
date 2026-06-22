@@ -72,15 +72,25 @@ KLTN/
 - Node.js 20+
 - (Optional) MetaMask to test the wallet flow
 
-### Run everything via Docker
+### Run app services via Docker
 
 ```bash
+cd blockchain && cp .env.example .env
+npm install
+npm run node                              # terminal 1
+npm run deploy:local                      # terminal 2, then copy output to blockchain/.env
+
+cd ..
 docker compose up -d
 # Backend:  http://localhost:3001/api
 # Frontend: http://localhost:5173
 # Postgres: localhost:5432
 # Hardhat:  http://localhost:8545
 ```
+
+Docker Compose no longer starts a blockchain container. The backend container
+loads `./blockchain/.env` and reaches the host Hardhat node through
+`http://host.docker.internal:8545`.
 
 ### Or run each part separately
 
@@ -93,8 +103,9 @@ cd frontend && npm install && npm run dev
 
 # Blockchain (local node + deploy)
 cd blockchain && npm install
-npx hardhat node                          # terminal 1
-npx hardhat run scripts/deploy.js --network localhost  # terminal 2
+cp .env.example .env
+npm run node                              # terminal 1
+npm run deploy:local                      # terminal 2
 ```
 
 ---

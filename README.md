@@ -1,112 +1,115 @@
 # KLTN Hospital Management System
 
-Hệ thống quản lý bệnh viện full-stack với NestJS, React, PostgreSQL, AI hỗ trợ chẩn đoán, xác thực sinh trắc học và blockchain audit trail. Blockchain chỉ dùng để neo hash/Merkle root phục vụ kiểm chứng toàn vẹn; tuyệt đối không lưu PII, nội dung bệnh án, PDF, X-Ray hay file y tế on-chain.
+He thong quan ly benh vien full-stack voi NestJS, React, PostgreSQL, AI ho tro chan doan, xac thuc sinh trac hoc va blockchain audit trail.
 
-## Cấu trúc monorepo
+Blockchain chi dung de neo hash/Merkle root phuc vu kiem chung toan ven. Tuyet doi khong dua PII, noi dung benh an, PDF, X-Ray, anh y te, S3 object key hay file len chain.
+
+## Cau Truc Monorepo
 
 ```text
 KLTN/
-├── backend/      NestJS + Prisma + PostgreSQL
-├── frontend/     React + Vite + Tailwind CSS
-├── mobile/       Expo React Native NFC apps for receptionist and patient flows
-├── blockchain/   Solidity + Hardhat + Ethers.js
-├── docs/         Tài liệu kiến trúc, audit, backup/recovery
-├── tools/        Công cụ khẩn cấp chạy offline
-└── .env.example  Mẫu cấu hình môi trường an toàn để copy ra .env
+|-- backend/      NestJS + Prisma + PostgreSQL
+|-- frontend/     React + Vite + Tailwind CSS
+|-- mobile/       Expo React Native NFC demo apps
+|-- blockchain/   Solidity + Hardhat + Ethers.js
+|-- docs/         Tai lieu kien truc, audit, backup/recovery
+|-- tools/        Cong cu khoi phuc/khan cap offline
+|-- .env.example  Mau env root cho app/backend/frontend/database
 ```
 
-## NFC mobile
+## Environment Model
 
-`mobile/` is the single source for NFC mobile setup, APK build, and card payload docs. It contains two app surfaces:
+Root `.env` khong con chua blockchain address/key nua.
 
-- Receptionist scanner: pairs with the web intake flow through NFC sessions and SSE.
-- Patient portal: scans the NFC CCCD card, then reuses backend patient verification with DB and blockchain checks.
+- Root `.env`: database, JWT, encryption, audit crypto, S3, Cloudinary avatar, server config.
+- `blockchain/.env`: RPC, contract addresses, owner key, relayer key, frontend wallet config.
+- `blockchain/.env.example`: mau va lenh deploy blockchain.
 
-Current demo backend URL:
-
-```env
-EXPO_PUBLIC_BACKEND_URL=http://192.168.1.13:3001/api
-```
-
-See [mobile/README.md](./mobile/README.md).
-
-## Luồng blockchain hiện tại
-
-Blockchain trong dự án có 3 vai trò tách biệt:
-
-| Vai trò | Nằm ở đâu | Dùng để làm gì | Có nên nằm trong backend env không? |
-|---|---|---|---|
-| Owner / Root Governance | `BLOCKCHAIN_OWNER_PRIVATE_KEY` trong dev; production nên là cold wallet/multisig | `authorizeAdmin`, `revokeAdmin`, `addRelayer`, `removeRelayer`, `transferOwnership` | Dev được; production không nên |
-| Relayer / Backend Writer | `BLOCKCHAIN_RELAYER_PRIVATE_KEY` | Ký giao dịch tự động: `AuditAnchor.commitRoot`, `FaceRegistry.setFaceHash`, `recordAction` | Có, nhưng phải rotate được |
-| Admin Wallet | Ví MetaMask/hardware của admin | Login, step-up, emergency restore, ký challenge chứng minh danh tính | Không, ví nằm phía người dùng |
-
-Điểm quan trọng: backend không dùng ví Admin để trả gas cho từng audit transaction. Admin ký challenge để chứng minh danh tính hoặc phê duyệt thao tác nhạy cảm; backend relayer mới là ví gửi giao dịch vận hành lên chain.
-
-## Contract authority model
-
-`IdentityRegistry` là nguồn quyền trung tâm:
-
-```text
-IdentityRegistry.owner()
-├── quản trị Admin wallets
-├── quản trị backend relayers
-└── chuyển ownership
-
-IdentityRegistry.isRelayerOrOwner(address)
-├── cho phép FaceRegistry ghi face hash
-├── cho phép AuditAnchor commit Merkle root
-└── cho phép recordAction
-```
-
-`FaceRegistry` và `AuditAnchor` không tự giữ danh sách owner/relayer riêng. Hai contract này luôn hỏi `IdentityRegistry`, nhờ vậy khi rotate relayer chỉ cần cập nhật một nơi.
-
-## Nếu mất key thì sao?
-
-| Sự cố | Hậu quả | Cách xử lý |
-|---|---|---|
-| Mất `BLOCKCHAIN_RELAYER_PRIVATE_KEY` | Không ghi được audit root/face hash mới; log có thể dồn `UNANCHORED`/failed | Owner gọi `removeRelayer(old)` và `addRelayer(new)`, backend đổi relayer key |
-| Relayer bị lộ | Kẻ xấu có thể gửi giao dịch operational trong quyền relayer | Owner revoke relayer cũ, add relayer mới, audit lại batch trong khoảng nghi ngờ |
-| Mất Admin wallet | Admin đó không login/step-up/recovery được | Owner revoke ví cũ, authorize ví mới |
-| Mất Owner key đơn lẻ | Governance bị kẹt; sau này không rotate relayer/admin được | Không có cách cứu nếu contract không có recovery. Production phải dùng multisig/cold wallet |
-
-## Cấu hình môi trường
-
-Copy file mẫu:
+Setup co ban:
 
 ```bash
 cp .env.example .env
+cd blockchain
+cp .env.example .env
 ```
 
-Các biến blockchain chính:
+Khong commit file `.env` that.
 
-```env
-BLOCKCHAIN_RPC_URL=http://blockchain:8545
+## Blockchain Flow
 
-IDENTITY_REGISTRY_ADDRESS=0x...
-FACE_REGISTRY_ADDRESS=0x...
-AUDIT_ANCHOR_ADDRESS=0x...
+Co 3 vai tro tach biet:
 
-BLOCKCHAIN_OWNER_ADDRESS=0x...
-BLOCKCHAIN_OWNER_PRIVATE_KEY=0x...
+| Vai tro | Nam o dau | Lam gi |
+|---|---|---|
+| Owner / root governance | `BLOCKCHAIN_OWNER_PRIVATE_KEY` trong `blockchain/.env` cho dev; production nen la cold wallet/multisig | Authorize/revoke Admin wallets, add/remove relayers, transfer ownership |
+| Relayer / backend writer | `BLOCKCHAIN_RELAYER_PRIVATE_KEY` trong `blockchain/.env` | Ky giao dich tu dong: `AuditAnchor.commitRoot`, `FaceRegistry.setFaceHash`, `recordAction` |
+| Admin wallet | Vi nguoi dung nhu MetaMask/hardware wallet | Login, step-up, emergency restore challenge |
 
-BLOCKCHAIN_RELAYER_ADDRESS=0x...
-BLOCKCHAIN_RELAYER_PRIVATE_KEY=0x...
+Backend khong dung vi Admin de tra gas cho audit transaction. Admin ky challenge de chung minh danh tinh; backend relayer moi la vi gui giao dich van hanh len chain.
+
+`IdentityRegistry` la nguon quyen trung tam:
+
+```text
+IdentityRegistry.owner()
+|-- quan tri Admin wallets
+|-- quan tri backend relayers
+|-- transferOwnership
+
+IdentityRegistry.isRelayerOrOwner(address)
+|-- cho phep FaceRegistry ghi face hash
+|-- cho phep AuditAnchor commit Merkle root
+|-- cho phep recordAction
 ```
 
-Ghi chú:
+`FaceRegistry` va `AuditAnchor` khong giu danh sach relayer rieng. Khi rotate relayer chi can cap nhat `IdentityRegistry`.
 
-- `BLOCKCHAIN_OWNER_PRIVATE_KEY` hiện được hỗ trợ trong env để dev/local chạy nhanh. Production nên chuyển owner sang multisig hoặc cold wallet.
-- `BLOCKCHAIN_RELAYER_PRIVATE_KEY` là hot key của backend. Key này phải có thể revoke/rotate.
-- `SUPER_ADMIN_PRIVATE_KEY` là biến cũ, chỉ còn fallback tương thích ngược. Cấu hình mới không nên dùng.
-- Không commit `.env`; chỉ commit `.env.example`.
+## Neu Mat Key
 
-## Chạy nhanh bằng Docker
+| Su co | Hau qua | Xu ly |
+|---|---|---|
+| Mat `BLOCKCHAIN_RELAYER_PRIVATE_KEY` | Khong ghi audit root/face hash moi; log co the don `UNANCHORED`/failed | Owner goi `removeRelayer(old)` va `addRelayer(new)`, sau do backend doi relayer key |
+| Relayer bi lo | Ke xau co the gui giao dich operational trong quyen relayer | Owner revoke relayer cu, add relayer moi, audit lai batch trong khoang nghi ngo |
+| Mat Admin wallet | Admin do khong login/step-up/recovery duoc | Owner revoke vi cu, authorize vi moi |
+| Mat Owner key don le | Governance ket; khong rotate relayer/admin duoc | Neu contract khong co recovery thi khong cuu duoc. Production phai dung multisig/cold wallet |
+
+## Chay Blockchain Local
+
+Terminal 1:
+
+```bash
+cd blockchain
+npm install
+npm run node
+```
+
+Terminal 2:
+
+```bash
+cd blockchain
+npm run deploy:local
+```
+
+Sau khi deploy, copy cac dong script in ra vao `blockchain/.env`.
+
+Lenh huu ich:
+
+```bash
+cd blockchain
+npm run compile
+npm test
+npm run deploy:custom
+npm run deploy:audit:local
+```
+
+## Chay Bang Docker Compose
+
+Docker Compose khong chay blockchain container nua. Truoc khi `docker compose up`, hay chay Hardhat node o `blockchain/` nhu phan tren.
 
 ```bash
 docker compose up -d
 ```
 
-Mặc định:
+Mac dinh:
 
 ```text
 Backend:  http://localhost:3001/api
@@ -115,93 +118,53 @@ Postgres: localhost:5432
 Hardhat:  http://localhost:8545
 ```
 
-## Chạy blockchain local thủ công
-
-```bash
-cd blockchain
-npm install
-npx hardhat node
-```
-
-Terminal khác:
-
-```bash
-cd blockchain
-npx hardhat run scripts/deploy.js --network localhost
-```
-
-`scripts/deploy.js` sẽ:
-
-1. Deploy `IdentityRegistry`.
-2. Cấp quyền relayer từ `BLOCKCHAIN_RELAYER_ADDRESS` hoặc private key tương ứng.
-3. Deploy `FaceRegistry` và `AuditAnchor`.
-4. Chuyển ownership sang `BLOCKCHAIN_OWNER_ADDRESS` nếu cấu hình khác deployer.
-5. Tự `acceptOwnership()` nếu `BLOCKCHAIN_OWNER_PRIVATE_KEY` có sẵn trong env.
-
-## Luồng nghiệp vụ ví Admin
+Trong compose, backend container ket noi Hardhat node tren host qua:
 
 ```text
-Admin login/step-up
-→ Backend tạo challenge
-→ Admin ký bằng MetaMask/hardware wallet
-→ Backend recover address từ signature
-→ Backend kiểm tra IdentityRegistry.isAuthorized(address)
-→ Nếu hợp lệ thì cấp session/JWT hoặc cho phép thao tác nhạy cảm
+http://host.docker.internal:8545
 ```
 
-Ví Admin không thay thế relayer. Nó là human identity/recovery key.
+## Luu Tru File Y Te
 
-## Luồng audit khi thêm/sửa dữ liệu
+Medical result upload moi dung AWS S3 private bucket:
 
-Ví dụ Admin thêm phòng ban:
+- PDF report, X-Ray/MRI/CT/Ultrasound image, ECG, lab attachments.
+- AI image attachments: backend tai anh private tu S3, convert base64 va gui sang AI provider.
+
+Staff/doctor avatar khong di qua S3 private. Avatar dung Cloudinary public/static URL de frontend render truc tiep.
+
+PostgreSQL giu metadata/quyen truy cap (`storageProvider`, `bucket`, `objectKey`, `sha256`, `etag`). S3 chi giu blob. Blockchain chi anchor audit hash/Merkle root da sanitize.
+
+Download file y te di qua:
 
 ```text
-Admin thao tác trên UI
-→ Backend kiểm tra JWT/RBAC/step-up nếu cần
-→ Backend ghi dữ liệu vào PostgreSQL
-→ Backend ghi BlockchainLogger
-→ AuditAnchorService gom batch và tính Merkle root
-→ Backend relayer ký commitRoot()
-→ AuditAnchor hỏi IdentityRegistry.isRelayerOrOwner(msg.sender)
-→ Root được neo on-chain
+/api/medical-orders/results/files/:fileId/download
 ```
 
-On-chain chỉ có hash/root/timestamp/metadata kỹ thuật, không có dữ liệu y tế.
+Backend kiem tra RBAC roi moi tra pre-signed URL ngan han. File Cloudinary medical cu khong migrate trong phase nay; neu DB con `url` legacy va URL con song thi endpoint van mo duoc.
 
-## Thành phần chính
+## NFC Mobile
 
-| Thành phần | Công nghệ | Vai trò |
-|---|---|---|
-| Backend | NestJS, Prisma, PostgreSQL | API, nghiệp vụ, auth, audit, AWS S3 medical storage, Cloudinary avatars, AI child process |
-| Frontend | React, Vite, Tailwind CSS | SPA cho Admin, Receptionist, Doctor, Lab Manager |
-| Blockchain | Solidity, Hardhat, Ethers.js v6 | Integrity anchor, wallet authorization, audit root |
-| AI/ML | Python, TensorFlow, InsightFace | Diagnostic suggestions, face embedding |
+`mobile/` la noi setup NFC mobile, build APK va mo ta payload card.
 
-## Lưu trữ file y tế
+- Receptionist scanner: pair voi web intake qua NFC session va SSE.
+- Patient portal: scan NFC CCCD card, sau do dung lai backend patient verification.
 
-Medical result upload mới dùng AWS S3 private bucket:
+Xem [mobile/README.md](./mobile/README.md).
 
-- Medical result files: PDF, X-Ray/MRI/CT/Ultrasound image, ECG, lab attachments.
-- AI image attachments: backend tải ảnh private từ S3, convert base64 và gửi vào AI provider.
-
-Staff/doctor avatar không đi qua S3 private. Avatar dùng Cloudinary public/static URL để frontend render trực tiếp bằng `<img src={avatarUrl}>`.
-
-PostgreSQL giữ metadata/quyền truy cập (`storageProvider`, `bucket`, `objectKey`, `sha256`, `etag`). S3 chỉ giữ blob. Blockchain chỉ anchor audit hash/Merkle root đã sanitize; không đưa S3 URL, object key, PDF, ảnh, PII hoặc nội dung bệnh án lên chain.
-
-Medical file download vẫn đi qua endpoint backend `/api/medical-orders/results/files/:fileId/download`; backend kiểm tra RBAC rồi mới trả pre-signed URL ngắn hạn. File Cloudinary medical cũ không migrate trong phase này; nếu DB còn `url` legacy và URL đó còn sống thì endpoint vẫn mở được.
-
-## Tài liệu liên quan
+## Tai Lieu Lien Quan
 
 - [AGENTS.md](./AGENTS.md)
+- [blockchain/README.md](./blockchain/README.md)
 - [docs/security/audit-logging.md](./docs/security/audit-logging.md)
 - [docs/security/tiers-and-anchoring.md](./docs/security/tiers-and-anchoring.md)
 - [docs/backup-recovery/overview.md](./docs/backup-recovery/overview.md)
 - [tools/recovery-signer/README.md](./tools/recovery-signer/README.md)
 
-## Quy ước phát triển
+## Quy Uoc Phat Trien
 
-- Backend dùng feature-based modules, DTO validation bằng `class-validator`, business logic nằm ở service/use case.
-- Multi-step workflow phải dùng transaction.
-- Entity quan trọng phải ghi audit và anchor hash/root.
-- Blockchain không lưu PII, file y tế, nội dung chẩn đoán hoặc dữ liệu lớn.
-- `.env` không được commit; cập nhật `.env.example` khi thêm biến mới.
+- Backend dung feature-based modules, DTO validation bang `class-validator`, business logic nam o service/use case.
+- Multi-step workflow phai dung transaction.
+- Entity quan trong phai ghi audit va anchor hash/root.
+- Blockchain khong luu PII, file y te, noi dung chan doan hoac du lieu lon.
+- `.env` khong duoc commit; cap nhat `.env.example` khi them bien moi.

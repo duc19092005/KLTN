@@ -4,8 +4,10 @@ const hre = require('hardhat');
  * Deploys the auxiliary registry contracts (FaceRegistry + AuditAnchor) to an
  * already-running node, leaving the existing IdentityRegistry untouched. Both
  * contracts read owner/relayer authorization from IdentityRegistry, so its
- * address must be supplied.
- *   IDENTITY_REGISTRY_ADDRESS=0x... npx hardhat run scripts/deploy-audit.js --network localhost
+ * address must be supplied in blockchain/.env or inline.
+ *
+ *   npm run deploy:audit:local
+ *   IDENTITY_REGISTRY_ADDRESS=0x... npm run deploy:audit:local
  */
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
@@ -28,6 +30,9 @@ async function main() {
   // Machine-parseable markers so the caller can extract addresses reliably.
   console.log(`DEPLOYED FACE_REGISTRY_ADDRESS=${faceRegistryAddress}`);
   console.log(`DEPLOYED AUDIT_ANCHOR_ADDRESS=${auditAnchorAddress}`);
+  console.log('\nAdd/update these in blockchain/.env:');
+  console.log(`FACE_REGISTRY_ADDRESS=${faceRegistryAddress}`);
+  console.log(`AUDIT_ANCHOR_ADDRESS=${auditAnchorAddress}`);
 }
 
 main()

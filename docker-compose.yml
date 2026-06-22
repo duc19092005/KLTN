@@ -17,16 +17,6 @@ services:
       timeout: 5s
       retries: 20
 
-  blockchain:
-    build:
-      context: ./blockchain
-    container_name: admin-auth-blockchain
-    restart: unless-stopped
-    env_file:
-      - ./.env
-    ports:
-      - "8545:8545"
-
   backend:
     build:
       context: ./backend
@@ -34,59 +24,59 @@ services:
     restart: unless-stopped
     ports:
       - "3001:3001"
-    # Tự động nạp toàn bộ biến từ file .env ở thư mục gốc. Khi thêm biến mới
-    # vào .env thì không cần khai báo lại ở `environment:` nếu không cần override.
+    # Root .env keeps app/database/secrets. Blockchain deploy/runtime variables
+    # live in ./blockchain/.env and are loaded separately.
     env_file:
       - ./.env
-    # Các biến bắt buộc và override cho mạng Docker. Biến khai báo ở đây sẽ
-    # ưu tiên hơn `env_file`, giúp DATABASE_URL / BLOCKCHAIN_RPC_URL trỏ đúng
-    # vào service nội bộ thay vì localhost của máy host.
+      - ./blockchain/.env
+    # Values declared here override env_file values for Docker networking.
     environment:
-      # --- bắt buộc (thiếu thì fail sớm) ---
+      # --- required; fail fast if missing ---
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set in .env}
       AUDIT_PEPPER: ${AUDIT_PEPPER:?AUDIT_PEPPER must be set in .env}
-      # Crypto cho Audit V2. Với Docker local, cho phép fallback dev có chủ đích
-      # khi .env chưa khai báo AUDIT_HASH_KEY/AUDIT_ENCRYPTION_KEY thật.
+      # Audit V2 crypto. Docker local may use explicit dev fallback.
       AUDIT_HASH_KEY: ${AUDIT_HASH_KEY:-}
       AUDIT_ENCRYPTION_KEY: ${AUDIT_ENCRYPTION_KEY:-}
       AUDIT_ENCRYPTION_KEY_ID: ${AUDIT_ENCRYPTION_KEY_ID:-local-dev-audit-key-v1}
       ALLOW_INSECURE_AUDIT_CRYPTO: ${ALLOW_INSECURE_AUDIT_CRYPTO:-true}
-      # --- override cho mạng Docker ---
+      # --- Docker network overrides ---
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-change-me-local-only}@db:5432/${POSTGRES_DB:-zkp_identity}?schema=public
-      BLOCKCHAIN_RPC_URL: http://blockchain:8545
+      # The Hardhat node is now run from ./blockchain on the host, not as a
+      # docker-compose service. Start it with: cd blockchain && npm run node
+      BLOCKCHAIN_RPC_URL: http://host.docker.internal:8545
       FRONTEND_ORIGIN: http://localhost:5173
-      # --- cấu hình server ---
+      # --- server config ---
       NODE_ENV: development
       PORT: 3001
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./backend:/app
       - /app/node_modules
-    command: sh -c "until nc -z db 5432; do echo 'Waiting for PostgreSQL...'; sleep 2; done; until nc -z blockchain 8545; do echo 'Waiting for blockchain...'; sleep 2; done; sleep 6; npx prisma generate; npx prisma db push; npm run start:dev"
+    command: sh -c "until nc -z db 5432; do echo 'Waiting for PostgreSQL...'; sleep 2; done; sleep 6; npx prisma generate; npx prisma db push; npm run start:dev"
     depends_on:
       db:
         condition: service_healthy
-      blockchain:
-        condition: service_started
 
   frontend:
     build:
       context: ./frontend
       args:
-        # Vite reads VITE_* at build time; pass through .env values.
+        # Vite reads VITE_* at build time. For custom deployments, export these
+        # values in the shell or pass --env-file blockchain/.env to compose.
         VITE_API_URL: http://localhost:3001/api
-        VITE_IDENTITY_REGISTRY_ADDRESS: ${IDENTITY_REGISTRY_ADDRESS:-0x5FbDB2315678afecb367f032d93F642f64180aa3}
-        VITE_NETWORK_RPC_URL: http://localhost:8545
-        VITE_CHAIN_ID: 31337
+        VITE_IDENTITY_REGISTRY_ADDRESS: ${VITE_IDENTITY_REGISTRY_ADDRESS:-0x5FbDB2315678afecb367f032d93F642f64180aa3}
+        VITE_NETWORK_RPC_URL: ${VITE_NETWORK_RPC_URL:-http://localhost:8545}
+        VITE_CHAIN_ID: ${VITE_CHAIN_ID:-31337}
     container_name: admin-auth-frontend
     restart: unless-stopped
     ports:
       - "5173:5173"
+    env_file:
+      - ./blockchain/.env
     environment:
       VITE_API_URL: http://localhost:3001/api
-      VITE_IDENTITY_REGISTRY_ADDRESS: ${IDENTITY_REGISTRY_ADDRESS:-0x5FbDB2315678afecb367f032d93F642f64180aa3}
-      VITE_NETWORK_RPC_URL: http://localhost:8545
-      VITE_CHAIN_ID: 31337
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
     volumes:

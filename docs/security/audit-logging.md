@@ -174,7 +174,7 @@ cd backend && npx prisma migrate deploy      # production
 # hoặc: npx prisma db push                    # dev (trigger tự áp khi boot)
 
 # 2. Deploy contract (nếu chưa có) — AuditAnchor đã nằm trong deploy.js
-cd blockchain && npx hardhat run scripts/deploy.js --network localhost
+cd blockchain && npm run deploy:local
 # Copy AUDIT_ANCHOR_ADDRESS vào .env
 
 # 3. Đảm bảo .env có:
