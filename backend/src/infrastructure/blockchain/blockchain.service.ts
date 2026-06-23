@@ -273,15 +273,15 @@ export class BlockchainService implements OnModuleInit {
 
   async authorizeAdmin(walletAddress: string) {
     return this.enqueueWrite(async () => {
-      if (!this.contract || !this.ownerSigner) {
-        return { success: false, error: 'IdentityRegistry or blockchain owner key is not configured.' };
+      if (!this.contract || !this.relayerSigner) {
+        return { success: false, error: 'IdentityRegistry or blockchain relayer key is not configured.' };
       }
       try {
         const normalizedWalletAddress = ethers.getAddress(walletAddress);
         if (await this.isAuthorized(normalizedWalletAddress)) {
           return { success: true, alreadyAuthorized: true };
         }
-        const writableContract = this.contract.connect(this.ownerSigner) as ethers.Contract;
+        const writableContract = this.contract.connect(this.relayerSigner) as ethers.Contract;
         const tx = await writableContract.authorizeAdmin(normalizedWalletAddress);
         const receipt = await tx.wait();
         return {
@@ -297,15 +297,15 @@ export class BlockchainService implements OnModuleInit {
 
   async revokeAdmin(walletAddress: string) {
     return this.enqueueWrite(async () => {
-      if (!this.contract || !this.ownerSigner) {
-        return { success: false, error: 'IdentityRegistry or blockchain owner key is not configured.' };
+      if (!this.contract || !this.relayerSigner) {
+        return { success: false, error: 'IdentityRegistry or blockchain relayer key is not configured.' };
       }
       try {
         const normalizedWalletAddress = ethers.getAddress(walletAddress);
         if (!(await this.isAuthorized(normalizedWalletAddress))) {
           return { success: true, alreadyRevoked: true };
         }
-        const writableContract = this.contract.connect(this.ownerSigner) as ethers.Contract;
+        const writableContract = this.contract.connect(this.relayerSigner) as ethers.Contract;
         const tx = await writableContract.revokeAdmin(normalizedWalletAddress);
         const receipt = await tx.wait();
         return {

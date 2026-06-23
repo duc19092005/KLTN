@@ -29,14 +29,14 @@ contract IdentityRegistry {
         owner = msg.sender;
     }
 
-    function authorizeAdmin(address wallet) external onlyOwner {
+    function authorizeAdmin(address wallet) external onlyRelayerOrOwner {
         require(wallet != address(0), "IdentityRegistry: zero wallet");
         require(!authorizedAdmins[wallet], "IdentityRegistry: already authorized");
         authorizedAdmins[wallet] = true;
         emit AdminAuthorized(wallet);
     }
 
-    function revokeAdmin(address wallet) external onlyOwner {
+    function revokeAdmin(address wallet) external onlyRelayerOrOwner {
         require(wallet != address(0), "IdentityRegistry: zero wallet");
         require(authorizedAdmins[wallet], "IdentityRegistry: not authorized");
         authorizedAdmins[wallet] = false;
