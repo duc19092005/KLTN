@@ -40,7 +40,7 @@ export class AuthController {
     return this.authService.bootstrapFirstAdmin(
       body.username || 'admin',
       body.email || 'admin@example.local',
-      body.superAdminSecret,
+      body.bootstrapSecret || body.superAdminSecret,
     );
   }
 

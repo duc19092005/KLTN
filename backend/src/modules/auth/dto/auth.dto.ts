@@ -22,9 +22,15 @@ export class BootstrapAdminDto {
   @MaxLength(254)
   email?: string;
 
+  @IsOptional()
   @IsString()
   @Length(16, 256)
-  superAdminSecret: string;
+  superAdminSecret?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(16, 256)
+  bootstrapSecret?: string;
 }
 
 export class InviteLoginDto {

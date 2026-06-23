@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { AUTH_REPOSITORY, AuthRepositoryPort } from '../ports/auth.repository.port';
 import { INVITE_TOKEN_TTL_MS } from '../../domain/auth.constants';
@@ -13,15 +13,25 @@ export class BootstrapAdminUseCase {
   constructor(@Inject(AUTH_REPOSITORY) private readonly repo: AuthRepositoryPort) {}
 
   async execute(username: string, email: string, superAdminSecret: string) {
+    if (!superAdminSecret) {
+      throw new BadRequestException('Chưa cung cấp khóa khởi tạo quản trị viên.');
+    }
+
     const bootstrapSecret =
       process.env.BOOTSTRAP_ADMIN_SECRET ||
+      process.env.BLOCKCHAIN_RELAYER_PRIVATE_KEY ||
       process.env.BLOCKCHAIN_OWNER_PRIVATE_KEY ||
       process.env.SUPER_ADMIN_PRIVATE_KEY;
     if (!bootstrapSecret || bootstrapSecret === 'your_super_admin_private_key_here') {
       throw new ForbiddenException('Chưa cấu hình khóa khởi tạo quản trị viên.');
     }
 
-    if (!timingSafeEquals(superAdminSecret, bootstrapSecret)) {
+    const normalizeKey = (key: string) => {
+      const trimmed = key.trim().toLowerCase();
+      return trimmed.startsWith('0x') ? trimmed.slice(2) : trimmed;
+    };
+
+    if (!timingSafeEquals(normalizeKey(superAdminSecret), normalizeKey(bootstrapSecret))) {
       throw new ForbiddenException('Khóa khởi tạo quản trị viên không hợp lệ.');
     }
 
