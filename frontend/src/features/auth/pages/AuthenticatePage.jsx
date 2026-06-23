@@ -120,11 +120,11 @@ export default function AuthenticatePage() {
         {status && <StatusBox status={status} isError={isError} busy={busy} />}
 
         <div className="bg-slate-50/50 border border-slate-200/60 rounded-2xl p-4 sm:p-6 min-h-[220px] flex flex-col justify-center items-center">
-          {isFirstLogin && step === 1 && <div className="w-full max-w-sm animate-in fade-in-50 duration-300"><FaceCapture onCapture={registerFace} disabled={busy} label="Quét khuôn mặt thành viên" captureMode="enroll" /></div>}
+          {isFirstLogin && step === 1 && <div className="w-full max-w-sm animate-in fade-in-50 duration-300"><FaceCapture onCapture={registerFace} onError={(msg) => showStatus(msg, true)} disabled={busy} label="Quét khuôn mặt thành viên" captureMode="enroll" /></div>}
           {isAdmin && isFirstLogin && step === 2 && <ActionPanel title="Xác thực quyền hạn trên chuỗi" desc="Liên kết địa chỉ ví mật mã làm định danh bất biến." button="Kết nối MetaMask & Xác nhận" onClick={bindWallet} busy={busy} id="bind-wallet-button" />}
           {isAdmin && isFirstLogin && step === 3 && !secret && <ActionPanel title="Tạo lập bằng chứng Zero-Knowledge" desc="Mã hóa thông tin nội bộ thành biểu thức toán học bảo mật." button="Khởi tạo định danh ZKP" onClick={generateZkpIdentity} busy={busy} id="generate-zkp-button" />}
           {secret && <SecretPanel secret={secret} copied={copied} onCopy={handleCopySecret} onDone={() => goDashboard({ ...user, role: 'ADMIN' })} />}
-          {!isFirstLogin && !secret && <div className="w-full max-w-sm animate-in fade-in duration-300"><FaceCapture onCapture={verifyFaceLogin} disabled={busy} label="Xác thực sinh trắc học" /></div>}
+          {!isFirstLogin && !secret && <div className="w-full max-w-sm animate-in fade-in duration-300"><FaceCapture onCapture={verifyFaceLogin} onError={(msg) => showStatus(msg, true)} disabled={busy} label="Xác thực sinh trắc học" /></div>}
         </div>
       </section>
     </main>

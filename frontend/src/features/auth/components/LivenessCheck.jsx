@@ -428,7 +428,7 @@ export default function LivenessCheck({
     }
     // Surface the validated anchor so the parent can reuse it (verify mode) instead of
     // re-detecting on the final frame, which is often a turned/blurred pose.
-    return { ok: true, worstDistance, anchor };
+    return { ok: true, worstDistance, anchor, descriptors };
   };
 
   useEffect(() => {
@@ -466,7 +466,7 @@ export default function LivenessCheck({
       const descriptor = Array.isArray(continuity.anchor) ? continuity.anchor : null;
       onLivenessPassRef.current?.(
         isEnrollMode && poseFrames.length > 0 ? poseFrames : (frame || videoRef.current),
-        { descriptor },
+        { descriptor, descriptors: continuity.descriptors },
       );
     }, 1500);
     return () => clearTimeout(timer);

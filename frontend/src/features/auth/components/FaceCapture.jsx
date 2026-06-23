@@ -40,6 +40,11 @@ export default function FaceCapture({
         return;
       }
 
+      if (captureMode === 'enroll' && Array.isArray(meta.descriptors) && meta.descriptors.length >= 3) {
+        onCapture?.(meta.descriptors);
+        return;
+      }
+
       await loadModels();
       if (!mountedRef.current) return;
 
