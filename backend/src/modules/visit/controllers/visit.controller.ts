@@ -17,8 +17,8 @@ export class VisitController {
 
   @Roles('ADMIN', 'RECEPTIONIST')
   @Post()
-  create(@Body() dto: CreateVisitDto) {
-    return this.visitService.create(dto);
+  create(@Body() dto: CreateVisitDto, @CurrentUser() user: AuthUser) {
+    return this.visitService.create(dto, user);
   }
 
   @Roles('ADMIN', 'RECEPTIONIST', 'DOCTOR')

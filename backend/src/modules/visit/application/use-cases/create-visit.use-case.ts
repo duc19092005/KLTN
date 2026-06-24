@@ -3,6 +3,8 @@ import { CreateVisitDto } from '../../dto/visit.dto';
 import { VISIT_REPOSITORY, VisitRepositoryPort } from '../ports/visit.repository.port';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { NotificationService } from '../../../notification/services/notification.service';
+import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { AuthUser } from '../../../../common/types/auth-user.type';
 
 /**
  * Intake workflow: reception selects an active examination department, then the
@@ -14,9 +16,10 @@ export class CreateVisitUseCase {
     @Inject(VISIT_REPOSITORY) private readonly repo: VisitRepositoryPort,
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
+    private readonly auditLogger: AuditLoggerService,
   ) {}
 
-  async execute(dto: CreateVisitDto): Promise<unknown> {
+  async execute(dto: CreateVisitDto, user?: AuthUser): Promise<unknown> {
     if (!dto.patientId && !dto.patient) {
       throw new BadRequestException('Vui lòng chọn bệnh nhân hoặc nhập thông tin bệnh nhân mới.');
     }
@@ -43,6 +46,29 @@ export class CreateVisitUseCase {
         : undefined,
       departmentId: dto.departmentId,
     });
+
+    try {
+      const visit = result as any;
+      if (visit && visit.id) {
+        await this.auditLogger.recordV2({
+          entity: 'Visit',
+          entityId: visit.id,
+          action: 'CREATE',
+          actorId: user?.sub ?? null,
+          before: null,
+          after: {
+            visitCode: visit.visitCode,
+            patientId: visit.patientId,
+            departmentId: visit.departmentId,
+            staffId: visit.staffId,
+            status: visit.status,
+          },
+          metadata: { schema: 'KLTN_VISIT_CREATE_AUDIT_V2' },
+        });
+      }
+    } catch (err) {
+      console.error('Failed to write audit log for visit registration:', err);
+    }
 
     try {
       const visit = result as any;

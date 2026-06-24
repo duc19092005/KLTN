@@ -20,8 +20,8 @@ export class VisitService {
     private readonly suggestDepartmentsUseCase: SuggestDepartmentsUseCase,
   ) {}
 
-  create(dto: CreateVisitDto) {
-    return this.createVisitUseCase.execute(dto);
+  create(dto: CreateVisitDto, user?: AuthUser) {
+    return this.createVisitUseCase.execute(dto, user);
   }
 
   findAll(query: VisitQueryDto, user?: AuthUser) {
