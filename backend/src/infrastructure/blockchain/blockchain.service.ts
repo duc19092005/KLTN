@@ -231,10 +231,36 @@ export class BlockchainService implements OnModuleInit {
     }
   }
 
+  private toBlockchainErrorMessage(error: unknown, fallback: string): string {
+    const message = error instanceof Error ? error.message : String(error || '');
+
+    if (message.includes('IdentityRegistry: caller is not owner')) {
+      return 'Ví blockchain của hệ thống không phải chủ sở hữu IdentityRegistry. Vui lòng kiểm tra BLOCKCHAIN_OWNER_PRIVATE_KEY và IDENTITY_REGISTRY_ADDRESS.';
+    }
+
+    if (message.includes('FaceRegistry: caller is not owner')) {
+      return 'Ví blockchain của hệ thống không phải chủ sở hữu FaceRegistry. Vui lòng kiểm tra cấu hình ví owner và địa chỉ contract FaceRegistry.';
+    }
+
+    if (message.includes('AuditAnchor: caller is not owner')) {
+      return 'Ví blockchain của hệ thống không phải chủ sở hữu AuditAnchor. Vui lòng kiểm tra cấu hình ví owner và địa chỉ contract AuditAnchor.';
+    }
+
+    if (message.includes('insufficient funds')) {
+      return 'Ví blockchain của hệ thống không đủ phí gas để ghi dữ liệu lên blockchain.';
+    }
+
+    if (message.includes('could not coalesce error') || message.includes('ECONNREFUSED')) {
+      return 'Không thể kết nối tới blockchain RPC. Vui lòng kiểm tra BLOCKCHAIN_RPC_URL và node blockchain.';
+    }
+
+    return fallback;
+  }
+
   async addRelayer(walletAddress: string) {
     return this.enqueueWrite(async () => {
       if (!this.contract || !this.ownerSigner) {
-        return { success: false, error: 'IdentityRegistry or blockchain owner key is not configured.' };
+        return { success: false, error: 'IdentityRegistry hoặc khóa owner blockchain chưa được cấu hình.' };
       }
       try {
         const normalizedWalletAddress = ethers.getAddress(walletAddress);
@@ -246,7 +272,7 @@ export class BlockchainService implements OnModuleInit {
         const receipt = await tx.wait();
         return { success: true, txHash: tx.hash, blockNumber: receipt.blockNumber };
       } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to authorize relayer' };
+        return { success: false, error: this.toBlockchainErrorMessage(error, 'Không thể cấp quyền relayer trên blockchain.') };
       }
     });
   }
@@ -254,7 +280,7 @@ export class BlockchainService implements OnModuleInit {
   async removeRelayer(walletAddress: string) {
     return this.enqueueWrite(async () => {
       if (!this.contract || !this.ownerSigner) {
-        return { success: false, error: 'IdentityRegistry or blockchain owner key is not configured.' };
+        return { success: false, error: 'IdentityRegistry hoặc khóa owner blockchain chưa được cấu hình.' };
       }
       try {
         const normalizedWalletAddress = ethers.getAddress(walletAddress);
@@ -266,22 +292,22 @@ export class BlockchainService implements OnModuleInit {
         const receipt = await tx.wait();
         return { success: true, txHash: tx.hash, blockNumber: receipt.blockNumber };
       } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to revoke relayer' };
+        return { success: false, error: this.toBlockchainErrorMessage(error, 'Không thể thu hồi quyền relayer trên blockchain.') };
       }
     });
   }
 
   async authorizeAdmin(walletAddress: string) {
     return this.enqueueWrite(async () => {
-      if (!this.contract || !this.relayerSigner) {
-        return { success: false, error: 'IdentityRegistry or blockchain relayer key is not configured.' };
+      if (!this.contract || !this.ownerSigner) {
+        return { success: false, error: 'IdentityRegistry hoặc khóa owner blockchain chưa được cấu hình.' };
       }
       try {
         const normalizedWalletAddress = ethers.getAddress(walletAddress);
         if (await this.isAuthorized(normalizedWalletAddress)) {
           return { success: true, alreadyAuthorized: true };
         }
-        const writableContract = this.contract.connect(this.relayerSigner) as ethers.Contract;
+        const writableContract = this.contract.connect(this.ownerSigner) as ethers.Contract;
         const tx = await writableContract.authorizeAdmin(normalizedWalletAddress);
         const receipt = await tx.wait();
         return {
@@ -290,22 +316,22 @@ export class BlockchainService implements OnModuleInit {
           blockNumber: receipt.blockNumber,
         };
       } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to authorize wallet' };
+        return { success: false, error: this.toBlockchainErrorMessage(error, 'Không thể cấp quyền admin trên blockchain.') };
       }
     });
   }
 
   async revokeAdmin(walletAddress: string) {
     return this.enqueueWrite(async () => {
-      if (!this.contract || !this.relayerSigner) {
-        return { success: false, error: 'IdentityRegistry or blockchain relayer key is not configured.' };
+      if (!this.contract || !this.ownerSigner) {
+        return { success: false, error: 'IdentityRegistry hoặc khóa owner blockchain chưa được cấu hình.' };
       }
       try {
         const normalizedWalletAddress = ethers.getAddress(walletAddress);
         if (!(await this.isAuthorized(normalizedWalletAddress))) {
           return { success: true, alreadyRevoked: true };
         }
-        const writableContract = this.contract.connect(this.relayerSigner) as ethers.Contract;
+        const writableContract = this.contract.connect(this.ownerSigner) as ethers.Contract;
         const tx = await writableContract.revokeAdmin(normalizedWalletAddress);
         const receipt = await tx.wait();
         return {
@@ -314,7 +340,7 @@ export class BlockchainService implements OnModuleInit {
           blockNumber: receipt.blockNumber,
         };
       } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to revoke wallet' };
+        return { success: false, error: this.toBlockchainErrorMessage(error, 'Không thể thu hồi quyền admin trên blockchain.') };
       }
     });
   }
@@ -322,7 +348,7 @@ export class BlockchainService implements OnModuleInit {
   async recordActionAsSuperAdmin(actionPayload: unknown) {
     return this.enqueueWrite(async () => {
       if (!this.contract || !this.relayerSigner) {
-        return { success: false, error: 'IdentityRegistry or blockchain relayer key is not configured.' };
+        return { success: false, error: 'IdentityRegistry hoặc khóa relayer blockchain chưa được cấu hình.' };
       }
       try {
         const actionHash = computeBackendActionHash(actionPayload);
@@ -330,7 +356,7 @@ export class BlockchainService implements OnModuleInit {
         const tx = await writableContract.recordAction(actionHash);
         const receipt = await tx.wait();
         if (!receipt || receipt.status !== 1) {
-          return { success: false, error: 'Backend-signed action transaction failed or was not confirmed.' };
+          return { success: false, error: 'Giao dịch blockchain ghi nhận hành động không thành công hoặc chưa được xác nhận.' };
         }
         return {
           success: true,
@@ -340,7 +366,7 @@ export class BlockchainService implements OnModuleInit {
           blockNumber: receipt.blockNumber,
         };
       } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to record backend-signed action' };
+        return { success: false, error: this.toBlockchainErrorMessage(error, 'Không thể ghi nhận hành động lên blockchain.') };
       }
     });
   }
