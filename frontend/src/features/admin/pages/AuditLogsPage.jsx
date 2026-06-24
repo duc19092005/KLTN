@@ -7,28 +7,47 @@ import { auditService } from '../apis/auditService';
 import { FaceStepUpModal } from '../../auth';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { ArrowUp, ArrowDown, Eye, X, Layers, User as UserIcon, ShieldCheck, ShieldAlert, LockKeyhole, FileDiff, Fingerprint } from 'lucide-react';
+import {
+  ArrowUp,
+  ArrowDown,
+  Eye,
+  X,
+  Layers,
+  User as UserIcon,
+  ShieldCheck,
+  ShieldAlert,
+  LockKeyhole,
+  FileDiff,
+  Fingerprint,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  Calendar,
+  CheckCircle2,
+  AlertTriangle,
+  History
+} from 'lucide-react';
 
 // ---- Display helpers --------------------------------------------------------
 
 const ACTION_TONE = {
-  CREATE: 'bg-cyan-50 text-cyan-700 border-cyan-100',
-  UPDATE: 'bg-cyan-50 text-cyan-700 border-cyan-100',
-  DELETE: 'bg-rose-50 text-rose-700 border-rose-100',
-  LOGIN_PASSWORD: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-  LOGIN_INVITE: 'bg-teal-50 text-teal-700 border-teal-100',
-  LOGIN_FAIL: 'bg-rose-50 text-rose-700 border-rose-100',
-  FACE_VERIFY_PASS: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-  FACE_VERIFY_FAIL: 'bg-amber-50 text-amber-700 border-amber-100',
-  FACE_INTEGRITY_FAIL: 'bg-rose-50 text-rose-700 border-rose-100',
-  FACE_ENROLL: 'bg-cyan-50 text-cyan-700 border-cyan-100',
+  CREATE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  UPDATE: 'bg-amber-50 text-amber-700 border-amber-200',
+  DELETE: 'bg-rose-50 text-rose-700 border-rose-200',
+  LOGIN_PASSWORD: 'bg-slate-50 text-slate-700 border-slate-200',
+  LOGIN_INVITE: 'bg-slate-50 text-slate-700 border-slate-200',
+  LOGIN_FAIL: 'bg-rose-50 text-rose-700 border-rose-200',
+  FACE_VERIFY_PASS: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+  FACE_VERIFY_FAIL: 'bg-orange-50 text-orange-700 border-orange-200',
+  FACE_INTEGRITY_FAIL: 'bg-red-50 text-red-700 border-red-200',
+  FACE_ENROLL: 'bg-indigo-50 text-indigo-700 border-indigo-200',
 };
 
 const ACTION_LABEL = {
-  LOGIN_PASSWORD: 'Đăng nhập (mật khẩu)',
-  LOGIN_INVITE: 'Đăng nhập (lời mời)',
+  LOGIN_PASSWORD: 'Đăng nhập (Mật khẩu)',
+  LOGIN_INVITE: 'Đăng nhập (Lời mời)',
   LOGIN_FAIL: 'Đăng nhập thất bại',
-  FACE_VERIFY_PASS: 'Xác thực khuôn mặt thành công',
+  FACE_VERIFY_PASS: 'Xác thực khuôn mặt OK',
   FACE_VERIFY_FAIL: 'Xác thực khuôn mặt lỗi',
   FACE_INTEGRITY_FAIL: 'Khuôn mặt bị sửa đổi',
   FACE_ENROLL: 'Đăng ký khuôn mặt',
@@ -51,26 +70,26 @@ const ROLE_LABELS = {
 };
 
 const ROLE_TONE = {
-  ADMIN: 'bg-cyan-50 text-cyan-700 border-cyan-100',
-  RECEPTIONIST: 'bg-sky-50 text-sky-700 border-sky-100',
-  DOCTOR: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-  LAB_MANAGER: 'bg-amber-50 text-amber-700 border-amber-100',
+  ADMIN: 'bg-purple-50 text-purple-700 border-purple-200',
+  RECEPTIONIST: 'bg-blue-50 text-blue-700 border-blue-200',
+  DOCTOR: 'bg-teal-50 text-teal-700 border-teal-200',
+  LAB_MANAGER: 'bg-orange-50 text-orange-700 border-orange-200',
 };
 
 function shortHash(hash) {
   if (!hash) return '—';
   const clean = hash.startsWith('0x') ? hash.slice(2) : hash;
   if (clean.length <= 18) return clean;
-  return `${clean.slice(0, 10)}…${clean.slice(-8)}`;
+  return `${clean.slice(0, 8)}…${clean.slice(-6)}`;
 }
 
 function formatTime(value) {
-  return value ? new Date(value).toLocaleString('vi-VN') : 'N/A';
+  return value ? new Date(value).toLocaleString('vi-VN', { hour12: false }) : 'N/A';
 }
 
 function formatHashVersion(version) {
-  if (version === 'KLTN_AUDIT_ENTRY_V2') return 'V2 · Diff đã mã hóa';
-  return version ? `Phiên bản cũ · ${version}` : 'Phiên bản cũ';
+  if (version === 'KLTN_AUDIT_ENTRY_V2') return 'V2 · Mã hóa';
+  return version ? `V1 · ${version}` : 'V1';
 }
 
 const VERIFICATION_TONE = {
@@ -80,23 +99,23 @@ const VERIFICATION_TONE = {
 };
 
 const VERIFICATION_LABEL = {
-  VERIFIED: 'Đã xác minh',
-  PENDING: 'Chưa kiểm sâu',
+  VERIFIED: 'Toàn vẹn',
+  PENDING: 'Chờ kiểm tra',
   TAMPERED: 'Nghi sửa đổi',
 };
 
 function renderDiffValue(value, redacted) {
-  if (redacted) return 'Đã ẩn theo chính sách';
+  if (redacted) return 'Đã ẩn theo chính sách bảo mật';
   if (value === null || value === undefined || value === '') return '—';
-  if (typeof value === 'boolean') return value ? 'Có' : 'Không';
+  if (typeof value === 'boolean') return value ? 'Đúng' : 'Sai';
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 }
 
 function renderFieldList(fields) {
-  if (!fields.length) return 'Không có thay đổi field-level';
+  if (!fields.length) return 'Không có thay đổi dữ liệu';
   const labels = fields.map((field) => fieldDisplayName({ fieldPath: field, field }));
-  return labels.slice(0, 3).join(', ') + (labels.length > 3 ? ` +${labels.length - 3}` : '');
+  return labels.slice(0, 2).join(', ') + (labels.length > 2 ? ` +${labels.length - 2}` : '');
 }
 
 function getPrimaryDiff(log) {
@@ -134,13 +153,12 @@ export default function AuditLogsPage() {
   const [batches, setBatches] = useState([]);
   const [chain, setChain] = useState(null);
   const [entity, setEntity] = useState('');
-  const [sortOrder, setSortOrder] = useState('desc'); // seq display order: desc (newest) | asc (oldest)
-  const [batchFilter, setBatchFilter] = useState(''); // '' = all; otherwise a batchId number
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [batchFilter, setBatchFilter] = useState('');
   const [anchoring, setAnchoring] = useState(false);
   const [proof, setProof] = useState(null);
   const [stepUpOpen, setStepUpOpen] = useState(false);
 
-  // Pagination states
   const [logsPage, setLogsPage] = useState(1);
   const [logsTotalPages, setLogsTotalPages] = useState(1);
   const [logsTotal, setLogsTotal] = useState(0);
@@ -168,7 +186,7 @@ export default function AuditLogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [logsPage, entity, sortOrder, batchFilter]);
+  }, [logsPage, entity, sortOrder, batchFilter, toast]);
 
   const loadBatches = useCallback(async () => {
     setLoading(true);
@@ -186,7 +204,7 @@ export default function AuditLogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [batchesPage]);
+  }, [batchesPage, toast]);
 
   const loadChain = useCallback(async () => {
     try {
@@ -207,7 +225,6 @@ export default function AuditLogsPage() {
     await loadChain();
   }, [tab, loadLogs, loadBatches, loadChain]);
 
-  // Fetch data depending on active tab/page/filter
   useEffect(() => {
     if (tab === 'logs') {
       loadLogs();
@@ -216,12 +233,10 @@ export default function AuditLogsPage() {
     }
   }, [tab, logsPage, batchesPage, entity, sortOrder, batchFilter, loadLogs, loadBatches]);
 
-  // Load chain status once on mount
   useEffect(() => {
     loadChain();
   }, [loadChain]);
 
-  // Reset page when any filter/sort changes
   useEffect(() => {
     setLogsPage(1);
   }, [entity, sortOrder, batchFilter]);
@@ -235,12 +250,10 @@ export default function AuditLogsPage() {
     };
   }, [logsTotal, batchesTotal, chain]);
 
-  // Step 1: open the face step-up modal. The anchor only commits after a valid ticket is minted.
   const handleAnchorNow = () => {
     setStepUpOpen(true);
   };
 
-  // Step 2: a fresh face scan produced a single-use ticket -> commit the on-chain anchor with it.
   const handleStepUpSuccess = async (ticket) => {
     setStepUpOpen(false);
     setAnchoring(true);
@@ -278,40 +291,66 @@ export default function AuditLogsPage() {
       onNavigate={(id) => navigateAdmin(navigate, id)}
       onLogout={logout}
     >
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex justify-end">
+      <div className="max-w-7xl mx-auto space-y-6 p-4 md:p-6 text-slate-800">
+        {/* Header Action */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Nhật ký hệ thống tối cao</h1>
+            <p className="text-sm text-slate-500 mt-0.5">Giám sát tính toàn vẹn, định danh sinh trắc học và lịch sử biến động dữ liệu.</p>
+          </div>
           <button
             id="audit-anchor-now-button"
             onClick={handleAnchorNow}
             disabled={anchoring}
-            className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-cyan-700 active:scale-98 disabled:opacity-50"
           >
-            {anchoring ? 'Đang neo…' : 'Neo lên blockchain ngay'}
+            <LockKeyhole className="h-4 w-4" />
+            {anchoring ? 'Đang kiểm chứng & neo…' : 'Neo Blockchain Ngay'}
           </button>
         </div>
 
         {/* Integrity banner */}
         <ChainBanner chain={chain} loading={loading} />
 
-        {/* Stats */}
-        <section className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          <StatCard label="Tổng bản ghi" value={stats.total} hint="Tất cả nhật ký hệ thống" />
-          <StatCard label="Tổng lô blockchain" value={stats.batches} hint="Các lô Merkle đã neo" />
-          <StatCard label="Trạng thái chuỗi" value={stats.isChainOk ? 'Tốt' : 'Lỗi'} hint={stats.isChainOk ? 'Toàn vẹn hoàn toàn' : 'Phát hiện sửa đổi!'} />
-          <StatCard label="Số bản ghi chuỗi" value={stats.chainLength} hint="Đã kiểm tra đầu-cuối" />
+        {/* Stats Grid */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard label="Tổng số bản ghi" value={stats.total} hint="Lịch sử toàn hệ thống" icon={History} color="text-slate-700" />
+          <StatCard label="Lô Blockchain" value={stats.batches} hint="Khối Merkle đã đóng" icon={Layers} color="text-cyan-600" />
+          <StatCard
+            label="Tính toàn vẹn"
+            value={stats.isChainOk ? 'Đạt' : 'Lỗi'}
+            hint={stats.isChainOk ? 'Chuỗi mã hóa an toàn' : 'Phát hiện sửa đổi trái phép!'}
+            icon={stats.isChainOk ? CheckCircle2 : AlertTriangle}
+            color={stats.isChainOk ? 'text-emerald-600' : 'text-rose-600'}
+            bg={stats.isChainOk ? 'bg-emerald-50/50' : 'bg-rose-50'}
+          />
+          <StatCard label="Sức mạnh chuỗi" value={stats.chainLength} hint="Bản ghi kiểm toán sâu" icon={Fingerprint} color="text-indigo-600" />
         </section>
 
-        {/* Tabs */}
-        <div className="flex flex-wrap gap-2">
-          <TabButton active={tab === 'logs'} onClick={() => setTab('logs')}>Hoạt động ({logsTotal})</TabButton>
-          <TabButton active={tab === 'batches'} onClick={() => setTab('batches')}>Lô blockchain ({batchesTotal})</TabButton>
-          <button onClick={refreshAll} disabled={loading} className="ml-auto rounded-xl border border-cyan-100 bg-cyan-50 px-4 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-100 disabled:opacity-50">
-            {loading ? 'Đang tải…' : 'Làm mới'}
+        {/* Navigation Tabs */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-100/80 p-1.5 rounded-xl">
+          <div className="flex gap-1">
+            <TabButton active={tab === 'logs'} onClick={() => setTab('logs')}>
+              Hoạt động hệ thống ({logsTotal})
+            </TabButton>
+            <TabButton active={tab === 'batches'} onClick={() => setTab('batches')}>
+              Khối lưu trữ ({batchesTotal})
+            </TabButton>
+          </div>
+          <button
+            onClick={refreshAll}
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50 shadow-sm"
+          >
+            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+            Đồng bộ dữ liệu
           </button>
         </div>
 
         {loading ? (
-          <LoadingIndicator size="lg" label="Đang tải nhật ký..." />
+          <div className="py-12 bg-white rounded-2xl border border-slate-100 shadow-sm">
+            <LoadingIndicator size="lg" label="Đang cấu trúc dữ liệu audit..." />
+          </div>
         ) : tab === 'logs' ? (
           <LogsTable
             logs={logs}
@@ -345,8 +384,8 @@ export default function AuditLogsPage() {
       {stepUpOpen && (
         <FaceStepUpModal
           action="ANCHOR_BLOCKCHAIN"
-          title="Xác nhận neo blockchain"
-          description="Ghi dữ liệu lên blockchain là thao tác tốn phí và không thể hoàn tác. Vui lòng quét khuôn mặt để xác nhận."
+          title="Xác thực ký số chuỗi"
+          description="Hành động này sẽ tính toán mã băm Merkle Root của toàn bộ logs hiện tại và đẩy lên sổ cái bất biến. Vui lòng quét FaceID để xác minh danh quyền quản trị."
           onSuccess={handleStepUpSuccess}
           onClose={() => setStepUpOpen(false)}
         />
@@ -360,25 +399,28 @@ export default function AuditLogsPage() {
 function ChainBanner({ chain, loading }) {
   if (loading || !chain) {
     return (
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <p className="text-sm font-bold text-slate-500">Đang kiểm tra tính toàn vẹn của chuỗi…</p>
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex items-center gap-3">
+        <div className="w-2 h-2 rounded-full bg-slate-400 animate-pulse" />
+        <p className="text-sm font-medium text-slate-500">Hệ thống mã hóa đang quét chuỗi khối để kiểm tra tính toàn vẹn cơ sở dữ liệu…</p>
       </section>
     );
   }
   const ok = chain.ok;
   return (
     <section
-      className={`rounded-2xl border p-5 shadow-sm ${ok ? 'border-emerald-100 bg-emerald-50/70' : 'border-rose-100 bg-rose-50/70 animate-pulse'}`}
+      className={`rounded-xl border p-4 shadow-sm transition-all duration-300 ${ok ? 'border-emerald-200 bg-emerald-50/40 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900 animate-pulse'
+        }`}
     >
-      <div className="flex items-center gap-4">
+      <div className="flex items-start gap-3">
+        {ok ? <ShieldCheck className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" /> : <ShieldAlert className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />}
         <div className="min-w-0">
-          <p className={`text-sm font-black ${ok ? 'text-emerald-800' : 'text-rose-800'}`}>
-            {ok ? 'Chuỗi nhật ký toàn vẹn' : 'Phát hiện sửa đổi nhật ký!'}
+          <p className="text-sm font-semibold">
+            {ok ? 'Cơ sở dữ liệu audit hoàn toàn mật thiết & toàn vẹn' : 'CẢNH BÁO: Phát hiện bất thường cấu trúc dữ liệu!'}
           </p>
-          <p className={`mt-0.5 text-xs font-semibold ${ok ? 'text-emerald-700' : 'text-rose-700'}`}>
+          <p className="mt-0.5 text-xs font-normal opacity-85">
             {ok
-              ? `Đã xác minh ${chain.total} bản ghi — không có dấu hiệu sửa/xóa/chèn.`
-              : `Lỗi tại bản ghi seq=${chain.brokenAtSeq}: ${chain.reason}`}
+              ? `Hệ thống đã đối chiếu thành công ${chain.total} bản ghi. Không tìm thấy bất kỳ dấu hiệu sửa đổi, chèn hoặc xóa lén dữ liệu.`
+              : `Lỗi bất đối xứng mã băm được phát hiện tại bản ghi Sequence = ${chain.brokenAtSeq}. Lý do từ hệ thống: ${chain.reason}`}
           </p>
         </div>
       </div>
@@ -401,38 +443,38 @@ const ENTITY_LABELS = {
   Visit: 'Lượt khám',
   MedicalOrder: 'Chỉ định cận lâm sàng',
   MedicalResult: 'Kết quả cận lâm sàng',
-  User: 'Tài khoản người dùng',
+  User: 'Tài khoản',
 };
 
 const FIELD_LABELS = {
-  'Department.canReceiveOrders': 'Có nhận chỉ định cận lâm sàng',
+  'Department.canReceiveOrders': 'Có nhận chỉ định',
   'Department.departmentCode': 'Mã phòng ban',
   'Department.floor': 'Tầng',
   'Department.name': 'Tên phòng ban',
   'Department.specialty': 'Chuyên khoa',
-  'Department.type': 'Loại phòng ban',
-  'Department.status': 'Trạng thái phòng ban',
-  'Department.description': 'Mô tả phòng ban',
-  'Department.managerId': 'Người quản lý phòng ban',
-  'StaffProfile.fullName': 'Họ và tên nhân sự',
-  'StaffProfile.phone': 'Số điện thoại nhân sự',
-  'StaffProfile.departmentId': 'Phòng ban công tác',
-  'DoctorProfile.licenseNo': 'Số chứng chỉ hành nghề',
-  'DoctorProfile.specialty': 'Chuyên khoa bác sĩ',
-  'Patient.fullName': 'Họ và tên bệnh nhân',
-  'Patient.phone': 'Số điện thoại bệnh nhân',
-  'Patient.identityNumber': 'Số CCCD/CMND bệnh nhân',
+  'Department.type': 'Loại phòng',
+  'Department.status': 'Trạng thái phòng',
+  'Department.description': 'Mô tả phòng',
+  'Department.managerId': 'Người quản lý',
+  'StaffProfile.fullName': 'Họ tên nhân sự',
+  'StaffProfile.phone': 'SĐT nhân sự',
+  'StaffProfile.departmentId': 'Phòng ban làm việc',
+  'DoctorProfile.licenseNo': 'Số CCHN',
+  'DoctorProfile.specialty': 'Chuyên khoa BS',
+  'Patient.fullName': 'Họ tên bệnh nhân',
+  'Patient.phone': 'SĐT bệnh nhân',
+  'Patient.identityNumber': 'Số CCCD/CMND',
   'Patient.address': 'Địa chỉ bệnh nhân',
-  'Visit.status': 'Trạng thái lượt khám',
+  'Visit.status': 'Trạng thái khám',
   'MedicalOrder.status': 'Trạng thái chỉ định',
   'MedicalResult.note': 'Ghi chú kết quả',
-  'MedicalConclusion.diagnosis': 'Chẩn đoán cuối cùng',
+  'MedicalConclusion.diagnosis': 'Chẩn đoán lâm sàng',
   'MedicalConclusion.treatmentPlan': 'Phác đồ điều trị',
 };
 
 const FIELD_FALLBACK_LABELS = {
-  canReceiveOrders: 'Có nhận chỉ định cận lâm sàng',
-  departmentCode: 'Mã phòng ban',
+  canReceiveOrders: 'Nhận chỉ định',
+  departmentCode: 'Mã phòng',
   floor: 'Tầng',
   name: 'Tên',
   specialty: 'Chuyên khoa',
@@ -442,11 +484,11 @@ const FIELD_FALLBACK_LABELS = {
   managerId: 'Người quản lý',
   fullName: 'Họ và tên',
   phone: 'Số điện thoại',
-  identityNumber: 'Số CCCD/CMND',
+  identityNumber: 'Số định danh',
   address: 'Địa chỉ',
-  licenseNo: 'Số chứng chỉ hành nghề',
+  licenseNo: 'Số chứng chỉ',
   diagnosis: 'Chẩn đoán',
-  treatmentPlan: 'Phác đồ điều trị',
+  treatmentPlan: 'Phác đồ',
   note: 'Ghi chú',
 };
 
@@ -476,10 +518,9 @@ function LogsTable({
   onPrev,
   onNext,
 }) {
-  const [detail, setDetail] = useState(null); // the log row currently shown in the detail modal
+  const [detail, setDetail] = useState(null);
   const [batchInput, setBatchInput] = useState(batchFilter ?? '');
 
-  // Keep the local input in sync if the filter is cleared elsewhere.
   useEffect(() => { setBatchInput(batchFilter ?? ''); }, [batchFilter]);
 
   const applyBatch = () => {
@@ -488,136 +529,164 @@ function LogsTable({
   };
 
   return (
-    <section className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-      {/* Toolbar: entity filter + sort + batch filter (kept mounted even when empty) */}
-      <div className="flex flex-col gap-3 border-b border-slate-100 p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-black uppercase tracking-wider text-slate-400">Lọc theo đối tượng:</span>
-          <FilterChip active={!entity} onClick={() => setEntity('')}>Tất cả</FilterChip>
-          {Object.entries(ENTITY_LABELS).map(([key, value]) => (
-            <FilterChip key={key} active={entity === key} onClick={() => setEntity(key)}>
-              {value}
-            </FilterChip>
-          ))}
+    <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden transition-all">
+      {/* Filters Blueprint Panel */}
+      <div className="p-4 bg-slate-50/60 border-b border-slate-100 space-y-4">
+        {/* Chips */}
+        <div className="space-y-2">
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+            <SlidersHorizontal className="h-3 w-3" /> Phân loại cấu trúc đối tượng
+          </label>
+          <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-2 custom-scrollbar">
+            <FilterChip active={!entity} onClick={() => setEntity('')}>Tất cả dữ liệu</FilterChip>
+            {Object.entries(ENTITY_LABELS).map(([key, value]) => (
+              <FilterChip key={key} active={entity === key} onClick={() => setEntity(key)}>
+                {value}
+              </FilterChip>
+            ))}
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Seq sort toggle */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Sắp xếp Seq:</span>
-            <button
-              type="button"
-              onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-black text-slate-700 hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 transition-colors"
-              title={sortOrder === 'desc' ? 'Mới nhất trước (giảm dần)' : 'Cũ nhất trước (tăng dần)'}
-            >
-              {sortOrder === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />}
-              {sortOrder === 'desc' ? 'Giảm dần' : 'Tăng dần'}
-            </button>
-          </div>
-
-          {/* Batch filter */}
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-wider text-slate-400">
-              <Layers className="h-3.5 w-3.5" /> Lọc theo lô:
-            </span>
-            <div className="relative">
-              <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] font-black text-slate-400">#</span>
-              <input
-                type="number"
-                min={1}
-                value={batchInput}
-                onChange={(e) => setBatchInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') applyBatch(); }}
-                placeholder="Tất cả"
-                className="w-28 rounded-lg border border-slate-200 bg-white py-1.5 pl-6 pr-2 text-[12px] font-bold text-slate-700 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={applyBatch}
-              className="rounded-lg bg-cyan-600 px-3 py-1.5 text-[12px] font-black text-white hover:bg-cyan-700"
-            >
-              Lọc
-            </button>
-            {batchFilter !== '' && (
+        {/* Meta filters bar */}
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Sort order toggle */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400">Thứ tự Sequence:</span>
               <button
                 type="button"
-                onClick={() => { setBatchInput(''); setBatchFilter(''); }}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-black text-slate-500 hover:bg-slate-50"
+                onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-cyan-300 hover:bg-cyan-50/50 transition-all shadow-sm"
               >
-                Xóa lọc
+                {sortOrder === 'desc' ? <ArrowDown className="h-3.5 w-3.5 text-cyan-600" /> : <ArrowUp className="h-3.5 w-3.5 text-cyan-600" />}
+                {sortOrder === 'desc' ? 'Giảm dần (Mới nhất)' : 'Tăng dần (Cũ nhất)'}
               </button>
-            )}
+            </div>
+
+            {/* Batch code search */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400 flex items-center gap-0.5">
+                <Layers className="h-3 w-3" /> Lọc theo số lô:
+              </span>
+              <div className="flex items-center gap-1.5">
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">#</span>
+                  <input
+                    type="text"
+                    value={batchInput}
+                    onChange={(e) => setBatchInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') applyBatch(); }}
+                    placeholder="Tất cả lô"
+                    className="w-24 rounded-lg border border-slate-200 bg-white py-1.5 pl-6 pr-2 text-xs font-semibold text-slate-700 outline-none focus:border-cyan-500 transition-all shadow-sm"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={applyBatch}
+                  className="rounded-lg bg-slate-800 hover:bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition-colors shadow-sm"
+                >
+                  Tìm
+                </button>
+                {batchFilter !== '' && (
+                  <button
+                    type="button"
+                    onClick={() => { setBatchInput(''); setBatchFilter(''); }}
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 transition-colors"
+                  >
+                    Xóa
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="text-xs text-slate-400 font-medium bg-slate-100 px-2.5 py-1 rounded-md">
+            Tìm thấy <span className="font-bold text-slate-700">{total}</span> kết quả phù hợp
           </div>
         </div>
       </div>
 
       {!logs.length ? (
         <Empty
-          title="Không có nhật ký phù hợp"
-          desc={entity || batchFilter !== '' ? 'Không có bản ghi nào cho bộ lọc hiện tại. Thử đổi bộ lọc hoặc chọn “Tất cả”.' : 'Các hoạt động đăng nhập và thay đổi dữ liệu sẽ xuất hiện ở đây.'}
+          title="Không tìm thấy bản ghi tương thích"
+          desc={entity || batchFilter !== '' ? 'Không có dữ liệu audit nào khớp với tiêu chí bộ lọc của bạn hiện tại. Hãy thử đặt lại cấu hình lọc bộ gõ.' : 'Hệ thống chưa ghi nhận các hoạt động thay đổi cấu trúc dữ liệu.'}
         />
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="ui-table w-full text-left text-sm">
-              <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Seq</th>
-                  <th className="px-4 py-3">Hành động</th>
-                  <th className="px-4 py-3">Đối tượng</th>
-                  <th className="px-4 py-3">Trường thay đổi</th>
-                  <th className="px-4 py-3">Người thực hiện</th>
-                  <th className="px-4 py-3">Thời gian</th>
-                  <th className="px-4 py-3">Trên chuỗi</th>
-                  <th className="px-4 py-3">Toàn vẹn</th>
-                  <th className="px-4 py-3 text-right">Bằng chứng</th>
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/70 border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  <th className="px-4 py-3.5 text-center w-14">Seq</th>
+                  <th className="px-4 py-3.5 w-40">Hành động</th>
+                  <th className="px-4 py-3.5 w-60">Đối tượng tác động</th>
+                  <th className="px-4 py-3.5">Nội dung tóm lược</th>
+                  <th className="px-4 py-3.5 w-48">Tác nhân ký lệnh</th>
+                  <th className="px-4 py-3.5 w-44">Thời điểm (Hệ thống)</th>
+                  <th className="px-4 py-3.5 w-24 text-center">Trạng thái</th>
+                  <th className="px-4 py-3.5 w-28 text-center">Xác minh</th>
+                  <th className="px-4 py-3.5 w-32 text-right pr-6">Sổ cái</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-slate-100 text-xs">
                 {logs.map((log) => (
                   <tr
                     key={log.id}
                     onClick={() => setDetail(log)}
-                    className="cursor-pointer hover:bg-cyan-50/40"
-                    title="Bấm để xem chi tiết"
+                    className="group cursor-pointer hover:bg-slate-50/80 transition-colors"
                   >
-                    <td className="px-4 py-3 font-mono font-black text-slate-400">{log.seq ?? '—'}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex rounded-lg border px-2 py-1 text-[10px] font-black ${ACTION_TONE[log.action] || 'bg-slate-50 text-slate-600 border-slate-100'}`}>
+                    <td className="px-4 py-4 text-center font-mono font-bold text-slate-400 group-hover:text-cyan-600 transition-colors">
+                      {log.seq ?? '—'}
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className={`inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium tracking-wide shadow-sm ${ACTION_TONE[log.action] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                         {ACTION_LABEL[log.action] || log.action}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="font-black text-slate-900">{subjectTitle(log)}</span>
-                      <span className="mt-1 inline-flex rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[9px] font-black text-slate-500">
-                        {ENTITY_LABELS[log.entity] || log.subject?.label || log.entity} · {formatHashVersion(log.hashVersion)}
-                      </span>
-                      <span className="block max-w-[220px] truncate text-[11px] font-semibold text-slate-400">{subjectSubtitle(log)}</span>
+                    <td className="px-4 py-4">
+                      <div className="font-semibold text-slate-900 truncate max-w-[220px]">{subjectTitle(log)}</div>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="inline-flex rounded bg-slate-100 text-slate-500 px-1 py-0.2 text-[10px] font-medium font-mono">
+                          {ENTITY_LABELS[log.entity] || log.subject?.label || log.entity}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          {formatHashVersion(log.hashVersion)}
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-mono text-slate-400 mt-0.5 truncate max-w-[220px]">
+                        ID: {subjectSubtitle(log)}
+                      </div>
                     </td>
-                    <td className="min-w-[260px] px-4 py-3">
+                    <td className="px-4 py-4 max-w-xs md:max-w-sm">
                       <DiffPreview log={log} />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-4">
                       <ActorCell log={log} />
                     </td>
-                    <td className="px-4 py-3 text-[12px] text-slate-500">{formatTime(log.createdAt)}</td>
-                    <td className="px-4 py-3">
-                      <span className={`rounded-md border px-2 py-0.5 text-[10px] font-black ${log.onChainStatus === 'ANCHORED' ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-amber-100 bg-amber-50 text-amber-700'}`}>
-                        {log.onChainStatus === 'ANCHORED' ? `Lô #${log.batchId}` : 'Chờ neo'}
+                    <td className="px-4 py-4 text-slate-500 font-medium">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3 text-slate-300" />
+                        {formatTime(log.createdAt)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className={`inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-bold ${log.onChainStatus === 'ANCHORED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
+                        {log.onChainStatus === 'ANCHORED' ? `Lô #${log.batchId}` : 'Hàng đợi'}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-4 text-center">
                       <VerificationBadge status={log.blockchainStatus} />
                     </td>
-                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-4 text-right pr-6" onClick={(e) => e.stopPropagation()}>
                       {log.onChainStatus === 'ANCHORED' ? (
-                        <button onClick={() => onProof(log.seq)} className="rounded-lg border border-cyan-100 bg-cyan-50 px-3 py-1 text-[11px] font-black text-cyan-700 hover:bg-cyan-100">
-                          Xem bằng chứng
+                        <button
+                          onClick={() => onProof(log.seq)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:border-cyan-300 hover:text-cyan-600 shadow-sm transition-all active:scale-95"
+                        >
+                          <Eye className="h-3 w-3" /> Chứng chỉ
                         </button>
                       ) : (
-                        <span className="text-[11px] text-slate-300">—</span>
+                        <span className="text-xs text-slate-300 italic">Chưa kết khối</span>
                       )}
                     </td>
                   </tr>
@@ -629,7 +698,7 @@ function LogsTable({
             page={page}
             totalPages={totalPages}
             total={total}
-            label="bản ghi"
+            label="bản ghi dữ liệu"
             onPrev={onPrev}
             onNext={onNext}
           />
@@ -644,25 +713,22 @@ function LogsTable({
 function DiffPreview({ log }) {
   const preview = getPrimaryDiff(log);
   if (!preview.length) {
-    return <span className="text-[11px] font-bold text-slate-400">{summarizeDiff(log)}</span>;
+    return <span className="text-xs font-medium text-slate-400 italic">{summarizeDiff(log)}</span>;
   }
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1 max-w-[280px]">
       {preview.map((item) => (
-        <div key={item.field} className="rounded-xl border border-slate-100 bg-slate-50/70 px-2.5 py-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-1 text-[11px] font-black text-slate-700">
-              <FileDiff className="h-3 w-3 text-cyan-600" /> {fieldDisplayName(item)}
-            </span>
-            {item.redacted && <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-700">ĐÃ ẨN</span>}
-          </div>
-          <p className="mt-1 line-clamp-1 text-[10px] font-semibold text-slate-500">
-            {renderDiffValue(item.before, item.redacted)} → {renderDiffValue(item.after, item.redacted)}
-          </p>
+        <div key={item.field} className="text-[11px] text-slate-600 truncate flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded">
+          <span className="font-semibold text-slate-700 shrink-0">{fieldDisplayName(item)}:</span>
+          <span className="text-slate-400 line-through shrink-0 max-w-[50px] truncate">{renderDiffValue(item.before, item.redacted)}</span>
+          <span className="text-slate-400 shrink-0">→</span>
+          <span className="text-cyan-700 font-medium truncate">{renderDiffValue(item.after, item.redacted)}</span>
         </div>
       ))}
       {(log.diff?.length || 0) > preview.length && (
-        <p className="text-[10px] font-black text-cyan-600">+{log.diff.length - preview.length} field khác</p>
+        <p className="text-[10px] text-cyan-600 font-semibold pl-1">
+          + Phát hiện {log.diff.length - preview.length} thay đổi cấu trúc khác...
+        </p>
       )}
     </div>
   );
@@ -671,29 +737,35 @@ function DiffPreview({ log }) {
 function VerificationBadge({ status }) {
   const Icon = status === 'VERIFIED' ? ShieldCheck : ShieldAlert;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10px] font-black ${VERIFICATION_TONE[status] || VERIFICATION_TONE.TAMPERED}`}>
-      <Icon className="h-3 w-3" />
+    <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-bold shadow-sm ${VERIFICATION_TONE[status] || VERIFICATION_TONE.TAMPERED}`}>
+      <Icon className="h-3 w-3 shrink-0" />
       {VERIFICATION_LABEL[status] || status || 'Không rõ'}
     </span>
   );
 }
 
-// Compact actor identity for the table cell: display name + role chip, with a short id underneath.
 function ActorCell({ log }) {
-  if (!log.actorId) return <span className="text-[12px] font-bold text-slate-400">Hệ thống</span>;
+  if (!log.actorId) return <span className="text-xs font-medium text-slate-400 italic">Hệ thống kích hoạt</span>;
   const actor = log.actor;
   if (!actor) {
-    return <span className="font-mono text-[11px] text-slate-500">{shortHash(log.actorId)}</span>;
+    return <span className="font-mono text-[11px] text-slate-500 bg-slate-100 px-1 rounded">{shortHash(log.actorId)}</span>;
   }
   return (
     <div className="min-w-0">
-      <span className="block truncate text-[12px] font-black text-slate-800">{actor.displayName}</span>
-      <span className={`mt-0.5 inline-flex rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide ${ROLE_TONE[actor.role] || 'bg-slate-50 text-slate-600 border-slate-100'}`}>
-        {ROLE_LABELS[actor.role] || actor.role}
-      </span>
+      <div className="font-semibold text-slate-800 truncate flex items-center gap-1">
+        <UserIcon className="h-3 w-3 text-slate-400 shrink-0" />
+        {actor.displayName}
+      </div>
+      <div className="mt-0.5">
+        <span className={`inline-flex rounded text-[9px] font-bold px-1 uppercase tracking-wide border ${ROLE_TONE[actor.role] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+          {ROLE_LABELS[actor.role] || actor.role}
+        </span>
+      </div>
     </div>
   );
 }
+
+// ---- LogDetailModal Component -----------------------------------------------
 
 function LogDetailModal({ summaryLog, onClose, onProof }) {
   const [log, setLog] = useState(summaryLog);
@@ -719,139 +791,174 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
   const sensitiveDetailUnlocked = Boolean(log.sensitiveDetailUnlocked);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-cyan-100 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="relative overflow-hidden border-b border-cyan-100 bg-slate-950 px-6 py-5 text-white">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.28),transparent_38%),linear-gradient(135deg,rgba(15,23,42,1),rgba(8,47,73,0.95))]" />
-          <div className="relative flex items-start justify-between gap-4">
-            <div>
-              <p className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.22em] text-cyan-200">
-                <Fingerprint className="h-4 w-4" /> Trình kiểm tra Audit V2 mã hóa
-              </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className="font-mono text-lg font-black text-cyan-100">#{log.seq ?? '—'}</span>
-                <span className={`inline-flex rounded-lg border px-2 py-1 text-[10px] font-black ${ACTION_TONE[log.action] || 'border-white/20 bg-white/10 text-white'}`}>
-                  {ACTION_LABEL[log.action] || log.action}
-                </span>
-                <VerificationBadge status={log.blockchainStatus} />
-              </div>
-              <p className="mt-2 max-w-2xl text-sm font-semibold text-cyan-50/80">
-                Hiển thị trường thay đổi theo chính sách, chuỗi mã kiểm chứng và thông tin mã hóa. Dữ liệu gốc không được trả qua API mặc định.
-              </p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="relative flex flex-col w-full max-w-4xl max-h-[85vh] bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden text-slate-800 animate-in fade-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header Block */}
+        <div className="p-6 bg-slate-900 text-white flex items-start justify-between border-b border-slate-800">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 text-[10px] font-bold tracking-widest uppercase text-cyan-400">
+                <Fingerprint className="h-3 w-3" /> Audit Trace Ledger
+              </span>
+              <span className="text-xs text-slate-400 font-mono">Hash Version: {formatHashVersion(log.hashVersion)}</span>
             </div>
-            <button onClick={onClose} className="relative rounded-xl border border-white/15 bg-white/10 p-2 text-cyan-50 hover:bg-white/20">
-              <X className="h-5 w-5" />
-            </button>
+            <div className="mt-3 flex items-center gap-3">
+              <h2 className="text-xl font-bold font-mono tracking-tight text-white">Sequence ID #{log.seq ?? '—'}</h2>
+              <span className={`inline-flex rounded border px-2 py-0.5 text-xs font-semibold ${ACTION_TONE[log.action] || 'bg-slate-800 border-slate-700 text-white'}`}>
+                {ACTION_LABEL[log.action] || log.action}
+              </span>
+              <VerificationBadge status={log.blockchainStatus} />
+            </div>
           </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg border border-slate-800 bg-slate-800 text-slate-400 hover:text-white transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-slate-50/80 p-6">
-          {detailError && <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700">{detailError}</div>}
+        {/* Modal Main Content Container */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {detailError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs font-semibold text-rose-700 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-rose-500" />
+              {detailError}
+            </div>
+          )}
 
-          <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="space-y-5">
-              <section className="rounded-3xl border border-cyan-100 bg-cyan-50/60 p-5 shadow-sm">
-                <p className="mb-2 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-cyan-700">
-                  <Layers className="h-3.5 w-3.5" /> Đối tượng bị thay đổi
-                </p>
-                <div className="space-y-3">
-                  <p className="text-lg font-black text-slate-950">{subjectTitle(log)}</p>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <DetailField label="Bảng dữ liệu" value={ENTITY_LABELS[log.entity] || log.subject?.label || log.entity} />
-                    <DetailField label="Mã nghiệp vụ" value={log.subject?.code || '—'} mono />
-                    <DetailField label="Phòng ban" value={log.subject?.departmentName || '—'} />
-                    <DetailField label="Tài khoản liên kết" value={log.subject?.linkedUserId || '—'} mono />
-                  </div>
-                </div>
-              </section>
-
-              <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <h3 className="inline-flex items-center gap-2 text-sm font-black text-slate-900"><FileDiff className="h-4 w-4 text-cyan-600" /> Các trường đã thay đổi</h3>
-                  <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700">Dữ liệu nhạy cảm đã ẩn</span>
-                </div>
-                <DiffList diff={log.diff || []} />
-              </section>
-
-              <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h3 className="mb-4 inline-flex items-center gap-2 text-sm font-black text-slate-900"><ShieldCheck className="h-4 w-4 text-emerald-600" /> Chi tiết kiểm chứng</h3>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <DetailField label="Phiên bản kiểm chứng" value={formatHashVersion(log.hashVersion)} />
-                  <DetailField label="Trạng thái" value={VERIFICATION_LABEL[log.verification?.status] || VERIFICATION_LABEL[log.blockchainStatus] || log.verification?.status || log.blockchainStatus} />
-                  <DetailField label="Lý do" value={log.verification?.reason || 'Không phát hiện bất thường'} />
-                  <DetailField label="Trường nghi vấn" value={(log.verification?.suspiciousFields || []).join(', ') || '—'} />
-                </div>
-              </section>
+          {/* Quick Stats Summary Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Subject Data Meta */}
+            <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl space-y-3">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                <Layers className="h-3.5 w-3.5" /> Đối tượng chịu tác động
+              </h4>
+              <div className="space-y-2">
+                <DetailField label="Danh mục thực thể" value={ENTITY_LABELS[log.entity] || log.entity} />
+                <DetailField label="Tiêu đề đối tượng" value={subjectTitle(log)} highlight />
+                <DetailField label="Mã định danh Entity ID" value={log.entityId} mono />
+                <DetailField label="Chi tiết bổ sung" value={subjectSubtitle(log)} />
+              </div>
             </div>
 
-            <div className="space-y-5">
-              <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="mb-2 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
-                  <UserIcon className="h-3.5 w-3.5" /> Người thực hiện
-                </p>
-                {log.actorId ? (
-                  actor ? (
-                    <div className="space-y-1.5">
-                      <p className="text-sm font-black text-slate-900">{actor.displayName}</p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-black uppercase ${ROLE_TONE[actor.role] || 'bg-slate-50 text-slate-600 border-slate-100'}`}>
-                          {ROLE_LABELS[actor.role] || actor.role}
-                        </span>
-                        <span className="text-[12px] font-semibold text-slate-500">@{actor.username}</span>
-                      </div>
-                      {actor.email && <p className="text-[12px] text-slate-500">{actor.email}</p>}
-                    </div>
-                  ) : <p className="font-mono text-[12px] text-slate-500 break-all">ID: {log.actorId}</p>
-                ) : <p className="text-sm font-bold text-slate-500">Hệ thống tự động</p>}
-              </section>
+            {/* Actor Identity Profile */}
+            <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl space-y-3">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                <UserIcon className="h-3.5 w-3.5" /> Biên bản kiểm toán mật mã
+              </h4>
+              <div className="space-y-2">
+                <DetailField label="Người thực thi" value={actor?.displayName || 'Hệ thống tự động'} highlight={Boolean(actor)} />
+                <DetailField label="Vai trò nghiệp vụ" value={actor ? (ROLE_LABELS[actor.role] || actor.role) : '—'} />
+                <DetailField label="Mã định danh Actor ID" value={log.actorId || '—'} mono />
+                <DetailField label="Thời gian hệ thống" value={formatTime(log.createdAt)} />
+              </div>
+            </div>
+          </div>
 
-              <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h3 className="mb-4 text-sm font-black text-slate-900">Mã kiểm chứng & thông tin neo blockchain</h3>
-                <div className="space-y-3">
-                  <KV label="Mã kiểm chứng bản ghi" value={log.hashes?.entryHash || log.entryHash} mono />
-                  <KV label="Mã kiểm chứng dữ liệu trước khi đổi" value={log.hashes?.beforeHash} mono />
-                  <KV label="Mã kiểm chứng dữ liệu sau khi đổi" value={log.hashes?.afterHash} mono />
-                  <KV label="Mã kiểm chứng phần thay đổi" value={log.hashes?.diffHash} mono />
-                  <KV label="Lô blockchain" value={log.onChainStatus === 'ANCHORED' ? `#${log.batchId}` : 'Chờ neo'} />
-                </div>
-              </section>
+          {/* Security Hash Segment */}
+          <div className="p-4 border border-slate-100 rounded-xl space-y-2 bg-slate-50/50 font-mono text-[11px]">
+            <div className="text-xs font-bold text-slate-400 uppercase font-sans tracking-wide">Chữ ký số kiểm định (Hashes)</div>
+            <div className="grid grid-cols-1 gap-1.5 pt-1">
+              <div className="flex justify-between border-b border-slate-100 pb-1">
+                <span className="text-slate-400">Current Entry Hash:</span>
+                <span className="text-slate-700 font-medium break-all text-right max-w-md">{log.entryHash || '—'}</span>
+              </div>
+              <div className="flex justify-between pt-0.5">
+                <span className="text-slate-400">Previous Record Hash:</span>
+                <span className="text-slate-700 font-medium break-all text-right max-w-md">{log.prevHash || '—'}</span>
+              </div>
+            </div>
+          </div>
 
-              <section className="rounded-3xl border border-cyan-200 bg-cyan-50/60 p-5 shadow-sm">
-                <h3 className="mb-3 inline-flex items-center gap-2 text-sm font-black text-cyan-950"><LockKeyhole className="h-4 w-4" /> Dữ liệu chi tiết được bảo vệ</h3>
-                {log.encryptedSnapshots ? (
-                  <div className="space-y-3 rounded-2xl border border-cyan-100 bg-white/80 p-3 text-[12px] font-bold text-cyan-900">
-                    <p className="font-black text-emerald-700">Đã tải metadata mã hóa sau khi xác thực khuôn mặt.</p>
-                    <p>Trước thay đổi: {log.encryptedSnapshots.before?.alg || '—'} · khóa {log.encryptedSnapshots.before?.keyId || '—'}</p>
-                    <p>Sau thay đổi: {log.encryptedSnapshots.after?.alg || '—'} · khóa {log.encryptedSnapshots.after?.keyId || '—'}</p>
-                  </div>
-                ) : <p className="text-xs font-semibold text-cyan-800">Danh sách chỉ hiển thị tên trường thay đổi. Xác thực khuôn mặt để tải trạng thái chi tiết và metadata mã hóa của bản ghi này.</p>}
-                {!sensitiveDetailUnlocked ? (
-                  <button onClick={() => setStepUpOpen(true)} disabled={detailLoading} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-cyan-900/10 hover:bg-cyan-700 disabled:opacity-60">
-                    <Fingerprint className="h-4 w-4" /> {detailLoading ? 'Đang tải chi tiết…' : 'Xác thực khuôn mặt để tải chi tiết bảo mật'}
-                  </button>
-                ) : (
-                  <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-bold text-emerald-800">
-                    Đã xác thực khuôn mặt. Các trường an toàn được hiển thị ở mục “Các trường đã thay đổi”; giá trị PII/lâm sàng/tệp vẫn bị ẩn theo chính sách và chỉ đối chiếu qua quy trình break-glass có kiểm soát.
-                  </div>
-                )}
-              </section>
-
-              {log.onChainStatus === 'ANCHORED' && (
-                <button onClick={() => { onProof(log.seq); onClose(); }} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white hover:bg-slate-800">
-                  <Eye className="h-4 w-4" /> Xem bằng chứng Merkle
+          {/* Diff Changes Field Level Section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                <FileDiff className="h-3.5 w-3.5 text-cyan-600" /> Bảng phân rã biến động thuộc tính (Field-level Diff)
+              </h3>
+              {!sensitiveDetailUnlocked && (
+                <button
+                  type="button"
+                  onClick={() => setStepUpOpen(true)}
+                  disabled={detailLoading}
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-600 hover:text-cyan-700 bg-cyan-50 px-2.5 py-1 rounded-md border border-cyan-100 transition-all"
+                >
+                  <LockKeyhole className="h-3 w-3" /> {detailLoading ? 'Đang giải mã...' : 'Mở khóa dữ liệu nhạy cảm'}
                 </button>
               )}
             </div>
+
+            {Array.isArray(log.diff) && log.diff.length > 0 ? (
+              <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-400 font-bold border-b border-slate-100">
+                      <th className="px-4 py-2.5">Trường thuộc tính</th>
+                      <th className="px-4 py-2.5 bg-rose-50/30 text-rose-800">Dữ liệu trước (Before)</th>
+                      <th className="px-4 py-2.5 bg-emerald-50/30 text-emerald-800">Dữ liệu sau (After)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {log.diff.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-3 font-medium">
+                          <div className="text-slate-800 font-semibold">{fieldDisplayName(item)}</div>
+                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">{fieldTechnicalName(item)}</div>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-slate-500 bg-rose-50/10 max-w-xs break-all">
+                          {renderDiffValue(item.before, item.redacted)}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-slate-800 font-medium bg-emerald-50/10 max-w-xs break-all">
+                          {renderDiffValue(item.after, item.redacted)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-4 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400 font-medium italic">
+                Bản ghi này không ghi nhận biến động dữ liệu dạng bảng (Chỉ lưu vết sự kiện).
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer Action */}
+        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+          <div className="text-xs text-slate-400 font-medium">
+            Mã định danh bản ghi cơ sở dữ liệu nội bộ: <span className="font-mono text-slate-600 font-bold">{log.id}</span>
+          </div>
+          <div className="flex gap-2">
+            {log.onChainStatus === 'ANCHORED' && (
+              <button
+                type="button"
+                onClick={() => { onClose(); onProof(log.seq); }}
+                className="px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:border-slate-300 rounded-xl text-xs font-semibold transition-all shadow-sm"
+              >
+                Trích xuất Merkle Proof
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold transition-all shadow-sm"
+            >
+              Đóng cửa sổ
+            </button>
           </div>
         </div>
       </div>
 
       {stepUpOpen && (
         <FaceStepUpModal
-          action="AUDIT_DETAIL"
-          resourceId={String(log.seq)}
-          title="Mở chi tiết audit đã mã hóa"
-          description="Chi tiết audit có thể bao gồm diff nhạy cảm. Hệ thống yêu cầu quét khuôn mặt để cấp vé xem một lần; snapshot plaintext vẫn không được trả qua API mặc định."
+          action="DECRYPT_AUDIT_LOG"
+          title="Yêu cầu xác quyền sinh trắc"
+          description="Để phòng chống rò rỉ dữ liệu y khoa nhạy cảm, bạn cần hoàn thành FaceID để giải mã sâu các trường thông tin ẩn."
           onSuccess={loadDetail}
           onClose={() => setStepUpOpen(false)}
         />
@@ -860,206 +967,114 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
   );
 }
 
-function DiffList({ diff }) {
-  if (!diff.length) return <p className="text-sm font-semibold text-slate-400">Không có diff field-level cho bản ghi này.</p>;
+function DetailField({ label, value, mono = false, highlight = false }) {
   return (
-    <div className="space-y-3">
-      {diff.map((item) => (
-        <div key={item.field} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
-          <div className="mb-2 flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-sm font-black text-slate-900">{fieldDisplayName(item)}</p>
-              {fieldTechnicalName(item) && fieldTechnicalName(item) !== fieldDisplayName(item) && (
-                <p className="mt-0.5 font-mono text-[10px] font-semibold text-slate-400">Tên kỹ thuật: {fieldTechnicalName(item)}</p>
-              )}
-            </div>
-            {item.redacted && <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700">ĐÃ ẨN</span>}
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="rounded-xl bg-white p-2">
-              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Trước thay đổi</p>
-              <p className="mt-1 break-words text-xs font-bold text-slate-700">{renderDiffValue(item.before, item.redacted)}</p>
-            </div>
-            <div className="rounded-xl bg-white p-2">
-              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Sau thay đổi</p>
-              <p className="mt-1 break-words text-xs font-bold text-slate-900">{renderDiffValue(item.after, item.redacted)}</p>
-            </div>
-          </div>
-          {item.reason && (
-            <p className="mt-2 rounded-xl border border-amber-100 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">
-              Chính sách {item.policyCode ? `· ${item.policyCode}` : ''}: {item.reason}
-            </p>
-          )}
+    <div className="flex items-center justify-between gap-4 text-xs border-b border-slate-100/60 pb-1.5 last:border-0 last:pb-0">
+      <span className="text-slate-400 font-medium">{label}:</span>
+      <span className={`text-right truncate max-w-[200px] sm:max-w-xs ${mono ? 'font-mono bg-slate-100 px-1 rounded text-slate-600 text-[11px]' : ''
+        } ${highlight ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+// ---- Batches Ledger Table ---------------------------------------------------
+
+function BatchesTable({ batches, page, totalPages, total, onPrev, onNext }) {
+  return (
+    <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="p-4 bg-slate-50/60 border-b border-slate-100 flex items-center justify-between">
+        <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+          <Layers className="h-3.5 w-3.5 text-cyan-600" /> Sổ cái phân phối khối mã hóa Merkle
         </div>
-      ))}
-    </div>
-  );
-}
-
-
-
-function DetailField({ label, value, mono = false }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</dt>
-      <dd className={`mt-0.5 break-words text-[13px] font-bold text-slate-800 ${mono ? 'font-mono text-[12px]' : ''}`}>{value || '—'}</dd>
-    </div>
-  );
-}
-
-// ---- On-chain batches table -------------------------------------------------
-
-
-function BatchesTable({
-  batches,
-  page,
-  totalPages,
-  total,
-  onPrev,
-  onNext,
-}) {
-  if (!batches.length) {
-    return <Empty title="Chưa có lô nào được neo" desc="Hệ thống gom bản ghi thành lô và neo Merkle root định kỳ. Bấm 'Neo ngay' để tạo lô đầu tiên." />;
-  }
-  return (
-    <section className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="ui-table w-full text-left text-sm">
-          <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500">
-            <tr>
-              <th className="px-4 py-3">Lô</th>
-              <th className="px-4 py-3">Root Merkle</th>
-              <th className="px-4 py-3">Số bản ghi</th>
-              <th className="px-4 py-3">Khoảng seq</th>
-              <th className="px-4 py-3">Trạng thái</th>
-              <th className="px-4 py-3">Blockchain</th>
-              <th className="px-5 py-3">Hash giao dịch</th>
-              <th className="px-4 py-3">Neo lúc</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {batches.map((b) => (
-              <tr key={b.id} className="hover:bg-slate-50/60">
-                <td className="px-4 py-3 font-mono font-black text-slate-900">#{b.batchId}</td>
-                <td className="px-4 py-3 font-mono text-[11px] text-cyan-600">{shortHash(b.merkleRoot)}</td>
-                <td className="px-4 py-3 font-black text-slate-700">{b.leafCount}</td>
-                <td className="px-4 py-3 font-mono text-[11px] text-slate-500">{b.fromSeq}–{b.toSeq}</td>
-                <td className="px-4 py-3">
-                  <span className={`rounded-md border px-2 py-0.5 text-[10px] font-black ${
-                    b.status === 'ANCHORED' ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-                    : b.status === 'FAILED' ? 'border-rose-100 bg-rose-50 text-rose-700'
-                    : 'border-amber-100 bg-amber-50 text-amber-700'}`}>
-                    {BATCH_STATUS_LABEL[b.status] || b.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  {b.status === 'ANCHORED' ? (
-                    <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700">
-                      <span className="h-1 w-1 rounded-full bg-emerald-500" />
-                      Healthy
-                    </span>
-                  ) : b.status === 'FAILED' ? (
-                    <span className="inline-flex items-center gap-1 rounded-lg border border-rose-100 bg-rose-50 px-2 py-0.5 text-[10px] font-black text-rose-700 animate-pulse">
-                      <span className="h-1 w-1 rounded-full bg-rose-500" />
-                      Unhealthy
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-lg border border-amber-100 bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700">
-                      <span className="h-1 w-1 rounded-full bg-amber-500" />
-                      Pending
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-3 font-mono text-[11px] text-slate-500">{shortHash(b.txHash)}</td>
-                <td className="px-4 py-3 text-[12px] text-slate-500">{formatTime(b.anchoredAt)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="text-xs font-medium text-slate-400">
+          Tổng số lô định danh: <span className="font-bold text-slate-700">{total}</span> lô
+        </div>
       </div>
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        total={total}
-        label="lô"
-        onPrev={onPrev}
-        onNext={onNext}
-      />
+
+      {!batches.length ? (
+        <Empty
+          title="Chưa tìm thấy lô đóng gói nào"
+          desc="Khi hệ thống thực hiện thao tác đóng chuỗi và neo lên mạng lưới, danh sách lịch sử đóng khối khối sẽ xuất hiện tại đây."
+        />
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50/70 border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  <th className="px-6 py-3.5 text-center w-20">Mã lô</th>
+                  <th className="px-6 py-3.5">Merkle Root Hash</th>
+                  <th className="px-6 py-3.5 text-center w-36">Số lá cây (Records)</th>
+                  <th className="px-6 py-3.5 w-44">Thời điểm đóng cấu trúc</th>
+                  <th className="px-6 py-3.5 w-40">Mã giao dịch sổ cái (TxHash)</th>
+                  <th className="px-6 py-3.5 text-center w-32">Cơ chế xác thực</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                {batches.map((b) => (
+                  <tr key={b.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-6 py-4 text-center font-mono font-bold text-slate-400">#{b.id}</td>
+                    <td className="px-6 py-4 font-mono text-[11px] text-slate-800 break-all max-w-sm">{b.merkleRoot || '—'}</td>
+                    <td className="px-6 py-4 text-center font-bold text-cyan-700">{b.leafCount ?? 0} bản ghi</td>
+                    <td className="px-6 py-4 text-slate-500">{formatTime(b.createdAt)}</td>
+                    <td className="px-6 py-4 font-mono text-[11px] text-slate-400" title={b.txHash}>
+                      {b.txHash ? (
+                        <span className="text-slate-600 font-semibold bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded">
+                          {shortHash(b.txHash)}
+                        </span>
+                      ) : (
+                        <span className="italic text-slate-300">N/A (Cục bộ)</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold border ${b.status === 'ANCHORED' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'
+                        }`}>
+                        {BATCH_STATUS_LABEL[b.status] || b.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={page} totalPages={totalPages} total={total} label="lô kết khối" onPrev={onPrev} onNext={onNext} />
+        </>
+      )}
     </section>
   );
 }
 
-// ---- Merkle proof modal -----------------------------------------------------
+// ---- Reusable Structural UI Elements ----------------------------------------
 
-function ProofModal({ proof, onClose }) {
-  const d = proof.data;
+function StatCard({ label, value, hint, icon: Icon, color = 'text-slate-900', bg = 'bg-white' }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
-        <div className="shrink-0 border-b border-slate-100 p-6 flex items-start justify-between gap-4">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-600">Bằng chứng bao hàm Merkle</p>
-            <h3 className="mt-1 text-2xl font-black text-slate-950">Bằng chứng bản ghi #{proof.seq}</h3>
-            <p className="mt-1 text-sm text-slate-500">Chứng minh bản ghi này nằm trong lô đã neo, đối chiếu trực tiếp với root trên chuỗi.</p>
-          </div>
-          <button onClick={onClose} className="rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-black text-slate-600 hover:bg-slate-50">Đóng</button>
-        </div>
-        <div className="flex-1 overflow-y-auto bg-slate-50/60 p-5">
-          {proof.loading ? (
-            <LoadingIndicator size="md" label="Đang tạo bằng chứng..." />
-          ) : proof.error ? (
-            <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">{proof.error}</div>
-          ) : !d ? (
-            <Empty title="Không có bằng chứng" desc="Bản ghi này chưa được neo vào lô nào." />
-          ) : (
-            <div className="space-y-4">
-              <div className={`rounded-2xl border p-4 ${d.verified ? 'border-emerald-100 bg-emerald-50' : 'border-rose-100 bg-rose-50'}`}>
-                <p className={`text-sm font-black ${d.verified ? 'text-emerald-800' : 'text-rose-800'}`}>
-                  {d.verified ? 'Bằng chứng hợp lệ - khớp với root trên blockchain' : 'Bằng chứng KHÔNG khớp root trên chuỗi'}
-                </p>
-              </div>
-              <KV label="Lô (batchId)" value={`#${d.batchId}`} />
-              <KV label="Hash bản ghi (lá Merkle)" value={d.entryHash} mono />
-              <KV label="Merkle Root (tính lại)" value={d.merkleRoot} mono />
-              <KV label="Root trên blockchain" value={d.onChainRoot} mono />
-              <div>
-                <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-slate-400">Đường dẫn bằng chứng ({d.proof?.length || 0} nút)</p>
-                <div className="space-y-1.5">
-                  {(d.proof || []).map((p, i) => (
-                    <div key={i} className="rounded-lg border border-slate-100 bg-white px-3 py-2 font-mono text-[11px] text-slate-500">
-                      [{i}] {shortHash(p)}
-                    </div>
-                  ))}
-                  {!d.proof?.length && <p className="text-xs text-slate-400">Lô chỉ có 1 bản ghi - không cần nút trung gian.</p>}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+    <div className={`p-5 rounded-2xl border border-slate-100 shadow-sm flex items-start justify-between transition-all hover:shadow-md ${bg}`}>
+      <div className="space-y-1">
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label}</p>
+        <p className={`text-2xl font-bold font-mono tracking-tight ${color}`}>{value}</p>
+        <p className="text-[11px] text-slate-500 font-medium opacity-80">{hint}</p>
       </div>
+      {Icon && (
+        <div className={`p-2.5 rounded-xl bg-slate-50 text-slate-400`}>
+          <Icon className="h-5 w-5" />
+        </div>
+      )}
     </div>
-  );
-}
-
-// ---- Small presentational bits ----------------------------------------------
-
-function StatCard({ label, value, hint }) {
-  return (
-    <article className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
-      <div className="flex justify-between">
-        <div>
-          <p className="text-xs font-bold text-slate-500">{label}</p>
-          <strong className="block text-3xl font-black text-slate-950 mt-2">{String(value).padStart(2, '0')}</strong>
-        </div>
-      </div>
-      <p className="mt-3 text-xs font-semibold text-cyan-600">{hint}</p>
-    </article>
   );
 }
 
 function TabButton({ active, onClick, children }) {
   return (
-    <button onClick={onClick} className={`rounded-xl border px-4 py-2 text-xs font-black transition-colors ${active ? 'border-cyan-600 bg-cyan-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${active
+        ? 'bg-white text-slate-900 shadow-sm font-bold'
+        : 'text-slate-500 hover:text-slate-800'
+        }`}
+    >
       {children}
     </button>
   );
@@ -1067,28 +1082,42 @@ function TabButton({ active, onClick, children }) {
 
 function FilterChip({ active, onClick, children }) {
   return (
-    <button onClick={onClick} className={`rounded-lg border px-3 py-1 text-[11px] font-black transition-colors ${active ? 'border-cyan-200 bg-cyan-50 text-cyan-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all shadow-sm shrink-0 border ${active
+        ? 'bg-cyan-600 text-white border-cyan-600 font-semibold'
+        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+        }`}
+    >
       {children}
     </button>
   );
 }
 
-function KV({ label, value, mono }) {
+function Pagination({ page, totalPages, total, label = 'bản ghi', onPrev, onNext }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-white px-4 py-3">
-      <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">{label}</p>
-      <p className={`mt-1 break-all text-sm text-slate-700 ${mono ? 'font-mono text-[12px]' : ''}`}>{value || '—'}</p>
-    </div>
-  );
-}
-
-function Pagination({ page, totalPages, total, label, onPrev, onNext }) {
-  return (
-    <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-xs font-bold text-slate-500">Trang {page}/{totalPages} · {total} {label}</p>
-      <div className="flex gap-2">
-        <button onClick={onPrev} disabled={page <= 1} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-black text-slate-600 disabled:opacity-40">Trước</button>
-        <button onClick={onNext} disabled={page >= totalPages} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-black text-slate-600 disabled:opacity-40">Sau</button>
+    <div className="p-4 bg-slate-50/70 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-medium">
+      <div>
+        Hiển thị trang <span className="text-slate-800 font-bold">{page}</span> / <span className="text-slate-800 font-bold">{totalPages}</span> trang tổng (Tổng cộng {total} {label})
+      </div>
+      <div className="flex gap-2 w-full sm:w-auto">
+        <button
+          type="button"
+          onClick={onPrev}
+          disabled={page <= 1}
+          className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white text-xs font-semibold transition-all shadow-sm"
+        >
+          Trang trước
+        </button>
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={page >= totalPages}
+          className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white text-xs font-semibold transition-all shadow-sm"
+        >
+          Trang sau
+        </button>
       </div>
     </div>
   );
@@ -1096,9 +1125,62 @@ function Pagination({ page, totalPages, total, label, onPrev, onNext }) {
 
 function Empty({ title, desc }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center">
-      <strong className="text-slate-700">{title}</strong>
-      <p className="mt-1 text-sm text-slate-500">{desc}</p>
+    <div className="p-12 text-center max-w-md mx-auto space-y-2">
+      <div className="inline-flex p-3 rounded-full bg-slate-50 border border-slate-100 text-slate-400 mb-2">
+        <Search className="h-6 w-6" />
+      </div>
+      <h3 className="text-sm font-bold text-slate-800">{title}</h3>
+      <p className="text-xs text-slate-400 leading-relaxed font-medium">{desc}</p>
+    </div>
+  );
+}
+
+function ProofModal({ proof, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden flex flex-col max-h-[80vh] text-slate-800 animate-in fade-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+            <ShieldCheck className="h-4 w-4 text-emerald-600" /> Bằng chứng mật mã Merkle Proof (Seq #{proof.seq})
+          </h3>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-200 transition-colors text-slate-400 hover:text-slate-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="p-5 flex-1 overflow-y-auto text-xs space-y-4">
+          {proof.loading ? (
+            <LoadingIndicator size="sm" label="Đang truy xuất cấu trúc cây kiểm toán..." />
+          ) : proof.error ? (
+            <div className="p-3 bg-rose-50 text-rose-700 border border-rose-100 rounded-lg font-semibold">{proof.error}</div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-slate-500 leading-relaxed font-medium">
+                Chuỗi bằng chứng băm (Sibling Hashes) chứng minh bản ghi này nằm trong cây Merkle Root đã được neo lên chuỗi khối mà không thể giả mạo:
+              </p>
+              <div className="p-3 bg-slate-900 text-cyan-400 font-mono text-[11px] rounded-xl overflow-x-auto space-y-1 shadow-inner">
+                <div><span className="text-slate-500">// Merkle Root định danh</span></div>
+                <div className="text-white font-bold pb-2 break-all">Root: {proof.data?.root || '—'}</div>
+                <div className="text-slate-500 pt-1">// Danh sách các node băm lân cận</div>
+                {Array.isArray(proof.data?.proof) && proof.data.proof.length > 0 ? (
+                  proof.data.proof.map((p, i) => (
+                    <div key={i} className="break-all py-0.5"><span className="text-slate-500">[{i}]:</span> {typeof p === 'object' ? JSON.stringify(p) : p}</div>
+                  ))
+                ) : (
+                  <div className="text-slate-500 italic">Bản ghi độc lập (Single Leaf Node)</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="p-3 bg-slate-50 border-t border-slate-100 flex justify-end">
+          <button onClick={onClose} className="px-4 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-semibold hover:bg-slate-900 transition-colors">
+            Xác nhận
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
