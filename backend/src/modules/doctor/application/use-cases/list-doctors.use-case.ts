@@ -20,7 +20,7 @@ export class ListDoctorsUseCase {
       items.map(async (doctor: any) => {
         let integrityEval;
         try {
-          integrityEval = await this.integrity.evaluate(doctor);
+          integrityEval = await this.integrity.evaluate(doctor, true);
         } catch (err) {
           integrityEval = {
             status: 'UNANCHORED',

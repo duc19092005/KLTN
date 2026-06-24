@@ -67,7 +67,7 @@ export class AuditPatientIntegrityAnchor implements PatientIntegrityAnchorPort {
     return { value };
   }
 
-  async evaluate(patient: any): Promise<PatientIntegrityEvaluation> {
+  async evaluate(patient: any, skipChainCheck = false): Promise<PatientIntegrityEvaluation> {
     const snapshot = buildPatientSnapshot(patient);
     const recomputed = patient.dataSalt ? this.audit.recompute(snapshot, patient.dataSalt) : null;
     const dbHash = patient.hash256 || null;
@@ -81,12 +81,16 @@ export class AuditPatientIntegrityAnchor implements PatientIntegrityAnchorPort {
 
     let chainMatches = false;
     if (latestLog?.seq) {
-      try {
-        const proof = await this.auditAnchor.getInclusionProof(latestLog.seq);
-        if (proof && proof.verified) {
-          chainMatches = latestLog.dataHash === recomputed;
-        }
-      } catch { /* proof verification failed */ }
+      if (skipChainCheck) {
+        chainMatches = latestLog.dataHash === recomputed;
+      } else {
+        try {
+          const proof = await this.auditAnchor.getInclusionProof(latestLog.seq);
+          if (proof && proof.verified) {
+            chainMatches = latestLog.dataHash === recomputed;
+          }
+        } catch { /* proof verification failed */ }
+      }
     }
 
     let status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED';

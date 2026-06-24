@@ -22,6 +22,6 @@ export type DepartmentIntegrityEvaluation = {
  */
 export interface DepartmentIntegrityAnchorPort {
   anchorChange(department: any, action: DepartmentAnchorAction, actorId?: string, before?: unknown): Promise<void>;
-  evaluate(department: any): Promise<DepartmentIntegrityEvaluation>;
+  evaluate(department: any, skipChainCheck?: boolean): Promise<DepartmentIntegrityEvaluation>;
   history(id?: string): Promise<unknown>;
 }

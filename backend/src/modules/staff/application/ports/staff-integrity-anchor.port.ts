@@ -26,6 +26,6 @@ export type StaffIntegrityEvaluation = {
  */
 export interface StaffIntegrityAnchorPort {
   anchorChange(staffProfile: any, action: AuditAction, actorId?: string, before?: unknown): Promise<void>;
-  evaluate(staff: any): Promise<StaffIntegrityEvaluation>;
+  evaluate(staff: any, skipChainCheck?: boolean): Promise<StaffIntegrityEvaluation>;
   history(id?: string): Promise<unknown>;
 }

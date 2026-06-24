@@ -52,7 +52,7 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
     });
   }
 
-  async evaluate(dept: any): Promise<DepartmentIntegrityEvaluation> {
+  async evaluate(dept: any, skipChainCheck = false): Promise<DepartmentIntegrityEvaluation> {
     const snapshot = buildDepartmentSnapshot(dept);
     const recomputed = dept.dataSalt ? this.audit.recompute(snapshot, dept.dataSalt) : null;
     const dbHash = dept.hash256 || null;
@@ -76,13 +76,17 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
 
     let chainMatches = false;
     if (latestAnchored?.seq) {
-      try {
-        const proof = await this.auditAnchor.getInclusionProof(latestAnchored.seq);
-        if (proof && proof.verified) {
-          chainMatches = latestAnchored.afterHash === currentAfterHash;
+      if (skipChainCheck) {
+        chainMatches = latestAnchored.afterHash === currentAfterHash;
+      } else {
+        try {
+          const proof = await this.auditAnchor.getInclusionProof(latestAnchored.seq);
+          if (proof && proof.verified) {
+            chainMatches = latestAnchored.afterHash === currentAfterHash;
+          }
+        } catch {
+          // Proof verification failed; chainMatches stays false
         }
-      } catch {
-        // Proof verification failed; chainMatches stays false
       }
     }
 

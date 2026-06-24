@@ -70,6 +70,37 @@ export default function PatientVerificationPage() {
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
   const [expandedProof, setExpandedProof] = useState(null); // stores seq of expanded proof
+  const [verifyingVisits, setVerifyingVisits] = useState({});
+
+  const handleVerifyConclusion = async (conclusionId, visitId) => {
+    if (verifyingVisits[conclusionId]) return;
+    setVerifyingVisits((prev) => ({ ...prev, [conclusionId]: true }));
+    try {
+      const response = await axios.get(`${API_URL}/patient-verify/conclusion/${conclusionId}/verify`);
+      const verificationResult = response.data.success !== undefined ? response.data.data : response.data;
+      
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          visits: prev.visits.map((v) => {
+            if (v.conclusion?.id === conclusionId || v.id === visitId || v.visitCode === visitId) {
+              return {
+                ...v,
+                blockchainVerification: verificationResult,
+              };
+            }
+            return v;
+          }),
+        };
+      });
+    } catch (err) {
+      console.error(err);
+      alert('Không thể xác thực bản ghi này trên blockchain: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setVerifyingVisits((prev) => ({ ...prev, [conclusionId]: false }));
+    }
+  };
 
   // QR scanner state: a single modal handles both image upload and camera scan.
   const [qrModalOpen, setQrModalOpen] = useState(false);
@@ -417,7 +448,7 @@ export default function PatientVerificationPage() {
                     const verification = visit.blockchainVerification || { status: 'unanchored' };
                     
                     return (
-                      <div key={visit.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-colors hover:border-slate-300">
+                      <div key={visit.id || visit.visitCode} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-colors hover:border-slate-300">
                         
                         {/* Card Header */}
                         <div className="bg-[#f0f3ff] px-6 py-4 border-b border-[#c2c6d4]/30 flex flex-wrap justify-between items-center gap-3">
@@ -445,6 +476,26 @@ export default function PatientVerificationPage() {
                               <ShieldAlert className="h-3.5 w-3.5" />
                               Bị sửa đổi (cảnh báo toàn vẹn)
                             </span>
+                          )}
+                          {verification.status === 'unverified' && (
+                            <button
+                              type="button"
+                              disabled={verifyingVisits[visit.conclusion?.id]}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleVerifyConclusion(visit.conclusion?.id, visit.id || visit.visitCode);
+                              }}
+                              className="px-3 py-1.5 bg-[#e7eeff] border border-[#acc7ff] text-[#0891b2] text-xs font-bold rounded-full flex items-center gap-1.5 hover:bg-[#acc7ff]/30 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                            >
+                              <ShieldCheck className="h-3.5 w-3.5" />
+                              {verifyingVisits[visit.conclusion?.id] ? (
+                                <span className="flex items-center gap-1">
+                                  Đang xác thực...
+                                </span>
+                              ) : (
+                                'Chưa xác thực - Nhấn để xác thực'
+                              )}
+                            </button>
                           )}
                           {verification.status === 'unanchored' && (
                             <span className="px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold rounded-full flex items-center gap-1.5">

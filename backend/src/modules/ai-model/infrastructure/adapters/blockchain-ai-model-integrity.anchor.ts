@@ -49,7 +49,7 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
     });
   }
 
-  async evaluate(model: any): Promise<IntegrityEvaluation> {
+  async evaluate(model: any, skipChainCheck = false): Promise<IntegrityEvaluation> {
     const snapshot = buildAiModelSnapshot(model);
     const recomputed = model.dataSalt ? this.audit.recompute(snapshot, model.dataSalt) : null;
     const dbHash = model.hash256 || null;
@@ -64,12 +64,16 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
 
     let chainMatches = false;
     if (latestAnchored?.seq) {
-      try {
-        const proof = await this.auditAnchor.getInclusionProof(latestAnchored.seq);
-        if (proof && proof.verified) {
-          chainMatches = latestAnchored.afterHash === currentAfterHash;
-        }
-      } catch { /* proof verification failed */ }
+      if (skipChainCheck) {
+        chainMatches = latestAnchored.afterHash === currentAfterHash;
+      } else {
+        try {
+          const proof = await this.auditAnchor.getInclusionProof(latestAnchored.seq);
+          if (proof && proof.verified) {
+            chainMatches = latestAnchored.afterHash === currentAfterHash;
+          }
+        } catch { /* proof verification failed */ }
+      }
     }
 
     // Latest log entry overall (regardless of anchor status). Used to detect the window

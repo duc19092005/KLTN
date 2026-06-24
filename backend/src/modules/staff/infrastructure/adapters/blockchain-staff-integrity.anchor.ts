@@ -56,10 +56,10 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
     return { value };
   }
 
-  async evaluate(staff: any): Promise<StaffIntegrityEvaluation> {
+  async evaluate(staff: any, skipChainCheck = false): Promise<StaffIntegrityEvaluation> {
     // If this staff member is also a doctor, delegate to unified doctor verification
     if (staff.doctorProfile) {
-      return this.evaluateDoctor(staff);
+      return this.evaluateDoctor(staff, skipChainCheck);
     }
 
     const snapshot = buildStaffSnapshot(staff);
@@ -85,12 +85,16 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
 
     let chainMatches = false;
     if (latestAnchored?.seq) {
-      try {
-        const proof = await this.auditAnchor.getInclusionProof(latestAnchored.seq);
-        if (proof && proof.verified) {
-          chainMatches = latestAnchored.afterHash === currentAfterHash;
-        }
-      } catch { /* proof verification failed */ }
+      if (skipChainCheck) {
+        chainMatches = latestAnchored.afterHash === currentAfterHash;
+      } else {
+        try {
+          const proof = await this.auditAnchor.getInclusionProof(latestAnchored.seq);
+          if (proof && proof.verified) {
+            chainMatches = latestAnchored.afterHash === currentAfterHash;
+          }
+        } catch { /* proof verification failed */ }
+      }
     }
 
     let status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR';
@@ -134,7 +138,7 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
    * Evaluate a staff member who is also a doctor using the unified doctor snapshot.
    * The doctor's audit log is stored under entity='DoctorProfile', entityId=doctor.id.
    */
-  private async evaluateDoctor(staff: any): Promise<StaffIntegrityEvaluation> {
+  private async evaluateDoctor(staff: any, skipChainCheck = false): Promise<StaffIntegrityEvaluation> {
     const doctor = staff.doctorProfile;
     const doctorWithStaff = {
       ...doctor,
@@ -160,12 +164,16 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
 
     let chainMatches = false;
     if (latestAnchored?.seq) {
-      try {
-        const proof = await this.auditAnchor.getInclusionProof(latestAnchored.seq);
-        if (proof && proof.verified) {
-          chainMatches = latestAnchored.afterHash === currentAfterHash;
-        }
-      } catch { /* proof verification failed */ }
+      if (skipChainCheck) {
+        chainMatches = latestAnchored.afterHash === currentAfterHash;
+      } else {
+        try {
+          const proof = await this.auditAnchor.getInclusionProof(latestAnchored.seq);
+          if (proof && proof.verified) {
+            chainMatches = latestAnchored.afterHash === currentAfterHash;
+          }
+        } catch { /* proof verification failed */ }
+      }
     }
 
     let status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR';

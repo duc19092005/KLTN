@@ -17,6 +17,6 @@ export type PatientIntegrityEvaluation = {
  */
 export interface PatientIntegrityAnchorPort {
   anchorChange(patient: any, action: string, actorId?: string, before?: unknown): Promise<void>;
-  evaluate(patient: any): Promise<PatientIntegrityEvaluation>;
+  evaluate(patient: any, skipChainCheck?: boolean): Promise<PatientIntegrityEvaluation>;
   history(id?: string): Promise<any[]>;
 }

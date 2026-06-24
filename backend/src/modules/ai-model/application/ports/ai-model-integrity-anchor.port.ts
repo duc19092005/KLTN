@@ -20,6 +20,7 @@ export type IntegrityEvaluation = {
  * hash256/dataSalt, writing the BlockchainLogger audit entry, anchoring through
  * AuditAnchor, and recomputing/verifying integrity.
  *
+ *
  * Keeps the append-only audit + on-chain anchor behavior; never sends PII or
  * model content on-chain (only the salted hash).
  */
@@ -27,7 +28,7 @@ export interface AiModelIntegrityAnchorPort {
   /** Anchor a create/update/delete change and write the audit log. */
   anchorChange(model: any, action: AiModelAnchorAction, actorId?: string, before?: unknown): Promise<void>;
   /** Recompute the integrity hash and compare against DB + on-chain values. */
-  evaluate(model: any): Promise<IntegrityEvaluation>;
+  evaluate(model: any, skipChainCheck?: boolean): Promise<IntegrityEvaluation>;
   /** Append-only change history for an AI model (or all). */
   history(id?: string): Promise<unknown>;
 }

@@ -28,7 +28,7 @@ export class ListAiModelsUseCase {
         
         let integrityEval;
         try {
-          integrityEval = await this.integrity.evaluate(model);
+          integrityEval = await this.integrity.evaluate(model, true);
         } catch (err) {
           integrityEval = {
             status: 'UNANCHORED',

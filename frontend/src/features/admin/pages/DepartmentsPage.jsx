@@ -76,6 +76,26 @@ export default function DepartmentsPage() {
   const [staffs, setStaffs] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [selectedDepartment, setSelectedDepartment] = useState(null);
+  const handleSelectDepartment = async (dept) => {
+    setSelectedDepartment(dept);
+    if (!dept) return;
+    try {
+      const res = await departmentService.verifyOne(dept.id);
+      const verifyRes = res.data?.success !== undefined ? res.data.data : res.data;
+      setSelectedDepartment((prev) => {
+        if (prev?.id === dept.id) {
+          return {
+            ...prev,
+            blockchainStatus: verifyRes.status,
+            audit: verifyRes,
+          };
+        }
+        return prev;
+      });
+    } catch (err) {
+      console.error('Failed to verify department on blockchain:', err);
+    }
+  };
   const [editingDepartment, setEditingDepartment] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -190,7 +210,7 @@ export default function DepartmentsPage() {
       <div className="max-w-7xl mx-auto space-y-6">
         <Hero onCreate={openCreate} />
         {loading ? <LoadingIndicator size="lg" label="Đang tải phòng ban..." /> : (
-          <DepartmentDirectory departments={departments} staffs={staffs} busy={busy} selectedDepartment={selectedDepartment} onSelect={setSelectedDepartment} onAssignManager={assignManager} onEdit={openEdit} onDelete={removeDepartment} pagination={pagination} onPageChange={load} />
+          <DepartmentDirectory departments={departments} staffs={staffs} busy={busy} selectedDepartment={selectedDepartment} onSelect={handleSelectDepartment} onAssignManager={assignManager} onEdit={openEdit} onDelete={removeDepartment} pagination={pagination} onPageChange={load} />
         )}
         {selectedDepartment && (
           <DepartmentDetail

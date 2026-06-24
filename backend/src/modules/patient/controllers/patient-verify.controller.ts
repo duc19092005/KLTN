@@ -20,4 +20,13 @@ export class PatientVerifyController {
   verify(@Param('patientCode') patientCode: string) {
     return this.verifyUseCase.execute(patientCode);
   }
+
+  @Get('conclusion/:conclusionId/verify')
+  @ApiOperation({
+    summary: 'Public: Verify a single medical conclusion on-chain',
+    description: 'No login required. Cryptographically verifies a single medical conclusion and retrieves Merkle proof details.',
+  })
+  verifyConclusion(@Param('conclusionId') conclusionId: string) {
+    return this.verifyUseCase.verifyConclusion(conclusionId);
+  }
 }

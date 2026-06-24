@@ -31,7 +31,7 @@ export class ListDepartmentsUseCase {
       items.map(async (d: any) => {
         let integrityEval;
         try {
-          integrityEval = await this.integrity.evaluate(d);
+          integrityEval = await this.integrity.evaluate(d, true);
         } catch (err) {
           integrityEval = {
             status: 'UNANCHORED',
