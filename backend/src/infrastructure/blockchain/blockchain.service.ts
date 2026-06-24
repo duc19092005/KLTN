@@ -299,15 +299,15 @@ export class BlockchainService implements OnModuleInit {
 
   async authorizeAdmin(walletAddress: string) {
     return this.enqueueWrite(async () => {
-      if (!this.contract || !this.ownerSigner) {
-        return { success: false, error: 'IdentityRegistry hoặc khóa owner blockchain chưa được cấu hình.' };
+      if (!this.contract || !this.relayerSigner) {
+        return { success: false, error: 'IdentityRegistry hoặc khóa relayer blockchain chưa được cấu hình.' };
       }
       try {
         const normalizedWalletAddress = ethers.getAddress(walletAddress);
         if (await this.isAuthorized(normalizedWalletAddress)) {
           return { success: true, alreadyAuthorized: true };
         }
-        const writableContract = this.contract.connect(this.ownerSigner) as ethers.Contract;
+        const writableContract = this.contract.connect(this.relayerSigner) as ethers.Contract;
         const tx = await writableContract.authorizeAdmin(normalizedWalletAddress);
         const receipt = await tx.wait();
         return {
