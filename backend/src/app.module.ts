@@ -23,7 +23,8 @@ import { ApiResponseInterceptor } from './common/interceptors/api-response.inter
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { StepUpModule } from './common/stepup/stepup.module';
 import { NotificationModule } from './modules/notification/notification.module';
-import { NfcModule } from './modules/nfc/nfc.module';
+import { PatientAuthModule } from './modules/patient-auth/patient-auth.module';
+import { PatientPortalModule } from './modules/patient-portal/patient-portal.module';
 
 @Module({
   imports: [
@@ -45,7 +46,8 @@ import { NfcModule } from './modules/nfc/nfc.module';
     AuditApiModule,
     BackupModule,
     NotificationModule,
-    NfcModule,
+    PatientAuthModule,
+    PatientPortalModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,26 +1,15 @@
 {
   "expo": {
-    "name": "KLTN NFC",
-    "slug": "kltn-nfc-mobile",
+    "name": "KLTN Patient Mobile",
+    "slug": "kltn-patient-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true,
-      "infoPlist": {
-        "NFCReaderUsageDescription": "KLTN NFC uses CCCD demo cards to identify patients and pair receptionist scan sessions."
-      },
-      "entitlements": {
-        "com.apple.developer.nfc.readersession.formats": [
-          "NDEF"
-        ]
-      }
+      "supportsTablet": true
     },
     "android": {
-      "permissions": [
-        "android.permission.NFC"
-      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -28,9 +17,9 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.kltnnfcmobile"
+      "package": "com.anonymous.kltnpatientmobile"
     },
-    "scheme": "kltnnfc",
+    "scheme": "kltnpatient",
     "web": {
       "favicon": "./assets/favicon.png"
     }

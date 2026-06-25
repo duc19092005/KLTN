@@ -16,7 +16,7 @@ async function bootstrap() {
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.use(cookieParser());
 
-  const allowedOrigins = (process.env.FRONTEND_ORIGIN || 'http://localhost:5173,http://localhost:3000')
+  const allowedOrigins = (process.env.FRONTEND_ORIGIN || 'http://localhost:5173,http://localhost:3000,http://localhost:8081')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);

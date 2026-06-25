@@ -10,7 +10,7 @@ Blockchain chi dung de neo hash/Merkle root phuc vu kiem chung toan ven. Tuyet d
 KLTN/
 |-- backend/      NestJS + Prisma + PostgreSQL
 |-- frontend/     React + Vite + Tailwind CSS
-|-- mobile/       Expo React Native NFC demo apps
+|-- mobile/       Expo React Native patient mobile portal
 |-- blockchain/   Solidity + Hardhat + Ethers.js
 |-- docs/         Tai lieu kien truc, audit, backup/recovery
 |-- tools/        Cong cu khoi phuc/khan cap offline
@@ -140,14 +140,11 @@ Download file y te di qua:
 
 Backend kiem tra RBAC roi moi tra pre-signed URL ngan han. File Cloudinary medical cu khong migrate trong phase nay; neu DB con `url` legacy va URL con song thi endpoint van mo duoc.
 
-## NFC Mobile
+## Patient Mobile
 
-`mobile/` la noi setup NFC mobile, build APK va mo ta payload card.
+`mobile/` contains the Expo React Native patient portal. Patients sign in with phone OTP or their first-login password, can resend OTP after a 60-second cooldown, choose linked profiles, and view their linked medical visit history transparently.
 
-- Receptionist scanner: pair voi web intake qua NFC session va SSE.
-- Patient portal: scan NFC CCCD card, sau do dung lai backend patient verification.
-
-Xem [mobile/README.md](./mobile/README.md).
+See [mobile/README.md](./mobile/README.md).
 
 ## Tai Lieu Lien Quan
 

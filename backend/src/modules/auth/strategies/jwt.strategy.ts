@@ -27,7 +27,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      include: { adminProfile: true },
+      include: { adminProfile: true, patientAccesses: { where: { status: 'ACTIVE' } } },
     });
 
     if (!user || user.status === 'INACTIVE' || user.tokenVersion !== payload.tokenVersion) {
@@ -45,6 +45,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       staffId: payload.staffId,
       staffName: payload.staffName,
       shiftId: payload.shiftId,
+      patientId: payload.patientId || payload.patientIds?.[0] || user.patientAccesses[0]?.patientId,
+      patientIds: payload.patientIds || user.patientAccesses.map((access) => access.patientId),
     };
   }
 }

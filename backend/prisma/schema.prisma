@@ -12,12 +12,32 @@ enum UserRole {
   RECEPTIONIST
   DOCTOR
   LAB_MANAGER
+  PATIENT
 }
 
 enum UserStatus {
   ACTIVE
   INACTIVE
   PENDING
+}
+
+enum OtpPurpose {
+  PATIENT_LOGIN
+}
+
+enum PatientRelationship {
+  SELF
+  CHILD
+  PARENT
+  SPOUSE
+  GUARDIAN
+  OTHER
+}
+
+enum PatientAccessStatus {
+  ACTIVE
+  PENDING
+  REVOKED
 }
 
 enum DepartmentType {
@@ -45,8 +65,10 @@ enum LabSpecialty {
 
 model User {
   id                String     @id @default(uuid())
-  username          String     @unique
-  email             String     @unique
+  username          String?    @unique
+  email             String?    @unique
+  phone             String?
+  phoneNormalized   String?    @unique
   passwordHash      String?
   role              UserRole
   status            UserStatus @default(PENDING)
@@ -79,6 +101,8 @@ model User {
 
   staffProfile      StaffProfile?
   adminProfile      AdminProfile?
+  patientAccesses   PatientAccess[]
+  refreshTokens     RefreshToken[]
   performedResults  MedicalResult[]
   stepUpTickets     StepUpTicket[]
   stepUpSessions    StepUpSession[]
@@ -87,6 +111,7 @@ model User {
 
   @@index([role])
   @@index([status])
+  @@index([phone])
 }
 
 model Department {
@@ -202,13 +227,14 @@ model Patient {
   gender           String
   birthDate        DateTime
   citizenId        String?  @unique
-  phone            String?
+  phone            String?  @map("contactPhone")
   address          String?
   insuranceNumber  String?
   emergencyContact String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  linkedAccounts   PatientAccess[]
   visits           Visit[]
   aiDiagnoses      AiDiagnosis[]
   medicalOrders    MedicalOrder[]
@@ -221,6 +247,35 @@ model Patient {
   @@index([fullName])
   @@index([citizenId])
   @@index([phone])
+}
+
+model PatientAccess {
+  id              String              @id @default(uuid())
+
+  userId          String
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  patientId       String
+  patient         Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  relationship    PatientRelationship @default(SELF)
+  status          PatientAccessStatus @default(ACTIVE)
+
+  canViewProfile  Boolean             @default(true)
+  canViewVisits   Boolean             @default(true)
+  canViewResults  Boolean             @default(true)
+  canBookVisit    Boolean             @default(false)
+
+  verifiedAt      DateTime?
+  verifiedById    String?
+  revokedAt       DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([userId, patientId])
+  @@index([userId])
+  @@index([patientId])
+  @@index([status])
 }
 
 model AdminProfile {
@@ -270,6 +325,10 @@ model Visit {
   status         VisitStatus  @default(WAITING)
   checkInAt      DateTime     @default(now())
   completedAt    DateTime?
+  reason         String?
+  symptoms       String?
+  initialDiagnosis String?
+  note           String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -691,6 +750,49 @@ model StepUpSession {
   @@index([idleExpiresAt])
 }
 
+
+
+model RefreshToken {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash   String   @unique
+  deviceId    String?
+  deviceName  String?
+  ipAddress   String?
+  userAgent   String?
+
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+}
+
+model OtpVerification {
+  id              String     @id @default(uuid())
+  phone           String
+  phoneNormalized String
+  otpHash         String
+  purpose         OtpPurpose @default(PATIENT_LOGIN)
+  expiresAt       DateTime
+  usedAt          DateTime?
+  attempts        Int        @default(0)
+  maxAttempts     Int        @default(5)
+  ipAddress       String?
+  userAgent       String?
+  requestId       String?    @unique
+  sentAt          DateTime?
+  blockedUntil    DateTime?
+  createdAt       DateTime   @default(now())
+
+  @@index([phoneNormalized, purpose, createdAt])
+  @@index([expiresAt])
+  @@index([usedAt])
+}
 
 
 model Notification {

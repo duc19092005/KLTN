@@ -20,4 +20,6 @@ export type AuthUser = {
   staffId?: string;
   shiftId?: string;
   staffName?: string;
+  patientId?: string;
+  patientIds?: string[];
 };

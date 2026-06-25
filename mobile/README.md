@@ -1,11 +1,8 @@
-# KLTN NFC Mobile
+# KLTN Patient Mobile
 
-React Native / Expo mobile codebase for two NFC surfaces:
+React Native / Expo mobile codebase for the patient-facing portal.
 
-- Receptionist scanner: pairs with the web receptionist flow, scans a blank NFC CCCD card, and sends the card data to backend SSE.
-- Patient portal: scans the same NFC CCCD card, then asks the backend to return patient history with DB and blockchain verification.
-
-The app uses `react-native-nfc-manager`, so real NFC scans require a native Android build on a real NFC-capable phone. Expo Go is not enough.
+The app lets patients sign in with their phone number and OTP or first-login password, choose linked patient profiles, and view their linked medical visit history transparently.
 
 ## 1. Requirements
 
@@ -14,8 +11,7 @@ Install these first:
 - Node.js 20+
 - npm
 - Git
-- Android phone with NFC enabled
-- Android Studio, only needed for local builds
+- Android Studio, only needed for local native builds
 - Expo/EAS account, only needed for cloud APK builds
 
 Check Node:
@@ -30,7 +26,7 @@ npm -v
 Install dependencies:
 
 ```bash
-cd "D:\Personal Datas\KLTN\mobile"
+cd "D:\\Personal Datas\\KLTN\\mobile"
 npm install
 copy .env.example .env
 ```
@@ -39,7 +35,6 @@ Edit `mobile/.env`:
 
 ```env
 EXPO_PUBLIC_BACKEND_URL=http://192.168.1.13:3001/api
-EXPO_PUBLIC_SCANNER_DEVICE_LABEL=Reception Desk NFC Phone
 ```
 
 Use your laptop LAN IP instead of `localhost` when testing on a physical phone over WiFi.
@@ -61,14 +56,14 @@ Do not commit `.env`. It is ignored by git.
 From the repository root:
 
 ```bash
-cd "D:\Personal Datas\KLTN"
+cd "D:\\Personal Datas\\KLTN"
 docker compose up -d
 ```
 
 Or run only the backend manually:
 
 ```bash
-cd "D:\Personal Datas\KLTN\backend"
+cd "D:\\Personal Datas\\KLTN\\backend"
 npm install
 npm run start:dev
 ```
@@ -81,39 +76,37 @@ http://YOUR_BACKEND_HOST:3001/api
 
 ## 4. Run Mobile For Development
 
-Because NFC needs native code, use a native Android run:
+For normal Expo development:
 
 ```bash
-cd "D:\Personal Datas\KLTN\mobile"
+cd "D:\\Personal Datas\\KLTN\\mobile"
+npm start
+```
+
+For a native Android run:
+
+```bash
 npx expo run:android
 ```
 
-This creates an Android native build and installs it on the connected device or emulator.
+## 5. Patient OTP Login
 
-For NFC testing, use a real phone. Android emulators normally cannot scan physical NFC cards.
+The patient portal uses these backend endpoints:
 
-## 5. NFC Card Payload
-
-Write the blank NFC card as an NDEF Text record:
-
-```json
-{
-  "type": "KLTN_CCCD",
-  "version": 1,
-  "citizenId": "079203000001",
-  "fullName": "Nguyen Van An",
-  "dateOfBirth": "2003-04-12",
-  "gender": "MALE",
-  "address": "Ho Chi Minh City",
-  "issuedAt": "2024-01-15"
-}
+```text
+POST /api/patient/auth/request-otp
+POST /api/patient/auth/resend-otp
+POST /api/patient/auth/verify-otp
 ```
 
-The app rejects cards that are not `KLTN_CCCD` version `1`.
+OTP behavior:
+
+- OTP length: 6 digits
+- OTP validity: 5 minutes
+- Resend cooldown: 60 seconds
+- The app shows a countdown before another OTP can be requested
 
 ## 6. Export APK With EAS Cloud Build
-
-This is the easiest way to get a downloadable `.apk`.
 
 Login to Expo:
 
@@ -124,7 +117,7 @@ npx eas-cli@latest login
 Configure the project once:
 
 ```bash
-cd "D:\Personal Datas\KLTN\mobile"
+cd "D:\\Personal Datas\\KLTN\\mobile"
 npx eas-cli@latest build:configure
 ```
 
@@ -135,21 +128,6 @@ npx eas-cli@latest build -p android --profile preview
 ```
 
 When the build finishes, EAS prints a download URL. Open that URL, download the `.apk`, and install it on the Android phone.
-
-The `preview` profile is defined in `mobile/eas.json`:
-
-```json
-{
-  "build": {
-    "preview": {
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
-    }
-  }
-}
-```
 
 Important: before building, set `EXPO_PUBLIC_BACKEND_URL` in `eas.json` or through EAS environment variables. Do not use `localhost` in an APK that will run on a phone.
 
@@ -168,7 +146,7 @@ Install Android Studio and make sure these are configured:
 Generate native Android project:
 
 ```bash
-cd "D:\Personal Datas\KLTN\mobile"
+cd "D:\\Personal Datas\\KLTN\\mobile"
 npx expo prebuild --platform android
 ```
 
@@ -176,7 +154,7 @@ Build debug APK:
 
 ```bash
 cd android
-.\gradlew assembleDebug
+.\\gradlew assembleDebug
 ```
 
 The APK will be here:
@@ -190,8 +168,8 @@ Debug APKs are for development only. They expect Metro to be running and can sho
 Build release APK:
 
 ```bash
-cd "D:\Personal Datas\KLTN\mobile\android"
-.\gradlew assembleRelease
+cd "D:\\Personal Datas\\KLTN\\mobile\\android"
+.\\gradlew assembleRelease
 ```
 
 The unsigned release APK will be here:
@@ -211,7 +189,7 @@ Option A: copy APK to phone and tap the file.
 Option B: install with adb:
 
 ```bash
-adb install -r "path\to\app.apk"
+adb install -r "path\\to\\app.apk"
 ```
 
 If Android blocks the install, enable:
@@ -232,17 +210,13 @@ Test from phone browser:
 http://YOUR_BACKEND_HOST:3001/api/docs
 ```
 
-### NFC button says device does not support NFC
-
-Use a real Android phone with NFC hardware. Turn NFC on in Android settings.
-
-### Expo Go cannot scan NFC
-
-Correct. This app needs native code through `react-native-nfc-manager`. Use `npx expo run:android` or build an APK.
-
 ### EAS build uses the wrong backend URL
 
 Update the `env` block in `eas.json`, or set EAS environment variables before building. Rebuild the APK after changing the URL.
+
+### OTP does not arrive
+
+In development, the backend may log OTPs to the console if SMS sending is not configured or eSMS balance is insufficient.
 
 ## 10. Validation
 

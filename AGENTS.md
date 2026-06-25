@@ -41,12 +41,11 @@ The system is built on a strictly defined technology stack. **Do not propose dev
 - **Stack**: Python, TensorFlow, InsightFace.
 - **Integration**: Python scripts integrated as child processes via the backend.
 
-**Mobile NFC:**
+**Patient Mobile:**
 - **Framework**: Expo React Native in `mobile/`.
-- **Purpose**: NFC demo surfaces for receptionist intake and patient portal access.
-- **NFC Library**: `react-native-nfc-manager`.
+- **Purpose**: Patient portal for OTP/password login, linked profile selection, and transparent linked medical history access.
+- **Authentication**: Phone OTP through `patient-auth`; OTP is valid for 5 minutes and can be resent after a 60-second cooldown.
 - **Environment**: `EXPO_PUBLIC_BACKEND_URL` in `mobile/.env`; never commit `.env`.
-- **Card Format**: Blank NFC cards are NDEF Text records containing `KLTN_CCCD` version `1` JSON.
 
 ## 3. Project Conventions & Coding Standards
 
@@ -86,37 +85,21 @@ Patient
       └─ BlockchainLogger (Integrity anchors for the Visit and its children)
 ```
 
-### NFC Identification Flow
+### Patient Mobile Access Flow
 
-The NFC feature does not replace the Patient or Visit aggregate. It only changes how CCCD data enters the system.
+The mobile app does not use NFC. Patients authenticate by phone OTP and then access only patient profiles linked to that phone number.
 
 ```text
-Blank NFC card
- └─ KLTN_CCCD v1 JSON
-      ├─ Receptionist scanner app
-      │    └─ Backend NFC session
-      │         └─ SSE result to receptionist web intake form
-      └─ Patient portal app
-           └─ Backend finds Patient by citizenId
-                └─ Existing patient verification use case checks DB + blockchain
+Patient phone number
+ └─ Backend patient-auth
+      ├─ Request OTP
+      ├─ Resend OTP after 60-second cooldown
+      └─ Verify OTP
+           └─ JWT with PATIENT role and linked patient IDs
+                └─ Patient portal fetches linked visit history
 ```
 
-The canonical demo payload is:
-
-```json
-{
-  "type": "KLTN_CCCD",
-  "version": 1,
-  "citizenId": "079203000001",
-  "fullName": "Nguyen Van An",
-  "dateOfBirth": "2003-04-12",
-  "gender": "MALE",
-  "address": "Ho Chi Minh City",
-  "issuedAt": "2024-01-15"
-}
-```
-
-The NFC card is a demo data carrier, not a cryptographic proof. Never store CCCD, patient PII, or raw NFC payloads on-chain.
+OTP payloads and patient access tokens are never stored on-chain. Blockchain remains an audit/integrity layer only.
 
 ### 5. Medical Result Definitions
 
