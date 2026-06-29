@@ -25,9 +25,12 @@ const styles = StyleSheet.create({
   panel: {
     borderRadius: 16,
     borderWidth: 1,
-    padding: 14,
+    paddingVertical: 12,
+    paddingLeft: 14,
+    paddingRight: 46,
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'center',
+    gap: 10,
   },
   copy: {
     flex: 1,
@@ -38,11 +41,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   body: {
-    marginTop: 4,
+    marginTop: 2,
     color: colors.muted,
     fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '600',
+    lineHeight: 16,
+    fontWeight: '700',
   },
   info: {
     backgroundColor: colors.surfaceAlt,

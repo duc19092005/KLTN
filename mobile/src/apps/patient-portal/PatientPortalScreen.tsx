@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Animated, Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Animated, Alert, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { passwordPatientLogin, requestPatientOtp, resendPatientOtp, verifyPatientOtp, changePatientPassword, PatientOtpLoginResponse } from '../../shared/api/patientAuthClient';
 import {
@@ -123,6 +123,8 @@ export function PatientPortalScreen() {
   const [doctors, setDoctors] = useState<BookableDoctor[]>([]);
   const [slots, setSlots] = useState<AppointmentSlot[]>([]);
   const [appointments, setAppointments] = useState<PatientAppointment[]>([]);
+  const [expandedQrIds, setExpandedQrIds] = useState<Record<string, boolean>>({});
+  const qrRefs = useRef<Record<string, { toDataURL?: (callback: (data: string) => void) => void } | null>>({});
   const [bookingDepartmentId, setBookingDepartmentId] = useState('');
   const [bookingDoctorId, setBookingDoctorId] = useState('');
   const [bookingDate, setBookingDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
@@ -431,7 +433,7 @@ export function PatientPortalScreen() {
     setBookingBusyStage('patients');
     clearFeedback();
     try {
-      const appointmentData = await getPatientAppointments(session.accessToken, patientId);
+      const appointmentData = await getPatientAppointments(session.accessToken);
       setAppointments(appointmentData);
       setBookingStage('qr');
       setStep('booking');
@@ -566,12 +568,35 @@ export function PatientPortalScreen() {
     try {
       const updated = await getAppointmentQr(session.accessToken, appointmentId);
       setAppointments((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setExpandedQrIds((current) => ({ ...current, [updated.id]: true }));
       showSuccess('Đã tải mã QR check-in.');
     } catch (qrError) {
       showError(getFriendlyError(qrError, 'Không lấy được mã QR.'));
     } finally {
       setBookingBusyStage(null);
     }
+  };
+
+  const downloadAppointmentQr = (appointment: PatientAppointment) => {
+    const qrRef = qrRefs.current[appointment.id];
+    if (!appointment.qrPayload || !qrRef?.toDataURL) {
+      showInfo('Vui lòng hiển thị mã QR trước khi tải xuống.');
+      return;
+    }
+
+    qrRef.toDataURL((data) => {
+      const fileName = `${appointment.appointmentCode || 'lich-hen'}-qr.png`;
+      const dataUrl = `data:image/png;base64,${data}`;
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = fileName;
+        link.click();
+        showSuccess('Đã tải mã QR.');
+        return;
+      }
+      showInfo('Thiết bị này chưa hỗ trợ tải trực tiếp. Vui lòng chụp màn hình mã QR.');
+    });
   };
 
   const reset = () => {
@@ -601,19 +626,7 @@ export function PatientPortalScreen() {
       <ScrollView style={styles.portalScroll} contentContainerStyle={[styles.content, showAuthenticatedTabs && styles.contentWithTabs]} showsVerticalScrollIndicator={false}>
       {!showAuthenticatedTabs ? <View style={styles.statusSpacer} /> : null}
 
-      {feedback ? (
-        <View style={styles.feedbackWrap}>
-          <StatusPanel
-            tone={feedback.tone === 'danger' ? 'danger' : undefined}
-            title={feedback.title}
-            body={feedback.body}
-            icon={<Ionicons name={feedback.tone === 'danger' ? 'warning-outline' : feedback.tone === 'success' ? 'checkmark-circle-outline' : 'information-circle-outline'} size={22} color={feedback.tone === 'danger' ? colors.danger : feedback.tone === 'success' ? colors.success : colors.primary} />}
-          />
-          <Pressable accessibilityRole="button" accessibilityLabel="Đóng thông báo" onPress={() => setFeedback(null)} style={styles.feedbackClose}>
-            <Ionicons name="close" size={18} color={colors.muted} />
-          </Pressable>
-        </View>
-      ) : null}
+
 
       {step === 'phone' && (
         <View style={styles.onboardingScreen}>
@@ -713,7 +726,7 @@ export function PatientPortalScreen() {
           </View>
           <ActionButton label="Đăng nhập" loading={busy} onPress={loginWithPassword} icon={<Ionicons name="log-in-outline" size={20} color="#ffffff" />} />
           <Divider />
-          <ActionButton tone="secondary" label="Đăng nhập bằng OTP" loading={busy} onPress={requestOtp} icon={<Ionicons name="shield-checkmark-outline" size={20} color={colors.primaryDark} />} />
+          <ActionButton tone="secondary" label="Đăng nhập bằng OTP" loading={busy} onPress={() => { clearFeedback(); setStep('phone'); }} icon={<Ionicons name="shield-checkmark-outline" size={20} color={colors.primaryDark} />} />
         </AuthScaffold>
       )}
 
@@ -801,9 +814,29 @@ export function PatientPortalScreen() {
           onSymptoms={setBookingSymptoms}
           onSubmit={submitAppointment}
           onQr={refreshAppointmentQr}
+          expandedQrIds={expandedQrIds}
+          qrRefs={qrRefs}
+          onOpenQr={(appointmentId) => setExpandedQrIds((current) => ({ ...current, [appointmentId]: true }))}
+          onCloseQr={(appointmentId) => setExpandedQrIds((current) => ({ ...current, [appointmentId]: false }))}
+          onDownloadQr={downloadAppointmentQr}
         />
       )}
       </ScrollView>
+      {feedback ? (
+        <View pointerEvents="box-none" style={styles.feedbackWrap}>
+          <View style={styles.feedbackCard}>
+            <StatusPanel
+              tone={feedback.tone}
+              title={feedback.title}
+              body={feedback.body}
+              icon={<Ionicons name={feedback.tone === 'danger' ? 'warning-outline' : feedback.tone === 'success' ? 'checkmark-circle-outline' : 'information-circle-outline'} size={20} color={feedback.tone === 'danger' ? colors.danger : feedback.tone === 'success' ? colors.success : colors.primary} />}
+            />
+            <Pressable accessibilityRole="button" accessibilityLabel="Đóng thông báo" onPress={() => setFeedback(null)} style={styles.feedbackClose}>
+              <Ionicons name="close" size={17} color={colors.muted} />
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
       {showAuthenticatedTabs ? (
         <BottomTabs active={activeTab} onHome={() => setStep('dashboard')} onNotifications={() => setStep('notifications')} onFeatures={() => setStep('profiles')} onAccount={() => setStep('account')} />
       ) : null}
@@ -1009,10 +1042,16 @@ function AccountScreen({ session, onLogout, onHome, onChangePassword, notificati
   const primaryPatient = session.patients[0];
   const displayName = primaryPatient?.fullName || 'Người bệnh';
   const phoneText = maskPhone(primaryPatient?.phone || '');
-  const confirmLogout = () => Alert.alert('Đăng xuất', 'Bạn có chắc muốn đăng xuất không?', [
-    { text: 'Hủy', style: 'cancel' },
-    { text: 'Đăng xuất', style: 'destructive', onPress: onLogout },
-  ]);
+  const confirmLogout = () => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if (window.confirm('Bạn có chắc muốn đăng xuất không?')) onLogout();
+      return;
+    }
+    Alert.alert('Đăng xuất', 'Bạn có chắc muốn đăng xuất không?', [
+      { text: 'Hủy', style: 'cancel' },
+      { text: 'Đăng xuất', style: 'destructive', onPress: onLogout },
+    ]);
+  };
 
   return (
     <View style={styles.accountScreen}>
@@ -1397,19 +1436,19 @@ type BookingScreenProps = {
   onSymptoms: (symptoms: string) => void;
   onSubmit: () => void;
   onQr: (appointmentId: string) => void;
+  expandedQrIds: Record<string, boolean>;
+  qrRefs: React.MutableRefObject<Record<string, { toDataURL?: (callback: (data: string) => void) => void } | null>>;
+  onOpenQr: (appointmentId: string) => void;
+  onCloseQr: (appointmentId: string) => void;
+  onDownloadQr: (appointment: PatientAppointment) => void;
 };
 
-function BookingScreen({ patient, patients, selectedPatientId, stage, departments, doctors, slots, appointments, departmentId, doctorId, selectedSlot, date, reason, symptoms, busy, busyStage, onCreateProfile, onPatient, onStage, onDepartment, onDoctor, onDate, onSlot, onReason, onSymptoms, onSubmit, onQr }: BookingScreenProps) {
+function BookingScreen({ patient, patients, selectedPatientId, stage, departments, doctors, slots, appointments, departmentId, doctorId, selectedSlot, date, reason, symptoms, busy, busyStage, onCreateProfile, onPatient, onStage, onDepartment, onDoctor, onDate, onSlot, onReason, onSymptoms, onSubmit, onQr, expandedQrIds, qrRefs, onOpenQr, onCloseQr, onDownloadQr }: BookingScreenProps) {
   const selectedDepartment = departments.find((department) => department.id === departmentId);
   const selectedDoctor = doctors.find((doctor) => doctor.id === doctorId);
-  const { width } = useWindowDimensions();
-  const compact = width < 380;
-  const goBack = () => stage === 'profiles' ? onStage('profiles') : onStage(previousBookingStage(stage));
-
   return (
     <View style={styles.bookingScreen}>
-      <BookingTopBar title="Đặt khám" onBack={goBack} backDisabled={stage === 'profiles'} />
-      <StepProgress current={stage} compact={compact} />
+
 
       {stage === 'profiles' ? (
         <BookingProfilePage patients={patients} selectedPatientId={selectedPatientId} onPatient={onPatient} onCreateProfile={onCreateProfile} />
@@ -1432,7 +1471,7 @@ function BookingScreen({ patient, patients, selectedPatientId, stage, department
       ) : null}
 
       {stage === 'qr' ? (
-        <BookingQrPage appointments={appointments} loadingQr={busyStage === 'qr'} onQr={onQr} />
+        <BookingQrPage appointments={appointments} expandedQrIds={expandedQrIds} qrRefs={qrRefs} loadingQr={busyStage === 'qr'} onQr={onQr} onOpenQr={onOpenQr} onCloseQr={onCloseQr} onDownloadQr={onDownloadQr} />
       ) : null}
     </View>
   );
@@ -1444,42 +1483,31 @@ function previousBookingStage(stage: BookingStage): BookingStage {
   return order[Math.max(index - 1, 0)];
 }
 
-function BookingTopBar({ title, onBack, backDisabled = false }: { title: string; onBack: () => void; backDisabled?: boolean }) {
-  return (
-    <View style={styles.bookingTopBar}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Quay lại bước trước" disabled={backDisabled} onPress={onBack} style={[styles.bookingNavButton, backDisabled && styles.bookingNavButtonDisabled]}><Ionicons name="arrow-back" size={24} color={backDisabled ? '#94a3b8' : colors.primaryDark} /></Pressable>
-      <Text style={styles.bookingTopTitle}>{title}</Text>
-      <View style={styles.bookingHomeIcon}><Ionicons name="home" size={28} color={colors.primary} /></View>
-    </View>
-  );
-}
+
 
 function BookingProfilePage({ patients, selectedPatientId, onPatient, onCreateProfile }: any) {
   return (
-    <View style={styles.bookingPageBody}>
-      <View style={styles.bookingPageHeaderRow}>
-        <Text style={styles.bookingPageTitle}>Chọn hồ sơ</Text>
-        <Pressable onPress={onCreateProfile} style={styles.addProfileButton}>
-          <Ionicons name="person-add-outline" size={22} color="#ffffff" />
-          <Text style={styles.addProfileText}>Thêm mới hồ sơ</Text>
-        </Pressable>
-      </View>
+    <BookingStepPage title="Chọn hồ sơ" subtitle="Chọn hồ sơ người bệnh cần đặt lịch">
+      <Pressable onPress={onCreateProfile} style={styles.addProfileButton}>
+        <Ionicons name="person-add-outline" size={20} color="#ffffff" />
+        <Text style={styles.addProfileText}>Thêm hồ sơ</Text>
+      </Pressable>
       {patients.map((profile: PatientOtpLoginResponse['patients'][number]) => (
-        <Pressable key={profile.id} onPress={() => onPatient(profile.id)} style={({ pressed }) => [styles.bookingProfileChoice, selectedPatientId === profile.id && styles.bookingProfileChoiceActive, pressed && styles.bookingPressed]}>
-          <View style={styles.bookingProfileAvatarCircle}><Text style={styles.bookingProfileAvatarText}>{profile.fullName?.slice(0, 1).toUpperCase()}</Text></View>
+        <Pressable key={profile.id} onPress={() => onPatient(profile.id)} style={({ pressed }) => [styles.bookingListCard, selectedPatientId === profile.id && styles.bookingListCardActive, pressed && styles.bookingPressed]}>
+          <View style={styles.bookingAvatar}><Text style={styles.bookingAvatarText}>{profile.fullName?.slice(0, 1).toUpperCase()}</Text></View>
           <View style={styles.flex1}>
-            <Text style={styles.bookingProfileName}>{profile.fullName}</Text>
-            <View style={styles.bookingProfileMetaLine}>
-              <Ionicons name="card-outline" size={16} color={colors.primaryDark} />
-              <Text style={styles.bookingProfileMeta}>{profile.patientCode}</Text>
-              <Ionicons name="call" size={15} color={colors.primaryDark} />
-              <Text style={styles.bookingProfileMeta}>{profile.phone ? maskPhone(profile.phone) : 'Chưa có SĐT'}</Text>
+            <Text style={styles.bookingListTitle}>{profile.fullName}</Text>
+            <View style={styles.bookingMetaLine}>
+              <Ionicons name="card-outline" size={15} color="#64748b" />
+              <Text style={styles.bookingMetaText}>{profile.patientCode}</Text>
+              <Ionicons name="call" size={14} color="#64748b" />
+              <Text style={styles.bookingMetaText}>{profile.phone ? maskPhone(profile.phone) : 'Chưa có SĐT'}</Text>
             </View>
           </View>
-          <Ionicons name="chevron-forward" size={24} color="#94a3b8" />
+          <Ionicons name="chevron-forward" size={22} color="#94a3b8" />
         </Pressable>
       ))}
-    </View>
+    </BookingStepPage>
   );
 }
 
@@ -1501,11 +1529,11 @@ function BookingDoctorPage({ doctors, doctorId, onDoctor }: any) {
   return (
     <BookingStepPage title="Chọn bác sĩ" subtitle="Bác sĩ khả dụng theo chuyên khoa đã chọn">
       {doctors.map((doctor: BookableDoctor) => (
-        <Pressable key={doctor.id} onPress={() => onDoctor(doctor.id)} style={({ pressed }) => [styles.bookingDoctorCard, doctorId === doctor.id && styles.bookingSelectCardActive, pressed && styles.bookingPressed]}>
-          <View style={styles.bookingDoctorAvatar}><Text style={styles.bookingDoctorInitial}>{doctor.fullName?.slice(0, 1).toUpperCase()}</Text></View>
+        <Pressable key={doctor.id} onPress={() => onDoctor(doctor.id)} style={({ pressed }) => [styles.bookingListCard, doctorId === doctor.id && styles.bookingListCardActive, pressed && styles.bookingPressed]}>
+          <View style={styles.bookingAvatar}><Text style={styles.bookingAvatarText}>{doctor.fullName?.slice(0, 1).toUpperCase()}</Text></View>
           <View style={styles.flex1}>
-            <Text style={[styles.bookingSelectTitle, doctorId === doctor.id && styles.bookingSelectTitleActive]}>{doctor.fullName}</Text>
-            <Text style={[styles.bookingSelectMeta, doctorId === doctor.id && styles.bookingSelectMetaActive]}>{doctor.specialty || 'Bác sĩ'} • {doctor.qualification || 'Chuyên môn'}</Text>
+            <Text style={styles.bookingListTitle}>{doctor.fullName}</Text>
+            <Text style={styles.bookingMetaText}>{doctor.specialty || 'Bác sĩ'} • {doctor.qualification || 'Chuyên môn'}</Text>
           </View>
         </Pressable>
       ))}
@@ -1560,10 +1588,12 @@ function getAppointmentStatusLabel(status: string) {
   return map[status] || 'Không xác định';
 }
 
-function BookingQrPage({ appointments, loadingQr, onQr }: { appointments: PatientAppointment[]; loadingQr: boolean; onQr: (appointmentId: string) => void }) {
+function BookingQrPage({ appointments, expandedQrIds, qrRefs, loadingQr, onQr, onOpenQr, onCloseQr, onDownloadQr }: { appointments: PatientAppointment[]; expandedQrIds: Record<string, boolean>; qrRefs: React.MutableRefObject<Record<string, { toDataURL?: (callback: (data: string) => void) => void } | null>>; loadingQr: boolean; onQr: (appointmentId: string) => void; onOpenQr: (appointmentId: string) => void; onCloseQr: (appointmentId: string) => void; onDownloadQr: (appointment: PatientAppointment) => void }) {
   return (
     <BookingStepPage title="Lịch hẹn của bạn" subtitle="Đưa mã QR này cho lễ tân để check-in nhanh">
-      {appointments.length ? appointments.map((appointment) => (
+      {appointments.length ? appointments.map((appointment) => {
+        const qrVisible = appointment.status !== 'CHECKED_IN' && Boolean(appointment.qrPayload) && expandedQrIds[appointment.id];
+        return (
         <View key={appointment.id} style={styles.appointmentTicket}>
           <View style={styles.ticketTopRow}>
             <View style={styles.flex1}>
@@ -1573,18 +1603,25 @@ function BookingQrPage({ appointments, loadingQr, onQr }: { appointments: Patien
             </View>
             <Text style={styles.ticketStatus}>{getAppointmentStatusLabel(appointment.status)}</Text>
           </View>
-          {appointment.status !== 'CHECKED_IN' && appointment.qrPayload ? (
-            <View style={styles.qrBox} accessibilityLabel={`Mã QR check-in cho lịch hẹn ${appointment.appointmentCode}`}>
-              <QRCode value={appointment.qrPayload} size={170} backgroundColor="#ffffff" color={colors.primaryDark} />
-            </View>
+          {qrVisible ? (
+            <>
+              <View style={styles.qrBox} accessibilityLabel={`Mã QR check-in cho lịch hẹn ${appointment.appointmentCode}`}>
+                <QRCode getRef={(ref) => { qrRefs.current[appointment.id] = ref; }} value={appointment.qrPayload || ''} size={170} backgroundColor="#ffffff" color={colors.primaryDark} />
+              </View>
+              <View style={styles.qrActionRow}>
+                <Pressable accessibilityRole="button" accessibilityLabel={`Tải QR cho lịch hẹn ${appointment.appointmentCode}`} onPress={() => onDownloadQr(appointment)} style={styles.qrSecondaryButton}><Ionicons name="download-outline" size={17} color={colors.primaryDark} /><Text style={styles.qrSecondaryButtonText}>Tải QR</Text></Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel={`Đóng QR cho lịch hẹn ${appointment.appointmentCode}`} onPress={() => onCloseQr(appointment.id)} style={styles.qrSecondaryButton}><Ionicons name="close-outline" size={18} color={colors.primaryDark} /><Text style={styles.qrSecondaryButtonText}>Đóng</Text></Pressable>
+              </View>
+            </>
           ) : null}
           {appointment.status === 'CHECKED_IN' ? (
             <View style={styles.checkedInNotice}><Ionicons name="checkmark-circle" size={18} color="#047857" /><Text style={styles.checkedInNoticeText}>Lịch hẹn đã được check-in tại quầy.</Text></View>
           ) : (
-            <Pressable accessibilityRole="button" accessibilityLabel={`Hiển thị QR cho lịch hẹn ${appointment.appointmentCode}`} disabled={loadingQr} onPress={() => onQr(appointment.id)} style={[styles.qrButton, loadingQr && styles.actionDisabled]}><Ionicons name="qr-code-outline" size={18} color="#ffffff" /><Text style={styles.qrButtonText}>{loadingQr ? 'Đang tải QR...' : appointment.qrPayload ? 'Làm mới QR' : 'Hiển thị QR'}</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Hiển thị QR cho lịch hẹn ${appointment.appointmentCode}`} disabled={loadingQr} onPress={() => appointment.qrPayload ? onOpenQr(appointment.id) : onQr(appointment.id)} style={[styles.qrButton, loadingQr && styles.actionDisabled]}><Ionicons name="qr-code-outline" size={18} color="#ffffff" /><Text style={styles.qrButtonText}>{loadingQr ? 'Đang tải QR...' : qrVisible ? 'Làm mới QR' : 'Hiển thị QR'}</Text></Pressable>
           )}
         </View>
-      )) : <EmptyState text="Bạn chưa có lịch hẹn nào." />}
+        );
+      }) : <EmptyState text="Bạn chưa có lịch hẹn nào." />}
     </BookingStepPage>
   );
 }
@@ -1593,36 +1630,13 @@ function BookingStepPage({ title, subtitle, children }: { title: string; subtitl
   return (
     <View style={styles.bookingStepPage}>
       <Text style={styles.bookingStepTitle}>{title}</Text>
-      <Text style={styles.bookingStepSubtitle}>{subtitle}</Text>
+      {subtitle ? <Text style={styles.bookingStepSubtitle}>{subtitle}</Text> : null}
       <View style={styles.bookingCardGrid}>{children}</View>
     </View>
   );
 }
 
-function StepProgress({ current, compact }: { current: BookingStage; compact: boolean }) {
-  const steps: Array<{ key: BookingStage; label: string }> = [
-    { key: 'profiles', label: 'Hồ sơ' },
-    { key: 'department', label: 'Khoa' },
-    { key: 'doctor', label: 'Bác sĩ' },
-    { key: 'slot', label: 'Giờ khám' },
-    { key: 'confirm', label: 'Xác nhận' },
-    { key: 'qr', label: 'QR' },
-  ];
-  const currentIndex = steps.findIndex((step) => step.key === current);
-  return (
-    <View style={[styles.stepProgress, compact && styles.stepProgressCompact]}>
-      {steps.map((step, index) => {
-        const active = index <= currentIndex;
-        return (
-          <View key={step.key} style={styles.stepProgressItem}>
-            <View style={[styles.stepProgressDot, active && styles.stepProgressDotActive]} />
-            <Text numberOfLines={1} style={[styles.stepProgressText, active && styles.stepProgressTextActive]}>{step.label}</Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
+
 
 function VisitHistoryScreen({ patient, visits, busy, onOpenDetail }: { patient: PatientOtpLoginResponse['patients'][number] | null; visits: PatientVisitSummary[]; busy: boolean; onOpenDetail: (visitId: string) => void }) {
   const latestVisit = visits[0];
@@ -1902,8 +1916,9 @@ const styles = StyleSheet.create({
   content: { minHeight: '100%', padding: spacing.screen, gap: 18, backgroundColor: colors.background },
   contentWithTabs: { paddingTop: 0, paddingBottom: 4 },
   statusSpacer: { height: 10 },
-  feedbackWrap: { position: 'relative' },
-  feedbackClose: { position: 'absolute', top: 10, right: 10, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.72)' },
+  feedbackWrap: { position: 'absolute', top: 14, left: 18, right: 18, zIndex: 30, elevation: 30 },
+  feedbackCard: { position: 'relative', borderRadius: 18, shadowColor: '#0f172a', shadowOpacity: 0.14, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 10 },
+  feedbackClose: { position: 'absolute', top: 9, right: 9, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.82)' },
   fieldErrorText: { alignSelf: 'stretch', color: colors.danger, fontSize: 12, lineHeight: 17, fontWeight: '800', marginTop: -6 },
   actionDisabled: { opacity: 0.48 },
   onboardingScreen: { flex: 1, minHeight: 740, alignItems: 'center', justifyContent: 'space-between', gap: 24 },
@@ -2182,7 +2197,7 @@ const styles = StyleSheet.create({
   detailFileButtonSecondary: { borderRadius: 12, backgroundColor: '#eaf8ff', paddingHorizontal: 10, paddingVertical: 9 },
   detailFileButtonSecondaryText: { color: colors.primaryDark, fontSize: 12, fontWeight: '900' },
   qrPayload: { marginTop: 10, borderRadius: 16, borderWidth: 1, borderColor: '#bae6fd', backgroundColor: '#f0f9ff', padding: 12, color: colors.primaryDark, fontSize: 12, lineHeight: 18, fontWeight: '900' },
-  bookingScreen: { marginHorizontal: -24, marginTop: -52, marginBottom: -24, minHeight: '100%', backgroundColor: '#f5f7fc', paddingBottom: 28 },
+  bookingScreen: { marginHorizontal: -24, marginTop: 0, marginBottom: -24, minHeight: '100%', backgroundColor: '#f6f8fc', paddingTop: 6, paddingBottom: 28 },
   bookingHero: { minHeight: 240, paddingHorizontal: 24, paddingTop: 30, paddingBottom: 46, borderBottomLeftRadius: 34, borderBottomRightRadius: 34, backgroundColor: '#075985', overflow: 'hidden' },
   bookingHeroOrbOne: { position: 'absolute', right: -90, top: -70, width: 230, height: 230, borderRadius: 115, backgroundColor: 'rgba(34,211,238,0.28)' },
   bookingHeroOrbTwo: { position: 'absolute', left: -70, bottom: -90, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(255,255,255,0.14)' },
@@ -2206,11 +2221,11 @@ const styles = StyleSheet.create({
   bookingPanelTitle: { color: colors.text, fontSize: 19, lineHeight: 24, fontWeight: '900' },
   bookingPanelCaption: { marginTop: 3, color: '#64748b', fontSize: 13, lineHeight: 18, fontWeight: '700' },
   bookingCardGrid: { gap: 12 },
-  bookingSelectCard: { minHeight: 112, borderRadius: 24, borderWidth: 1, borderColor: '#dbeafe', backgroundColor: '#f8fbff', padding: 16, justifyContent: 'center' },
+  bookingSelectCard: { minHeight: 92, borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#ffffff', padding: 14, justifyContent: 'center' },
   bookingSelectCardActive: { borderColor: '#0891b2', backgroundColor: '#0891b2' },
   bookingPressed: { transform: [{ scale: 0.985 }], opacity: 0.92 },
-  bookingSelectIcon: { width: 38, height: 38, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.22)', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  bookingSelectTitle: { color: colors.text, fontSize: 16, lineHeight: 21, fontWeight: '900' },
+  bookingSelectIcon: { width: 36, height: 36, borderRadius: 14, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  bookingSelectTitle: { color: '#0f172a', fontSize: 16, lineHeight: 21, fontWeight: '900' },
   bookingSelectTitleActive: { color: '#ffffff' },
   bookingSelectMeta: { marginTop: 5, color: '#64748b', fontSize: 13, lineHeight: 18, fontWeight: '700' },
   bookingSelectMetaActive: { color: '#cffafe' },
@@ -2222,10 +2237,10 @@ const styles = StyleSheet.create({
   bookingPatientAvatarActive: { backgroundColor: 'rgba(255,255,255,0.22)' },
   bookingPatientInitial: { color: colors.primaryDark, fontSize: 18, fontWeight: '900' },
   bookingPatientInitialActive: { color: '#ffffff' },
-  bookingDateBox: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 20, borderWidth: 1, borderColor: '#dbeafe', backgroundColor: '#f8fbff', paddingHorizontal: 14, paddingVertical: 10 },
-  bookingDateInput: { flex: 1, minHeight: 38, color: colors.text, fontSize: 16, fontWeight: '900' },
+  bookingDateBox: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 18, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#ffffff', paddingHorizontal: 14, paddingVertical: 10 },
+  bookingDateInput: { flex: 1, minHeight: 38, color: '#0f172a', fontSize: 16, fontWeight: '900' },
   slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  slotPill: { minWidth: 104, flexGrow: 1, borderRadius: 20, borderWidth: 1, borderColor: '#bae6fd', backgroundColor: '#f0f9ff', paddingVertical: 14, paddingHorizontal: 12, alignItems: 'center' },
+  slotPill: { minWidth: 104, flexGrow: 1, borderRadius: 18, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#ffffff', paddingVertical: 14, paddingHorizontal: 12, alignItems: 'center' },
   slotPillDisabled: { borderColor: '#e2e8f0', backgroundColor: '#f8fafc' },
   slotTime: { color: colors.primaryDark, fontSize: 18, lineHeight: 22, fontWeight: '900' },
   slotTimeDisabled: { color: '#94a3b8' },
@@ -2238,6 +2253,9 @@ const styles = StyleSheet.create({
   ticketStatus: { alignSelf: 'flex-start', borderRadius: 999, backgroundColor: '#dcfce7', paddingHorizontal: 10, paddingVertical: 6, color: '#047857', fontSize: 11, fontWeight: '900' },
   qrButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 16, backgroundColor: colors.primary, paddingVertical: 12 },
   qrButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '900' },
+  qrActionRow: { flexDirection: 'row', gap: 10 },
+  qrSecondaryButton: { flex: 1, minHeight: 42, borderRadius: 14, borderWidth: 1, borderColor: '#bae6fd', backgroundColor: '#ffffff', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  qrSecondaryButtonText: { color: colors.primaryDark, fontSize: 13, fontWeight: '900' },
   checkedInNotice: { marginTop: 12, minHeight: 44, borderRadius: 14, backgroundColor: '#dcfce7', flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   checkedInNoticeText: { color: '#047857', fontSize: 13, fontWeight: '900', textAlign: 'center' },
   qrBox: { alignSelf: 'center', marginTop: 16, padding: 16, borderRadius: 22, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#dbeafe' },
@@ -2253,22 +2271,22 @@ const styles = StyleSheet.create({
   bookingNavButtonDisabled: { backgroundColor: '#eef2f7', opacity: 0.7 },
   bookingTopTitle: { flex: 1, color: colors.primaryDark, fontSize: 23, fontWeight: '900' },
   bookingHomeIcon: { width: 48, height: 48, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#eff6ff' },
-  bookingPageBody: { flex: 1, paddingHorizontal: 18, paddingTop: 22, gap: 14 },
+  bookingPageBody: { flex: 1, paddingHorizontal: 18, paddingTop: 18, gap: 12 },
   bookingPageHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 4 },
-  bookingPageTitle: { color: '#0f172a', fontSize: 24, lineHeight: 30, fontWeight: '900' },
-  addProfileButton: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 13, shadowColor: colors.primary, shadowOpacity: 0.18, shadowRadius: 12, shadowOffset: { width: 0, height: 7 }, elevation: 5 },
+  bookingPageTitle: { color: '#0f172a', fontSize: 23, lineHeight: 29, fontWeight: '900' },
+  addProfileButton: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 16, backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 12 },
   addProfileText: { color: '#ffffff', fontSize: 14, fontWeight: '900' },
-  bookingProfileChoice: { minHeight: 104, flexDirection: 'row', alignItems: 'center', gap: 13, borderRadius: 22, backgroundColor: '#ffffff', padding: 16, shadowColor: '#8aa7bd', shadowOpacity: 0.1, shadowRadius: 15, shadowOffset: { width: 0, height: 8 }, elevation: 4 },
-  bookingProfileChoiceActive: { borderWidth: 1, borderColor: '#bfdbfe', backgroundColor: '#ffffff' },
-  bookingProfileAvatarCircle: { width: 58, height: 58, borderRadius: 29, borderWidth: 2, borderColor: colors.primary, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' },
-  bookingProfileAvatarText: { color: colors.primaryDark, fontSize: 21, fontWeight: '900' },
-  bookingProfileName: { color: colors.primaryDark, fontSize: 17, lineHeight: 22, fontWeight: '900', textTransform: 'uppercase' },
-  bookingProfileMetaLine: { marginTop: 11, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
-  bookingProfileMeta: { color: '#475569', fontSize: 13, fontWeight: '800' },
-  bookingStepPage: { flex: 1, paddingHorizontal: 18, paddingTop: 22, gap: 14 },
-  bookingStepTitle: { color: '#0f172a', fontSize: 25, lineHeight: 31, fontWeight: '900' },
-  bookingStepSubtitle: { color: '#64748b', fontSize: 14, lineHeight: 20, fontWeight: '700', marginTop: -8, marginBottom: 8 },
-  bookingSummaryBox: { borderRadius: 22, backgroundColor: '#ffffff', padding: 16, gap: 8, shadowColor: '#8aa7bd', shadowOpacity: 0.1, shadowRadius: 15, shadowOffset: { width: 0, height: 8 }, elevation: 4 },
+  bookingListCard: { minHeight: 92, flexDirection: 'row', alignItems: 'center', gap: 13, borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#ffffff', padding: 14 },
+  bookingListCardActive: { borderColor: '#93c5fd', backgroundColor: '#eff6ff' },
+  bookingAvatar: { width: 52, height: 52, borderRadius: 26, borderWidth: 1.5, borderColor: colors.primary, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' },
+  bookingAvatarText: { color: colors.primaryDark, fontSize: 20, fontWeight: '900' },
+  bookingListTitle: { color: colors.primaryDark, fontSize: 16, lineHeight: 21, fontWeight: '900', textTransform: 'uppercase' },
+  bookingMetaLine: { marginTop: 8, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 7 },
+  bookingMetaText: { color: '#64748b', fontSize: 12.5, lineHeight: 18, fontWeight: '800' },
+  bookingStepPage: { flex: 1, paddingHorizontal: 18, paddingTop: 18, gap: 12 },
+  bookingStepTitle: { color: '#0f172a', fontSize: 23, lineHeight: 29, fontWeight: '900' },
+  bookingStepSubtitle: { color: '#64748b', fontSize: 13, lineHeight: 19, fontWeight: '700', marginTop: -6, marginBottom: 4 },
+  bookingSummaryBox: { borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#ffffff', padding: 14, gap: 8 },
   bookingSummaryText: { color: '#0f172a', fontSize: 14, lineHeight: 20, fontWeight: '800' },
   genderField: { gap: 8 },
   genderDropdownMenu: { overflow: 'hidden', borderRadius: 22, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#ffffff', shadowColor: '#0f172a', shadowOpacity: 0.14, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 8 },
