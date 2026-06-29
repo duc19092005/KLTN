@@ -32,3 +32,17 @@ export class PatientPasswordLoginDto extends RequestOtpDto {
   @MaxLength(72)
   password!: string;
 }
+
+export class PatientChangePasswordDto {
+  @ApiProperty({ example: 'Patient@12345' })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72)
+  currentPassword!: string;
+
+  @ApiProperty({ example: 'NewPatient@12345' })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72)
+  newPassword!: string;
+}

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Animated, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { passwordPatientLogin, requestPatientOtp, resendPatientOtp, verifyPatientOtp, PatientOtpLoginResponse } from '../../shared/api/patientAuthClient';
+import { Animated, Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
+import { passwordPatientLogin, requestPatientOtp, resendPatientOtp, verifyPatientOtp, changePatientPassword, PatientOtpLoginResponse } from '../../shared/api/patientAuthClient';
 import {
   createAppointment,
   createPatientProfile,
@@ -24,11 +25,50 @@ import { ActionButton } from '../../shared/components/ActionButton';
 import { StatusPanel } from '../../shared/components/StatusPanel';
 import { colors, spacing } from '../../shared/theme/theme';
 
-type Step = 'phone' | 'passwordLogin' | 'otp' | 'passwordSetup' | 'dashboard' | 'notifications' | 'account' | 'profiles' | 'visits' | 'detail' | 'createProfile' | 'booking';
+type Step = 'phone' | 'passwordLogin' | 'otp' | 'passwordSetup' | 'dashboard' | 'notifications' | 'account' | 'changePassword' | 'profiles' | 'visits' | 'detail' | 'createProfile' | 'booking';
+type BookingStage = 'profiles' | 'department' | 'doctor' | 'slot' | 'confirm' | 'qr';
+type BookingBusyStage = null | 'patients' | 'departments' | 'doctors' | 'slots' | 'submit' | 'qr';
+type ProfileForm = { fullName: string; gender: string; birthDate: string; citizenId: string; address: string; insuranceNumber: string; emergencyContact: string };
+type ProfileFormErrors = Partial<Record<keyof ProfileForm, string>>;
+type FeedbackTone = 'success' | 'info' | 'danger';
+type Feedback = { tone: FeedbackTone; title: string; body: string } | null;
 
 type PreviewUrls = Record<string, string>;
 
 const PATIENT_SESSION_STORAGE_KEY = 'kltn.patient.session.v1';
+const VIETNAM_PHONE_PATTERN = /^(?:\+84|84|0)(?:3|5|7|8|9)\d{8}$/;
+
+function normalizePhone(value: string) {
+  return value.replace(/[\s.-]/g, '');
+}
+
+function isValidVietnamPhone(value: string) {
+  return VIETNAM_PHONE_PATTERN.test(normalizePhone(value));
+}
+
+function getFriendlyError(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function validateProfileForm(form: ProfileForm): ProfileFormErrors {
+  const errors: ProfileFormErrors = {};
+  const fullName = form.fullName.trim();
+  if (!fullName) errors.fullName = 'Vui lòng nhập họ và tên.';
+  else if (fullName.length < 5 || fullName.split(/\s+/).length < 2) errors.fullName = 'Họ tên cần tối thiểu 2 từ hoặc 5 ký tự.';
+  if (!form.gender) errors.gender = 'Vui lòng chọn giới tính.';
+  if (!form.birthDate) errors.birthDate = 'Vui lòng chọn ngày sinh.';
+  else {
+    const birth = new Date(form.birthDate);
+    const now = new Date();
+    const min = new Date(now.getFullYear() - 120, now.getMonth(), now.getDate());
+    if (Number.isNaN(birth.getTime())) errors.birthDate = 'Ngày sinh không hợp lệ.';
+    else if (birth > now) errors.birthDate = 'Ngày sinh không được ở tương lai.';
+    else if (birth < min) errors.birthDate = 'Ngày sinh không được quá 120 tuổi.';
+  }
+  if (form.citizenId && !/^(\d{9}|\d{12})$/.test(form.citizenId)) errors.citizenId = 'CCCD/CMND phải gồm 9 hoặc 12 số.';
+  if (form.emergencyContact && !isValidVietnamPhone(form.emergencyContact)) errors.emergencyContact = 'Số liên hệ khẩn cấp không hợp lệ.';
+  return errors;
+}
 
 function loadStoredSession(): PatientOtpLoginResponse | null {
   try {
@@ -64,10 +104,14 @@ export function PatientPortalScreen() {
   const [otp, setOtp] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [changePasswordForm, setChangePasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [busy, setBusy] = useState(false);
+  const [bookingBusyStage, setBookingBusyStage] = useState<BookingBusyStage>(null);
   const [fileBusyId, setFileBusyId] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [feedback, setFeedback] = useState<Feedback>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [resendAfterSeconds, setResendAfterSeconds] = useState(0);
   const [otpExpiresAt, setOtpExpiresAt] = useState('');
   const [session, setSession] = useState<PatientOtpLoginResponse | null>(() => loadStoredSession());
@@ -85,8 +129,10 @@ export function PatientPortalScreen() {
   const [bookingSlot, setBookingSlot] = useState('');
   const [bookingReason, setBookingReason] = useState('');
   const [bookingSymptoms, setBookingSymptoms] = useState('');
-  const [bookingStage, setBookingStage] = useState<'profiles' | 'department' | 'doctor' | 'slot' | 'confirm' | 'qr'>('profiles');
-  const [profileForm, setProfileForm] = useState({ fullName: '', gender: 'MALE', birthDate: '', citizenId: '', address: '', insuranceNumber: '', emergencyContact: '' });
+  const [bookingStage, setBookingStage] = useState<BookingStage>('profiles');
+  const [profileForm, setProfileForm] = useState<ProfileForm>({ fullName: '', gender: 'MALE', birthDate: '', citizenId: '', address: '', insuranceNumber: '', emergencyContact: '' });
+  const [profileFormErrors, setProfileFormErrors] = useState<ProfileFormErrors>({});
+  const [creatingProfileFromBooking, setCreatingProfileFromBooking] = useState(false);
 
   useEffect(() => {
     if (session && step === 'phone') setStep('dashboard');
@@ -107,10 +153,78 @@ export function PatientPortalScreen() {
     [selectedPatientId, session?.patients],
   );
 
-  const loginWithPassword = async () => {
-    setBusy(true);
+  const phoneIsValid = isValidVietnamPhone(phone);
+  const otpIsValid = /^\d{6}$/.test(otp);
+
+  const clearFeedback = () => {
     setError('');
     setMessage('');
+    setFeedback(null);
+  };
+
+  const showFeedback = (tone: FeedbackTone, title: string, body: string) => {
+    setError('');
+    setMessage('');
+    setFeedback({ tone, title, body });
+  };
+
+  const showError = (body: string, title = 'Không thành công') => showFeedback('danger', title, body);
+  const showSuccess = (body: string, title = 'Thành công') => showFeedback('success', title, body);
+  const showInfo = (body: string, title = 'Thông báo') => showFeedback('info', title, body);
+
+  const ensureValidPhone = () => {
+    if (!phone.trim()) {
+      showError('Vui lòng nhập số điện thoại trước khi tiếp tục.');
+      return false;
+    }
+    if (!phoneIsValid) {
+      showError('Số điện thoại Việt Nam không hợp lệ. Ví dụ: 0912345678 hoặc +84912345678.');
+      return false;
+    }
+    return true;
+  };
+
+  const submitChangePassword = async () => {
+    if (!session) return;
+    if (!changePasswordForm.currentPassword || !changePasswordForm.newPassword || !changePasswordForm.confirmPassword) {
+      showError('Vui lòng nhập đầy đủ mật khẩu hiện tại, mật khẩu mới và xác nhận mật khẩu.');
+      return;
+    }
+    if (changePasswordForm.newPassword.length < 8) {
+      showError('Mật khẩu mới phải có tối thiểu 8 ký tự.');
+      return;
+    }
+    if (changePasswordForm.currentPassword === changePasswordForm.newPassword) {
+      showError('Mật khẩu mới không được trùng mật khẩu hiện tại.');
+      return;
+    }
+    if (changePasswordForm.newPassword !== changePasswordForm.confirmPassword) {
+      showError('Xác nhận mật khẩu mới không khớp.');
+      return;
+    }
+
+    setBusy(true);
+    clearFeedback();
+    try {
+      const response = await changePatientPassword(session.accessToken, changePasswordForm.currentPassword, changePasswordForm.newPassword);
+      setChangePasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      showSuccess(response.message || 'Đã đổi mật khẩu thành công. Vui lòng đăng nhập lại.');
+      reset();
+    } catch (changeError) {
+      showError(getFriendlyError(changeError, 'Không đổi được mật khẩu.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const loginWithPassword = async () => {
+    if (!ensureValidPhone()) return;
+    if (!password) {
+      showError('Vui lòng nhập mật khẩu.');
+      return;
+    }
+    setBusy(true);
+    clearFeedback();
     try {
       const response = await passwordPatientLogin(phone, password);
       setSession(response);
@@ -119,57 +233,62 @@ export function PatientPortalScreen() {
       setConfirmPassword('');
       setStep('dashboard');
     } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : 'Số điện thoại hoặc mật khẩu không hợp lệ.');
+      showError(getFriendlyError(loginError, 'Số điện thoại hoặc mật khẩu không hợp lệ.'));
     } finally {
       setBusy(false);
     }
   };
 
   const requestOtp = async () => {
+    if (!ensureValidPhone()) return;
     setBusy(true);
-    setError('');
-    setMessage('');
+    clearFeedback();
     try {
       const response = await requestPatientOtp(phone);
-      setMessage(response.message || 'OTP đã được gửi nếu số điện thoại hợp lệ.');
+      showInfo(response.message || 'OTP đã được gửi nếu số điện thoại hợp lệ. Mã có hiệu lực trong 5 phút.');
       setResendAfterSeconds(response.resendAfterSeconds || 60);
       setOtpExpiresAt(response.otpExpiresAt || '');
       setStep('otp');
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Không gửi được OTP.');
+      showError(getFriendlyError(requestError, 'Không gửi được OTP. Vui lòng thử lại.'));
     } finally {
       setBusy(false);
     }
   };
 
   const resendOtp = async () => {
+    if (!ensureValidPhone()) return;
     setBusy(true);
-    setError('');
-    setMessage('');
+    clearFeedback();
     try {
       const response = await resendPatientOtp(phone);
-      setMessage(response.message || 'OTP đã được gửi lại nếu số điện thoại hợp lệ.');
+      showInfo(response.message || 'OTP đã được gửi lại. Vui lòng nhập mã mới nhất trước khi hết hạn.');
       setResendAfterSeconds(response.resendAfterSeconds || 60);
       setOtpExpiresAt(response.otpExpiresAt || '');
       setOtp('');
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Không gửi lại được OTP.');
+      showError(getFriendlyError(requestError, 'Không gửi lại được OTP. Vui lòng thử lại sau.'));
     } finally {
       setBusy(false);
     }
   };
 
   const verifyOtp = async () => {
+    if (!ensureValidPhone()) return;
+    if (!otpIsValid) {
+      showError('Mã OTP phải gồm đúng 6 chữ số.');
+      return;
+    }
     setBusy(true);
-    setError('');
+    clearFeedback();
     try {
       const response = await verifyPatientOtp(phone, otp);
       setSession(response);
       persistSession(response);
       setStep(response.requirePasswordSetup ? 'passwordSetup' : 'profiles');
-      if (response.requirePasswordSetup) setMessage('Vui lòng tạo mật khẩu trước khi xem hồ sơ bệnh nhân.');
+      if (response.requirePasswordSetup) showInfo('Vui lòng tạo mật khẩu trước khi xem hồ sơ bệnh nhân.');
     } catch (verifyError) {
-      setError(verifyError instanceof Error ? verifyError.message : 'OTP không hợp lệ hoặc đã hết hạn.');
+      showError(getFriendlyError(verifyError, 'OTP không hợp lệ hoặc đã hết hạn.'));
     } finally {
       setBusy(false);
     }
@@ -300,20 +419,55 @@ export function PatientPortalScreen() {
     }
   };
 
+  const openAppointments = async () => {
+    if (!session) return;
+    const patientId = selectedPatientId || session.patients[0]?.id || '';
+    if (!patientId) {
+      showInfo('Vui lòng tạo hồ sơ bệnh nhân trước khi xem lịch hẹn.');
+      setStep('createProfile');
+      return;
+    }
+    setSelectedPatientId(patientId);
+    setBookingBusyStage('patients');
+    clearFeedback();
+    try {
+      const appointmentData = await getPatientAppointments(session.accessToken, patientId);
+      setAppointments(appointmentData);
+      setBookingStage('qr');
+      setStep('booking');
+    } catch (appointmentError) {
+      showError(getFriendlyError(appointmentError, 'Không tải được lịch khám đã đặt.'));
+    } finally {
+      setBookingBusyStage(null);
+    }
+  };
+
   const submitProfile = async () => {
     if (!session) return;
+    const validationErrors = validateProfileForm(profileForm);
+    setProfileFormErrors(validationErrors);
+    if (Object.keys(validationErrors).length) {
+      showError('Vui lòng kiểm tra lại thông tin hồ sơ.');
+      return;
+    }
     setBusy(true);
-    setError('');
+    clearFeedback();
     try {
-      const patient = await createPatientProfile(session.accessToken, { ...profileForm, phone });
+      const patient = await createPatientProfile(session.accessToken, { ...profileForm, phone: normalizePhone(phone) });
       const nextSession = { ...session, patients: [...session.patients, { ...patient, phone: patient.contactPhone || patient.phone || phone }] };
       setSession(nextSession);
       persistSession(nextSession);
       setSelectedPatientId(patient.id);
-      setMessage('Đã tạo hồ sơ bệnh nhân. Bạn có thể đặt lịch ngay.');
-      setStep('dashboard');
+      setProfileForm({ fullName: '', gender: 'MALE', birthDate: '', citizenId: '', address: '', insuranceNumber: '', emergencyContact: '' });
+      showSuccess('Đã tạo hồ sơ bệnh nhân.');
+      if (creatingProfileFromBooking) {
+        setCreatingProfileFromBooking(false);
+        await openBooking();
+      } else {
+        setStep('dashboard');
+      }
     } catch (profileError) {
-      setError(profileError instanceof Error ? profileError.message : 'Không tạo được hồ sơ bệnh nhân.');
+      showError(getFriendlyError(profileError, 'Không tạo được hồ sơ bệnh nhân.'));
     } finally {
       setBusy(false);
     }
@@ -326,30 +480,66 @@ export function PatientPortalScreen() {
     setBookingSlot('');
     setDoctors([]);
     setSlots([]);
+    setBookingBusyStage('doctors');
+    clearFeedback();
     try {
       setDoctors(await getBookableDoctors(session.accessToken, departmentId));
       setBookingStage('doctor');
     } catch (doctorError) {
-      setError(doctorError instanceof Error ? doctorError.message : 'Không tải được danh sách bác sĩ.');
+      showError(getFriendlyError(doctorError, 'Không tải được danh sách bác sĩ.'));
+    } finally {
+      setBookingBusyStage(null);
+    }
+  };
+
+  const loadSlotsForDoctor = async (doctorId: string, dateValue: string) => {
+    if (!session || !doctorId) return;
+    setBookingBusyStage('slots');
+    clearFeedback();
+    try {
+      setSlots(await getAppointmentSlots(session.accessToken, doctorId, dateValue));
+    } catch (slotError) {
+      showError(getFriendlyError(slotError, 'Không tải được khung giờ.'));
+    } finally {
+      setBookingBusyStage(null);
     }
   };
 
   const selectBookingDoctor = async (doctorId: string) => {
-    if (!session) return;
     setBookingDoctorId(doctorId);
     setBookingSlot('');
-    try {
-      setSlots(await getAppointmentSlots(session.accessToken, doctorId, bookingDate));
-      setBookingStage('slot');
-    } catch (slotError) {
-      setError(slotError instanceof Error ? slotError.message : 'Không tải được khung giờ.');
+    setSlots([]);
+    await loadSlotsForDoctor(doctorId, bookingDate);
+    setBookingStage('slot');
+  };
+
+  const changeBookingDate = async (value: string) => {
+    setBookingDate(value);
+    setBookingSlot('');
+    setSlots([]);
+    if (!bookingDoctorId) {
+      showInfo('Vui lòng chọn bác sĩ trước khi tải khung giờ.');
+      return;
     }
+    await loadSlotsForDoctor(bookingDoctorId, value);
   };
 
   const submitAppointment = async () => {
-    if (!session || !selectedPatient || !bookingDepartmentId || !bookingSlot) return;
-    setBusy(true);
-    setError('');
+    if (!session || !selectedPatient) return;
+    if (!bookingDepartmentId) {
+      showError('Vui lòng chọn chuyên khoa.');
+      return;
+    }
+    if (!bookingDoctorId) {
+      showError('Vui lòng chọn bác sĩ trước khi chọn giờ khám.');
+      return;
+    }
+    if (!bookingSlot) {
+      showError('Vui lòng chọn khung giờ khám.');
+      return;
+    }
+    setBookingBusyStage('submit');
+    clearFeedback();
     try {
       const appointment = await createAppointment(session.accessToken, {
         patientId: selectedPatient.id,
@@ -361,21 +551,26 @@ export function PatientPortalScreen() {
       });
       setAppointments((current) => [appointment, ...current]);
       setBookingStage('qr');
-      setMessage(`Đặt lịch thành công: ${appointment.appointmentCode}`);
+      showSuccess(`Đặt lịch thành công. Mã lịch hẹn: ${appointment.appointmentCode}`);
     } catch (appointmentError) {
-      setError(appointmentError instanceof Error ? appointmentError.message : 'Không đặt được lịch.');
+      showError(getFriendlyError(appointmentError, 'Không đặt được lịch.'));
     } finally {
-      setBusy(false);
+      setBookingBusyStage(null);
     }
   };
 
   const refreshAppointmentQr = async (appointmentId: string) => {
     if (!session) return;
+    setBookingBusyStage('qr');
+    clearFeedback();
     try {
       const updated = await getAppointmentQr(session.accessToken, appointmentId);
       setAppointments((current) => current.map((item) => item.id === updated.id ? updated : item));
+      showSuccess('Đã tải mã QR check-in.');
     } catch (qrError) {
-      setError(qrError instanceof Error ? qrError.message : 'Không lấy được mã QR.');
+      showError(getFriendlyError(qrError, 'Không lấy được mã QR.'));
+    } finally {
+      setBookingBusyStage(null);
     }
   };
 
@@ -406,8 +601,19 @@ export function PatientPortalScreen() {
       <ScrollView style={styles.portalScroll} contentContainerStyle={[styles.content, showAuthenticatedTabs && styles.contentWithTabs]} showsVerticalScrollIndicator={false}>
       {!showAuthenticatedTabs ? <View style={styles.statusSpacer} /> : null}
 
-      {error && step !== 'dashboard' ? <StatusPanel tone="danger" title="Không thành công" body={error} icon={<Ionicons name="warning-outline" size={22} color={colors.danger} />} /> : null}
-      {message && ['phone', 'passwordLogin', 'otp', 'passwordSetup'].includes(step) ? <StatusPanel title="Thông báo" body={message} icon={<Ionicons name="information-circle-outline" size={22} color={colors.primary} />} /> : null}
+      {feedback ? (
+        <View style={styles.feedbackWrap}>
+          <StatusPanel
+            tone={feedback.tone === 'danger' ? 'danger' : undefined}
+            title={feedback.title}
+            body={feedback.body}
+            icon={<Ionicons name={feedback.tone === 'danger' ? 'warning-outline' : feedback.tone === 'success' ? 'checkmark-circle-outline' : 'information-circle-outline'} size={22} color={feedback.tone === 'danger' ? colors.danger : feedback.tone === 'success' ? colors.success : colors.primary} />}
+          />
+          <Pressable accessibilityRole="button" accessibilityLabel="Đóng thông báo" onPress={() => setFeedback(null)} style={styles.feedbackClose}>
+            <Ionicons name="close" size={18} color={colors.muted} />
+          </Pressable>
+        </View>
+      ) : null}
 
       {step === 'phone' && (
         <View style={styles.onboardingScreen}>
@@ -433,15 +639,17 @@ export function PatientPortalScreen() {
           </View>
           <View style={styles.onboardingCopy}>
             <Text style={styles.onboardingTitle}>Đặt lịch khám bệnh trực tuyến</Text>
-            <Text style={styles.onboardingText}>Đăng nhập hoặc đăng ký để xem hồ sơ sức khỏe, lịch sử khám và kết quả cận lâm sàng của bạn.</Text>
+            <Text style={styles.onboardingText}>Nhập số điện thoại để đăng nhập, đăng ký OTP, xem hồ sơ sức khỏe và đặt lịch khám.</Text>
+            <FormInput label="Số điện thoại" value={phone} onChangeText={(value) => { setPhone(value); if (feedback?.tone === 'danger') setFeedback(null); }} icon="phone-portrait-outline" keyboardType="phone-pad" placeholder="Ví dụ: 0912345678" />
+            {phone.trim() && !phoneIsValid ? <Text style={styles.fieldErrorText}>Số điện thoại Việt Nam chưa hợp lệ.</Text> : null}
             <View style={styles.pager}><View style={styles.pagerActive} /><View style={styles.pagerDot} /></View>
           </View>
           <View style={styles.bottomActions}>
-            <Pressable onPress={() => { setError(''); setMessage(''); setPassword(''); setStep('passwordLogin'); }} style={styles.loginPill}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Đăng nhập bằng mật khẩu" onPress={() => { clearFeedback(); setPassword(''); setStep('passwordLogin'); }} style={styles.loginPill}>
               <Text style={styles.loginPillText}>Đăng nhập</Text>
             </Pressable>
-            <Pressable onPress={requestOtp} disabled={busy} style={styles.registerPill}>
-              <Text style={styles.registerPillText}>{busy ? 'Đang xử lý...' : 'Đăng ký'}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Tiếp tục bằng OTP" accessibilityHint="Gửi mã OTP đến số điện thoại đã nhập" onPress={requestOtp} disabled={busy || !phoneIsValid} style={[styles.registerPill, (!phoneIsValid || busy) && styles.actionDisabled]}>
+              <Text style={styles.registerPillText}>{busy ? 'Đang gửi...' : 'Tiếp tục bằng OTP'}</Text>
             </Pressable>
           </View>
         </View>
@@ -474,6 +682,7 @@ export function PatientPortalScreen() {
             <View style={styles.featureGrid}>
               {getHomeFeatures({
                 openBooking,
+                openAppointments,
                 openProfiles: () => setStep('profiles'),
               }).map((feature) => (
                 <FeatureTile key={feature.label} {...feature} />
@@ -487,7 +696,11 @@ export function PatientPortalScreen() {
       )}
 
       {step === 'account' && session && (
-        <AccountScreen session={session} onLogout={reset} onHome={() => setStep('dashboard')} />
+        <AccountScreen session={session} onLogout={reset} onHome={() => setStep('dashboard')} onChangePassword={() => { clearFeedback(); setStep('changePassword'); }} notificationsEnabled={notificationsEnabled} onToggleNotifications={setNotificationsEnabled} />
+      )}
+
+      {step === 'changePassword' && session && (
+        <ChangePasswordScreen form={changePasswordForm} setForm={setChangePasswordForm} busy={busy} onSubmit={submitChangePassword} onBack={() => setStep('account')} />
       )}
 
       {step === 'passwordLogin' && (
@@ -552,7 +765,7 @@ export function PatientPortalScreen() {
         />
       )}
       {step === 'createProfile' && session && (
-        <CreateProfileScreen form={profileForm} setForm={setProfileForm} busy={busy} onSubmit={submitProfile} onBack={() => setStep('dashboard')} />
+        <CreateProfileScreen form={profileForm} errors={profileFormErrors} setForm={setProfileForm} busy={busy} onSubmit={submitProfile} onBack={() => { setCreatingProfileFromBooking(false); setStep(creatingProfileFromBooking ? 'booking' : 'dashboard'); }} />
       )}
 
       {step === 'notifications' && session && (
@@ -576,12 +789,13 @@ export function PatientPortalScreen() {
           reason={bookingReason}
           symptoms={bookingSymptoms}
           busy={busy}
-          onCreateProfile={() => setStep('createProfile')}
+          busyStage={bookingBusyStage}
+          onCreateProfile={() => { setCreatingProfileFromBooking(true); setStep('createProfile'); }}
           onPatient={selectBookingPatient}
           onStage={setBookingStage}
           onDepartment={selectBookingDepartment}
           onDoctor={selectBookingDoctor}
-          onDate={(value: string) => setBookingDate(value)}
+          onDate={changeBookingDate}
           onSlot={setBookingSlot}
           onReason={setBookingReason}
           onSymptoms={setBookingSymptoms}
@@ -605,9 +819,10 @@ type HomeFeature = {
   onPress: () => void;
 };
 
-function getHomeFeatures({ openBooking, openProfiles }: { openBooking: () => void; openProfiles: () => void }): HomeFeature[] {
+function getHomeFeatures({ openBooking, openAppointments, openProfiles }: { openBooking: () => void; openAppointments: () => void; openProfiles: () => void }): HomeFeature[] {
   return [
     { label: 'Đặt khám', icon: 'calendar-clear-outline', accent: colors.primary, onPress: openBooking },
+    { label: 'Lịch đã đặt', icon: 'ticket-outline', accent: '#7c3aed', onPress: openAppointments },
     { label: 'Lịch sử khám', icon: 'folder-open-outline', accent: '#1d8fe1', onPress: openProfiles },
     { label: 'Kết quả cận lâm sàng', icon: 'flask-outline', accent: '#21b8c7', onPress: openProfiles },
   ];
@@ -790,10 +1005,14 @@ function NotificationCard({ item }: { item: { icon: keyof typeof Ionicons.glyphM
   );
 }
 
-function AccountScreen({ session, onLogout, onHome }: { session: PatientOtpLoginResponse; onLogout: () => void; onHome: () => void }) {
+function AccountScreen({ session, onLogout, onHome, onChangePassword, notificationsEnabled, onToggleNotifications }: { session: PatientOtpLoginResponse; onLogout: () => void; onHome: () => void; onChangePassword: () => void; notificationsEnabled: boolean; onToggleNotifications: (value: boolean) => void }) {
   const primaryPatient = session.patients[0];
   const displayName = primaryPatient?.fullName || 'Người bệnh';
   const phoneText = maskPhone(primaryPatient?.phone || '');
+  const confirmLogout = () => Alert.alert('Đăng xuất', 'Bạn có chắc muốn đăng xuất không?', [
+    { text: 'Hủy', style: 'cancel' },
+    { text: 'Đăng xuất', style: 'destructive', onPress: onLogout },
+  ]);
 
   return (
     <View style={styles.accountScreen}>
@@ -811,32 +1030,32 @@ function AccountScreen({ session, onLogout, onHome }: { session: PatientOtpLogin
         <AccountSection title="Tài khoản">
           <AccountRow icon="person" label="Thông tin cá nhân" />
           <AccountRow icon="key" label="Thay đổi mật khẩu" />
-          <AccountRow icon="lock-closed" label="Passcode" />
+          <AccountRow icon="lock-closed" label="Đổi mật khẩu" onPress={onChangePassword} />
         </AccountSection>
 
         <AccountSection title="Cài đặt">
           <View style={styles.accountRow}>
             <View style={styles.accountRowIcon}><Ionicons name="notifications" size={21} color={colors.primary} /></View>
             <Text style={styles.accountRowText}>Nhận thông báo</Text>
-            <View style={styles.toggleTrack}><View style={styles.toggleThumb} /></View>
+            <Switch accessibilityLabel="Bật hoặc tắt nhận thông báo" value={notificationsEnabled} onValueChange={onToggleNotifications} trackColor={{ false: '#cbd5e1', true: colors.primarySoft }} thumbColor={notificationsEnabled ? colors.primary : '#f8fafc'} />
           </View>
         </AccountSection>
 
         <AccountSection title="Thông tin pháp lý">
-          <AccountRow icon="document-text" label="Điều khoản dịch vụ" />
-          <AccountRow icon="document-text" label="Chính sách bảo mật" />
-          <AccountRow icon="document-text" label="Quy định sử dụng" />
+          <AccountRow icon="document-text" label="Điều khoản dịch vụ" disabled />
+          <AccountRow icon="document-text" label="Chính sách bảo mật" disabled />
+          <AccountRow icon="document-text" label="Quy định sử dụng" disabled />
         </AccountSection>
 
-        <Pressable onPress={onLogout} style={styles.logoutCard}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Đăng xuất tài khoản" onPress={confirmLogout} style={styles.logoutCard}>
           <View style={[styles.accountRowIcon, styles.logoutIcon]}><Ionicons name="log-out-outline" size={22} color="#ef4444" /></View>
           <Text style={styles.logoutText}>Đăng xuất</Text>
           <Ionicons name="chevron-forward" size={22} color="#c7cdd8" />
         </Pressable>
 
         <View style={styles.accountVersionRow}>
-          <View style={styles.certBadge}><Ionicons name="checkmark-done-circle" size={22} color="#0ea5e9" /><Text style={styles.certText}>Đã thông báo</Text></View>
-          <Text style={styles.versionText}>v3.2.1-496</Text>
+          <View style={styles.certBadge}><Ionicons name="checkmark-done-circle" size={22} color="#0ea5e9" /><Text style={styles.certText}>Phiên bản ổn định</Text></View>
+          <Text style={styles.versionText}>Patient Portal</Text>
         </View>
       </View>
 
@@ -854,13 +1073,42 @@ function AccountSection({ title, children }: { title: string; children: React.Re
   );
 }
 
-function AccountRow({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string }) {
+function AccountRow({ icon, label, disabled = false, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; disabled?: boolean; onPress?: () => void }) {
+  const content = (
+    <>
+      <View style={styles.accountRowIcon}><Ionicons name={icon} size={21} color={disabled ? colors.muted : colors.primary} /></View>
+      <Text style={[styles.accountRowText, disabled && styles.accountRowTextDisabled]}>{label}{disabled ? ' · Sắp ra mắt' : ''}</Text>
+      {!disabled ? <Ionicons name="chevron-forward" size={22} color="#c7cdd8" /> : null}
+    </>
+  );
+
+  if (onPress && !disabled) {
+    return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={styles.accountRow}>{content}</Pressable>;
+  }
+
   return (
-    <Pressable style={styles.accountRow}>
-      <View style={styles.accountRowIcon}><Ionicons name={icon} size={21} color={colors.primary} /></View>
-      <Text style={styles.accountRowText}>{label}</Text>
-      <Ionicons name="chevron-forward" size={22} color="#c7cdd8" />
-    </Pressable>
+    <View accessibilityRole={disabled ? 'text' : 'button'} accessibilityLabel={`${label}${disabled ? ', sắp ra mắt' : ''}`} style={[styles.accountRow, disabled && styles.accountRowDisabled]}>
+      {content}
+    </View>
+  );
+}
+
+function ChangePasswordScreen({ form, setForm, busy, onSubmit, onBack }: { form: { currentPassword: string; newPassword: string; confirmPassword: string }; setForm: (value: { currentPassword: string; newPassword: string; confirmPassword: string }) => void; busy: boolean; onSubmit: () => void; onBack: () => void }) {
+  const update = (key: keyof typeof form, value: string) => setForm({ ...form, [key]: value });
+  return (
+    <View style={styles.authScreen}>
+      <BackHeader onBack={onBack} />
+      <MedicalMark />
+      <Text style={styles.authEyebrow}>Bảo mật tài khoản</Text>
+      <Text style={styles.authTitle}>Đổi mật khẩu</Text>
+      <Text style={styles.authSubtitle}>Sau khi đổi mật khẩu thành công, bạn sẽ cần đăng nhập lại để bảo vệ phiên truy cập.</Text>
+      <View style={styles.authCard}>
+        <FormInput label="Mật khẩu hiện tại" secureTextEntry value={form.currentPassword} onChangeText={(v) => update('currentPassword', v)} icon="lock-closed-outline" placeholder="Nhập mật khẩu hiện tại" accessibilityLabel="Mật khẩu hiện tại" />
+        <FormInput label="Mật khẩu mới" secureTextEntry value={form.newPassword} onChangeText={(v) => update('newPassword', v)} icon="shield-checkmark-outline" placeholder="Tối thiểu 8 ký tự" accessibilityLabel="Mật khẩu mới" />
+        <FormInput label="Xác nhận mật khẩu mới" secureTextEntry value={form.confirmPassword} onChangeText={(v) => update('confirmPassword', v)} icon="checkmark-done-outline" placeholder="Nhập lại mật khẩu mới" accessibilityLabel="Xác nhận mật khẩu mới" />
+        <ActionButton label="Cập nhật mật khẩu" loading={busy} onPress={onSubmit} icon={<Ionicons name="key-outline" size={20} color="#ffffff" />} />
+      </View>
+    </View>
   );
 }
 
@@ -949,8 +1197,8 @@ function PatientProfileCard({ patient, index, onPress }: { patient: PatientOtpLo
   );
 }
 
-function CreateProfileScreen({ form, setForm, busy, onSubmit, onBack }: { form: any; setForm: (updater: any) => void; busy: boolean; onSubmit: () => void; onBack: () => void }) {
-  const update = (key: string, value: string) => setForm((current: any) => ({ ...current, [key]: value }));
+function CreateProfileScreen({ form, errors, setForm, busy, onSubmit, onBack }: { form: ProfileForm; errors: ProfileFormErrors; setForm: (updater: (current: ProfileForm) => ProfileForm) => void; busy: boolean; onSubmit: () => void; onBack: () => void }) {
+  const update = (key: keyof ProfileForm, value: string) => setForm((current) => ({ ...current, [key]: value }));
   return (
     <View style={styles.profileScreen}>
       <View style={styles.profileHero}>
@@ -959,13 +1207,19 @@ function CreateProfileScreen({ form, setForm, busy, onSubmit, onBack }: { form: 
         <Text style={styles.profileHeroSubtitle}>Thông tin này sẽ được dùng khi đặt lịch và tiếp nhận tại bệnh viện.</Text>
       </View>
       <View style={styles.profileListPanel}>
-        <FormInput label="Họ và tên" value={form.fullName} onChangeText={(v) => update('fullName', v)} icon="person-outline" placeholder="Nguyễn Văn A" />
+        <FormInput label="Họ và tên" value={form.fullName} onChangeText={(v) => update('fullName', v)} icon="person-outline" placeholder="Nguyễn Văn A" accessibilityLabel="Họ và tên bệnh nhân" />
+        {errors.fullName ? <Text style={styles.fieldErrorText}>{errors.fullName}</Text> : null}
         <GenderSelector value={form.gender} onChange={(value) => update('gender', value)} />
+        {errors.gender ? <Text style={styles.fieldErrorText}>{errors.gender}</Text> : null}
         <BirthDateSelector value={form.birthDate} onChange={(value) => update('birthDate', value)} />
-        <FormInput label="CCCD/CMND" value={form.citizenId} onChangeText={(v) => update('citizenId', v)} icon="card-outline" placeholder="Không bắt buộc" />
-        <FormInput label="Địa chỉ" value={form.address} onChangeText={(v) => update('address', v)} icon="location-outline" placeholder="Không bắt buộc" />
+        {errors.birthDate ? <Text style={styles.fieldErrorText}>{errors.birthDate}</Text> : null}
+        <FormInput label="CCCD/CMND" value={form.citizenId} onChangeText={(v) => update('citizenId', v.replace(/\D/g, '').slice(0, 12))} icon="card-outline" placeholder="Không bắt buộc" keyboardType="number-pad" accessibilityLabel="CCCD hoặc chứng minh nhân dân" />
+        {errors.citizenId ? <Text style={styles.fieldErrorText}>{errors.citizenId}</Text> : null}
+        <FormInput label="Địa chỉ" value={form.address} onChangeText={(v) => update('address', v)} icon="location-outline" placeholder="Không bắt buộc" accessibilityLabel="Địa chỉ bệnh nhân" />
+        <FormInput label="Liên hệ khẩn cấp" value={form.emergencyContact} onChangeText={(v) => update('emergencyContact', v)} icon="call-outline" placeholder="Không bắt buộc" keyboardType="phone-pad" accessibilityLabel="Số điện thoại liên hệ khẩn cấp" />
+        {errors.emergencyContact ? <Text style={styles.fieldErrorText}>{errors.emergencyContact}</Text> : null}
         <ActionButton label="Tạo hồ sơ" loading={busy} onPress={onSubmit} icon={<Ionicons name="checkmark-circle-outline" size={20} color="#ffffff" />} />
-        <Pressable onPress={onBack} style={styles.linkButton}><Text style={styles.linkText}>Quay lại</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={onBack} style={styles.linkButton}><Text style={styles.linkText}>Quay lại</Text></Pressable>
       </View>
     </View>
   );
@@ -1115,51 +1369,85 @@ function pad2(value: number) {
   return String(value).padStart(2, '0');
 }
 
-function BookingScreen({ patient, patients, selectedPatientId, stage, departments, doctors, slots, appointments, departmentId, doctorId, selectedSlot, date, reason, symptoms, busy, onCreateProfile, onPatient, onStage, onDepartment, onDoctor, onDate, onSlot, onReason, onSymptoms, onSubmit, onQr }: any) {
-  const selectedDepartment = departments.find((department: BookableDepartment) => department.id === departmentId);
-  const selectedDoctor = doctors.find((doctor: BookableDoctor) => doctor.id === doctorId);
+type BookingScreenProps = {
+  patient: PatientOtpLoginResponse['patients'][number] | null;
+  patients: PatientOtpLoginResponse['patients'];
+  selectedPatientId: string;
+  stage: BookingStage;
+  departments: BookableDepartment[];
+  doctors: BookableDoctor[];
+  slots: AppointmentSlot[];
+  appointments: PatientAppointment[];
+  departmentId: string;
+  doctorId: string;
+  selectedSlot: string;
+  date: string;
+  reason: string;
+  symptoms: string;
+  busy: boolean;
+  busyStage: BookingBusyStage;
+  onCreateProfile: () => void;
+  onPatient: (patientId: string) => void;
+  onStage: (stage: BookingStage) => void;
+  onDepartment: (departmentId: string) => void;
+  onDoctor: (doctorId: string) => void;
+  onDate: (date: string) => void;
+  onSlot: (slot: string) => void;
+  onReason: (reason: string) => void;
+  onSymptoms: (symptoms: string) => void;
+  onSubmit: () => void;
+  onQr: (appointmentId: string) => void;
+};
+
+function BookingScreen({ patient, patients, selectedPatientId, stage, departments, doctors, slots, appointments, departmentId, doctorId, selectedSlot, date, reason, symptoms, busy, busyStage, onCreateProfile, onPatient, onStage, onDepartment, onDoctor, onDate, onSlot, onReason, onSymptoms, onSubmit, onQr }: BookingScreenProps) {
+  const selectedDepartment = departments.find((department) => department.id === departmentId);
+  const selectedDoctor = doctors.find((doctor) => doctor.id === doctorId);
+  const { width } = useWindowDimensions();
+  const compact = width < 380;
+  const goBack = () => stage === 'profiles' ? onStage('profiles') : onStage(previousBookingStage(stage));
 
   return (
     <View style={styles.bookingScreen}>
-      <BookingTopBar title="Đặt khám" onBack={() => stage === 'profiles' ? undefined : onStage(previousBookingStage(stage))} />
+      <BookingTopBar title="Đặt khám" onBack={goBack} backDisabled={stage === 'profiles'} />
+      <StepProgress current={stage} compact={compact} />
 
       {stage === 'profiles' ? (
         <BookingProfilePage patients={patients} selectedPatientId={selectedPatientId} onPatient={onPatient} onCreateProfile={onCreateProfile} />
       ) : null}
 
       {stage === 'department' ? (
-        <BookingDepartmentPage departments={departments} departmentId={departmentId} onDepartment={onDepartment} />
+        <BookingDepartmentPage departments={departments} departmentId={departmentId} loading={busyStage === 'departments'} onDepartment={onDepartment} />
       ) : null}
 
       {stage === 'doctor' ? (
-        <BookingDoctorPage doctors={doctors} doctorId={doctorId} onDoctor={onDoctor} />
+        <BookingDoctorPage doctors={doctors} doctorId={doctorId} loading={busyStage === 'doctors'} onDoctor={onDoctor} />
       ) : null}
 
       {stage === 'slot' ? (
-        <BookingSlotPage date={date} slots={slots} onDate={onDate} onSlot={(slot: string) => { onSlot(slot); onStage('confirm'); }} />
+        <BookingSlotPage date={date} slots={slots} selectedSlot={selectedSlot} loading={busyStage === 'slots'} hasDoctor={Boolean(doctorId)} onDate={onDate} onSlot={(slot: string) => { onSlot(slot); onStage('confirm'); }} />
       ) : null}
 
       {stage === 'confirm' ? (
-        <BookingConfirmPage patient={patient} department={selectedDepartment} doctor={selectedDoctor} slot={selectedSlot} reason={reason} symptoms={symptoms} busy={busy} onReason={onReason} onSymptoms={onSymptoms} onSubmit={onSubmit} />
+        <BookingConfirmPage patient={patient} department={selectedDepartment} doctor={selectedDoctor} slot={selectedSlot} reason={reason} symptoms={symptoms} busy={busyStage === 'submit' || busy} onReason={onReason} onSymptoms={onSymptoms} onSubmit={onSubmit} />
       ) : null}
 
       {stage === 'qr' ? (
-        <BookingQrPage appointments={appointments} onQr={onQr} />
+        <BookingQrPage appointments={appointments} loadingQr={busyStage === 'qr'} onQr={onQr} />
       ) : null}
     </View>
   );
 }
 
-function previousBookingStage(stage: string) {
-  const order = ['profiles', 'department', 'doctor', 'slot', 'confirm', 'qr'];
+function previousBookingStage(stage: BookingStage): BookingStage {
+  const order: BookingStage[] = ['profiles', 'department', 'doctor', 'slot', 'confirm', 'qr'];
   const index = order.indexOf(stage);
   return order[Math.max(index - 1, 0)];
 }
 
-function BookingTopBar({ title, onBack }: { title: string; onBack: () => void }) {
+function BookingTopBar({ title, onBack, backDisabled = false }: { title: string; onBack: () => void; backDisabled?: boolean }) {
   return (
     <View style={styles.bookingTopBar}>
-      <Pressable onPress={onBack} style={styles.bookingNavButton}><Ionicons name="arrow-back" size={24} color={colors.primaryDark} /></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Quay lại bước trước" disabled={backDisabled} onPress={onBack} style={[styles.bookingNavButton, backDisabled && styles.bookingNavButtonDisabled]}><Ionicons name="arrow-back" size={24} color={backDisabled ? '#94a3b8' : colors.primaryDark} /></Pressable>
       <Text style={styles.bookingTopTitle}>{title}</Text>
       <View style={styles.bookingHomeIcon}><Ionicons name="home" size={28} color={colors.primary} /></View>
     </View>
@@ -1261,20 +1549,40 @@ function BookingConfirmPage({ patient, department, doctor, slot, reason, symptom
   );
 }
 
-function BookingQrPage({ appointments, onQr }: any) {
+function getAppointmentStatusLabel(status: string) {
+  const map: Record<string, string> = {
+    PENDING: 'Chờ xác nhận',
+    CONFIRMED: 'Đã xác nhận',
+    CHECKED_IN: 'Đã check-in',
+    CANCELLED: 'Đã hủy',
+    COMPLETED: 'Hoàn tất',
+  };
+  return map[status] || 'Không xác định';
+}
+
+function BookingQrPage({ appointments, loadingQr, onQr }: { appointments: PatientAppointment[]; loadingQr: boolean; onQr: (appointmentId: string) => void }) {
   return (
     <BookingStepPage title="Lịch hẹn của bạn" subtitle="Đưa mã QR này cho lễ tân để check-in nhanh">
-      {appointments.length ? appointments.map((appointment: PatientAppointment) => (
+      {appointments.length ? appointments.map((appointment) => (
         <View key={appointment.id} style={styles.appointmentTicket}>
           <View style={styles.ticketTopRow}>
-            <View>
+            <View style={styles.flex1}>
               <Text style={styles.ticketCode}>{appointment.appointmentCode}</Text>
               <Text style={styles.ticketMeta}>{appointment.department?.name || 'Khoa khám'} • {formatDateTime(appointment.scheduledAt)}</Text>
+              {appointment.doctor?.fullName ? <Text style={styles.ticketMeta}>Bác sĩ: {appointment.doctor.fullName}</Text> : null}
             </View>
-            <Text style={styles.ticketStatus}>{appointment.status}</Text>
+            <Text style={styles.ticketStatus}>{getAppointmentStatusLabel(appointment.status)}</Text>
           </View>
-          {appointment.qrPayload ? <Text style={styles.qrPayload}>{appointment.qrPayload}</Text> : null}
-          <Pressable onPress={() => onQr(appointment.id)} style={styles.qrButton}><Ionicons name="qr-code-outline" size={18} color="#ffffff" /><Text style={styles.qrButtonText}>Hiển thị QR</Text></Pressable>
+          {appointment.status !== 'CHECKED_IN' && appointment.qrPayload ? (
+            <View style={styles.qrBox} accessibilityLabel={`Mã QR check-in cho lịch hẹn ${appointment.appointmentCode}`}>
+              <QRCode value={appointment.qrPayload} size={170} backgroundColor="#ffffff" color={colors.primaryDark} />
+            </View>
+          ) : null}
+          {appointment.status === 'CHECKED_IN' ? (
+            <View style={styles.checkedInNotice}><Ionicons name="checkmark-circle" size={18} color="#047857" /><Text style={styles.checkedInNoticeText}>Lịch hẹn đã được check-in tại quầy.</Text></View>
+          ) : (
+            <Pressable accessibilityRole="button" accessibilityLabel={`Hiển thị QR cho lịch hẹn ${appointment.appointmentCode}`} disabled={loadingQr} onPress={() => onQr(appointment.id)} style={[styles.qrButton, loadingQr && styles.actionDisabled]}><Ionicons name="qr-code-outline" size={18} color="#ffffff" /><Text style={styles.qrButtonText}>{loadingQr ? 'Đang tải QR...' : appointment.qrPayload ? 'Làm mới QR' : 'Hiển thị QR'}</Text></Pressable>
+          )}
         </View>
       )) : <EmptyState text="Bạn chưa có lịch hẹn nào." />}
     </BookingStepPage>
@@ -1291,8 +1599,29 @@ function BookingStepPage({ title, subtitle, children }: { title: string; subtitl
   );
 }
 
-function BookingProgress({ label, active }: { label: string; active: boolean }) {
-  return <View style={[styles.bookingProgressItem, active && styles.bookingProgressItemActive]}><View style={[styles.bookingProgressDot, active && styles.bookingProgressDotActive]} /><Text style={[styles.bookingProgressText, active && styles.bookingProgressTextActive]}>{label}</Text></View>;
+function StepProgress({ current, compact }: { current: BookingStage; compact: boolean }) {
+  const steps: Array<{ key: BookingStage; label: string }> = [
+    { key: 'profiles', label: 'Hồ sơ' },
+    { key: 'department', label: 'Khoa' },
+    { key: 'doctor', label: 'Bác sĩ' },
+    { key: 'slot', label: 'Giờ khám' },
+    { key: 'confirm', label: 'Xác nhận' },
+    { key: 'qr', label: 'QR' },
+  ];
+  const currentIndex = steps.findIndex((step) => step.key === current);
+  return (
+    <View style={[styles.stepProgress, compact && styles.stepProgressCompact]}>
+      {steps.map((step, index) => {
+        const active = index <= currentIndex;
+        return (
+          <View key={step.key} style={styles.stepProgressItem}>
+            <View style={[styles.stepProgressDot, active && styles.stepProgressDotActive]} />
+            <Text numberOfLines={1} style={[styles.stepProgressText, active && styles.stepProgressTextActive]}>{step.label}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
 }
 
 function VisitHistoryScreen({ patient, visits, busy, onOpenDetail }: { patient: PatientOtpLoginResponse['patients'][number] | null; visits: PatientVisitSummary[]; busy: boolean; onOpenDetail: (visitId: string) => void }) {
@@ -1573,6 +1902,10 @@ const styles = StyleSheet.create({
   content: { minHeight: '100%', padding: spacing.screen, gap: 18, backgroundColor: colors.background },
   contentWithTabs: { paddingTop: 0, paddingBottom: 4 },
   statusSpacer: { height: 10 },
+  feedbackWrap: { position: 'relative' },
+  feedbackClose: { position: 'absolute', top: 10, right: 10, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.72)' },
+  fieldErrorText: { alignSelf: 'stretch', color: colors.danger, fontSize: 12, lineHeight: 17, fontWeight: '800', marginTop: -6 },
+  actionDisabled: { opacity: 0.48 },
   onboardingScreen: { flex: 1, minHeight: 740, alignItems: 'center', justifyContent: 'space-between', gap: 24 },
   heroArt: { width: '100%', height: 330, alignItems: 'center', justifyContent: 'center' },
   dotGrid: { position: 'absolute', right: 10, top: 10, width: 128, flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
@@ -1584,9 +1917,9 @@ const styles = StyleSheet.create({
   chartCard: { position: 'absolute', left: 28, bottom: 36, width: 92, borderRadius: 18, backgroundColor: '#ffffff', padding: 12, gap: 7, shadowColor: '#5ba9cf', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 5 },
   chartLine: { height: 6, width: 58, borderRadius: 4, backgroundColor: '#cfe2f4' },
   chartLineShort: { width: 38 },
-  onboardingCopy: { alignItems: 'center', gap: 14, paddingHorizontal: 8 },
+  onboardingCopy: { alignItems: 'center', gap: 14, paddingHorizontal: 8, width: '100%' },
   onboardingTitle: { color: '#05070d', fontSize: 27, lineHeight: 34, fontWeight: '900', textAlign: 'center' },
-  onboardingText: { color: '#1f2937', fontSize: 17, lineHeight: 24, textAlign: 'center', fontWeight: '600' },
+  onboardingText: { color: '#1f2937', fontSize: 16, lineHeight: 23, textAlign: 'center', fontWeight: '600' },
   pager: { marginTop: 18, flexDirection: 'row', gap: 10, alignItems: 'center' },
   pagerActive: { width: 30, height: 6, borderRadius: 6, backgroundColor: colors.primary },
   pagerDot: { width: 14, height: 6, borderRadius: 6, backgroundColor: '#cad1e3' },
@@ -1679,8 +2012,10 @@ const styles = StyleSheet.create({
   accountSectionTitle: { color: '#6b7280', fontSize: 16, lineHeight: 22, fontWeight: '900' },
   accountCard: { borderRadius: 16, backgroundColor: '#ffffff', overflow: 'hidden', shadowColor: '#9aa9ba', shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 3 },
   accountRow: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: '#eef1f5', backgroundColor: '#ffffff' },
+  accountRowDisabled: { opacity: 0.62 },
   accountRowIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: '#eef6ff', alignItems: 'center', justifyContent: 'center' },
   accountRowText: { flex: 1, color: '#252b37', fontSize: 17, lineHeight: 22, fontWeight: '800' },
+  accountRowTextDisabled: { color: colors.muted },
   toggleTrack: { width: 52, height: 30, borderRadius: 15, backgroundColor: '#dbeafe', alignItems: 'flex-end', justifyContent: 'center', paddingHorizontal: 3 },
   toggleThumb: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary },
   logoutCard: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 16, backgroundColor: '#ffffff', paddingHorizontal: 18, shadowColor: '#9aa9ba', shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 3 },
@@ -1903,8 +2238,19 @@ const styles = StyleSheet.create({
   ticketStatus: { alignSelf: 'flex-start', borderRadius: 999, backgroundColor: '#dcfce7', paddingHorizontal: 10, paddingVertical: 6, color: '#047857', fontSize: 11, fontWeight: '900' },
   qrButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 16, backgroundColor: colors.primary, paddingVertical: 12 },
   qrButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '900' },
+  checkedInNotice: { marginTop: 12, minHeight: 44, borderRadius: 14, backgroundColor: '#dcfce7', flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  checkedInNoticeText: { color: '#047857', fontSize: 13, fontWeight: '900', textAlign: 'center' },
+  qrBox: { alignSelf: 'center', marginTop: 16, padding: 16, borderRadius: 22, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#dbeafe' },
+  stepProgress: { marginHorizontal: 18, marginTop: 12, padding: 12, borderRadius: 18, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', flexDirection: 'row', justifyContent: 'space-between', gap: 6 },
+  stepProgressCompact: { gap: 3, paddingHorizontal: 8 },
+  stepProgressItem: { flex: 1, alignItems: 'center', gap: 5 },
+  stepProgressDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#cbd5e1' },
+  stepProgressDotActive: { backgroundColor: colors.primary },
+  stepProgressText: { color: '#94a3b8', fontSize: 9.5, fontWeight: '900' },
+  stepProgressTextActive: { color: colors.primaryDark },
   bookingTopBar: { minHeight: 112, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 26, backgroundColor: '#ffffff' },
   bookingNavButton: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  bookingNavButtonDisabled: { backgroundColor: '#eef2f7', opacity: 0.7 },
   bookingTopTitle: { flex: 1, color: colors.primaryDark, fontSize: 23, fontWeight: '900' },
   bookingHomeIcon: { width: 48, height: 48, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#eff6ff' },
   bookingPageBody: { flex: 1, paddingHorizontal: 18, paddingTop: 22, gap: 14 },

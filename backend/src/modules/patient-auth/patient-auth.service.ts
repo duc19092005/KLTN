@@ -110,6 +110,32 @@ export class PatientAuthService {
     return this.buildLoginResponse(user.id, phoneNormalized, patients);
   }
 
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    if (currentPassword === newPassword) {
+      throw new BadRequestException('Mật khẩu mới không được trùng mật khẩu hiện tại.');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.role !== 'PATIENT' || user.status !== 'ACTIVE' || !user.passwordHash) {
+      throw new UnauthorizedException(INVALID_CREDENTIAL_MESSAGE);
+    }
+    if (!verifyPassword(currentPassword, user.passwordHash)) {
+      throw new UnauthorizedException(INVALID_CREDENTIAL_MESSAGE);
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: hashPassword(newPassword),
+        tokenVersion: { increment: 1 },
+        firstLogin: false,
+        registrationStep: 2,
+      },
+    });
+
+    return { success: true, message: 'Đã đổi mật khẩu thành công. Vui lòng đăng nhập lại.' };
+  }
+
   private async issueOtp(
     phoneInput: string,
     message: string,

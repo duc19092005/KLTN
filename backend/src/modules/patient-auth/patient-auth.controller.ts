@@ -1,8 +1,13 @@
-import { Body, Controller, Post, Req } from '@nestjs/common';
+import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { AuthUser } from '../../common/types/auth-user.type';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { PatientAuthService } from './patient-auth.service';
-import { RequestOtpDto, VerifyOtpDto, PatientPasswordLoginDto } from './patient-auth.dto';
+import { RequestOtpDto, VerifyOtpDto, PatientPasswordLoginDto, PatientChangePasswordDto } from './patient-auth.dto';
 
 @ApiTags('Patient Auth')
 @Controller('patient/auth')
@@ -27,6 +32,14 @@ export class PatientAuthController {
   @Post('password-login')
   passwordLogin(@Body() dto: PatientPasswordLoginDto) {
     return this.patientAuthService.passwordLogin(dto.phone, dto.password);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PATIENT')
+  @Post('change-password')
+  changePassword(@CurrentUser() user: AuthUser, @Body() dto: PatientChangePasswordDto) {
+    return this.patientAuthService.changePassword(user.sub, dto.currentPassword, dto.newPassword);
   }
 
   private clientIp(req: Request): string {

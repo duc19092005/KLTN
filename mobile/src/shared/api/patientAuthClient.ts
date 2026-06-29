@@ -72,3 +72,17 @@ export function verifyPatientOtp(phone: string, otp: string, newPassword?: strin
 export function passwordPatientLogin(phone: string, password: string) {
   return request<PatientOtpLoginResponse>('/patient/auth/password-login', { phone, password });
 }
+
+export function changePatientPassword(token: string, currentPassword: string, newPassword: string) {
+  return fetch(`${BACKEND_URL}/patient/auth/change-password`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  }).then(async (response) => {
+    const payload = (await response.json().catch(() => null)) as ApiEnvelope<{ success: boolean; message: string }> | null;
+    if (!response.ok) {
+      throw new PatientAuthApiError(payload?.message || `Request failed with status ${response.status}`, response.status);
+    }
+    return payload && 'data' in payload && payload.data !== undefined ? payload.data : (payload as { success: boolean; message: string });
+  });
+}
