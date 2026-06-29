@@ -63,6 +63,20 @@ enum LabSpecialty {
   BOTH
 }
 
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  CANCELLED
+  EXPIRED
+  NO_SHOW
+}
+
+enum VisitSource {
+  WALK_IN
+  APPOINTMENT
+}
+
 model User {
   id                String     @id @default(uuid())
   username          String?    @unique
@@ -130,6 +144,7 @@ model Department {
   staffs         StaffProfile[] @relation("DepartmentStaffs")
   visits         Visit[]
   medicalOrders  MedicalOrder[]
+  appointments   Appointment[]
 
   blockchainLogs BlockchainLogger[]
 
@@ -197,6 +212,7 @@ model DoctorProfile {
 
   aiQualities     AiQuality[]
   medicalOrders   MedicalOrder[]
+  appointments    Appointment[]
   reviewedAiDiagnoses AiDiagnosis[]
   medicalConclusions  MedicalConclusion[]
   blockchainLogs      BlockchainLogger[]
@@ -236,6 +252,7 @@ model Patient {
 
   linkedAccounts   PatientAccess[]
   visits           Visit[]
+  appointments     Appointment[]
   aiDiagnoses      AiDiagnosis[]
   medicalOrders    MedicalOrder[]
   blockchainLogs   BlockchainLogger[]
@@ -323,6 +340,7 @@ model Visit {
   staff          StaffProfile? @relation("VisitAssignedStaff", fields: [staffId], references: [id])
 
   status         VisitStatus  @default(WAITING)
+  source         VisitSource  @default(WALK_IN)
   checkInAt      DateTime     @default(now())
   completedAt    DateTime?
   reason         String?
@@ -332,6 +350,7 @@ model Visit {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
+  appointment    Appointment?
   medicalOrders  MedicalOrder[]
   aiDiagnoses    AiDiagnosis[]
   finalConclusion MedicalConclusion?
@@ -339,6 +358,45 @@ model Visit {
   @@index([patientId])
   @@index([departmentId])
   @@index([staffId])
+  @@index([status])
+  @@index([source])
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  appointmentCode String            @unique
+
+  patientId       String
+  patient         Patient           @relation(fields: [patientId], references: [id])
+
+  departmentId    String
+  department      Department        @relation(fields: [departmentId], references: [id])
+
+  doctorId        String?
+  doctor          DoctorProfile?    @relation(fields: [doctorId], references: [id])
+
+  scheduledAt     DateTime
+  reason          String?
+  symptoms        String?
+  status          AppointmentStatus @default(CONFIRMED)
+
+  qrTokenHash     String            @unique
+  qrExpiresAt     DateTime
+  checkedInAt     DateTime?
+
+  visitId         String?           @unique
+  visit           Visit?            @relation(fields: [visitId], references: [id])
+
+  cancelledAt     DateTime?
+  cancelReason    String?
+  createdByUserId String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([patientId])
+  @@index([departmentId])
+  @@index([doctorId])
+  @@index([scheduledAt])
   @@index([status])
 }
 

@@ -20,6 +20,7 @@ export type PatientSummary = {
   birthDate: string;
   citizenId?: string | null;
   contactPhone?: string | null;
+  phone?: string | null;
   address?: string | null;
   insuranceNumber?: string | null;
   emergencyContact?: string | null;
@@ -29,6 +30,7 @@ export type PatientVisitSummary = {
   id: string;
   visitCode: string;
   status: string;
+  source?: string;
   checkInAt: string;
   completedAt?: string | null;
   reason?: string | null;
@@ -88,17 +90,59 @@ export type PatientVisitDetail = PatientVisitSummary & {
   }>;
 };
 
+export type CreatePatientProfilePayload = {
+  fullName: string;
+  gender: string;
+  birthDate: string;
+  citizenId?: string;
+  phone?: string;
+  address?: string;
+  insuranceNumber?: string;
+  emergencyContact?: string;
+};
+
+export type BookableDepartment = { id: string; departmentCode: string; name: string; floor?: string | null; specialty?: string | null; description?: string | null };
+export type BookableDoctor = { id: string; staffProfileId: string; fullName: string; specialty?: string | null; qualification?: string | null; yearsExperience?: number | null };
+export type AppointmentSlot = { startAt: string; available: boolean };
+
+export type PatientAppointment = {
+  id: string;
+  appointmentCode: string;
+  scheduledAt: string;
+  reason?: string | null;
+  symptoms?: string | null;
+  status: string;
+  qrExpiresAt: string;
+  checkedInAt?: string | null;
+  qrPayload?: string;
+  patient?: PatientSummary | null;
+  department?: { id: string; name: string; type?: string; floor?: string | null } | null;
+  doctor?: { id: string; fullName: string; specialty?: string | null } | null;
+  visitId?: string | null;
+};
+
+export type CreateAppointmentPayload = {
+  patientId: string;
+  departmentId: string;
+  doctorId?: string;
+  scheduledAt: string;
+  reason?: string;
+  symptoms?: string;
+};
+
 type ApiEnvelope<T> = {
   success?: boolean;
-  message?: string;
+  message?: string | string[];
   data?: T;
 };
 
-async function request<T>(path: string, token: string): Promise<T> {
+async function request<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${BACKEND_URL}${path}`, {
+    ...options,
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
+      ...(options.headers || {}),
     },
   });
   const payload = (await response.json().catch(() => null)) as ApiEnvelope<T> | null;
@@ -115,6 +159,10 @@ export function getPatientProfiles(token: string) {
   return request<PatientProfileAccess[]>('/patient/me/profiles', token);
 }
 
+export function createPatientProfile(token: string, payload: CreatePatientProfilePayload) {
+  return request<PatientSummary>('/patient/me/profiles', token, { method: 'POST', body: JSON.stringify(payload) });
+}
+
 export function getPatientVisits(token: string, patientId: string) {
   return request<PatientVisitSummary[]>(`/patient/me/profiles/${encodeURIComponent(patientId)}/visits`, token);
 }
@@ -125,4 +173,33 @@ export function getPatientVisitDetail(token: string, patientId: string, visitId:
 
 export function getPatientResultFileDownloadUrl(token: string, patientId: string, fileId: string) {
   return request<PatientFileDownload>(`/patient/me/profiles/${encodeURIComponent(patientId)}/files/${encodeURIComponent(fileId)}/download`, token);
+}
+
+export function getBookableDepartments(token: string) {
+  return request<BookableDepartment[]>('/patient/me/booking/departments', token);
+}
+
+export function getBookableDoctors(token: string, departmentId: string) {
+  return request<BookableDoctor[]>(`/patient/me/booking/departments/${encodeURIComponent(departmentId)}/doctors`, token);
+}
+
+export function getAppointmentSlots(token: string, doctorId: string, date: string) {
+  return request<AppointmentSlot[]>(`/patient/me/booking/doctors/${encodeURIComponent(doctorId)}/slots?date=${encodeURIComponent(date)}`, token);
+}
+
+export function createAppointment(token: string, payload: CreateAppointmentPayload) {
+  return request<PatientAppointment>('/patient/me/appointments', token, { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function getPatientAppointments(token: string, patientId?: string) {
+  const query = patientId ? `?patientId=${encodeURIComponent(patientId)}` : '';
+  return request<PatientAppointment[]>(`/patient/me/appointments${query}`, token);
+}
+
+export function getAppointmentQr(token: string, appointmentId: string) {
+  return request<PatientAppointment>(`/patient/me/appointments/${encodeURIComponent(appointmentId)}/qr`, token);
+}
+
+export function cancelAppointment(token: string, appointmentId: string) {
+  return request<PatientAppointment>(`/patient/me/appointments/${encodeURIComponent(appointmentId)}`, token, { method: 'DELETE' });
 }

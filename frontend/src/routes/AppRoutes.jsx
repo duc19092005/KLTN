@@ -6,6 +6,7 @@ import { ReceptionistDashboard, DoctorDashboard, LabManagerDashboard } from '../
 import ReceptionistIntakePage from '../features/receptionist/pages/ReceptionistIntakePage';
 import ReceptionistQueuePage from '../features/receptionist/pages/ReceptionistQueuePage';
 import ReceptionistRecordsPage from '../features/receptionist/pages/ReceptionistRecordsPage';
+import ReceptionistAppointmentCheckInPage from '../features/receptionist/pages/ReceptionistAppointmentCheckInPage';
 
 import LabOrdersPage from '../features/lab-manager/pages/LabOrdersPage';
 import LabResultsPage from '../features/lab-manager/pages/LabResultsPage';
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="/receptionist/intake" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST']}><ReceptionistIntakePage /></ProtectedRoute>} />
         <Route path="/receptionist/queue" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST']}><ReceptionistQueuePage /></ProtectedRoute>} />
         <Route path="/receptionist/records" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST']}><ReceptionistRecordsPage /></ProtectedRoute>} />
+        <Route path="/receptionist/appointments" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST']}><ReceptionistAppointmentCheckInPage /></ProtectedRoute>} />
         <Route path="/doctor" element={<ProtectedRoute requireVerified roles={['DOCTOR']}><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/doctor/queue" element={<ProtectedRoute requireVerified roles={['DOCTOR']}><DoctorQueuePage /></ProtectedRoute>} />
         <Route path="/lab-manager" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><LabManagerDashboardPage /></ProtectedRoute>} />

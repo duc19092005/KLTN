@@ -2,12 +2,29 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Animated, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { passwordPatientLogin, requestPatientOtp, resendPatientOtp, verifyPatientOtp, PatientOtpLoginResponse } from '../../shared/api/patientAuthClient';
-import { getPatientResultFileDownloadUrl, getPatientVisitDetail, getPatientVisits, PatientVisitDetail, PatientVisitSummary } from '../../shared/api/patientPortalClient';
+import {
+  createAppointment,
+  createPatientProfile,
+  getAppointmentQr,
+  getAppointmentSlots,
+  getBookableDepartments,
+  getBookableDoctors,
+  getPatientAppointments,
+  getPatientResultFileDownloadUrl,
+  getPatientVisitDetail,
+  getPatientVisits,
+  BookableDepartment,
+  BookableDoctor,
+  AppointmentSlot,
+  PatientAppointment,
+  PatientVisitDetail,
+  PatientVisitSummary,
+} from '../../shared/api/patientPortalClient';
 import { ActionButton } from '../../shared/components/ActionButton';
 import { StatusPanel } from '../../shared/components/StatusPanel';
 import { colors, spacing } from '../../shared/theme/theme';
 
-type Step = 'phone' | 'passwordLogin' | 'otp' | 'passwordSetup' | 'dashboard' | 'account' | 'profiles' | 'visits' | 'detail';
+type Step = 'phone' | 'passwordLogin' | 'otp' | 'passwordSetup' | 'dashboard' | 'notifications' | 'account' | 'profiles' | 'visits' | 'detail' | 'createProfile' | 'booking';
 
 type PreviewUrls = Record<string, string>;
 
@@ -58,6 +75,18 @@ export function PatientPortalScreen() {
   const [visits, setVisits] = useState<PatientVisitSummary[]>([]);
   const [visitDetail, setVisitDetail] = useState<PatientVisitDetail | null>(null);
   const [previewUrls, setPreviewUrls] = useState<PreviewUrls>({});
+  const [departments, setDepartments] = useState<BookableDepartment[]>([]);
+  const [doctors, setDoctors] = useState<BookableDoctor[]>([]);
+  const [slots, setSlots] = useState<AppointmentSlot[]>([]);
+  const [appointments, setAppointments] = useState<PatientAppointment[]>([]);
+  const [bookingDepartmentId, setBookingDepartmentId] = useState('');
+  const [bookingDoctorId, setBookingDoctorId] = useState('');
+  const [bookingDate, setBookingDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const [bookingSlot, setBookingSlot] = useState('');
+  const [bookingReason, setBookingReason] = useState('');
+  const [bookingSymptoms, setBookingSymptoms] = useState('');
+  const [bookingStage, setBookingStage] = useState<'profiles' | 'department' | 'doctor' | 'slot' | 'confirm' | 'qr'>('profiles');
+  const [profileForm, setProfileForm] = useState({ fullName: '', gender: 'MALE', birthDate: '', citizenId: '', address: '', insuranceNumber: '', emergencyContact: '' });
 
   useEffect(() => {
     if (session && step === 'phone') setStep('dashboard');
@@ -74,7 +103,7 @@ export function PatientPortalScreen() {
   }, [step, resendAfterSeconds]);
 
   const selectedPatient = useMemo(
-    () => session?.patients.find((patient) => patient.id === selectedPatientId) ?? null,
+    () => session?.patients.find((patient) => patient.id === selectedPatientId) ?? session?.patients[0] ?? null,
     [selectedPatientId, session?.patients],
   );
 
@@ -225,6 +254,131 @@ export function PatientPortalScreen() {
     }
   };
 
+  const openBooking = async () => {
+    if (!session) return;
+    if (!session.patients.length) {
+      setStep('createProfile');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    const patientId = selectedPatientId || session.patients[0]?.id || '';
+    setSelectedPatientId(patientId);
+    try {
+      const [departmentData, appointmentData] = await Promise.all([
+        getBookableDepartments(session.accessToken),
+        getPatientAppointments(session.accessToken, patientId),
+      ]);
+      setDepartments(departmentData);
+      setAppointments(appointmentData);
+      setBookingStage('profiles');
+      setStep('booking');
+    } catch (bookingError) {
+      setError(bookingError instanceof Error ? bookingError.message : 'Không tải được dữ liệu đặt lịch.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const selectBookingPatient = async (patientId: string) => {
+    if (!session) return;
+    setSelectedPatientId(patientId);
+    setBookingDepartmentId('');
+    setBookingDoctorId('');
+    setBookingSlot('');
+    setDoctors([]);
+    setSlots([]);
+    setBusy(true);
+    setError('');
+    try {
+      setAppointments(await getPatientAppointments(session.accessToken, patientId));
+      setBookingStage('department');
+    } catch (appointmentError) {
+      setError(appointmentError instanceof Error ? appointmentError.message : 'Không tải được lịch hẹn của hồ sơ này.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitProfile = async () => {
+    if (!session) return;
+    setBusy(true);
+    setError('');
+    try {
+      const patient = await createPatientProfile(session.accessToken, { ...profileForm, phone });
+      const nextSession = { ...session, patients: [...session.patients, { ...patient, phone: patient.contactPhone || patient.phone || phone }] };
+      setSession(nextSession);
+      persistSession(nextSession);
+      setSelectedPatientId(patient.id);
+      setMessage('Đã tạo hồ sơ bệnh nhân. Bạn có thể đặt lịch ngay.');
+      setStep('dashboard');
+    } catch (profileError) {
+      setError(profileError instanceof Error ? profileError.message : 'Không tạo được hồ sơ bệnh nhân.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const selectBookingDepartment = async (departmentId: string) => {
+    if (!session) return;
+    setBookingDepartmentId(departmentId);
+    setBookingDoctorId('');
+    setBookingSlot('');
+    setDoctors([]);
+    setSlots([]);
+    try {
+      setDoctors(await getBookableDoctors(session.accessToken, departmentId));
+      setBookingStage('doctor');
+    } catch (doctorError) {
+      setError(doctorError instanceof Error ? doctorError.message : 'Không tải được danh sách bác sĩ.');
+    }
+  };
+
+  const selectBookingDoctor = async (doctorId: string) => {
+    if (!session) return;
+    setBookingDoctorId(doctorId);
+    setBookingSlot('');
+    try {
+      setSlots(await getAppointmentSlots(session.accessToken, doctorId, bookingDate));
+      setBookingStage('slot');
+    } catch (slotError) {
+      setError(slotError instanceof Error ? slotError.message : 'Không tải được khung giờ.');
+    }
+  };
+
+  const submitAppointment = async () => {
+    if (!session || !selectedPatient || !bookingDepartmentId || !bookingSlot) return;
+    setBusy(true);
+    setError('');
+    try {
+      const appointment = await createAppointment(session.accessToken, {
+        patientId: selectedPatient.id,
+        departmentId: bookingDepartmentId,
+        doctorId: bookingDoctorId || undefined,
+        scheduledAt: bookingSlot,
+        reason: bookingReason,
+        symptoms: bookingSymptoms,
+      });
+      setAppointments((current) => [appointment, ...current]);
+      setBookingStage('qr');
+      setMessage(`Đặt lịch thành công: ${appointment.appointmentCode}`);
+    } catch (appointmentError) {
+      setError(appointmentError instanceof Error ? appointmentError.message : 'Không đặt được lịch.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const refreshAppointmentQr = async (appointmentId: string) => {
+    if (!session) return;
+    try {
+      const updated = await getAppointmentQr(session.accessToken, appointmentId);
+      setAppointments((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch (qrError) {
+      setError(qrError instanceof Error ? qrError.message : 'Không lấy được mã QR.');
+    }
+  };
+
   const reset = () => {
     setStep('phone');
     setOtp('');
@@ -244,8 +398,8 @@ export function PatientPortalScreen() {
 
   const otpExpiryText = otpExpiresAt ? `OTP hết hạn lúc ${new Date(otpExpiresAt).toLocaleTimeString()}.` : 'OTP có hiệu lực trong 5 phút.';
   const resendDisabled = busy || resendAfterSeconds > 0;
-  const showAuthenticatedTabs = Boolean(session && ['dashboard', 'profiles', 'visits', 'detail', 'account'].includes(step));
-  const activeTab = step === 'account' ? 'account' : step === 'profiles' || step === 'visits' || step === 'detail' ? 'features' : 'home';
+  const showAuthenticatedTabs = Boolean(session && ['dashboard', 'notifications', 'profiles', 'visits', 'detail', 'account', 'createProfile', 'booking'].includes(step));
+  const activeTab = step === 'account' ? 'account' : step === 'notifications' ? 'notifications' : step === 'profiles' || step === 'visits' || step === 'detail' ? 'features' : 'home';
 
   return (
     <View style={styles.portalShell}>
@@ -253,7 +407,7 @@ export function PatientPortalScreen() {
       {!showAuthenticatedTabs ? <View style={styles.statusSpacer} /> : null}
 
       {error && step !== 'dashboard' ? <StatusPanel tone="danger" title="Không thành công" body={error} icon={<Ionicons name="warning-outline" size={22} color={colors.danger} />} /> : null}
-      {message && step !== 'dashboard' ? <StatusPanel title="Thông báo" body={message} icon={<Ionicons name="information-circle-outline" size={22} color={colors.primary} />} /> : null}
+      {message && ['phone', 'passwordLogin', 'otp', 'passwordSetup'].includes(step) ? <StatusPanel title="Thông báo" body={message} icon={<Ionicons name="information-circle-outline" size={22} color={colors.primary} />} /> : null}
 
       {step === 'phone' && (
         <View style={styles.onboardingScreen}>
@@ -319,12 +473,8 @@ export function PatientPortalScreen() {
 
             <View style={styles.featureGrid}>
               {getHomeFeatures({
+                openBooking,
                 openProfiles: () => setStep('profiles'),
-                openUnavailable: (label) => {
-                  setError('');
-                  setMessage('');
-                  setMessage(`Chức năng ${label} sẽ được bổ sung sau.`);
-                },
               }).map((feature) => (
                 <FeatureTile key={feature.label} {...feature} />
               ))}
@@ -378,7 +528,8 @@ export function PatientPortalScreen() {
         <ProfileSelectionScreen
           patients={session.patients}
           onOpenVisits={openVisits}
-          onSwitchAccount={reset}
+          onCreateProfile={() => setStep('createProfile')}
+          onBook={openBooking}
         />
       )}
 
@@ -400,9 +551,47 @@ export function PatientPortalScreen() {
           onOpenFile={openResultFile}
         />
       )}
+      {step === 'createProfile' && session && (
+        <CreateProfileScreen form={profileForm} setForm={setProfileForm} busy={busy} onSubmit={submitProfile} onBack={() => setStep('dashboard')} />
+      )}
+
+      {step === 'notifications' && session && (
+        <NotificationsScreen session={session} appointments={appointments} onBooking={() => setStep('booking')} />
+      )}
+
+      {step === 'booking' && session && (
+        <BookingScreen
+          patient={selectedPatient}
+          patients={session.patients}
+          selectedPatientId={selectedPatientId || selectedPatient?.id || ''}
+          stage={bookingStage}
+          departments={departments}
+          doctors={doctors}
+          slots={slots}
+          appointments={appointments}
+          departmentId={bookingDepartmentId}
+          doctorId={bookingDoctorId}
+          selectedSlot={bookingSlot}
+          date={bookingDate}
+          reason={bookingReason}
+          symptoms={bookingSymptoms}
+          busy={busy}
+          onCreateProfile={() => setStep('createProfile')}
+          onPatient={selectBookingPatient}
+          onStage={setBookingStage}
+          onDepartment={selectBookingDepartment}
+          onDoctor={selectBookingDoctor}
+          onDate={(value: string) => setBookingDate(value)}
+          onSlot={setBookingSlot}
+          onReason={setBookingReason}
+          onSymptoms={setBookingSymptoms}
+          onSubmit={submitAppointment}
+          onQr={refreshAppointmentQr}
+        />
+      )}
       </ScrollView>
       {showAuthenticatedTabs ? (
-        <BottomTabs active={activeTab} onHome={() => setStep('dashboard')} onAccount={() => setStep('account')} />
+        <BottomTabs active={activeTab} onHome={() => setStep('dashboard')} onNotifications={() => setStep('notifications')} onFeatures={() => setStep('profiles')} onAccount={() => setStep('account')} />
       ) : null}
     </View>
   );
@@ -416,9 +605,9 @@ type HomeFeature = {
   onPress: () => void;
 };
 
-function getHomeFeatures({ openProfiles, openUnavailable }: { openProfiles: () => void; openUnavailable: (label: string) => void }): HomeFeature[] {
+function getHomeFeatures({ openBooking, openProfiles }: { openBooking: () => void; openProfiles: () => void }): HomeFeature[] {
   return [
-    { label: 'Đặt khám', icon: 'calendar-clear-outline', accent: colors.primary, onPress: () => openUnavailable('Đặt khám') },
+    { label: 'Đặt khám', icon: 'calendar-clear-outline', accent: colors.primary, onPress: openBooking },
     { label: 'Lịch sử khám', icon: 'folder-open-outline', accent: '#1d8fe1', onPress: openProfiles },
     { label: 'Kết quả cận lâm sàng', icon: 'flask-outline', accent: '#21b8c7', onPress: openProfiles },
   ];
@@ -458,11 +647,11 @@ function DashboardBanner() {
   );
 }
 
-function BottomTabs({ active, onHome, onAccount }: { active: 'home' | 'notifications' | 'features' | 'account'; onHome: () => void; onAccount: () => void }) {
+function BottomTabs({ active, onHome, onNotifications, onFeatures, onAccount }: { active: 'home' | 'notifications' | 'features' | 'account'; onHome: () => void; onNotifications: () => void; onFeatures: () => void; onAccount: () => void }) {
   const tabs: Array<{ key: 'home' | 'notifications' | 'features' | 'account'; label: string; icon: keyof typeof Ionicons.glyphMap; activeIcon?: keyof typeof Ionicons.glyphMap; onPress?: () => void }> = [
     { key: 'home', label: 'Trang chủ', icon: 'home-outline', activeIcon: 'home', onPress: onHome },
-    { key: 'notifications', label: 'Thông báo', icon: 'notifications-outline', activeIcon: 'notifications' },
-    { key: 'features', label: 'Chức năng', icon: 'layers-outline', activeIcon: 'layers' },
+    { key: 'notifications', label: 'Thông báo', icon: 'notifications-outline', activeIcon: 'notifications', onPress: onNotifications },
+    { key: 'features', label: 'Chức năng', icon: 'layers-outline', activeIcon: 'layers', onPress: onFeatures },
     { key: 'account', label: 'Cá nhân', icon: 'person-circle-outline', activeIcon: 'person-circle', onPress: onAccount },
   ];
 
@@ -493,25 +682,111 @@ function LiquidTabItem({ icon, activeIcon, label, active, onPress }: { icon: key
     Animated.spring(progress, {
       toValue: active ? 1 : 0,
       useNativeDriver: true,
-      tension: 150,
-      friction: 13,
+      tension: 190,
+      friction: 18,
     }).start();
   }, [active, progress]);
 
-  const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
-  const lift = progress.interpolate({ inputRange: [0, 1], outputRange: [0, -5] });
-  const activeOpacity = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+  const pillScale = progress.interpolate({ inputRange: [0, 0.72, 1], outputRange: [0.78, 1.04, 1] });
+  const pillOpacity = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+  const pillLift = progress.interpolate({ inputRange: [0, 1], outputRange: [7, 0] });
+  const iconLift = progress.interpolate({ inputRange: [0, 1], outputRange: [0, -4] });
+  const iconScale = progress.interpolate({ inputRange: [0, 0.72, 1], outputRange: [1, 1.13, 1.07] });
+  const iconTilt = progress.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-5deg'] });
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.bottomTabItem, pressed && styles.bottomTabPressed]}>
-      <Animated.View style={[styles.bottomTabLiquid, { opacity: activeOpacity, transform: [{ scale }] }]} />
-      <Animated.View style={[styles.bottomTabIcon, { transform: [{ translateY: lift }, { scale }] }]}>
+      <Animated.View style={[styles.bottomTabActivePill, { opacity: pillOpacity, transform: [{ translateY: pillLift }, { scale: pillScale }] }]}>
+        <View style={styles.bottomTabActiveGloss} />
+      </Animated.View>
+      <Animated.View style={[styles.bottomTabIconWrap, { transform: [{ translateY: iconLift }, { scale: iconScale }, { rotate: iconTilt }] }]}>
         <View style={[styles.bottomTabIconHalo, active && styles.bottomTabIconHaloActive]}>
-          <Ionicons name={active ? activeIcon : icon} size={25} color={active ? colors.primary : '#172033'} />
+          <Ionicons name={active ? activeIcon : icon} size={active ? 23 : 22} color={active ? colors.primary : '#64748b'} />
         </View>
       </Animated.View>
-      <Text style={[styles.bottomTabText, active && styles.bottomTabTextActive]}>{label}</Text>
+      <Text style={[styles.bottomTabText, active && styles.bottomTabTextActive]} numberOfLines={1}>{label}</Text>
     </Pressable>
+  );
+}
+
+function NotificationsScreen({ session, appointments, onBooking }: { session: PatientOtpLoginResponse; appointments: PatientAppointment[]; onBooking: () => void }) {
+  const primaryPatient = session.patients[0];
+  const upcomingAppointment = appointments.find((appointment) => ['PENDING', 'CONFIRMED'].includes(appointment.status));
+  const notificationItems = [
+    upcomingAppointment ? {
+      icon: 'calendar-clear' as const,
+      tone: 'primary' as const,
+      title: 'Lịch khám sắp tới',
+      message: `${formatDateTime(upcomingAppointment.scheduledAt)} • ${upcomingAppointment.department?.name || 'Chuyên khoa đã chọn'}`,
+      time: 'Vừa cập nhật',
+    } : {
+      icon: 'calendar-outline' as const,
+      tone: 'primary' as const,
+      title: 'Bạn chưa có lịch khám mới',
+      message: 'Đặt lịch tại nhà để nhận QR check-in và giảm thời gian chờ tại quầy.',
+      time: 'Gợi ý',
+    },
+    {
+      icon: 'shield-checkmark' as const,
+      tone: 'success' as const,
+      title: 'Hồ sơ được bảo vệ',
+      message: `Tài khoản đang liên kết ${session.patients.length} hồ sơ bệnh nhân với quyền truy cập an toàn.`,
+      time: 'Hôm nay',
+    },
+    {
+      icon: 'qr-code' as const,
+      tone: 'info' as const,
+      title: 'Check-in nhanh bằng QR',
+      message: 'Khi đặt lịch thành công, mã QR sẽ xuất hiện trong phiếu hẹn để lễ tân xác thực nhanh.',
+      time: 'Hướng dẫn',
+    },
+  ];
+
+  return (
+    <View style={styles.notificationsScreen}>
+      <View style={styles.notificationsHero}>
+        <View style={styles.notificationsHeroGlow} />
+        <View style={styles.notificationsHeroIcon}><Ionicons name="notifications" size={28} color="#ffffff" /></View>
+        <View style={styles.flex1}>
+          <Text style={styles.notificationsTitle}>Thông báo</Text>
+          <Text style={styles.notificationsSubtitle}>Xin chào {primaryPatient?.fullName || 'người bệnh'}, các cập nhật quan trọng sẽ hiển thị tại đây.</Text>
+        </View>
+      </View>
+
+      <View style={styles.notificationsQuickCard}>
+        <View style={styles.notificationsQuickIcon}><Ionicons name="sparkles" size={22} color={colors.primary} /></View>
+        <View style={styles.flex1}>
+          <Text style={styles.notificationsQuickTitle}>Trợ lý lịch khám</Text>
+          <Text style={styles.notificationsQuickText}>Theo dõi lịch hẹn, QR check-in và nhắc nhở hồ sơ trong một nơi.</Text>
+        </View>
+        <Pressable onPress={onBooking} style={styles.notificationsQuickButton}><Text style={styles.notificationsQuickButtonText}>Đặt lịch</Text></Pressable>
+      </View>
+
+      <View style={styles.notificationsSectionHeader}>
+        <Text style={styles.notificationsSectionTitle}>Mới nhất</Text>
+        <Text style={styles.notificationsSectionMeta}>{notificationItems.length} mục</Text>
+      </View>
+
+      <View style={styles.notificationsList}>
+        {notificationItems.map((item) => <NotificationCard key={item.title} item={item} />)}
+      </View>
+    </View>
+  );
+}
+
+function NotificationCard({ item }: { item: { icon: keyof typeof Ionicons.glyphMap; tone: 'primary' | 'success' | 'info'; title: string; message: string; time: string } }) {
+  const toneStyle = item.tone === 'success' ? styles.notificationIconSuccess : item.tone === 'info' ? styles.notificationIconInfo : styles.notificationIconPrimary;
+  return (
+    <View style={styles.notificationCard}>
+      <View style={[styles.notificationIcon, toneStyle]}><Ionicons name={item.icon} size={22} color="#ffffff" /></View>
+      <View style={styles.flex1}>
+        <View style={styles.notificationCardHeader}>
+          <Text style={styles.notificationTitle}>{item.title}</Text>
+          <Text style={styles.notificationTime}>{item.time}</Text>
+        </View>
+        <Text style={styles.notificationMessage}>{item.message}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -596,7 +871,7 @@ function maskPhone(value: string) {
   return `${digits.slice(0, 3)}****${digits.slice(-3)}`;
 }
 
-function ProfileSelectionScreen({ patients, onOpenVisits, onSwitchAccount }: { patients: PatientOtpLoginResponse['patients']; onOpenVisits: (patientId: string) => void; onSwitchAccount: () => void }) {
+function ProfileSelectionScreen({ patients, onOpenVisits, onCreateProfile, onBook }: { patients: PatientOtpLoginResponse['patients']; onOpenVisits: (patientId: string) => void; onCreateProfile: () => void; onBook: () => void }) {
   return (
     <View style={styles.profileScreen}>
       <View style={styles.profileHero}>
@@ -625,11 +900,20 @@ function ProfileSelectionScreen({ patients, onOpenVisits, onSwitchAccount }: { p
         )) : <EmptyState text="Chưa có hồ sơ bệnh nhân liên kết với số điện thoại này." />}
       </View>
 
-      <Pressable onPress={onSwitchAccount} style={styles.switchAccountCard}>
-        <View style={styles.switchAccountIcon}><Ionicons name="swap-horizontal-outline" size={22} color={colors.primary} /></View>
+      <Pressable onPress={onBook} style={styles.switchAccountCard}>
+        <View style={styles.switchAccountIcon}><Ionicons name="calendar-clear-outline" size={22} color={colors.primary} /></View>
         <View style={styles.flex1}>
-          <Text style={styles.switchAccountTitle}>Đăng nhập tài khoản khác</Text>
-          <Text style={styles.switchAccountText}>Thoát phiên hiện tại và chọn số điện thoại khác.</Text>
+          <Text style={styles.switchAccountTitle}>Đặt lịch khám tại nhà</Text>
+          <Text style={styles.switchAccountText}>Chọn chuyên khoa, bác sĩ và nhận mã QR check-in.</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={22} color="#9aa8b8" />
+      </Pressable>
+
+      <Pressable onPress={onCreateProfile} style={styles.switchAccountCard}>
+        <View style={styles.switchAccountIcon}><Ionicons name="person-add-outline" size={22} color={colors.primary} /></View>
+        <View style={styles.flex1}>
+          <Text style={styles.switchAccountTitle}>Tạo hồ sơ bệnh nhân mới</Text>
+          <Text style={styles.switchAccountText}>Dành cho người bệnh chưa có hồ sơ trong hệ thống.</Text>
         </View>
         <Ionicons name="chevron-forward" size={22} color="#9aa8b8" />
       </Pressable>
@@ -663,6 +947,352 @@ function PatientProfileCard({ patient, index, onPress }: { patient: PatientOtpLo
       </View>
     </Pressable>
   );
+}
+
+function CreateProfileScreen({ form, setForm, busy, onSubmit, onBack }: { form: any; setForm: (updater: any) => void; busy: boolean; onSubmit: () => void; onBack: () => void }) {
+  const update = (key: string, value: string) => setForm((current: any) => ({ ...current, [key]: value }));
+  return (
+    <View style={styles.profileScreen}>
+      <View style={styles.profileHero}>
+        <View style={styles.profileHeroIcon}><Ionicons name="person-add-outline" size={29} color={colors.primary} /></View>
+        <Text style={styles.profileHeroTitle}>Tạo hồ sơ bệnh nhân</Text>
+        <Text style={styles.profileHeroSubtitle}>Thông tin này sẽ được dùng khi đặt lịch và tiếp nhận tại bệnh viện.</Text>
+      </View>
+      <View style={styles.profileListPanel}>
+        <FormInput label="Họ và tên" value={form.fullName} onChangeText={(v) => update('fullName', v)} icon="person-outline" placeholder="Nguyễn Văn A" />
+        <GenderSelector value={form.gender} onChange={(value) => update('gender', value)} />
+        <BirthDateSelector value={form.birthDate} onChange={(value) => update('birthDate', value)} />
+        <FormInput label="CCCD/CMND" value={form.citizenId} onChangeText={(v) => update('citizenId', v)} icon="card-outline" placeholder="Không bắt buộc" />
+        <FormInput label="Địa chỉ" value={form.address} onChangeText={(v) => update('address', v)} icon="location-outline" placeholder="Không bắt buộc" />
+        <ActionButton label="Tạo hồ sơ" loading={busy} onPress={onSubmit} icon={<Ionicons name="checkmark-circle-outline" size={20} color="#ffffff" />} />
+        <Pressable onPress={onBack} style={styles.linkButton}><Text style={styles.linkText}>Quay lại</Text></Pressable>
+      </View>
+    </View>
+  );
+}
+
+function GenderSelector({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const options = [
+    { label: 'Nam', value: 'MALE', icon: 'male-outline' as const },
+    { label: 'Nữ', value: 'FEMALE', icon: 'female-outline' as const },
+    { label: 'Khác', value: 'OTHER', icon: 'male-female-outline' as const },
+  ];
+  const selected = options.find((option) => option.value === value) || options[0];
+
+  return (
+    <View style={styles.genderField}>
+      <Text style={styles.label}>Giới tính</Text>
+      {open ? (
+        <View style={styles.genderDropdownMenu}>
+          {options.map((option) => {
+            const active = value === option.value;
+            return (
+              <Pressable key={option.value} onPress={() => { onChange(option.value); setOpen(false); }} style={[styles.genderDropdownItem, active && styles.genderDropdownItemActive]}>
+                <Ionicons name={option.icon} size={18} color={active ? colors.primary : '#64748b'} />
+                <Text style={[styles.genderDropdownText, active && styles.genderDropdownTextActive]}>{option.label}</Text>
+                {active ? <Ionicons name="checkmark" size={18} color={colors.primary} /> : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+      <Pressable onPress={() => setOpen((current) => !current)} style={[styles.genderDropdownTrigger, open && styles.genderDropdownTriggerActive]}>
+        <View style={styles.genderDropdownValueRow}>
+          <Ionicons name={selected.icon} size={20} color={colors.primaryDark} />
+          <Text style={styles.genderDropdownValue}>{selected.label}</Text>
+        </View>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={20} color="#0f172a" />
+      </Pressable>
+    </View>
+  );
+}
+
+function BirthDateSelector({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const parsed = parseBirthDate(value);
+  const [viewMonth, setViewMonth] = useState(parsed.month);
+  const [viewYear, setViewYear] = useState(parsed.year);
+  const selectedDate = value;
+  const monthNames = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'];
+  const days = buildCalendarDays(viewMonth, viewYear);
+
+  const moveMonth = (direction: -1 | 1) => {
+    setViewMonth((current) => {
+      const next = current + direction;
+      if (next < 1) {
+        setViewYear((year) => year - 1);
+        return 12;
+      }
+      if (next > 12) {
+        setViewYear((year) => year + 1);
+        return 1;
+      }
+      return next;
+    });
+  };
+
+  const selectDate = (dateValue: string) => {
+    onChange(dateValue);
+    setOpen(false);
+  };
+
+  return (
+    <View style={styles.datePickerField}>
+      <Text style={styles.label}>Ngày sinh</Text>
+      <Pressable onPress={() => setOpen((current) => !current)} style={styles.datePickerTrigger}>
+        <Ionicons name="calendar-outline" size={22} color={colors.primaryDark} />
+        <Text style={[styles.datePickerValue, !value && styles.datePickerPlaceholder]}>{value || 'Chọn ngày sinh'}</Text>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={20} color="#94a3b8" />
+      </Pressable>
+      {open ? (
+        <View style={styles.calendarPanel}>
+          <View style={styles.calendarHeader}>
+            <Pressable onPress={() => moveMonth(-1)} style={styles.calendarNavButton}><Ionicons name="chevron-back" size={20} color={colors.primaryDark} /></Pressable>
+            <View style={styles.calendarTitleBlock}>
+              <Text style={styles.calendarTitle}>{monthNames[viewMonth - 1]}</Text>
+              <Text style={styles.calendarYear}>{viewYear}</Text>
+            </View>
+            <Pressable onPress={() => moveMonth(1)} style={styles.calendarNavButton}><Ionicons name="chevron-forward" size={20} color={colors.primaryDark} /></Pressable>
+          </View>
+          <View style={styles.calendarWeekRow}>{['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((item) => <Text key={item} style={styles.calendarWeekText}>{item}</Text>)}</View>
+          <View style={styles.calendarGrid}>
+            {days.map((item, index) => {
+              const active = item.dateValue === selectedDate;
+              return (
+                <Pressable key={`${item.dateValue}-${index}`} onPress={() => item.inMonth && selectDate(item.dateValue)} disabled={!item.inMonth} style={[styles.calendarDay, active && styles.calendarDayActive, !item.inMonth && styles.calendarDayMuted]}>
+                  <Text style={[styles.calendarDayText, active && styles.calendarDayTextActive, !item.inMonth && styles.calendarDayTextMuted]}>{item.day}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function parseBirthDate(value: string) {
+  const [year, month, day] = value.split('-').map((part) => Number(part));
+  const now = new Date();
+  return {
+    day: Number.isFinite(day) && day > 0 ? day : 1,
+    month: Number.isFinite(month) && month > 0 ? month : now.getMonth() + 1,
+    year: Number.isFinite(year) && year > 0 ? year : now.getFullYear() - 25,
+  };
+}
+
+function buildCalendarDays(month: number, year: number) {
+  const firstDay = new Date(year, month - 1, 1).getDay();
+  const totalDays = daysInMonth(month, year);
+  const previousMonth = month === 1 ? 12 : month - 1;
+  const previousYear = month === 1 ? year - 1 : year;
+  const previousTotalDays = daysInMonth(previousMonth, previousYear);
+  const cells: Array<{ day: number; dateValue: string; inMonth: boolean }> = [];
+
+  for (let index = firstDay - 1; index >= 0; index -= 1) {
+    const day = previousTotalDays - index;
+    cells.push({ day, dateValue: `${previousYear}-${pad2(previousMonth)}-${pad2(day)}`, inMonth: false });
+  }
+  for (let day = 1; day <= totalDays; day += 1) {
+    cells.push({ day, dateValue: `${year}-${pad2(month)}-${pad2(day)}`, inMonth: true });
+  }
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+  let nextDay = 1;
+  while (cells.length % 7 !== 0 || cells.length < 42) {
+    cells.push({ day: nextDay, dateValue: `${nextYear}-${pad2(nextMonth)}-${pad2(nextDay)}`, inMonth: false });
+    nextDay += 1;
+  }
+  return cells;
+}
+
+function daysInMonth(month: number, year: number) {
+  return new Date(year, month, 0).getDate();
+}
+
+function pad2(value: number) {
+  return String(value).padStart(2, '0');
+}
+
+function BookingScreen({ patient, patients, selectedPatientId, stage, departments, doctors, slots, appointments, departmentId, doctorId, selectedSlot, date, reason, symptoms, busy, onCreateProfile, onPatient, onStage, onDepartment, onDoctor, onDate, onSlot, onReason, onSymptoms, onSubmit, onQr }: any) {
+  const selectedDepartment = departments.find((department: BookableDepartment) => department.id === departmentId);
+  const selectedDoctor = doctors.find((doctor: BookableDoctor) => doctor.id === doctorId);
+
+  return (
+    <View style={styles.bookingScreen}>
+      <BookingTopBar title="Đặt khám" onBack={() => stage === 'profiles' ? undefined : onStage(previousBookingStage(stage))} />
+
+      {stage === 'profiles' ? (
+        <BookingProfilePage patients={patients} selectedPatientId={selectedPatientId} onPatient={onPatient} onCreateProfile={onCreateProfile} />
+      ) : null}
+
+      {stage === 'department' ? (
+        <BookingDepartmentPage departments={departments} departmentId={departmentId} onDepartment={onDepartment} />
+      ) : null}
+
+      {stage === 'doctor' ? (
+        <BookingDoctorPage doctors={doctors} doctorId={doctorId} onDoctor={onDoctor} />
+      ) : null}
+
+      {stage === 'slot' ? (
+        <BookingSlotPage date={date} slots={slots} onDate={onDate} onSlot={(slot: string) => { onSlot(slot); onStage('confirm'); }} />
+      ) : null}
+
+      {stage === 'confirm' ? (
+        <BookingConfirmPage patient={patient} department={selectedDepartment} doctor={selectedDoctor} slot={selectedSlot} reason={reason} symptoms={symptoms} busy={busy} onReason={onReason} onSymptoms={onSymptoms} onSubmit={onSubmit} />
+      ) : null}
+
+      {stage === 'qr' ? (
+        <BookingQrPage appointments={appointments} onQr={onQr} />
+      ) : null}
+    </View>
+  );
+}
+
+function previousBookingStage(stage: string) {
+  const order = ['profiles', 'department', 'doctor', 'slot', 'confirm', 'qr'];
+  const index = order.indexOf(stage);
+  return order[Math.max(index - 1, 0)];
+}
+
+function BookingTopBar({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <View style={styles.bookingTopBar}>
+      <Pressable onPress={onBack} style={styles.bookingNavButton}><Ionicons name="arrow-back" size={24} color={colors.primaryDark} /></Pressable>
+      <Text style={styles.bookingTopTitle}>{title}</Text>
+      <View style={styles.bookingHomeIcon}><Ionicons name="home" size={28} color={colors.primary} /></View>
+    </View>
+  );
+}
+
+function BookingProfilePage({ patients, selectedPatientId, onPatient, onCreateProfile }: any) {
+  return (
+    <View style={styles.bookingPageBody}>
+      <View style={styles.bookingPageHeaderRow}>
+        <Text style={styles.bookingPageTitle}>Chọn hồ sơ</Text>
+        <Pressable onPress={onCreateProfile} style={styles.addProfileButton}>
+          <Ionicons name="person-add-outline" size={22} color="#ffffff" />
+          <Text style={styles.addProfileText}>Thêm mới hồ sơ</Text>
+        </Pressable>
+      </View>
+      {patients.map((profile: PatientOtpLoginResponse['patients'][number]) => (
+        <Pressable key={profile.id} onPress={() => onPatient(profile.id)} style={({ pressed }) => [styles.bookingProfileChoice, selectedPatientId === profile.id && styles.bookingProfileChoiceActive, pressed && styles.bookingPressed]}>
+          <View style={styles.bookingProfileAvatarCircle}><Text style={styles.bookingProfileAvatarText}>{profile.fullName?.slice(0, 1).toUpperCase()}</Text></View>
+          <View style={styles.flex1}>
+            <Text style={styles.bookingProfileName}>{profile.fullName}</Text>
+            <View style={styles.bookingProfileMetaLine}>
+              <Ionicons name="card-outline" size={16} color={colors.primaryDark} />
+              <Text style={styles.bookingProfileMeta}>{profile.patientCode}</Text>
+              <Ionicons name="call" size={15} color={colors.primaryDark} />
+              <Text style={styles.bookingProfileMeta}>{profile.phone ? maskPhone(profile.phone) : 'Chưa có SĐT'}</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color="#94a3b8" />
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function BookingDepartmentPage({ departments, departmentId, onDepartment }: any) {
+  return (
+    <BookingStepPage title="Chọn chuyên khoa" subtitle="Chọn khoa hoặc dịch vụ bạn muốn đặt lịch">
+      {departments.map((department: BookableDepartment) => (
+        <Pressable key={department.id} onPress={() => onDepartment(department.id)} style={({ pressed }) => [styles.bookingSelectCard, departmentId === department.id && styles.bookingSelectCardActive, pressed && styles.bookingPressed]}>
+          <View style={styles.bookingSelectIcon}><Ionicons name="medkit-outline" size={20} color={departmentId === department.id ? '#ffffff' : colors.primary} /></View>
+          <Text style={[styles.bookingSelectTitle, departmentId === department.id && styles.bookingSelectTitleActive]}>{department.name}</Text>
+          <Text style={[styles.bookingSelectMeta, departmentId === department.id && styles.bookingSelectMetaActive]}>{department.specialty || 'Phòng khám'} • Tầng {department.floor || '--'}</Text>
+        </Pressable>
+      ))}
+    </BookingStepPage>
+  );
+}
+
+function BookingDoctorPage({ doctors, doctorId, onDoctor }: any) {
+  return (
+    <BookingStepPage title="Chọn bác sĩ" subtitle="Bác sĩ khả dụng theo chuyên khoa đã chọn">
+      {doctors.map((doctor: BookableDoctor) => (
+        <Pressable key={doctor.id} onPress={() => onDoctor(doctor.id)} style={({ pressed }) => [styles.bookingDoctorCard, doctorId === doctor.id && styles.bookingSelectCardActive, pressed && styles.bookingPressed]}>
+          <View style={styles.bookingDoctorAvatar}><Text style={styles.bookingDoctorInitial}>{doctor.fullName?.slice(0, 1).toUpperCase()}</Text></View>
+          <View style={styles.flex1}>
+            <Text style={[styles.bookingSelectTitle, doctorId === doctor.id && styles.bookingSelectTitleActive]}>{doctor.fullName}</Text>
+            <Text style={[styles.bookingSelectMeta, doctorId === doctor.id && styles.bookingSelectMetaActive]}>{doctor.specialty || 'Bác sĩ'} • {doctor.qualification || 'Chuyên môn'}</Text>
+          </View>
+        </Pressable>
+      ))}
+      {!doctors.length ? <EmptyState text="Chưa có bác sĩ khả dụng cho khoa này." /> : null}
+    </BookingStepPage>
+  );
+}
+
+function BookingSlotPage({ date, slots, onDate, onSlot }: any) {
+  return (
+    <BookingStepPage title="Chọn ngày giờ" subtitle="Chọn khung giờ phù hợp để đến bệnh viện">
+      <View style={styles.bookingDateBox}>
+        <Ionicons name="calendar-clear-outline" size={20} color={colors.primary} />
+        <TextInput value={date} onChangeText={onDate} placeholder="YYYY-MM-DD" placeholderTextColor="#94a3b8" style={styles.bookingDateInput} />
+      </View>
+      <View style={styles.slotGrid}>
+        {slots.map((slot: AppointmentSlot) => (
+          <Pressable key={slot.startAt} disabled={!slot.available} onPress={() => onSlot(slot.startAt)} style={({ pressed }) => [styles.slotPill, !slot.available && styles.slotPillDisabled, pressed && slot.available && styles.bookingPressed]}>
+            <Text style={[styles.slotTime, !slot.available && styles.slotTimeDisabled]}>{formatTime(slot.startAt)}</Text>
+            <Text style={[styles.slotStatus, !slot.available && styles.slotStatusDisabled]}>{slot.available ? 'Còn trống' : 'Đã kín'}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </BookingStepPage>
+  );
+}
+
+function BookingConfirmPage({ patient, department, doctor, slot, reason, symptoms, busy, onReason, onSymptoms, onSubmit }: any) {
+  return (
+    <BookingStepPage title="Xác nhận thông tin" subtitle="Kiểm tra lại trước khi tạo mã QR check-in">
+      <View style={styles.bookingSummaryBox}>
+        <Text style={styles.bookingSummaryText}>Hồ sơ: {patient?.fullName || 'N/A'}</Text>
+        <Text style={styles.bookingSummaryText}>Khoa: {department?.name || 'N/A'}</Text>
+        <Text style={styles.bookingSummaryText}>Bác sĩ: {doctor?.fullName || 'N/A'}</Text>
+        <Text style={styles.bookingSummaryText}>Ngày: {slot || 'N/A'}</Text>
+      </View>
+      <FormInput label="Lý do khám" value={reason} onChangeText={onReason} icon="document-text-outline" placeholder="Ví dụ: Đau ngực" />
+      <FormInput label="Triệu chứng" value={symptoms} onChangeText={onSymptoms} icon="pulse-outline" placeholder="Mô tả ngắn triệu chứng" />
+      <ActionButton label="Xác nhận đặt lịch" loading={busy} onPress={onSubmit} icon={<Ionicons name="qr-code-outline" size={20} color="#ffffff" />} />
+    </BookingStepPage>
+  );
+}
+
+function BookingQrPage({ appointments, onQr }: any) {
+  return (
+    <BookingStepPage title="Lịch hẹn của bạn" subtitle="Đưa mã QR này cho lễ tân để check-in nhanh">
+      {appointments.length ? appointments.map((appointment: PatientAppointment) => (
+        <View key={appointment.id} style={styles.appointmentTicket}>
+          <View style={styles.ticketTopRow}>
+            <View>
+              <Text style={styles.ticketCode}>{appointment.appointmentCode}</Text>
+              <Text style={styles.ticketMeta}>{appointment.department?.name || 'Khoa khám'} • {formatDateTime(appointment.scheduledAt)}</Text>
+            </View>
+            <Text style={styles.ticketStatus}>{appointment.status}</Text>
+          </View>
+          {appointment.qrPayload ? <Text style={styles.qrPayload}>{appointment.qrPayload}</Text> : null}
+          <Pressable onPress={() => onQr(appointment.id)} style={styles.qrButton}><Ionicons name="qr-code-outline" size={18} color="#ffffff" /><Text style={styles.qrButtonText}>Hiển thị QR</Text></Pressable>
+        </View>
+      )) : <EmptyState text="Bạn chưa có lịch hẹn nào." />}
+    </BookingStepPage>
+  );
+}
+
+function BookingStepPage({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.bookingStepPage}>
+      <Text style={styles.bookingStepTitle}>{title}</Text>
+      <Text style={styles.bookingStepSubtitle}>{subtitle}</Text>
+      <View style={styles.bookingCardGrid}>{children}</View>
+    </View>
+  );
+}
+
+function BookingProgress({ label, active }: { label: string; active: boolean }) {
+  return <View style={[styles.bookingProgressItem, active && styles.bookingProgressItemActive]}><View style={[styles.bookingProgressDot, active && styles.bookingProgressDotActive]} /><Text style={[styles.bookingProgressText, active && styles.bookingProgressTextActive]}>{label}</Text></View>;
 }
 
 function VisitHistoryScreen({ patient, visits, busy, onOpenDetail }: { patient: PatientOtpLoginResponse['patients'][number] | null; visits: PatientVisitSummary[]; busy: boolean; onOpenDetail: (visitId: string) => void }) {
@@ -997,18 +1627,46 @@ const styles = StyleSheet.create({
   bannerCaption: { position: 'absolute', left: 12, top: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.82)', paddingHorizontal: 10, paddingVertical: 6 },
   bannerText: { color: colors.primaryDark, fontSize: 12, fontWeight: '900' },
   dashboardSpacer: { height: 12 },
-  bottomTabsDock: { paddingHorizontal: 14, paddingTop: 8, paddingBottom: 12, backgroundColor: 'rgba(244,247,251,0.62)' },
-  bottomTabsGlow: { position: 'absolute', left: 34, right: 34, top: 2, height: 24, borderRadius: 999, backgroundColor: '#bdefff', opacity: 0.34 },
-  bottomTabsGlass: { minHeight: 76, borderRadius: 30, borderWidth: 1, borderColor: 'rgba(255,255,255,0.86)', backgroundColor: 'rgba(255,255,255,0.78)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingVertical: 8, overflow: 'hidden', shadowColor: '#4d8db8', shadowOpacity: 0.22, shadowRadius: 24, shadowOffset: { width: 0, height: 10 }, elevation: 14 },
-  bottomTabsSheen: { position: 'absolute', left: 12, right: 12, top: 6, height: 20, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.72)', opacity: 0.64 },
-  bottomTabItem: { flex: 1, minHeight: 62, alignItems: 'center', justifyContent: 'center', gap: 3 },
-  bottomTabPressed: { transform: [{ scale: 0.96 }] },
-  bottomTabLiquid: { position: 'absolute', top: 3, width: 58, height: 42, borderRadius: 21, backgroundColor: 'rgba(213,244,255,0.92)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.95)', shadowColor: colors.primary, shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 7 }, elevation: 5 },
-  bottomTabIcon: { width: 44, height: 34, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  bottomTabIconHalo: { width: 38, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  bottomTabIconHaloActive: { backgroundColor: 'rgba(255,255,255,0.52)' },
-  bottomTabText: { color: '#172033', fontSize: 11, lineHeight: 15, fontWeight: '800', textAlign: 'center' },
+  bottomTabsDock: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 12, backgroundColor: '#f4f7fb' },
+  bottomTabsGlow: { position: 'absolute', left: 68, right: 68, top: 8, height: 17, borderRadius: 999, backgroundColor: '#7dd3fc', opacity: 0.14 },
+  bottomTabsGlass: { minHeight: 78, borderRadius: 39, borderWidth: 1, borderColor: 'rgba(255,255,255,0.92)', backgroundColor: 'rgba(255,255,255,0.86)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 9, paddingVertical: 7, overflow: 'hidden', shadowColor: '#075985', shadowOpacity: 0.12, shadowRadius: 22, shadowOffset: { width: 0, height: 10 }, elevation: 9 },
+  bottomTabsSheen: { position: 'absolute', left: 24, right: 24, top: 7, height: 1, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.95)' },
+  bottomTabItem: { flex: 1, minHeight: 62, alignItems: 'center', justifyContent: 'center', gap: 1, borderRadius: 31, overflow: 'visible' },
+  bottomTabPressed: { transform: [{ scale: 0.97 }] },
+  bottomTabLiquid: { display: 'none' },
+  bottomTabIcon: { display: 'none' },
+  bottomTabActivePill: { position: 'absolute', top: 2, left: '50%', width: 58, height: 58, marginLeft: -29, borderRadius: 29, borderWidth: 1, borderColor: 'rgba(255,255,255,0.82)', backgroundColor: 'rgba(219,244,255,0.72)', shadowColor: '#0284c7', shadowOpacity: 0.16, shadowRadius: 15, shadowOffset: { width: 0, height: 7 }, elevation: 5 },
+  bottomTabActiveGloss: { position: 'absolute', left: 12, right: 12, top: 8, height: 12, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.54)' },
+  bottomTabIconWrap: { width: 38, height: 30, alignItems: 'center', justifyContent: 'center' },
+  bottomTabIconHalo: { width: 36, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
+  bottomTabIconHaloActive: { backgroundColor: 'transparent' },
+  bottomTabText: { color: '#475569', fontSize: 10.5, lineHeight: 13, fontWeight: '800', textAlign: 'center' },
   bottomTabTextActive: { color: colors.primary, fontWeight: '900' },
+  notificationsScreen: { flexGrow: 1, minHeight: '100%', marginHorizontal: -24, marginTop: -28, marginBottom: -24, padding: 20, paddingTop: 26, gap: 16, backgroundColor: '#f4f7fb' },
+  notificationsHero: { minHeight: 148, borderRadius: 30, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 15, overflow: 'hidden', backgroundColor: colors.primary, shadowColor: '#075985', shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 8 },
+  notificationsHeroGlow: { position: 'absolute', right: -46, top: -58, width: 170, height: 170, borderRadius: 85, backgroundColor: 'rgba(255,255,255,0.18)' },
+  notificationsHeroIcon: { width: 58, height: 58, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)', alignItems: 'center', justifyContent: 'center' },
+  notificationsTitle: { color: '#ffffff', fontSize: 25, lineHeight: 31, fontWeight: '900' },
+  notificationsSubtitle: { marginTop: 6, color: 'rgba(255,255,255,0.86)', fontSize: 13.5, lineHeight: 20, fontWeight: '700' },
+  notificationsQuickCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 24, padding: 15, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#0f4c81', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 4 },
+  notificationsQuickIcon: { width: 42, height: 42, borderRadius: 16, backgroundColor: '#e0f2fe', alignItems: 'center', justifyContent: 'center' },
+  notificationsQuickTitle: { color: colors.text, fontSize: 15, fontWeight: '900' },
+  notificationsQuickText: { marginTop: 3, color: '#64748b', fontSize: 12.5, lineHeight: 18, fontWeight: '700' },
+  notificationsQuickButton: { minHeight: 38, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 13 },
+  notificationsQuickButtonText: { color: '#ffffff', fontSize: 12.5, fontWeight: '900' },
+  notificationsSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
+  notificationsSectionTitle: { color: colors.text, fontSize: 18, fontWeight: '900' },
+  notificationsSectionMeta: { color: '#94a3b8', fontSize: 12, fontWeight: '900' },
+  notificationsList: { gap: 12 },
+  notificationCard: { flexDirection: 'row', gap: 13, borderRadius: 24, padding: 15, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#8aa7bd', shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 7 }, elevation: 3 },
+  notificationIcon: { width: 44, height: 44, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  notificationIconPrimary: { backgroundColor: colors.primary },
+  notificationIconSuccess: { backgroundColor: '#10b981' },
+  notificationIconInfo: { backgroundColor: '#6366f1' },
+  notificationCardHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
+  notificationTitle: { flex: 1, color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: '900' },
+  notificationTime: { color: '#94a3b8', fontSize: 11, fontWeight: '900' },
+  notificationMessage: { marginTop: 5, color: '#64748b', fontSize: 13, lineHeight: 19, fontWeight: '700' },
   accountScreen: { flexGrow: 1, minHeight: '100%', marginHorizontal: -24, marginTop: -28, marginBottom: -24, backgroundColor: '#f4f6fb' },
   accountHero: { height: 244, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   accountBubbleOne: { position: 'absolute', left: -74, top: -70, width: 210, height: 210, borderRadius: 105, backgroundColor: 'rgba(255,255,255,0.12)' },
@@ -1188,4 +1846,111 @@ const styles = StyleSheet.create({
   detailFileIcon: { width: 52, height: 52, borderRadius: 14, backgroundColor: '#eef6ff', alignItems: 'center', justifyContent: 'center' },
   detailFileButtonSecondary: { borderRadius: 12, backgroundColor: '#eaf8ff', paddingHorizontal: 10, paddingVertical: 9 },
   detailFileButtonSecondaryText: { color: colors.primaryDark, fontSize: 12, fontWeight: '900' },
+  qrPayload: { marginTop: 10, borderRadius: 16, borderWidth: 1, borderColor: '#bae6fd', backgroundColor: '#f0f9ff', padding: 12, color: colors.primaryDark, fontSize: 12, lineHeight: 18, fontWeight: '900' },
+  bookingScreen: { marginHorizontal: -24, marginTop: -52, marginBottom: -24, minHeight: '100%', backgroundColor: '#f5f7fc', paddingBottom: 28 },
+  bookingHero: { minHeight: 240, paddingHorizontal: 24, paddingTop: 30, paddingBottom: 46, borderBottomLeftRadius: 34, borderBottomRightRadius: 34, backgroundColor: '#075985', overflow: 'hidden' },
+  bookingHeroOrbOne: { position: 'absolute', right: -90, top: -70, width: 230, height: 230, borderRadius: 115, backgroundColor: 'rgba(34,211,238,0.28)' },
+  bookingHeroOrbTwo: { position: 'absolute', left: -70, bottom: -90, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(255,255,255,0.14)' },
+  bookingHeroTopRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  bookingHeroIcon: { width: 50, height: 50, borderRadius: 18, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', shadowColor: '#083344', shadowOpacity: 0.22, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 8 },
+  bookingHeroKicker: { color: '#bae6fd', fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1.4 },
+  bookingHeroTitle: { marginTop: 24, color: '#ffffff', fontSize: 38, lineHeight: 43, fontWeight: '900' },
+  bookingHeroSubtitle: { marginTop: 10, color: '#dff7ff', fontSize: 15, lineHeight: 22, fontWeight: '800' },
+  bookingProgressCard: { marginHorizontal: 18, marginTop: -30, flexDirection: 'row', gap: 8, borderRadius: 24, backgroundColor: '#ffffff', padding: 10, shadowColor: '#075985', shadowOpacity: 0.14, shadowRadius: 20, shadowOffset: { width: 0, height: 12 }, elevation: 8 },
+  bookingProgressItem: { flex: 1, alignItems: 'center', gap: 5, borderRadius: 18, backgroundColor: '#f1f5f9', paddingVertical: 10 },
+  bookingProgressItemActive: { backgroundColor: '#ecfeff' },
+  bookingProgressDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#cbd5e1' },
+  bookingProgressDotActive: { backgroundColor: colors.primary },
+  bookingProgressText: { color: '#94a3b8', fontSize: 11, fontWeight: '900' },
+  bookingProgressTextActive: { color: colors.primaryDark },
+  bookingPanel: { marginHorizontal: 18, marginTop: 18, borderRadius: 28, backgroundColor: '#ffffff', padding: 18, gap: 16, shadowColor: '#8aa7bd', shadowOpacity: 0.13, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 6 },
+  bookingPanelHeader: { flexDirection: 'row', alignItems: 'center', gap: 13 },
+  bookingPanelNumber: { width: 44, height: 44, borderRadius: 16, backgroundColor: '#083344', alignItems: 'center', justifyContent: 'center' },
+  bookingPanelNumberText: { color: '#ffffff', fontSize: 13, fontWeight: '900' },
+  bookingPanelTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  bookingPanelTitle: { color: colors.text, fontSize: 19, lineHeight: 24, fontWeight: '900' },
+  bookingPanelCaption: { marginTop: 3, color: '#64748b', fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  bookingCardGrid: { gap: 12 },
+  bookingSelectCard: { minHeight: 112, borderRadius: 24, borderWidth: 1, borderColor: '#dbeafe', backgroundColor: '#f8fbff', padding: 16, justifyContent: 'center' },
+  bookingSelectCardActive: { borderColor: '#0891b2', backgroundColor: '#0891b2' },
+  bookingPressed: { transform: [{ scale: 0.985 }], opacity: 0.92 },
+  bookingSelectIcon: { width: 38, height: 38, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.22)', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  bookingSelectTitle: { color: colors.text, fontSize: 16, lineHeight: 21, fontWeight: '900' },
+  bookingSelectTitleActive: { color: '#ffffff' },
+  bookingSelectMeta: { marginTop: 5, color: '#64748b', fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  bookingSelectMetaActive: { color: '#cffafe' },
+  bookingDoctorCard: { minHeight: 96, flexDirection: 'row', alignItems: 'center', gap: 13, borderRadius: 24, borderWidth: 1, borderColor: '#dbeafe', backgroundColor: '#f8fbff', padding: 14 },
+  bookingDoctorAvatar: { width: 50, height: 50, borderRadius: 18, backgroundColor: '#e0f2fe', alignItems: 'center', justifyContent: 'center' },
+  bookingDoctorInitial: { color: colors.primaryDark, fontSize: 18, fontWeight: '900' },
+  bookingPatientCard: { minHeight: 92, flexDirection: 'row', alignItems: 'center', gap: 13, borderRadius: 24, borderWidth: 1, borderColor: '#dbeafe', backgroundColor: '#f8fbff', padding: 14 },
+  bookingPatientAvatar: { width: 52, height: 52, borderRadius: 18, backgroundColor: '#e0f2fe', alignItems: 'center', justifyContent: 'center' },
+  bookingPatientAvatarActive: { backgroundColor: 'rgba(255,255,255,0.22)' },
+  bookingPatientInitial: { color: colors.primaryDark, fontSize: 18, fontWeight: '900' },
+  bookingPatientInitialActive: { color: '#ffffff' },
+  bookingDateBox: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 20, borderWidth: 1, borderColor: '#dbeafe', backgroundColor: '#f8fbff', paddingHorizontal: 14, paddingVertical: 10 },
+  bookingDateInput: { flex: 1, minHeight: 38, color: colors.text, fontSize: 16, fontWeight: '900' },
+  slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  slotPill: { minWidth: 104, flexGrow: 1, borderRadius: 20, borderWidth: 1, borderColor: '#bae6fd', backgroundColor: '#f0f9ff', paddingVertical: 14, paddingHorizontal: 12, alignItems: 'center' },
+  slotPillDisabled: { borderColor: '#e2e8f0', backgroundColor: '#f8fafc' },
+  slotTime: { color: colors.primaryDark, fontSize: 18, lineHeight: 22, fontWeight: '900' },
+  slotTimeDisabled: { color: '#94a3b8' },
+  slotStatus: { marginTop: 4, color: '#0284c7', fontSize: 12, fontWeight: '900' },
+  slotStatusDisabled: { color: '#94a3b8' },
+  appointmentTicket: { borderRadius: 26, borderWidth: 1, borderColor: '#bae6fd', backgroundColor: '#f8fdff', padding: 16, gap: 12 },
+  ticketTopRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  ticketCode: { color: colors.text, fontSize: 17, fontWeight: '900' },
+  ticketMeta: { marginTop: 4, color: '#64748b', fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  ticketStatus: { alignSelf: 'flex-start', borderRadius: 999, backgroundColor: '#dcfce7', paddingHorizontal: 10, paddingVertical: 6, color: '#047857', fontSize: 11, fontWeight: '900' },
+  qrButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 16, backgroundColor: colors.primary, paddingVertical: 12 },
+  qrButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '900' },
+  bookingTopBar: { minHeight: 112, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 26, backgroundColor: '#ffffff' },
+  bookingNavButton: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  bookingTopTitle: { flex: 1, color: colors.primaryDark, fontSize: 23, fontWeight: '900' },
+  bookingHomeIcon: { width: 48, height: 48, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#eff6ff' },
+  bookingPageBody: { flex: 1, paddingHorizontal: 18, paddingTop: 22, gap: 14 },
+  bookingPageHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 4 },
+  bookingPageTitle: { color: '#0f172a', fontSize: 24, lineHeight: 30, fontWeight: '900' },
+  addProfileButton: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 13, shadowColor: colors.primary, shadowOpacity: 0.18, shadowRadius: 12, shadowOffset: { width: 0, height: 7 }, elevation: 5 },
+  addProfileText: { color: '#ffffff', fontSize: 14, fontWeight: '900' },
+  bookingProfileChoice: { minHeight: 104, flexDirection: 'row', alignItems: 'center', gap: 13, borderRadius: 22, backgroundColor: '#ffffff', padding: 16, shadowColor: '#8aa7bd', shadowOpacity: 0.1, shadowRadius: 15, shadowOffset: { width: 0, height: 8 }, elevation: 4 },
+  bookingProfileChoiceActive: { borderWidth: 1, borderColor: '#bfdbfe', backgroundColor: '#ffffff' },
+  bookingProfileAvatarCircle: { width: 58, height: 58, borderRadius: 29, borderWidth: 2, borderColor: colors.primary, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' },
+  bookingProfileAvatarText: { color: colors.primaryDark, fontSize: 21, fontWeight: '900' },
+  bookingProfileName: { color: colors.primaryDark, fontSize: 17, lineHeight: 22, fontWeight: '900', textTransform: 'uppercase' },
+  bookingProfileMetaLine: { marginTop: 11, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  bookingProfileMeta: { color: '#475569', fontSize: 13, fontWeight: '800' },
+  bookingStepPage: { flex: 1, paddingHorizontal: 18, paddingTop: 22, gap: 14 },
+  bookingStepTitle: { color: '#0f172a', fontSize: 25, lineHeight: 31, fontWeight: '900' },
+  bookingStepSubtitle: { color: '#64748b', fontSize: 14, lineHeight: 20, fontWeight: '700', marginTop: -8, marginBottom: 8 },
+  bookingSummaryBox: { borderRadius: 22, backgroundColor: '#ffffff', padding: 16, gap: 8, shadowColor: '#8aa7bd', shadowOpacity: 0.1, shadowRadius: 15, shadowOffset: { width: 0, height: 8 }, elevation: 4 },
+  bookingSummaryText: { color: '#0f172a', fontSize: 14, lineHeight: 20, fontWeight: '800' },
+  genderField: { gap: 8 },
+  genderDropdownMenu: { overflow: 'hidden', borderRadius: 22, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#ffffff', shadowColor: '#0f172a', shadowOpacity: 0.14, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 8 },
+  genderDropdownItem: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 15, backgroundColor: '#ffffff' },
+  genderDropdownItemActive: { backgroundColor: '#eef6ff' },
+  genderDropdownText: { flex: 1, color: '#334155', fontSize: 15, fontWeight: '800' },
+  genderDropdownTextActive: { color: colors.primaryDark, fontWeight: '900' },
+  genderDropdownTrigger: { minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderRadius: 16, borderWidth: 1.5, borderColor: '#dbeafe', backgroundColor: '#f8fbff', paddingHorizontal: 15 },
+  genderDropdownTriggerActive: { borderColor: '#0f172a', backgroundColor: '#ffffff' },
+  genderDropdownValueRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  genderDropdownValue: { color: colors.text, fontSize: 16, fontWeight: '900' },
+  datePickerField: { gap: 8 },
+  datePickerTrigger: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 11, borderRadius: 16, borderWidth: 1, borderColor: '#dbeafe', backgroundColor: '#f8fbff', paddingHorizontal: 15 },
+  datePickerValue: { flex: 1, color: colors.text, fontSize: 16, fontWeight: '900' },
+  datePickerPlaceholder: { color: '#b9c5d3' },
+  calendarPanel: { gap: 12, borderRadius: 26, borderWidth: 1, borderColor: '#dbeafe', backgroundColor: '#ffffff', padding: 16, shadowColor: '#0f4c81', shadowOpacity: 0.16, shadowRadius: 22, shadowOffset: { width: 0, height: 12 }, elevation: 8 },
+  calendarHeader: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 18, backgroundColor: '#f0f9ff', paddingHorizontal: 8 },
+  calendarNavButton: { width: 40, height: 40, borderRadius: 14, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center' },
+  calendarTitleBlock: { alignItems: 'center' },
+  calendarTitle: { color: colors.primaryDark, fontSize: 17, fontWeight: '900' },
+  calendarYear: { marginTop: 2, color: '#64748b', fontSize: 12, fontWeight: '800' },
+  calendarWeekRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 },
+  calendarWeekText: { width: '14.285%', textAlign: 'center', color: '#64748b', fontSize: 11, fontWeight: '900' },
+  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  calendarDay: { width: '14.285%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
+  calendarDayActive: { backgroundColor: colors.primary, shadowColor: colors.primary, shadowOpacity: 0.24, shadowRadius: 10, shadowOffset: { width: 0, height: 6 }, elevation: 5 },
+  calendarDayMuted: { opacity: 0.32 },
+  calendarDayText: { color: colors.text, fontSize: 14, fontWeight: '900' },
+  calendarDayTextActive: { color: '#ffffff' },
+  calendarDayTextMuted: { color: '#94a3b8' },
 });

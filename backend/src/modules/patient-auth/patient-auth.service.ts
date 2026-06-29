@@ -77,12 +77,13 @@ export class PatientAuthService {
       ...(requiresPasswordSetup ? [] : [this.prisma.otpVerification.update({ where: { id: record.id }, data: { usedAt: new Date() } })]),
       ...patients.map((patient) => this.prisma.patientAccess.upsert({
         where: { userId_patientId: { userId: user.id, patientId: patient.id } },
-        update: { status: 'ACTIVE', revokedAt: null },
+        update: { status: 'ACTIVE', revokedAt: null, canBookVisit: true },
         create: {
           userId: user.id,
           patientId: patient.id,
           relationship: 'SELF',
           status: 'ACTIVE',
+          canBookVisit: true,
           verifiedAt: new Date(),
         },
       })),
