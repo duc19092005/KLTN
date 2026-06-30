@@ -4,6 +4,7 @@ import { Animated, Alert, Image, Linking, Platform, Pressable, ScrollView, Style
 import QRCode from 'react-native-qrcode-svg';
 import { passwordPatientLogin, requestPatientOtp, resendPatientOtp, verifyPatientOtp, changePatientPassword, PatientOtpLoginResponse } from '../../shared/api/patientAuthClient';
 import {
+  getPatientProfiles,
   createAppointment,
   createPatientProfile,
   getAppointmentQr,
@@ -18,6 +19,7 @@ import {
   BookableDoctor,
   AppointmentSlot,
   PatientAppointment,
+  PatientSummary,
   PatientVisitDetail,
   PatientVisitSummary,
 } from '../../shared/api/patientPortalClient';
@@ -25,7 +27,7 @@ import { ActionButton } from '../../shared/components/ActionButton';
 import { StatusPanel } from '../../shared/components/StatusPanel';
 import { colors, spacing } from '../../shared/theme/theme';
 
-type Step = 'phone' | 'passwordLogin' | 'otp' | 'passwordSetup' | 'dashboard' | 'notifications' | 'account' | 'changePassword' | 'profiles' | 'visits' | 'detail' | 'createProfile' | 'booking';
+type Step = 'phone' | 'passwordLogin' | 'otp' | 'passwordSetup' | 'dashboard' | 'notifications' | 'account' | 'changePassword' | 'profiles' | 'profileDetail' | 'visits' | 'detail' | 'createProfile' | 'booking';
 type BookingStage = 'profiles' | 'department' | 'doctor' | 'slot' | 'confirm' | 'qr';
 type BookingBusyStage = null | 'patients' | 'departments' | 'doctors' | 'slots' | 'submit' | 'qr';
 type ProfileForm = { fullName: string; gender: string; birthDate: string; citizenId: string; address: string; insuranceNumber: string; emergencyContact: string };
@@ -117,6 +119,8 @@ export function PatientPortalScreen() {
   const [session, setSession] = useState<PatientOtpLoginResponse | null>(() => loadStoredSession());
   const [selectedPatientId, setSelectedPatientId] = useState('');
   const [visits, setVisits] = useState<PatientVisitSummary[]>([]);
+  const [profileDetails, setProfileDetails] = useState<PatientSummary[]>([]);
+  const [selectedProfileDetail, setSelectedProfileDetail] = useState<PatientSummary | null>(null);
   const [visitDetail, setVisitDetail] = useState<PatientVisitDetail | null>(null);
   const [previewUrls, setPreviewUrls] = useState<PreviewUrls>({});
   const [departments, setDepartments] = useState<BookableDepartment[]>([]);
@@ -184,6 +188,28 @@ export function PatientPortalScreen() {
       return false;
     }
     return true;
+  };
+
+  const openPersonalProfiles = async () => {
+    if (!session) return;
+    setBusy(true);
+    clearFeedback();
+    try {
+      const accesses = await getPatientProfiles(session.accessToken);
+      setProfileDetails(accesses.map((access) => access.patient));
+      setSelectedProfileDetail(null);
+      setStep('profiles');
+    } catch (profileError) {
+      showError(getFriendlyError(profileError, 'Không tải được thông tin hồ sơ cá nhân.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openProfileDetail = (patient: PatientSummary) => {
+    setSelectedPatientId(patient.id);
+    setSelectedProfileDetail(patient);
+    setStep('profileDetail');
   };
 
   const submitChangePassword = async () => {
@@ -696,7 +722,7 @@ export function PatientPortalScreen() {
               {getHomeFeatures({
                 openBooking,
                 openAppointments,
-                openProfiles: () => setStep('profiles'),
+                openProfiles: openPersonalProfiles,
               }).map((feature) => (
                 <FeatureTile key={feature.label} {...feature} />
               ))}
@@ -709,7 +735,7 @@ export function PatientPortalScreen() {
       )}
 
       {step === 'account' && session && (
-        <AccountScreen session={session} onLogout={reset} onHome={() => setStep('dashboard')} onChangePassword={() => { clearFeedback(); setStep('changePassword'); }} notificationsEnabled={notificationsEnabled} onToggleNotifications={setNotificationsEnabled} />
+        <AccountScreen session={session} onLogout={reset} onHome={() => setStep('dashboard')} onOpenProfiles={openPersonalProfiles} onChangePassword={() => { clearFeedback(); setStep('changePassword'); }} notificationsEnabled={notificationsEnabled} onToggleNotifications={setNotificationsEnabled} />
       )}
 
       {step === 'changePassword' && session && (
@@ -752,11 +778,15 @@ export function PatientPortalScreen() {
 
       {step === 'profiles' && session && (
         <ProfileSelectionScreen
-          patients={session.patients}
-          onOpenVisits={openVisits}
+          patients={profileDetails.length ? profileDetails : session.patients}
+          onOpenVisits={openProfileDetail}
           onCreateProfile={() => setStep('createProfile')}
           onBook={openBooking}
         />
+      )}
+
+      {step === 'profileDetail' && selectedProfileDetail && (
+        <ProfileDetailScreen patient={selectedProfileDetail} onBack={() => setStep('profiles')} onOpenVisits={() => openVisits(selectedProfileDetail.id)} />
       )}
 
       {step === 'visits' && (
@@ -838,7 +868,7 @@ export function PatientPortalScreen() {
         </View>
       ) : null}
       {showAuthenticatedTabs ? (
-        <BottomTabs active={activeTab} onHome={() => setStep('dashboard')} onNotifications={() => setStep('notifications')} onFeatures={() => setStep('profiles')} onAccount={() => setStep('account')} />
+        <BottomTabs active={activeTab} onHome={() => setStep('dashboard')} onNotifications={() => setStep('notifications')} onFeatures={openPersonalProfiles} onAccount={() => setStep('account')} />
       ) : null}
     </View>
   );
@@ -1038,7 +1068,7 @@ function NotificationCard({ item }: { item: { icon: keyof typeof Ionicons.glyphM
   );
 }
 
-function AccountScreen({ session, onLogout, onHome, onChangePassword, notificationsEnabled, onToggleNotifications }: { session: PatientOtpLoginResponse; onLogout: () => void; onHome: () => void; onChangePassword: () => void; notificationsEnabled: boolean; onToggleNotifications: (value: boolean) => void }) {
+function AccountScreen({ session, onLogout, onHome, onOpenProfiles, onChangePassword, notificationsEnabled, onToggleNotifications }: { session: PatientOtpLoginResponse; onLogout: () => void; onHome: () => void; onOpenProfiles: () => void; onChangePassword: () => void; notificationsEnabled: boolean; onToggleNotifications: (value: boolean) => void }) {
   const primaryPatient = session.patients[0];
   const displayName = primaryPatient?.fullName || 'Người bệnh';
   const phoneText = maskPhone(primaryPatient?.phone || '');
@@ -1067,8 +1097,7 @@ function AccountScreen({ session, onLogout, onHome, onChangePassword, notificati
 
       <View style={styles.accountContent}>
         <AccountSection title="Tài khoản">
-          <AccountRow icon="person" label="Thông tin cá nhân" />
-          <AccountRow icon="key" label="Thay đổi mật khẩu" />
+          <AccountRow icon="person" label="Thông tin cá nhân" onPress={onOpenProfiles} />
           <AccountRow icon="lock-closed" label="Đổi mật khẩu" onPress={onChangePassword} />
         </AccountSection>
 
@@ -1158,7 +1187,7 @@ function maskPhone(value: string) {
   return `${digits.slice(0, 3)}****${digits.slice(-3)}`;
 }
 
-function ProfileSelectionScreen({ patients, onOpenVisits, onCreateProfile, onBook }: { patients: PatientOtpLoginResponse['patients']; onOpenVisits: (patientId: string) => void; onCreateProfile: () => void; onBook: () => void }) {
+function ProfileSelectionScreen({ patients, onOpenVisits, onCreateProfile, onBook }: { patients: PatientSummary[]; onOpenVisits: (patient: PatientSummary) => void; onCreateProfile: () => void; onBook: () => void }) {
   return (
     <View style={styles.profileScreen}>
       <View style={styles.profileHero}>
@@ -1173,7 +1202,7 @@ function ProfileSelectionScreen({ patients, onOpenVisits, onCreateProfile, onBoo
         <View style={styles.profileSummaryIcon}><Ionicons name="shield-checkmark-outline" size={22} color={colors.primary} /></View>
         <View style={styles.flex1}>
           <Text style={styles.profileSummaryTitle}>{patients.length} hồ sơ liên kết</Text>
-          <Text style={styles.profileSummaryText}>Chọn đúng hồ sơ để xem lịch sử khám và kết quả cận lâm sàng.</Text>
+          <Text style={styles.profileSummaryText}>Chọn đúng hồ sơ để xem đầy đủ thông tin cá nhân.</Text>
         </View>
       </View>
 
@@ -1183,7 +1212,7 @@ function ProfileSelectionScreen({ patients, onOpenVisits, onCreateProfile, onBoo
           <View style={styles.profileSecureChip}><Ionicons name="lock-closed" size={14} color={colors.primaryDark} /><Text style={styles.profileSecureText}>Bảo mật</Text></View>
         </View>
         {patients.length ? patients.map((patient, index) => (
-          <PatientProfileCard key={patient.id} patient={patient} index={index} onPress={() => onOpenVisits(patient.id)} />
+          <PatientProfileCard key={patient.id} patient={patient} index={index} onPress={() => onOpenVisits(patient)} />
         )) : <EmptyState text="Chưa có hồ sơ bệnh nhân liên kết với số điện thoại này." />}
       </View>
 
@@ -1234,6 +1263,67 @@ function PatientProfileCard({ patient, index, onPress }: { patient: PatientOtpLo
       </View>
     </Pressable>
   );
+}
+
+function ProfileDetailScreen({ patient, onBack, onOpenVisits }: { patient: PatientSummary; onBack: () => void; onOpenVisits: () => void }) {
+  const rows = [
+    { icon: 'barcode-outline' as const, label: 'Mã bệnh nhân', value: patient.patientCode },
+    { icon: 'person-outline' as const, label: 'Họ và tên', value: patient.fullName },
+    { icon: 'male-female-outline' as const, label: 'Giới tính', value: formatGender(patient.gender) },
+    { icon: 'calendar-outline' as const, label: 'Ngày sinh', value: formatDate(patient.birthDate) },
+    { icon: 'card-outline' as const, label: 'CCCD/CMND', value: patient.citizenId || 'Chưa cập nhật' },
+    { icon: 'call-outline' as const, label: 'Số điện thoại', value: patient.contactPhone || patient.phone || 'Chưa cập nhật' },
+    { icon: 'location-outline' as const, label: 'Địa chỉ', value: patient.address || 'Chưa cập nhật' },
+    { icon: 'shield-checkmark-outline' as const, label: 'Số BHYT', value: patient.insuranceNumber || 'Chưa cập nhật' },
+    { icon: 'medkit-outline' as const, label: 'Liên hệ khẩn cấp', value: patient.emergencyContact || 'Chưa cập nhật' },
+  ];
+
+  return (
+    <View style={styles.profileScreen}>
+      <BackHeader onBack={onBack} />
+      <View style={styles.profileHero}>
+        <View style={styles.profileHeroBubbleOne} />
+        <View style={styles.profileHeroBubbleTwo} />
+        <View style={styles.patientProfileAvatar}>
+          <Text style={styles.patientProfileInitial}>{patient.fullName.slice(0, 1).toUpperCase()}</Text>
+        </View>
+        <Text style={styles.profileHeroTitle}>{patient.fullName}</Text>
+        <Text style={styles.profileHeroSubtitle}>Thông tin cá nhân trong hồ sơ bệnh nhân.</Text>
+      </View>
+
+      <View style={styles.profileListPanel}>
+        <View style={styles.profileListHeader}>
+          <Text style={styles.profileSectionTitle}>Chi tiết hồ sơ</Text>
+          <View style={styles.profileSecureChip}><Ionicons name="shield-checkmark" size={14} color={colors.primaryDark} /><Text style={styles.profileSecureText}>Đã xác thực</Text></View>
+        </View>
+        {rows.map((row) => (
+          <View key={row.label} style={styles.profileDetailRow}>
+            <View style={styles.accountRowIcon}><Ionicons name={row.icon} size={20} color={colors.primary} /></View>
+            <View style={styles.flex1}>
+              <Text style={styles.profileDetailLabel}>{row.label}</Text>
+              <Text style={styles.profileDetailValue}>{row.value}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+
+      <Pressable onPress={onOpenVisits} style={styles.switchAccountCard}>
+        <View style={styles.switchAccountIcon}><Ionicons name="folder-open-outline" size={22} color={colors.primary} /></View>
+        <View style={styles.flex1}>
+          <Text style={styles.switchAccountTitle}>Xem lịch sử khám</Text>
+          <Text style={styles.switchAccountText}>Mở các lần khám và kết quả cận lâm sàng của hồ sơ này.</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={22} color="#9aa8b8" />
+      </Pressable>
+    </View>
+  );
+}
+
+function formatGender(value?: string | null) {
+  if (value === 'MALE') return 'Nam';
+  if (value === 'FEMALE') return 'Nữ';
+  if (value === 'OTHER') return 'Khác';
+  return value || 'Chưa cập nhật';
 }
 
 function CreateProfileScreen({ form, errors, setForm, busy, onSubmit, onBack }: { form: ProfileForm; errors: ProfileFormErrors; setForm: (updater: (current: ProfileForm) => ProfileForm) => void; busy: boolean; onSubmit: () => void; onBack: () => void }) {
@@ -2152,6 +2242,9 @@ const styles = StyleSheet.create({
   profileSectionTitle: { flex: 1, color: colors.text, fontSize: 20, lineHeight: 26, fontWeight: '900' },
   profileSecureChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, backgroundColor: '#eef6ff', paddingHorizontal: 12, paddingVertical: 8 },
   profileSecureText: { color: colors.primaryDark, fontSize: 12, fontWeight: '900' },
+  profileDetailRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: '#e4edf6', backgroundColor: '#fbfdff', padding: 14 },
+  profileDetailLabel: { color: '#64748b', fontSize: 12, lineHeight: 17, fontWeight: '900', textTransform: 'uppercase' },
+  profileDetailValue: { marginTop: 3, color: colors.text, fontSize: 16, lineHeight: 22, fontWeight: '900' },
   patientProfileCard: { flexDirection: 'row', alignItems: 'center', gap: 13, borderRadius: 18, borderWidth: 1, borderColor: '#e4edf6', backgroundColor: '#fbfdff', padding: 14 },
   patientProfileCardPressed: { transform: [{ scale: 0.99 }], backgroundColor: '#f3f9ff' },
   patientProfileAvatar: { width: 58, height: 58, borderRadius: 20, backgroundColor: '#dff5ff', alignItems: 'center', justifyContent: 'center' },
