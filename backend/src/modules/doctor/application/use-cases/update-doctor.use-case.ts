@@ -29,7 +29,6 @@ export class UpdateDoctorUseCase {
         throw new ConflictException('CCCD/CMND đã tồn tại.');
       }
     }
-    const targetSpecialty = dto.specialty !== undefined ? dto.specialty : existing.specialty;
     const targetDepartmentId = dto.departmentId !== undefined ? dto.departmentId : existing.staffProfile?.departmentId;
 
     if (targetDepartmentId) {
@@ -39,9 +38,6 @@ export class UpdateDoctorUseCase {
       }
       if (dept.type !== 'EXAMINATION' && dept.type !== 'CLINICAL') {
         throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng khám hoặc lâm sàng.');
-      }
-      if (dept.specialty && dept.specialty !== targetSpecialty) {
-        throw new BadRequestException(`Bác sĩ chuyên khoa "${targetSpecialty}" không thể được xếp vào phòng ban chuyên khoa "${dept.specialty}"`);
       }
     }
 

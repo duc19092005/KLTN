@@ -9,13 +9,13 @@ import {
   createPatientProfile,
   getAppointmentQr,
   getAppointmentSlots,
-  getBookableDepartments,
-  getBookableDoctors,
+  getBookableSpecialties,
+  getBookableDoctorsBySpecialty,
   getPatientAppointments,
   getPatientResultFileDownloadUrl,
   getPatientVisitDetail,
   getPatientVisits,
-  BookableDepartment,
+  BookableSpecialty,
   BookableDoctor,
   AppointmentSlot,
   PatientAppointment,
@@ -28,8 +28,8 @@ import { StatusPanel } from '../../shared/components/StatusPanel';
 import { colors, spacing } from '../../shared/theme/theme';
 
 type Step = 'phone' | 'passwordLogin' | 'otp' | 'passwordSetup' | 'dashboard' | 'notifications' | 'account' | 'changePassword' | 'profiles' | 'profileDetail' | 'visits' | 'detail' | 'createProfile' | 'booking';
-type BookingStage = 'profiles' | 'department' | 'doctor' | 'slot' | 'confirm' | 'qr';
-type BookingBusyStage = null | 'patients' | 'departments' | 'doctors' | 'slots' | 'submit' | 'qr';
+type BookingStage = 'profiles' | 'specialty' | 'doctor' | 'slot' | 'confirm' | 'qr';
+type BookingBusyStage = null | 'patients' | 'specialties' | 'doctors' | 'slots' | 'submit' | 'qr';
 type ProfileForm = { fullName: string; gender: string; birthDate: string; citizenId: string; address: string; insuranceNumber: string; emergencyContact: string };
 type ProfileFormErrors = Partial<Record<keyof ProfileForm, string>>;
 type FeedbackTone = 'success' | 'info' | 'danger';
@@ -123,13 +123,13 @@ export function PatientPortalScreen() {
   const [selectedProfileDetail, setSelectedProfileDetail] = useState<PatientSummary | null>(null);
   const [visitDetail, setVisitDetail] = useState<PatientVisitDetail | null>(null);
   const [previewUrls, setPreviewUrls] = useState<PreviewUrls>({});
-  const [departments, setDepartments] = useState<BookableDepartment[]>([]);
+  const [specialties, setSpecialties] = useState<BookableSpecialty[]>([]);
   const [doctors, setDoctors] = useState<BookableDoctor[]>([]);
   const [slots, setSlots] = useState<AppointmentSlot[]>([]);
   const [appointments, setAppointments] = useState<PatientAppointment[]>([]);
   const [expandedQrIds, setExpandedQrIds] = useState<Record<string, boolean>>({});
   const qrRefs = useRef<Record<string, { toDataURL?: (callback: (data: string) => void) => void } | null>>({});
-  const [bookingDepartmentId, setBookingDepartmentId] = useState('');
+  const [bookingSpecialty, setBookingSpecialty] = useState('');
   const [bookingDoctorId, setBookingDoctorId] = useState('');
   const [bookingDate, setBookingDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
   const [bookingSlot, setBookingSlot] = useState('');
@@ -412,11 +412,11 @@ export function PatientPortalScreen() {
     const patientId = selectedPatientId || session.patients[0]?.id || '';
     setSelectedPatientId(patientId);
     try {
-      const [departmentData, appointmentData] = await Promise.all([
-        getBookableDepartments(session.accessToken),
+      const [specialtyData, appointmentData] = await Promise.all([
+        getBookableSpecialties(session.accessToken),
         getPatientAppointments(session.accessToken, patientId),
       ]);
-      setDepartments(departmentData);
+      setSpecialties(specialtyData);
       setAppointments(appointmentData);
       setBookingStage('profiles');
       setStep('booking');
@@ -430,7 +430,7 @@ export function PatientPortalScreen() {
   const selectBookingPatient = async (patientId: string) => {
     if (!session) return;
     setSelectedPatientId(patientId);
-    setBookingDepartmentId('');
+    setBookingSpecialty('');
     setBookingDoctorId('');
     setBookingSlot('');
     setDoctors([]);
@@ -439,7 +439,7 @@ export function PatientPortalScreen() {
     setError('');
     try {
       setAppointments(await getPatientAppointments(session.accessToken, patientId));
-      setBookingStage('department');
+      setBookingStage('specialty');
     } catch (appointmentError) {
       setError(appointmentError instanceof Error ? appointmentError.message : 'Không tải được lịch hẹn của hồ sơ này.');
     } finally {
@@ -501,17 +501,16 @@ export function PatientPortalScreen() {
     }
   };
 
-  const selectBookingDepartment = async (departmentId: string) => {
+  const selectBookingSpecialty = async (specialty: string) => {
     if (!session) return;
-    setBookingDepartmentId(departmentId);
+    setBookingSpecialty(specialty);
     setBookingDoctorId('');
     setBookingSlot('');
-    setDoctors([]);
     setSlots([]);
     setBookingBusyStage('doctors');
     clearFeedback();
     try {
-      setDoctors(await getBookableDoctors(session.accessToken, departmentId));
+      setDoctors(await getBookableDoctorsBySpecialty(session.accessToken, specialty));
       setBookingStage('doctor');
     } catch (doctorError) {
       showError(getFriendlyError(doctorError, 'Không tải được danh sách bác sĩ.'));
@@ -519,6 +518,7 @@ export function PatientPortalScreen() {
       setBookingBusyStage(null);
     }
   };
+
 
   const loadSlotsForDoctor = async (doctorId: string, dateValue: string) => {
     if (!session || !doctorId) return;
@@ -554,7 +554,7 @@ export function PatientPortalScreen() {
 
   const submitAppointment = async () => {
     if (!session || !selectedPatient) return;
-    if (!bookingDepartmentId) {
+    if (!bookingSpecialty) {
       showError('Vui lòng chọn chuyên khoa.');
       return;
     }
@@ -571,8 +571,8 @@ export function PatientPortalScreen() {
     try {
       const appointment = await createAppointment(session.accessToken, {
         patientId: selectedPatient.id,
-        departmentId: bookingDepartmentId,
-        doctorId: bookingDoctorId || undefined,
+        specialty: bookingSpecialty,
+        doctorId: bookingDoctorId,
         scheduledAt: bookingSlot,
         reason: bookingReason,
         symptoms: bookingSymptoms,
@@ -821,11 +821,11 @@ export function PatientPortalScreen() {
           patients={session.patients}
           selectedPatientId={selectedPatientId || selectedPatient?.id || ''}
           stage={bookingStage}
-          departments={departments}
+          specialties={specialties}
           doctors={doctors}
           slots={slots}
           appointments={appointments}
-          departmentId={bookingDepartmentId}
+          specialty={bookingSpecialty}
           doctorId={bookingDoctorId}
           selectedSlot={bookingSlot}
           date={bookingDate}
@@ -836,7 +836,7 @@ export function PatientPortalScreen() {
           onCreateProfile={() => { setCreatingProfileFromBooking(true); setStep('createProfile'); }}
           onPatient={selectBookingPatient}
           onStage={setBookingStage}
-          onDepartment={selectBookingDepartment}
+          onSpecialty={selectBookingSpecialty}
           onDoctor={selectBookingDoctor}
           onDate={changeBookingDate}
           onSlot={setBookingSlot}
@@ -1503,11 +1503,11 @@ type BookingScreenProps = {
   patients: PatientOtpLoginResponse['patients'];
   selectedPatientId: string;
   stage: BookingStage;
-  departments: BookableDepartment[];
+  specialties: BookableSpecialty[];
   doctors: BookableDoctor[];
   slots: AppointmentSlot[];
   appointments: PatientAppointment[];
-  departmentId: string;
+  specialty: string;
   doctorId: string;
   selectedSlot: string;
   date: string;
@@ -1518,7 +1518,7 @@ type BookingScreenProps = {
   onCreateProfile: () => void;
   onPatient: (patientId: string) => void;
   onStage: (stage: BookingStage) => void;
-  onDepartment: (departmentId: string) => void;
+  onSpecialty: (specialty: string) => void;
   onDoctor: (doctorId: string) => void;
   onDate: (date: string) => void;
   onSlot: (slot: string) => void;
@@ -1533,8 +1533,8 @@ type BookingScreenProps = {
   onDownloadQr: (appointment: PatientAppointment) => void;
 };
 
-function BookingScreen({ patient, patients, selectedPatientId, stage, departments, doctors, slots, appointments, departmentId, doctorId, selectedSlot, date, reason, symptoms, busy, busyStage, onCreateProfile, onPatient, onStage, onDepartment, onDoctor, onDate, onSlot, onReason, onSymptoms, onSubmit, onQr, expandedQrIds, qrRefs, onOpenQr, onCloseQr, onDownloadQr }: BookingScreenProps) {
-  const selectedDepartment = departments.find((department) => department.id === departmentId);
+function BookingScreen({ patient, patients, selectedPatientId, stage, specialties, doctors, slots, appointments, specialty, doctorId, selectedSlot, date, reason, symptoms, busy, busyStage, onCreateProfile, onPatient, onStage, onSpecialty, onDoctor, onDate, onSlot, onReason, onSymptoms, onSubmit, onQr, expandedQrIds, qrRefs, onOpenQr, onCloseQr, onDownloadQr }: BookingScreenProps) {
+  const selectedSpecialty = specialties.find((item) => item.value === specialty);
   const selectedDoctor = doctors.find((doctor) => doctor.id === doctorId);
   return (
     <View style={styles.bookingScreen}>
@@ -1544,8 +1544,8 @@ function BookingScreen({ patient, patients, selectedPatientId, stage, department
         <BookingProfilePage patients={patients} selectedPatientId={selectedPatientId} onPatient={onPatient} onCreateProfile={onCreateProfile} />
       ) : null}
 
-      {stage === 'department' ? (
-        <BookingDepartmentPage departments={departments} departmentId={departmentId} loading={busyStage === 'departments'} onDepartment={onDepartment} />
+      {stage === 'specialty' ? (
+        <BookingSpecialtyPage specialties={specialties} specialty={specialty} loading={busyStage === 'specialties'} onSpecialty={onSpecialty} />
       ) : null}
 
       {stage === 'doctor' ? (
@@ -1557,7 +1557,7 @@ function BookingScreen({ patient, patients, selectedPatientId, stage, department
       ) : null}
 
       {stage === 'confirm' ? (
-        <BookingConfirmPage patient={patient} department={selectedDepartment} doctor={selectedDoctor} slot={selectedSlot} reason={reason} symptoms={symptoms} busy={busyStage === 'submit' || busy} onReason={onReason} onSymptoms={onSymptoms} onSubmit={onSubmit} />
+        <BookingConfirmPage patient={patient} specialty={selectedSpecialty} doctor={selectedDoctor} slot={selectedSlot} reason={reason} symptoms={symptoms} busy={busyStage === 'submit' || busy} onReason={onReason} onSymptoms={onSymptoms} onSubmit={onSubmit} />
       ) : null}
 
       {stage === 'qr' ? (
@@ -1568,7 +1568,7 @@ function BookingScreen({ patient, patients, selectedPatientId, stage, department
 }
 
 function previousBookingStage(stage: BookingStage): BookingStage {
-  const order: BookingStage[] = ['profiles', 'department', 'doctor', 'slot', 'confirm', 'qr'];
+  const order: BookingStage[] = ['profiles', 'specialty', 'doctor', 'slot', 'confirm', 'qr'];
   const index = order.indexOf(stage);
   return order[Math.max(index - 1, 0)];
 }
@@ -1601,16 +1601,17 @@ function BookingProfilePage({ patients, selectedPatientId, onPatient, onCreatePr
   );
 }
 
-function BookingDepartmentPage({ departments, departmentId, onDepartment }: any) {
+function BookingSpecialtyPage({ specialties, specialty, onSpecialty }: any) {
   return (
-    <BookingStepPage title="Chọn chuyên khoa" subtitle="Chọn khoa hoặc dịch vụ bạn muốn đặt lịch">
-      {departments.map((department: BookableDepartment) => (
-        <Pressable key={department.id} onPress={() => onDepartment(department.id)} style={({ pressed }) => [styles.bookingSelectCard, departmentId === department.id && styles.bookingSelectCardActive, pressed && styles.bookingPressed]}>
-          <View style={styles.bookingSelectIcon}><Ionicons name="medkit-outline" size={20} color={departmentId === department.id ? '#ffffff' : colors.primary} /></View>
-          <Text style={[styles.bookingSelectTitle, departmentId === department.id && styles.bookingSelectTitleActive]}>{department.name}</Text>
-          <Text style={[styles.bookingSelectMeta, departmentId === department.id && styles.bookingSelectMetaActive]}>{department.specialty || 'Phòng khám'} • Tầng {department.floor || '--'}</Text>
+    <BookingStepPage title="Chọn chuyên khoa" subtitle="Chọn chuyên khoa cần khám để xem bác sĩ phù hợp">
+      {specialties.map((item: BookableSpecialty) => (
+        <Pressable key={item.value} onPress={() => onSpecialty(item.value)} style={({ pressed }) => [styles.bookingSelectCard, specialty === item.value && styles.bookingSelectCardActive, pressed && styles.bookingPressed]}>
+          <View style={styles.bookingSelectIcon}><Ionicons name="medkit-outline" size={20} color={specialty === item.value ? '#ffffff' : colors.primary} /></View>
+          <Text style={[styles.bookingSelectTitle, specialty === item.value && styles.bookingSelectTitleActive]}>{item.label}</Text>
+          <Text style={[styles.bookingSelectMeta, specialty === item.value && styles.bookingSelectMetaActive]}>{item.doctorCount} bác sĩ khả dụng</Text>
         </Pressable>
       ))}
+      {!specialties.length ? <EmptyState text="Chưa có chuyên khoa khả dụng để đặt lịch." /> : null}
     </BookingStepPage>
   );
 }
@@ -1623,7 +1624,8 @@ function BookingDoctorPage({ doctors, doctorId, onDoctor }: any) {
           <View style={styles.bookingAvatar}><Text style={styles.bookingAvatarText}>{doctor.fullName?.slice(0, 1).toUpperCase()}</Text></View>
           <View style={styles.flex1}>
             <Text style={styles.bookingListTitle}>{doctor.fullName}</Text>
-            <Text style={styles.bookingMetaText}>{doctor.specialty || 'Bác sĩ'} • {doctor.qualification || 'Chuyên môn'}</Text>
+            <Text style={styles.bookingMetaText}>{doctor.specialtyLabel || doctor.specialty || 'Bác sĩ'} • {doctor.qualification || 'Chuyên môn'}</Text>
+            <Text style={styles.bookingMetaText}>Phòng: {doctor.department?.name || 'Chưa phân phòng'}{doctor.department?.floor ? ` • Tầng ${doctor.department.floor}` : ''}</Text>
           </View>
         </Pressable>
       ))}
@@ -1651,13 +1653,14 @@ function BookingSlotPage({ date, slots, onDate, onSlot }: any) {
   );
 }
 
-function BookingConfirmPage({ patient, department, doctor, slot, reason, symptoms, busy, onReason, onSymptoms, onSubmit }: any) {
+function BookingConfirmPage({ patient, specialty, doctor, slot, reason, symptoms, busy, onReason, onSymptoms, onSubmit }: any) {
   return (
     <BookingStepPage title="Xác nhận thông tin" subtitle="Kiểm tra lại trước khi tạo mã QR check-in">
       <View style={styles.bookingSummaryBox}>
         <Text style={styles.bookingSummaryText}>Hồ sơ: {patient?.fullName || 'N/A'}</Text>
-        <Text style={styles.bookingSummaryText}>Khoa: {department?.name || 'N/A'}</Text>
+        <Text style={styles.bookingSummaryText}>Chuyên khoa: {specialty?.label || doctor?.specialtyLabel || 'N/A'}</Text>
         <Text style={styles.bookingSummaryText}>Bác sĩ: {doctor?.fullName || 'N/A'}</Text>
+        <Text style={styles.bookingSummaryText}>Phòng ban: {doctor?.department?.name || 'N/A'}</Text>
         <Text style={styles.bookingSummaryText}>Ngày: {slot || 'N/A'}</Text>
       </View>
       <FormInput label="Lý do khám" value={reason} onChangeText={onReason} icon="document-text-outline" placeholder="Ví dụ: Đau ngực" />

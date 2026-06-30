@@ -1,10 +1,11 @@
 import * as crypto from 'crypto';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, PrismaClient, VisitSource, VisitStatus } from '@prisma/client';
+import { MedicalSpecialty, Prisma, PrismaClient, VisitSource, VisitStatus } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { S3MedicalResultStorageAdapter } from '../medical-order/infrastructure/adapters/s3-medical-result-storage.adapter';
 import { AuditLoggerService } from '../../infrastructure/audit/audit-logger.service';
 import { AuthUser } from '../../common/types/auth-user.type';
+import { getMedicalSpecialtyLabel, getMedicalSpecialtyOptions } from '../doctor/medical-specialty';
 import { CheckInAppointmentDto, CreateAppointmentDto, CreatePatientProfileFromPortalDto } from './patient-booking.dto';
 
 const QR_PREFIX = 'KLTN_APPOINTMENT_CHECKIN:';
@@ -272,24 +273,36 @@ export class PatientPortalService {
     });
   }
 
-  async getBookableDepartments() {
-    return this.prisma.department.findMany({
-      where: { status: 'ACTIVE', type: 'EXAMINATION' },
-      select: { id: true, departmentCode: true, name: true, floor: true, specialty: true, description: true },
-      orderBy: [{ name: 'asc' }],
-    });
-  }
-
-  async getDepartmentDoctors(departmentId: string) {
-    await this.requireBookableDepartment(departmentId);
-    const doctors = await this.prisma.doctorProfile.findMany({
+  async getBookableSpecialties() {
+    const grouped = await this.prisma.doctorProfile.groupBy({
+      by: ['specialty'],
       where: {
         staffProfile: {
-          departmentId,
+          departmentId: { not: null },
           user: { role: 'DOCTOR', status: 'ACTIVE' },
+          department: { status: 'ACTIVE', type: { in: ['EXAMINATION', 'CLINICAL'] } },
         },
       },
-      include: { staffProfile: true },
+      _count: { _all: true },
+      orderBy: { specialty: 'asc' },
+    });
+    const counts = new Map(grouped.map((item) => [item.specialty, item._count._all]));
+    return getMedicalSpecialtyOptions()
+      .filter((option) => counts.has(option.value))
+      .map((option) => ({ ...option, doctorCount: counts.get(option.value) ?? 0 }));
+  }
+
+  async getSpecialtyDoctors(specialty: MedicalSpecialty) {
+    const doctors = await this.prisma.doctorProfile.findMany({
+      where: {
+        specialty,
+        staffProfile: {
+          departmentId: { not: null },
+          user: { role: 'DOCTOR', status: 'ACTIVE' },
+          department: { status: 'ACTIVE', type: { in: ['EXAMINATION', 'CLINICAL'] } },
+        },
+      },
+      include: { staffProfile: { include: { department: true } } },
       orderBy: { staffProfile: { fullName: 'asc' } },
     });
 
@@ -298,8 +311,15 @@ export class PatientPortalService {
       staffProfileId: doctor.staffProfileId,
       fullName: doctor.staffProfile.fullName,
       specialty: doctor.specialty,
+      specialtyLabel: getMedicalSpecialtyLabel(doctor.specialty),
       qualification: doctor.qualification,
       yearsExperience: doctor.yearsExperience,
+      department: doctor.staffProfile.department ? {
+        id: doctor.staffProfile.department.id,
+        departmentCode: doctor.staffProfile.department.departmentCode,
+        name: doctor.staffProfile.department.name,
+        floor: doctor.staffProfile.department.floor,
+      } : null,
     }));
   }
 
@@ -335,20 +355,23 @@ export class PatientPortalService {
     await this.requireAccess(userId, dto.patientId, 'booking');
     const scheduledAt = new Date(dto.scheduledAt);
     this.assertBookableScheduledAt(scheduledAt);
-    await this.requireBookableDepartment(dto.departmentId);
 
-    let doctorStaffId: string | null = null;
-    if (dto.doctorId) {
-      const doctor = await this.prisma.doctorProfile.findUnique({
-        where: { id: dto.doctorId },
-        include: { staffProfile: true },
-      });
-      if (!doctor || doctor.staffProfile.departmentId !== dto.departmentId) {
-        throw new BadRequestException('Bác sĩ không thuộc chuyên khoa/phòng khám đã chọn.');
-      }
-      doctorStaffId = doctor.staffProfileId;
-      await this.assertDoctorSlotAvailable(dto.doctorId, scheduledAt);
+    const doctor = await this.prisma.doctorProfile.findUnique({
+      where: { id: dto.doctorId },
+      include: { staffProfile: { include: { department: true } } },
+    });
+    if (!doctor || doctor.staffProfile.userId === null || !doctor.staffProfile.departmentId || !doctor.staffProfile.department) {
+      throw new BadRequestException('Bác sĩ không hợp lệ để đặt lịch.');
     }
+    if (doctor.specialty !== dto.specialty) {
+      throw new BadRequestException('Bác sĩ không thuộc chuyên khoa đã chọn.');
+    }
+    if (doctor.staffProfile.department.status !== 'ACTIVE' || !['EXAMINATION', 'CLINICAL'].includes(doctor.staffProfile.department.type)) {
+      throw new BadRequestException('Phòng ban của bác sĩ không hợp lệ để đặt lịch.');
+    }
+    await this.assertDoctorSlotAvailable(dto.doctorId, scheduledAt);
+    const departmentId = doctor.staffProfile.departmentId;
+    const doctorStaffId = doctor.staffProfileId;
 
     const rawQrToken = this.generateQrToken();
     const qrTokenHash = this.hashQrToken(rawQrToken);
@@ -358,7 +381,7 @@ export class PatientPortalService {
         data: {
           appointmentCode,
           patientId: dto.patientId,
-          departmentId: dto.departmentId,
+          departmentId,
           doctorId: dto.doctorId ?? null,
           scheduledAt,
           reason: dto.reason?.trim() || null,

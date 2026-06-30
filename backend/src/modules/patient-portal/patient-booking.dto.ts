@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsISO8601, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { MedicalSpecialty } from '@prisma/client';
+import { IsDateString, IsEnum, IsISO8601, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class CreatePatientProfileFromPortalDto {
   @ApiProperty({ example: 'Nguyễn Văn A' })
@@ -51,14 +52,13 @@ export class CreateAppointmentDto {
   @IsUUID()
   patientId!: string;
 
-  @ApiProperty({ example: 'department-id' })
-  @IsUUID()
-  departmentId!: string;
+  @ApiProperty({ enum: MedicalSpecialty, example: MedicalSpecialty.CARDIOLOGY })
+  @IsEnum(MedicalSpecialty)
+  specialty!: MedicalSpecialty;
 
-  @ApiPropertyOptional({ example: 'doctor-profile-id' })
-  @IsOptional()
+  @ApiProperty({ example: 'doctor-profile-id' })
   @IsUUID()
-  doctorId?: string;
+  doctorId!: string;
 
   @ApiProperty({ example: '2026-06-30T08:30:00.000Z' })
   @IsISO8601()

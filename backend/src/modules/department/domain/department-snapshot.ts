@@ -12,6 +12,5 @@ export function buildDepartmentSnapshot(d: any) {
     canReceiveOrders: d.canReceiveOrders,
     description: d.description ?? null,
     managerId: d.managerId ?? null,
-    specialty: d.specialty ?? null,
   };
 }

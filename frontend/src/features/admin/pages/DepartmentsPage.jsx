@@ -19,45 +19,7 @@ const DEPARTMENT_TYPES = [
   { value: 'OTHER', label: 'Khác' },
 ];
 
-const SPECIALTIES = [
-  'Nội tổng quát',
-  'Ngoại tổng quát',
-  'Nhi khoa',
-  'Sản phụ khoa',
-  'Tim mạch',
-  'Tai Mũi Họng',
-  'Răng Hàm Mặt',
-  'Mắt',
-  'Da liễu',
-  'Thần kinh',
-  'Chấn thương chỉnh hình',
-  'Tiêu hóa',
-  'Nội tiết',
-  'Ung bướu',
-  'Hô hấp'
-];
-
-const LAB_TEST_TYPES = [
-  'Xét nghiệm Máu (Công thức máu, Sinh hóa, Đông máu)',
-  'Xét nghiệm Nước tiểu',
-  'Xét nghiệm Phân',
-  'Xét nghiệm Vi sinh (Nuôi cấy, Soi tươi)',
-  'Xét nghiệm Sinh học phân tử (PCR, ADN)',
-  'Giải phẫu bệnh & Tế bào học',
-  'Xét nghiệm Miễn dịch & Dị ứng'
-];
-
-const IMAGING_DIAGNOSIS_TYPES = [
-  'X-Ray',
-  'MRI',
-  'CT Scan',
-  'Siêu âm',
-  'ECG / Điện tâm đồ',
-  'Nội soi hình ảnh',
-  'Chẩn đoán da liễu từ ảnh'
-];
-
-const emptyForm = { departmentCode: '', name: '', floor: '', status: 'ACTIVE', type: 'EXAMINATION', canReceiveOrders: false, description: '', specialty: '' };
+const emptyForm = { departmentCode: '', name: '', floor: '', status: 'ACTIVE', type: 'EXAMINATION', canReceiveOrders: false, description: '' };
 const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100', INACTIVE: 'bg-rose-50 text-rose-700 border-rose-100' };
 const orderTone = { true: 'bg-cyan-50 text-cyan-700 border-cyan-100', false: 'bg-slate-50 text-slate-600 border-slate-100' };
 const STATUS_LABELS = { ACTIVE: 'Đang hoạt động', INACTIVE: 'Ngưng hoạt động', PENDING: 'Chờ kích hoạt' };
@@ -137,7 +99,6 @@ export default function DepartmentsPage() {
       type: department.type || 'EXAMINATION',
       canReceiveOrders: Boolean(department.canReceiveOrders),
       description: department.description || '',
-      specialty: department.specialty || '',
     });
     setIsModalOpen(true);
   };
@@ -152,7 +113,6 @@ export default function DepartmentsPage() {
       floor: form.floor || undefined,
       description: form.description || undefined,
       canReceiveOrders: canDepartmentReceiveOrders(form.type) && Boolean(form.canReceiveOrders),
-      specialty: ['EXAMINATION', 'CLINICAL', 'LABORATORY', 'IMAGING'].includes(form.type) ? (form.specialty || undefined) : undefined,
     };
     setBusy(true);
     try {
@@ -256,7 +216,7 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
 
   const visibleDepartments = departments.filter((dep) => {
     const keyword = search.trim().toLowerCase();
-    const matchesKeyword = !keyword || [dep.name, dep.departmentCode, dep.specialty, dep.manager?.fullName]
+    const matchesKeyword = !keyword || [dep.name, dep.departmentCode, dep.manager?.fullName]
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(keyword));
     const matchesType = !typeFilter || dep.type === typeFilter;
@@ -322,7 +282,7 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
                     <h4 className="mt-1 truncate text-base font-black text-slate-950">{dep.name}</h4>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <span className="rounded-lg bg-cyan-50 px-2 py-1 text-[10px] font-black text-cyan-700">{getTypeLabel(dep.type)}</span>
-                      {dep.specialty && <span className="rounded-lg bg-cyan-50 px-2 py-1 text-[10px] font-black text-cyan-700">{dep.specialty}</span>}
+
                       <span className={`rounded-lg border px-2 py-1 text-[10px] font-black ${orderTone[String(Boolean(dep.canReceiveOrders))]}`}>{dep.canReceiveOrders ? 'Nhận chỉ định' : 'Không nhận chỉ định'}</span>
                     </div>
                     <p className="mt-2 line-clamp-1 text-xs font-semibold text-slate-400">{dep.description || 'Chưa có mô tả'}</p>
@@ -384,7 +344,7 @@ function DepartmentDetail({ department, staffs, onGoStaff, onClose }) {
             <span className={`rounded-xl border px-3 py-1 text-xs font-black ${statusTone[department.status] || statusTone.ACTIVE}`}>{getStatusLabel(department.status)}</span>
             <BlockchainStatusBadge status={department.blockchainStatus} prefix="Blockchain: " />
             <span className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-1.5 text-xs font-black text-cyan-700">{getTypeLabel(department.type)}</span>
-            {department.specialty && <span className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-1.5 text-xs font-black text-cyan-700">{department.specialty}</span>}
+
             <span className={`rounded-xl border px-3 py-1.5 text-xs font-black ${orderTone[String(Boolean(department.canReceiveOrders))]}`}>{department.canReceiveOrders ? 'Có thể nhận phiếu chỉ định' : 'Không nhận phiếu chỉ định'}</span>
           </div>
 
@@ -483,7 +443,7 @@ function DepartmentHistory({ departmentId }) {
     </div>
   );
 }
-function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing }) { const canReceiveOrders = canDepartmentReceiveOrders(form.type); return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm"><form onSubmit={onSubmit} className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl space-y-4"><div className="flex items-start justify-between"><div><p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.18em]">Thiết lập phòng ban</p><h3 className="text-2xl font-black text-slate-950">{editing ? 'Cập nhật phòng ban' : 'Tạo phòng ban'}</h3><p className="text-sm text-slate-500">Khai báo mã, phân loại, quyền nhận chỉ định và nhiệm vụ.</p></div><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500">Đóng</button></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Input label="Mã phòng ban" value={form.departmentCode} onChange={(v) => setForm({ ...form, departmentCode: v })} placeholder="PB-XRAY" required /><Input label="Tên phòng ban" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="X-Ray, MRI, Lễ tân..." required /><Input label="Tầng" value={form.floor} onChange={(v) => setForm({ ...form, floor: v })} placeholder="VD: 2" /><Select label="Loại phòng ban" value={form.type} onChange={(v) => setForm({ ...form, type: v, canReceiveOrders: canDepartmentReceiveOrders(v) ? form.canReceiveOrders : false, specialty: ['EXAMINATION', 'CLINICAL', 'LABORATORY', 'IMAGING'].includes(v) ? form.specialty : '' })} options={DEPARTMENT_TYPES} />{['EXAMINATION', 'CLINICAL'].includes(form.type) && <Select label="Chuyên khoa" value={form.specialty} onChange={(v) => setForm({ ...form, specialty: v })} options={[{ value: '', label: 'Chọn chuyên khoa' }, ...SPECIALTIES.map(s => ({ value: s, label: s }))]} required />}{form.type === 'LABORATORY' && <Select label="Loại xét nghiệm" value={form.specialty} onChange={(v) => setForm({ ...form, specialty: v })} options={[{ value: '', label: 'Chọn loại xét nghiệm' }, ...LAB_TEST_TYPES.map(l => ({ value: l, label: l }))]} required />}{form.type === 'IMAGING' && <Select label="Loại chẩn đoán hình ảnh" value={form.specialty} onChange={(v) => setForm({ ...form, specialty: v })} options={[{ value: '', label: 'Chọn loại chẩn đoán hình ảnh' }, ...IMAGING_DIAGNOSIS_TYPES.map(i => ({ value: i, label: i }))]} required />}{canReceiveOrders && <label className="rounded-2xl border border-cyan-100 bg-cyan-50/60 p-4 flex items-start gap-3"><input type="checkbox" checked={Boolean(form.canReceiveOrders)} onChange={(e) => setForm({ ...form, canReceiveOrders: e.target.checked })} className="mt-1 h-4 w-4" /><span><strong className="block text-sm text-cyan-800">Nhận phiếu chỉ định</strong><small className="mt-1 block text-xs font-semibold text-cyan-600">Bật cho Xét nghiệm, X-Ray, MRI, Siêu âm, Nhà thuốc để hiện trong biểu mẫu bác sĩ.</small></span></label>}</div><Textarea label="Mô tả nhiệm vụ" value={form.description} onChange={(v) => setForm({ ...form, description: v })} placeholder="Mô tả chức năng phòng ban" /><button disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 disabled:opacity-70">{busy && <LoadingIndicator size="sm" tone="white" />}{editing ? 'Lưu thay đổi' : 'Tạo phòng ban'}</button></form></div>; }
+function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing }) { const canReceiveOrders = canDepartmentReceiveOrders(form.type); return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm"><form onSubmit={onSubmit} className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl space-y-4"><div className="flex items-start justify-between"><div><p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.18em]">Thiết lập phòng ban</p><h3 className="text-2xl font-black text-slate-950">{editing ? 'Cập nhật phòng ban' : 'Tạo phòng ban'}</h3><p className="text-sm text-slate-500">Khai báo mã, phân loại, quyền nhận chỉ định và nhiệm vụ. Chuyên khoa được cấu hình ở hồ sơ bác sĩ.</p></div><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500">Đóng</button></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Input label="Mã phòng ban" value={form.departmentCode} onChange={(v) => setForm({ ...form, departmentCode: v })} placeholder="PB-XRAY" required /><Input label="Tên phòng ban" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="X-Ray, MRI, Lễ tân..." required /><Input label="Tầng" value={form.floor} onChange={(v) => setForm({ ...form, floor: v })} placeholder="VD: 2" /><Select label="Loại phòng ban" value={form.type} onChange={(v) => setForm({ ...form, type: v, canReceiveOrders: canDepartmentReceiveOrders(v) ? form.canReceiveOrders : false })} options={DEPARTMENT_TYPES} />{canReceiveOrders && <label className="rounded-2xl border border-cyan-100 bg-cyan-50/60 p-4 flex items-start gap-3"><input type="checkbox" checked={Boolean(form.canReceiveOrders)} onChange={(e) => setForm({ ...form, canReceiveOrders: e.target.checked })} className="mt-1 h-4 w-4" /><span><strong className="block text-sm text-cyan-800">Nhận phiếu chỉ định</strong><small className="mt-1 block text-xs font-semibold text-cyan-600">Bật cho Xét nghiệm, X-Ray, MRI, Siêu âm, Nhà thuốc để hiện trong biểu mẫu bác sĩ.</small></span></label>}</div><Textarea label="Mô tả nhiệm vụ" value={form.description} onChange={(v) => setForm({ ...form, description: v })} placeholder="Mô tả chức năng phòng ban" /><button disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 disabled:opacity-70">{busy && <LoadingIndicator size="sm" tone="white" />}{editing ? 'Lưu thay đổi' : 'Tạo phòng ban'}</button></form></div>; }
 function InfoBox({ label, value }) { return <div className="rounded-xl bg-white border border-slate-100 p-3"><p className="text-[11px] uppercase tracking-wider font-black text-slate-400">{label}</p><p className="mt-1 text-sm font-bold text-slate-800">{value}</p></div>; }
 function MiniMetric({ label, value }) { return <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className="mt-0.5 text-sm font-black text-slate-800">{value}</p></div>; }
 function Alert({ children }) { return <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">{children}</div>; }

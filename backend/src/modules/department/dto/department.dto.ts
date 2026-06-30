@@ -10,7 +10,7 @@ export class CreateDepartmentDto {
   @MaxLength(32)
   departmentCode!: string;
 
-  @ApiProperty({ example: 'Cardiology', maxLength: 120 })
+  @ApiProperty({ example: 'Phòng khám tổng quát', maxLength: 120 })
   @IsString()
   @MaxLength(120)
   name!: string;
@@ -31,10 +31,6 @@ export class CreateDepartmentDto {
   @IsEnum(DepartmentType)
   type?: DepartmentType;
 
-  @ApiPropertyOptional({ example: 'Cardiology' })
-  @IsOptional()
-  @IsString()
-  specialty?: string;
 
 
   @ApiPropertyOptional({ example: false })
@@ -62,7 +58,7 @@ export class UpdateDepartmentDto {
   @MaxLength(32)
   departmentCode?: string;
 
-  @ApiPropertyOptional({ example: 'Cardiology', maxLength: 120 })
+  @ApiPropertyOptional({ example: 'Phòng khám tổng quát', maxLength: 120 })
   @IsOptional()
   @IsString()
   @MaxLength(120)
@@ -84,10 +80,6 @@ export class UpdateDepartmentDto {
   @IsEnum(DepartmentType)
   type?: DepartmentType;
 
-  @ApiPropertyOptional({ example: 'Cardiology' })
-  @IsOptional()
-  @IsString()
-  specialty?: string;
 
 
   @ApiPropertyOptional({ example: false })

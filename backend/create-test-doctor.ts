@@ -1,3 +1,4 @@
+import { MedicalSpecialty } from '@prisma/client';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './src/app.module';
 import { DoctorService } from './src/modules/doctor/services/doctor.service';
@@ -15,7 +16,7 @@ async function test() {
       citizenId: '999999999999',
       birthDate: '1990-01-01',
       avatarUrl: 'https://avatar.url',
-      specialty: 'Pediatrics',
+      specialty: MedicalSpecialty.PEDIATRICS,
       licenseNumber: 'VN-MOH-999999',
       qualification: 'MD',
       yearsExperience: 5,

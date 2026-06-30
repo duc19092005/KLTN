@@ -1,10 +1,11 @@
+import { MedicalSpecialty } from '@prisma/client';
 import { CreateDoctorDto, CreateDoctorWithStaffDto, UpdateDoctorDto } from '../../dto/doctor.dto';
 
 /** DI token for the Doctor repository port. */
 export const DOCTOR_REPOSITORY = Symbol('DOCTOR_REPOSITORY');
 
 export type DoctorListFilter = {
-  specialty?: string;
+  specialty?: MedicalSpecialty;
   search?: string;
 };
 
@@ -24,7 +25,7 @@ export interface DoctorRepositoryPort {
   findByIdWithRelations(id: string): Promise<any | null>;
   findStaffForDoctorCreate(staffProfileId: string): Promise<StaffForDoctorCreate | null>;
   departmentExists(id: string): Promise<boolean>;
-  findDepartment(id: string): Promise<{ id: string; type: string; specialty?: string | null } | null>;
+  findDepartment(id: string): Promise<{ id: string; type: string } | null>;
 
   findDoctorByLicense(licenseNumber: string): Promise<{ id: string } | null>;
   findStaffByCitizenId(citizenId: string): Promise<{ id: string } | null>;

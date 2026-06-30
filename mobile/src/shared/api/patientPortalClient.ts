@@ -101,8 +101,8 @@ export type CreatePatientProfilePayload = {
   emergencyContact?: string;
 };
 
-export type BookableDepartment = { id: string; departmentCode: string; name: string; floor?: string | null; specialty?: string | null; description?: string | null };
-export type BookableDoctor = { id: string; staffProfileId: string; fullName: string; specialty?: string | null; qualification?: string | null; yearsExperience?: number | null };
+export type BookableSpecialty = { value: string; label: string; doctorCount: number };
+export type BookableDoctor = { id: string; staffProfileId: string; fullName: string; specialty?: string | null; specialtyLabel?: string | null; qualification?: string | null; yearsExperience?: number | null; department?: { id: string; departmentCode?: string | null; name: string; floor?: string | null } | null };
 export type AppointmentSlot = { startAt: string; available: boolean };
 
 export type PatientAppointment = {
@@ -123,8 +123,8 @@ export type PatientAppointment = {
 
 export type CreateAppointmentPayload = {
   patientId: string;
-  departmentId: string;
-  doctorId?: string;
+  specialty: string;
+  doctorId: string;
   scheduledAt: string;
   reason?: string;
   symptoms?: string;
@@ -175,12 +175,12 @@ export function getPatientResultFileDownloadUrl(token: string, patientId: string
   return request<PatientFileDownload>(`/patient/me/profiles/${encodeURIComponent(patientId)}/files/${encodeURIComponent(fileId)}/download`, token);
 }
 
-export function getBookableDepartments(token: string) {
-  return request<BookableDepartment[]>('/patient/me/booking/departments', token);
+export function getBookableSpecialties(token: string) {
+  return request<BookableSpecialty[]>('/patient/me/booking/specialties', token);
 }
 
-export function getBookableDoctors(token: string, departmentId: string) {
-  return request<BookableDoctor[]>(`/patient/me/booking/departments/${encodeURIComponent(departmentId)}/doctors`, token);
+export function getBookableDoctorsBySpecialty(token: string, specialty: string) {
+  return request<BookableDoctor[]>(`/patient/me/booking/specialties/${encodeURIComponent(specialty)}/doctors`, token);
 }
 
 export function getAppointmentSlots(token: string, doctorId: string, date: string) {

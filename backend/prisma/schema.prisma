@@ -63,6 +63,24 @@ enum LabSpecialty {
   BOTH
 }
 
+enum MedicalSpecialty {
+  GENERAL_INTERNAL_MEDICINE
+  GENERAL_SURGERY
+  PEDIATRICS
+  OBSTETRICS_GYNECOLOGY
+  CARDIOLOGY
+  ENT
+  DENTOMAXILLOFACIAL
+  OPHTHALMOLOGY
+  DERMATOLOGY
+  NEUROLOGY
+  ORTHOPEDICS
+  GASTROENTEROLOGY
+  ENDOCRINOLOGY
+  ONCOLOGY
+  RESPIRATORY
+}
+
 enum AppointmentStatus {
   PENDING
   CONFIRMED
@@ -137,7 +155,6 @@ model Department {
   type             DepartmentType @default(CLINICAL)
   canReceiveOrders Boolean        @default(false)
   description      String?
-  specialty        String?
   managerId        String?        @unique
 
   manager        StaffProfile?  @relation("DepartmentManager", fields: [managerId], references: [id])
@@ -205,7 +222,7 @@ model DoctorProfile {
   staffProfileId  String       @unique
   staffProfile    StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
 
-  specialty       String
+  specialty       MedicalSpecialty
   licenseNumber   String       @unique
   qualification   String
   yearsExperience Int?

@@ -29,10 +29,10 @@ export class PrismaStaffRepository implements StaffRepositoryPort {
     return Boolean(await this.prisma.department.findUnique({ where: { id }, select: { id: true } }));
   }
 
-  async findDepartment(id: string): Promise<{ id: string; type: string; specialty?: string | null } | null> {
-    const dept = await this.prisma.department.findUnique({ where: { id }, select: { id: true, type: true, specialty: true } });
+  async findDepartment(id: string): Promise<{ id: string; type: string } | null> {
+    const dept = await this.prisma.department.findUnique({ where: { id }, select: { id: true, type: true } });
     if (!dept) return null;
-    return { id: dept.id, type: dept.type, specialty: dept.specialty };
+    return { id: dept.id, type: dept.type };
   }
 
   async findUserByUsernameOrEmail(username?: string, email?: string) {

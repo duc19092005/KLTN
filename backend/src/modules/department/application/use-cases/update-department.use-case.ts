@@ -28,10 +28,6 @@ export class UpdateDepartmentUseCase {
       }
     }
     const before = buildDepartmentSnapshot(existing);
-    const targetType = dto.type || existing.type;
-    const specialtyValue = (targetType === 'EXAMINATION' || targetType === 'CLINICAL' || targetType === 'LABORATORY')
-      ? (dto.specialty !== undefined ? dto.specialty : existing.specialty)
-      : null;
 
     const department = await this.repo.update(id, {
       departmentCode: dto.departmentCode,
@@ -41,7 +37,6 @@ export class UpdateDepartmentUseCase {
       type: dto.type,
       canReceiveOrders: dto.canReceiveOrders,
       description: dto.description,
-      specialty: specialtyValue,
     });
 
     await this.integrity.anchorChange(department, 'UPDATE', actorId, before);

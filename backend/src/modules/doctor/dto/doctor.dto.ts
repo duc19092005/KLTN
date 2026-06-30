@@ -1,14 +1,15 @@
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class-validator';
+import { MedicalSpecialty } from '@prisma/client';
+import { IsDateString, IsEmail, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class-validator';
 import { PaginationQueryDto } from '../../shared/pagination.dto';
 
 export class CreateDoctorDto {
   @ApiProperty({ example: '0d82b56f-5d0a-4501-bd18-bb9af91e90d7' })
   @IsString() @IsUUID() staffProfileId!: string;
 
-  @ApiProperty({ example: 'Cardiology' })
-  @IsString() specialty!: string;
+  @ApiProperty({ enum: MedicalSpecialty, example: MedicalSpecialty.CARDIOLOGY })
+  @IsEnum(MedicalSpecialty) specialty!: MedicalSpecialty;
 
   @ApiProperty({ example: 'VN-MOH-123456' })
   @IsString() licenseNumber!: string;
@@ -54,8 +55,8 @@ export class CreateDoctorWithStaffDto {
   @ApiPropertyOptional({ example: 'Senior Doctor' })
   @IsOptional() @IsString() position?: string;
 
-  @ApiProperty({ example: 'Cardiology' })
-  @IsString() specialty!: string;
+  @ApiProperty({ enum: MedicalSpecialty, example: MedicalSpecialty.CARDIOLOGY })
+  @IsEnum(MedicalSpecialty) specialty!: MedicalSpecialty;
 
   @ApiProperty({ example: 'VN-MOH-123456' })
   @IsString() licenseNumber!: string;
@@ -69,8 +70,8 @@ export class CreateDoctorWithStaffDto {
 }
 
 export class UpdateDoctorDto {
-  @ApiPropertyOptional({ example: 'Neurology' })
-  @IsOptional() @IsString() specialty?: string;
+  @ApiPropertyOptional({ enum: MedicalSpecialty, example: MedicalSpecialty.NEUROLOGY })
+  @IsOptional() @IsEnum(MedicalSpecialty) specialty?: MedicalSpecialty;
 
   @ApiPropertyOptional({ example: 'VN-MOH-654321' })
   @IsOptional() @IsString() licenseNumber?: string;
@@ -111,6 +112,6 @@ export class UpdateDoctorDto {
 }
 
 export class DoctorQueryDto extends PaginationQueryDto {
-  @ApiPropertyOptional({ example: 'Cardiology' })
-  @IsOptional() @IsString() specialty?: string;
+  @ApiPropertyOptional({ enum: MedicalSpecialty, example: MedicalSpecialty.CARDIOLOGY })
+  @IsOptional() @IsEnum(MedicalSpecialty) specialty?: MedicalSpecialty;
 }

@@ -12,22 +12,26 @@ import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
 
 const SPECIALTIES = [
-  'Nội tổng quát',
-  'Ngoại tổng quát',
-  'Nhi khoa',
-  'Sản phụ khoa',
-  'Tim mạch',
-  'Tai Mũi Họng',
-  'Răng Hàm Mặt',
-  'Mắt',
-  'Da liễu',
-  'Thần kinh',
-  'Chấn thương chỉnh hình',
-  'Tiêu hóa',
-  'Nội tiết',
-  'Ung bướu',
-  'Hô hấp'
+  { value: 'GENERAL_INTERNAL_MEDICINE', label: 'Nội tổng quát' },
+  { value: 'GENERAL_SURGERY', label: 'Ngoại tổng quát' },
+  { value: 'PEDIATRICS', label: 'Nhi khoa' },
+  { value: 'OBSTETRICS_GYNECOLOGY', label: 'Sản phụ khoa' },
+  { value: 'CARDIOLOGY', label: 'Tim mạch' },
+  { value: 'ENT', label: 'Tai Mũi Họng' },
+  { value: 'DENTOMAXILLOFACIAL', label: 'Răng Hàm Mặt' },
+  { value: 'OPHTHALMOLOGY', label: 'Mắt' },
+  { value: 'DERMATOLOGY', label: 'Da liễu' },
+  { value: 'NEUROLOGY', label: 'Thần kinh' },
+  { value: 'ORTHOPEDICS', label: 'Chấn thương chỉnh hình' },
+  { value: 'GASTROENTEROLOGY', label: 'Tiêu hóa' },
+  { value: 'ENDOCRINOLOGY', label: 'Nội tiết' },
+  { value: 'ONCOLOGY', label: 'Ung bướu' },
+  { value: 'RESPIRATORY', label: 'Hô hấp' },
 ];
+
+function getSpecialtyLabel(value) {
+  return SPECIALTIES.find((item) => item.value === value)?.label || value || 'N/A';
+}
 
 const DOCTOR_POSITIONS = [
   'Bác sĩ',
@@ -234,7 +238,7 @@ function DoctorRow({ doctor, onEdit, onViewDetails, busy }) {
             <span className="text-xs text-slate-500">{doctor.staffProfile?.user?.email}</span>
           </div>
         </div>
-        <Info label="Chuyên khoa" value={doctor.specialty} />
+        <Info label="Chuyên khoa" value={getSpecialtyLabel(doctor.specialty)} />
         <Info label="Phòng khám" value={doctor.staffProfile?.department?.name || 'Chưa gán'} />
         <div>
           <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Trạng thái dữ liệu</p>

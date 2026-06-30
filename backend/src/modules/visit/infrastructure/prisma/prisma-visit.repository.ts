@@ -133,13 +133,13 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
     const where: Prisma.DepartmentWhereInput = {
       status: 'ACTIVE',
       type: 'EXAMINATION',
-      ...(specialty ? { specialty: { contains: specialty, mode: 'insensitive' } } : {}),
+      ...(specialty ? { staffs: { some: { doctorProfile: { specialty: specialty as any }, user: { role: 'DOCTOR', status: 'ACTIVE' } } } } : {}),
     };
     return this.prisma.department.findMany({
       where,
       include: {
         staffs: {
-          where: { user: { role: 'DOCTOR', status: 'ACTIVE' } },
+          where: { user: { role: 'DOCTOR', status: 'ACTIVE' }, ...(specialty ? { doctorProfile: { specialty: specialty as any } } : {}) },
           include: { user: { select: this.safeUserSelect() }, doctorProfile: true },
         },
       },

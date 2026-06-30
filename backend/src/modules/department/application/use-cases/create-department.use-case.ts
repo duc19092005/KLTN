@@ -59,7 +59,6 @@ export class CreateDepartmentUseCase {
       canReceiveOrders: dto.canReceiveOrders ?? false,
       description: dto.description,
       managerId: dto.managerId || null,
-      specialty: dto.specialty || null,
     });
 
     await this.integrity.anchorChange(department, 'CREATE', actorId, null);

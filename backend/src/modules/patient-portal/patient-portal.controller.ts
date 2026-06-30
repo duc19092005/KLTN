@@ -67,15 +67,15 @@ export class PatientPortalController {
   }
 
   @Roles('PATIENT')
-  @Get('patient/me/booking/departments')
-  bookableDepartments() {
-    return this.patientPortalService.getBookableDepartments();
+  @Get('patient/me/booking/specialties')
+  bookableSpecialties() {
+    return this.patientPortalService.getBookableSpecialties();
   }
 
   @Roles('PATIENT')
-  @Get('patient/me/booking/departments/:departmentId/doctors')
-  departmentDoctors(@Param('departmentId') departmentId: string) {
-    return this.patientPortalService.getDepartmentDoctors(departmentId);
+  @Get('patient/me/booking/specialties/:specialty/doctors')
+  specialtyDoctors(@Param('specialty') specialty: string) {
+    return this.patientPortalService.getSpecialtyDoctors(specialty as any);
   }
 
   @Roles('PATIENT')

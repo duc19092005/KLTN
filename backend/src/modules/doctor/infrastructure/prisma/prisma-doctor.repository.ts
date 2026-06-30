@@ -34,10 +34,10 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
     return Boolean(await this.prisma.department.findUnique({ where: { id }, select: { id: true } }));
   }
 
-  async findDepartment(id: string): Promise<{ id: string; type: string; specialty?: string | null } | null> {
-    const dept = await this.prisma.department.findUnique({ where: { id }, select: { id: true, type: true, specialty: true } });
+  async findDepartment(id: string): Promise<{ id: string; type: string } | null> {
+    const dept = await this.prisma.department.findUnique({ where: { id }, select: { id: true, type: true } });
     if (!dept) return null;
-    return { id: dept.id, type: dept.type, specialty: dept.specialty };
+    return { id: dept.id, type: dept.type };
   }
 
   async findDoctorByLicense(licenseNumber: string) {
@@ -110,8 +110,8 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
 
   async findManyPaginated(filter: DoctorListFilter, skip: number, take: number) {
     const where: Prisma.DoctorProfileWhereInput = {
-      ...(filter.specialty ? { specialty: { contains: filter.specialty, mode: 'insensitive' } } : {}),
-      ...(filter.search ? { OR: [{ specialty: { contains: filter.search, mode: 'insensitive' } }, { licenseNumber: { contains: filter.search, mode: 'insensitive' } }, { staffProfile: { fullName: { contains: filter.search, mode: 'insensitive' } } }] } : {}),
+      ...(filter.specialty ? { specialty: filter.specialty } : {}),
+      ...(filter.search ? { OR: [{ licenseNumber: { contains: filter.search, mode: 'insensitive' } }, { staffProfile: { fullName: { contains: filter.search, mode: 'insensitive' } } }] } : {}),
     };
     const [items, total] = await this.prisma.$transaction([
       this.prisma.doctorProfile.findMany({ where, include: this.includeRelations(), orderBy: { createdAt: 'desc' }, skip, take }),
@@ -138,7 +138,7 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
       return tx.doctorProfile.update({
         where: { id },
         data: {
-          ...(dto.specialty !== undefined ? { specialty: dto.specialty.trim() } : {}),
+          ...(dto.specialty !== undefined ? { specialty: dto.specialty } : {}),
           ...(dto.licenseNumber !== undefined ? { licenseNumber: dto.licenseNumber.trim() } : {}),
           ...(dto.qualification !== undefined ? { qualification: dto.qualification.trim() } : {}),
           ...(dto.yearsExperience !== undefined ? { yearsExperience: Number(dto.yearsExperience) } : {}),
@@ -158,11 +158,11 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
   }
 
   private toCreateData(dto: CreateDoctorDto): Prisma.DoctorProfileUncheckedCreateInput {
-    return { staffProfileId: dto.staffProfileId, specialty: dto.specialty.trim(), licenseNumber: dto.licenseNumber.trim(), qualification: dto.qualification.trim(), yearsExperience: dto.yearsExperience === undefined ? null : Number(dto.yearsExperience) };
+    return { staffProfileId: dto.staffProfileId, specialty: dto.specialty, licenseNumber: dto.licenseNumber.trim(), qualification: dto.qualification.trim(), yearsExperience: dto.yearsExperience === undefined ? null : Number(dto.yearsExperience) };
   }
 
   private toNestedCreateData(dto: Pick<CreateDoctorWithStaffDto, 'specialty' | 'licenseNumber' | 'qualification' | 'yearsExperience'>): Prisma.DoctorProfileCreateWithoutStaffProfileInput {
-    return { specialty: dto.specialty.trim(), licenseNumber: dto.licenseNumber.trim(), qualification: dto.qualification.trim(), yearsExperience: dto.yearsExperience === undefined ? null : Number(dto.yearsExperience) };
+    return { specialty: dto.specialty, licenseNumber: dto.licenseNumber.trim(), qualification: dto.qualification.trim(), yearsExperience: dto.yearsExperience === undefined ? null : Number(dto.yearsExperience) };
   }
 
   private includeRelations() {

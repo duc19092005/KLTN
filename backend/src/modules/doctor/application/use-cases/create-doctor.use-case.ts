@@ -27,9 +27,6 @@ export class CreateDoctorUseCase {
         if (dept.type !== 'EXAMINATION' && dept.type !== 'CLINICAL') {
           throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng khám hoặc lâm sàng.');
         }
-        if (dept.specialty && dept.specialty !== dto.specialty) {
-          throw new BadRequestException(`Bác sĩ chuyên khoa "${dto.specialty}" không thể được xếp vào phòng ban chuyên khoa "${dept.specialty}"`);
-        }
       }
     }
 
