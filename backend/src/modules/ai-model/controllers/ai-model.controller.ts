@@ -5,14 +5,12 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
-import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
-import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
 import { AiModelQueryDto, CreateAiModelDto, TestAiModelApiDto, RateAiModelDto, UpdateAiModelDto } from '../dto/ai-model.dto';
 import { AiModelService } from '../services/ai-model.service';
 
 @ApiTags('AI Model Registry')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('ai-models')
 export class AiModelController {
   constructor(private readonly service: AiModelService) {}
@@ -37,7 +35,6 @@ export class AiModelController {
 
   @Roles('ADMIN')
   @Delete(':id')
-  @RequireFaceStepUp('DELETE_AI_MODEL')
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.service.remove(id, user.sub);
   }

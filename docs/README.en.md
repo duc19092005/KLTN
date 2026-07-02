@@ -3,7 +3,6 @@
 # Documentation Index
 
 > [!TIP]
-> Just want a fast overview? Read [**SUMMARY.en.md**](./SUMMARY.en.md) — a one-page technical summary covering architecture, security model, and backup/recovery in English.
 
 Documentation for the KLTN Hospital Management System, organized by topic.
 
@@ -23,23 +22,16 @@ Documentation for the KLTN Hospital Management System, organized by topic.
 | [Tiers & Anchoring Policy](./security/tiers-and-anchoring.md) | Backend + Frontend | Step-up Tier A/B, immediate vs batch-5min anchoring |
 | [Audit Logging & Tamper-Evidence](./security/audit-logging.md) | Backend | Hash chain + Merkle anchoring mechanism |
 
-## 💾 [Backup & Recovery](./backup-recovery/)
 
 | Document | Scope | Content |
 |---|---|---|
-| [Backup & Recovery Overview](./backup-recovery/overview.md) | Backend + Frontend | Cron 02:00, manual backup, surgical restore, two HTML tools |
-| [Backup & Restore CLI](./backup-recovery/backup-restore-cli.md) | Backend | `npm run db:backup` & restore workflow |
-| [Emergency Restore (out-of-band)](./backup-recovery/emergency-restore.md) | Backend + Tools | Last-resort path: SSH + recovery-signer out-of-band |
 
 > [!NOTE]
-> The documents under `architecture/`, `security/`, and `backup-recovery/` are deep technical references kept in Vietnamese only. For an English overview, read [`SUMMARY.en.md`](./SUMMARY.en.md).
 
 ## 🛠️ Standalone tools
 
 | Tool | Purpose |
 |---|---|
-| [tools/break-glass-viewer](../tools/break-glass-viewer/README.en.md) | Verify the backup ledger offline (read-only) |
-| [tools/recovery-signer](../tools/recovery-signer/README.en.md) | Out-of-band Web3 signing to restore the DB (write) |
 
 ## 📦 Module-level READMEs
 

@@ -11,7 +11,6 @@
     "prisma:migrate": "npx prisma migrate dev",
     "prisma:push": "npx prisma db push",
     "prisma:seed": "ts-node prisma/seed.ts",
-    "db:emergency-restore": "ts-node src/scripts/emergency-restore.ts",
     "audit:v2:reset:dev": "ts-node src/scripts/reset-audit-v2-dev.ts",
     "test": "jest",
     "test:e2e": "jest --config ./test/jest-e2e.json"

@@ -1,10 +1,8 @@
-import { Controller, Get, Param, Post, Query, UseGuards, NotFoundException, Req } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query, UseGuards, NotFoundException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
-import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
-import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
 import { AuditLoggerService } from '../../../infrastructure/audit/audit-logger.service';
 import { AuditAnchorService } from '../../../infrastructure/audit/audit-anchor.service';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -23,7 +21,7 @@ import { buildAuditEncryptionAad, decryptAuditSnapshot } from '../../../infrastr
  *  - proof:      Merkle inclusion proof for a single log, independently verifiable.
  *  - anchorNow:  force-seal+commit the current batch (Tier-A / on-demand).
  */
-@UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
 @ApiTags('Audit & Integrity')
 @ApiBearerAuth()
@@ -136,9 +134,8 @@ export class AuditController {
   }
 
   @Get('logs/:seq')
-  @RequireFaceStepUp('AUDIT_DETAIL')
   @ApiOperation({ summary: 'Get one audit log with readable diff and V2 verification details' })
-  async logDetail(@Param('seq') seq: string, @CurrentUser() user?: AuthUser, @Req() req?: any) {
+  async logDetail(@Param('seq') seq: string, @CurrentUser() user?: AuthUser) {
     const row = await this.prisma.blockchainLogger.findFirst({ where: { seq: Number(seq) } });
     if (!row) throw new NotFoundException('Không tìm thấy audit log.');
 
@@ -156,9 +153,8 @@ export class AuditController {
         })
       : null;
 
-    const faceVerified = req?.stepUp?.verified === true && req?.stepUp?.action === 'AUDIT_DETAIL';
     const subject = await this.resolveSubjectContext(row);
-    return this.presentAuditRow(row, actor, user, true, faceVerified, subject);
+    return this.presentAuditRow(row, actor, user, true, true, subject);
   }
 
   @Get('logs/:seq/proof')
@@ -168,8 +164,7 @@ export class AuditController {
   }
 
   @Post('anchor-now')
-  @RequireFaceStepUp('ANCHOR_BLOCKCHAIN')
-  @ApiOperation({ summary: 'Force-seal the pending batch and commit its Merkle root on-chain (requires face step-up)' })
+  @ApiOperation({ summary: 'Force-seal the pending batch and commit its Merkle root on-chain' })
   anchorNow() {
     return this.anchor.anchorNow();
   }

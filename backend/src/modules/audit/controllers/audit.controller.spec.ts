@@ -150,8 +150,7 @@ describe('AuditController readable V2 diff', () => {
   it('returns detail with verification and decrypted snapshots for admin step-up context', async () => {
     const { controller } = setup();
 
-    const reqMock = { stepUp: { verified: true, action: 'AUDIT_DETAIL' } };
-    const result: any = await controller.logDetail('1', { sub: 'admin-1', role: 'ADMIN' } as any, reqMock as any);
+    const result: any = await controller.logDetail('1', { sub: 'admin-1', role: 'ADMIN' } as any);
 
     expect(result.verification).toMatchObject({ ok: true, status: 'VERIFIED', version: 'V2' });
     expect(result.encryptedSnapshots.before).toMatchObject({ alg: 'AES-256-GCM', keyId: 'audit-key-test', ciphertextPresent: true });

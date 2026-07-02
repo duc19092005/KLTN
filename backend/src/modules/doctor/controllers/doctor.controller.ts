@@ -7,12 +7,11 @@ import { Roles } from '../../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
 import { RolesGuard } from '../../auth/guards/roles.guard';
-import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
 import { CreateDoctorDto, CreateDoctorWithStaffDto, DoctorQueryDto, UpdateDoctorDto } from '../dto/doctor.dto';
 import { DoctorService } from '../services/doctor.service';
 import { uploadAvatarToCloudinary } from '../../../infrastructure/storage/cloudinary-avatar-uploader';
 
-@UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
 @ApiTags('Doctors')
 @ApiBearerAuth()

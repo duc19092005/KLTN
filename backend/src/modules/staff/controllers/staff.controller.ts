@@ -8,13 +8,11 @@ import { Roles } from '../../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
 import { RolesGuard } from '../../auth/guards/roles.guard';
-import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
-import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
 import { CreateStaffDto, StaffQueryDto, UpdateStaffDto } from '../dto/staff.dto';
 import { StaffService } from '../services/staff.service';
 import { uploadAvatarToCloudinary } from '../../../infrastructure/storage/cloudinary-avatar-uploader';
 
-@UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
 @ApiTags('Staff')
 @ApiBearerAuth()
@@ -84,8 +82,7 @@ export class StaffController {
   }
 
   @Delete(':id')
-  @RequireFaceStepUp('DELETE_STAFF')
-  @ApiOperation({ summary: 'Soft-delete staff by marking account inactive (requires face step-up)' })
+  @ApiOperation({ summary: 'Soft-delete staff by marking account inactive' })
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.service.remove(id, user?.sub);
   }

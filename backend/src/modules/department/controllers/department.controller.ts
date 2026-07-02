@@ -5,12 +5,10 @@ import { Roles } from '../../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
 import { RolesGuard } from '../../auth/guards/roles.guard';
-import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
-import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
 import { DepartmentService } from '../services/department.service';
 import { AssignManagerDto, CreateDepartmentDto, DepartmentQueryDto, UpdateDepartmentDto } from '../dto/department.dto';
 
-@UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
 @ApiTags('Departments')
 @ApiBearerAuth()
@@ -68,8 +66,7 @@ export class DepartmentController {
   }
 
   @Delete(':id')
-  @RequireFaceStepUp('DELETE_DEPARTMENT')
-  @ApiOperation({ summary: 'Delete an empty department (requires face step-up)' })
+  @ApiOperation({ summary: 'Delete an empty department' })
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.service.remove(id, user?.sub);
   }

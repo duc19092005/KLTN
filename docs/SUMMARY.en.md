@@ -2,7 +2,6 @@
 
 # Technical Summary
 
-> One-page technical overview of the KLTN Hospital Management System for reviewers who want a fast read before diving into the full Vietnamese reference docs under [`docs/architecture/`](./architecture/), [`docs/security/`](./security/), and [`docs/backup-recovery/`](./backup-recovery/).
 
 ## What this project is
 
@@ -26,7 +25,6 @@ A modern, full-stack hospital platform pursuing the **Triple Aim**: better patie
                                   └────────────────────┘
 ```
 
-- **Backend** is feature-based clean architecture (`modules/visit`, `modules/department`, `modules/backup`, etc.). All multi-step workflows use `prisma.$transaction` for atomicity. Controllers are thin; services hold business logic.
 - **Frontend** mirrors the same feature topology (`features/admin`, `features/doctor`, ...). Custom "Hospital OS" Tailwind theme. 4 roles: Admin, Receptionist, Doctor, Lab Manager.
 - **Blockchain** stores **only** integrity hashes and Merkle roots — never PII or medical files. Active contracts are `IdentityRegistry`, `FaceRegistry`, and `AuditAnchor`; Department/Staff/AI model integrity now flows through `BlockchainLogger` + `AuditAnchor`.
 - **AI** runs as a Python child process called from the backend (TensorFlow + InsightFace for face embeddings, plus a pluggable diagnostic provider).
@@ -46,12 +44,7 @@ Three reinforcing layers:
 
 > The on-chain layer can detect tampering even if a hostile DBA edits Postgres directly: the recomputed Merkle root will not match the on-chain root.
 
-## Backup & disaster recovery
 
-- **Automated nightly backup** (default 02:00) via `pg_dump`, plus on-demand admin-triggered backups. Each dump is recorded as a JSONL line in `backup-ledger.jsonl` (offsite volume) with its SHA-256, and the ledger entry itself is hash-chained and on-chain-anchored.
-- **Surgical Restore.** When only a few records are tampered and the Admin UI still works, restore happens record-by-record from the most recent untampered backup — minimal blast radius. See [`docs/backup-recovery/overview.md`](./backup-recovery/overview.md).
-- **Emergency Restore (out-of-band).** When the DB is wiped or unrecoverable and biometrics can no longer be trusted, restore is gated by an Admin Web3 signature verified against the on-chain `IdentityRegistry`. The challenge is signed with MetaMask on the Admin's *personal* machine using the standalone `tools/recovery-signer/index.html` — no private key ever touches the failing server. See [`docs/backup-recovery/emergency-restore.md`](./backup-recovery/emergency-restore.md).
-- **Break-glass viewer.** Independent single-file HTML tool (`tools/break-glass-viewer/index.html`, pure JS, fully offline) that re-verifies the JSONL ledger's hash chain and (optionally with the pepper) every `entryHash`. Designed to live on the same offsite volume as the ledger so an auditor can verify integrity without trusting the server.
 
 ## What makes this design notable
 
@@ -70,8 +63,6 @@ Three reinforcing layers:
 | Frontend UI design system | [`docs/architecture/frontend-ui-guidelines.md`](./architecture/frontend-ui-guidelines.md) |
 | Step-up tiers & anchoring policy | [`docs/security/tiers-and-anchoring.md`](./security/tiers-and-anchoring.md) |
 | Audit logging & tamper-evidence | [`docs/security/audit-logging.md`](./security/audit-logging.md) |
-| Backup & recovery overview | [`docs/backup-recovery/overview.md`](./backup-recovery/overview.md) |
-| Emergency restore (out-of-band) | [`docs/backup-recovery/emergency-restore.md`](./backup-recovery/emergency-restore.md) |
 
 > [!NOTE]
 > The deep technical references above are maintained in Vietnamese only. This summary is the canonical English entry point.

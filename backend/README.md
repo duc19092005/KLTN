@@ -27,4 +27,3 @@ npm run start:dev
 
 ## Documentation
 - **Audit Logging:** For detailed information on the blockchain audit and Merkle tree anchoring implementation, see [AUDIT_LOGGING.md](./AUDIT_LOGGING.md).
-- **Database Restore:** For instructions on verified data restoration after tampering, see [BACKUP_RESTORE.md](./BACKUP_RESTORE.md).

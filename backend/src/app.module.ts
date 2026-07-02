@@ -17,7 +17,6 @@ import { AiModelModule } from './modules/ai-model/ai-model.module';
 import { MedicalOrderModule } from './modules/medical-order/medical-order.module';
 import { ClinicalDecisionModule } from './modules/clinical-decision/clinical-decision.module';
 import { AuditApiModule } from './modules/audit/audit-api.module';
-import { BackupModule } from './modules/backup/backup.module';
 import { StorageModule } from './infrastructure/storage/storage.module';
 import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -44,7 +43,6 @@ import { PatientPortalModule } from './modules/patient-portal/patient-portal.mod
     MedicalOrderModule,
     ClinicalDecisionModule,
     AuditApiModule,
-    BackupModule,
     NotificationModule,
     PatientAuthModule,
     PatientPortalModule,

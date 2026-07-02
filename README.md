@@ -12,7 +12,6 @@ KLTN/
 |-- frontend/     React + Vite + Tailwind CSS
 |-- mobile/       Expo React Native patient mobile portal
 |-- blockchain/   Solidity + Hardhat + Ethers.js
-|-- docs/         Tai lieu kien truc, audit, backup/recovery
 |-- tools/        Cong cu khoi phuc/khan cap offline
 |-- .env.example  Legacy/reference env checklist
 ```
@@ -44,7 +43,6 @@ Co 3 vai tro tach biet:
 |---|---|---|
 | Owner / root governance | `BLOCKCHAIN_OWNER_PRIVATE_KEY` trong `blockchain/.env` cho deploy/governance; production nen la cold wallet/multisig | Authorize/revoke Admin wallets, add/remove relayers, transfer ownership |
 | Relayer / backend writer | `BLOCKCHAIN_RELAYER_PRIVATE_KEY` trong `backend/.env` hoac secret manager backend | Ky giao dich tu dong: `AuditAnchor.commitRoot`, `FaceRegistry.setFaceHash`, `recordAction` |
-| Admin wallet | Vi nguoi dung nhu MetaMask/hardware wallet | Login, step-up, emergency restore challenge |
 
 Backend khong dung vi Admin de tra gas cho audit transaction. Admin ky challenge de chung minh danh tinh; backend relayer moi la vi gui giao dich van hanh len chain.
 
@@ -152,8 +150,6 @@ See [mobile/README.md](./mobile/README.md).
 - [blockchain/README.md](./blockchain/README.md)
 - [docs/security/audit-logging.md](./docs/security/audit-logging.md)
 - [docs/security/tiers-and-anchoring.md](./docs/security/tiers-and-anchoring.md)
-- [docs/backup-recovery/overview.md](./docs/backup-recovery/overview.md)
-- [tools/recovery-signer/README.md](./tools/recovery-signer/README.md)
 
 ## Quy Uoc Phat Trien
 

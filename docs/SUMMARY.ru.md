@@ -2,7 +2,6 @@
 
 # Техническое резюме
 
-> Одностраничный технический обзор системы KLTN Hospital Management для рецензентов, которым нужно быстро понять проект перед погружением в полные технические документы на вьетнамском в [`docs/architecture/`](./architecture/), [`docs/security/`](./security/), [`docs/backup-recovery/`](./backup-recovery/).
 
 ## Что это за проект
 
@@ -26,7 +25,6 @@
                                   └────────────────────┘
 ```
 
-- **Backend** — clean architecture, разбитая по фичам (`modules/visit`, `modules/department`, `modules/backup` и т.д.). Все многошаговые сценарии используют `prisma.$transaction` для атомарности. Контроллеры тонкие, бизнес-логика — в сервисах.
 - **Frontend** повторяет ту же топологию по фичам (`features/admin`, `features/doctor`, ...). Своя «Hospital OS» дизайн-система на Tailwind. 4 роли: Admin, Receptionist, Doctor, Lab Manager.
 - **Blockchain** хранит **только** хеши целостности и Merkle-корни — никогда PII или медицинские файлы. Активные контракты: `IdentityRegistry`, `FaceRegistry`, `AuditAnchor`; целостность Department/Staff/AI model теперь проходит через `BlockchainLogger` + `AuditAnchor`.
 - **AI** работает как Python child-process, вызываемый backend (TensorFlow + InsightFace для face-эмбеддингов, плюс pluggable диагностический провайдер).
@@ -46,12 +44,7 @@
 
 > On-chain слой обнаружит подделку даже если злоумышленный DBA отредактирует Postgres напрямую: пересчитанный Merkle-корень не совпадёт с on-chain.
 
-## Резервное копирование и восстановление
 
-- **Автоматический ночной бэкап** (по умолчанию в 02:00) через `pg_dump`, плюс ручные бэкапы по запросу администратора. Каждый дамп записывается как JSONL-строка в `backup-ledger.jsonl` (offsite-том) с SHA-256; сама строка журнала также входит в хеш-цепочку и якорится on-chain.
-- **Surgical Restore (точечное восстановление).** Когда повреждено только несколько записей и UI Admin работает, восстановление происходит запись за записью из последнего нетронутого бэкапа — минимальная зона поражения. См. [`docs/backup-recovery/overview.md`](./backup-recovery/overview.md).
-- **Emergency Restore (вне сервера).** Когда БД удалена/невосстановима, а биометрии нельзя доверять, восстановление защищено Web3-подписью администратора, проверяемой против on-chain `IdentityRegistry`. Challenge подписывается через MetaMask на *личной* машине администратора с помощью автономного `tools/recovery-signer/index.html` — приватный ключ никогда не попадает на падающий сервер. См. [`docs/backup-recovery/emergency-restore.md`](./backup-recovery/emergency-restore.md).
-- **Break-glass viewer.** Независимый однофайловый HTML-инструмент (`tools/break-glass-viewer/index.html`, чистый JS, полностью офлайн), который перепроверяет хеш-цепочку JSONL-журнала и (опционально, с pepper) каждый `entryHash`. Размещается на том же offsite-томе, что и журнал, чтобы аудитор мог проверить целостность не доверяя серверу.
 
 ## Чем эта архитектура примечательна
 
@@ -70,8 +63,6 @@
 | Дизайн-система frontend | [`docs/architecture/frontend-ui-guidelines.md`](./architecture/frontend-ui-guidelines.md) |
 | Step-up tiers & политика якорения | [`docs/security/tiers-and-anchoring.md`](./security/tiers-and-anchoring.md) |
 | Аудит-логи и tamper-evidence | [`docs/security/audit-logging.md`](./security/audit-logging.md) |
-| Обзор backup & recovery | [`docs/backup-recovery/overview.md`](./backup-recovery/overview.md) |
-| Emergency restore (out-of-band) | [`docs/backup-recovery/emergency-restore.md`](./backup-recovery/emergency-restore.md) |
 
 > [!NOTE]
 > Полные технические документы выше поддерживаются только на вьетнамском. Это резюме — канонический англо/русскоязычный entry point.

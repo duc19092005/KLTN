@@ -28,4 +28,3 @@ npm run start:dev
 
 ## Документация
 - **Аудит-логи:** подробности о цепочке аудита и якорении Merkle — [AUDIT_LOGGING.md](./AUDIT_LOGGING.md).
-- **Восстановление БД:** проверяемое восстановление данных после вмешательства — [BACKUP_RESTORE.md](./BACKUP_RESTORE.md).

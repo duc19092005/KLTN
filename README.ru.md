@@ -5,7 +5,6 @@
 > Современная полнофункциональная медицинская платформа, ориентированная на «Тройную цель»: улучшение опыта пациента, точность клинических решений и непреложная целостность данных.
 
 > [!TIP]
-> **Для быстрого технического обзора** (архитектура, модель безопасности, backup/recovery на одной странице) читайте [`docs/SUMMARY.ru.md`](./docs/SUMMARY.ru.md).
 
 ## Обзор
 
@@ -97,12 +96,9 @@ npx hardhat run scripts/deploy.js --network localhost  # терминал 2
 |---|---|
 | **Архитектура** | [Backend Clean Architecture](./docs/architecture/backend.md) · [File Structure](./docs/architecture/backend-file-structure.md) · [Frontend UI](./docs/architecture/frontend-ui-guidelines.md) |
 | **Безопасность** | [Tiers & Anchoring Policy](./docs/security/tiers-and-anchoring.md) · [Audit Logging](./docs/security/audit-logging.md) |
-| **Резервное копирование и DR** | [Overview](./docs/backup-recovery/overview.md) · [Backup CLI](./docs/backup-recovery/backup-restore-cli.md) · [Emergency Restore](./docs/backup-recovery/emergency-restore.md) |
-| **Автономные инструменты** | [Break-Glass Viewer](./tools/break-glass-viewer/README.ru.md) · [Recovery Signer](./tools/recovery-signer/README.ru.md) |
 | **Для ИИ-агентов** | [AGENTS.md](./AGENTS.md) |
 
 > [!NOTE]
-> Технические документы внутри `docs/architecture/`, `docs/security/` и `docs/backup-recovery/` оставлены только на вьетнамском. Многоязычное покрытие ограничено набором README выше.
 
 ### Часто задаваемые вопросы
 
@@ -110,9 +106,7 @@ npx hardhat run scripts/deploy.js --network localhost  # терминал 2
 |---|---|
 | Что такое Tier A и Tier B step-up? | [docs/security/tiers-and-anchoring.md](./docs/security/tiers-and-anchoring.md) |
 | Когда якорение происходит сразу, а когда пакетом раз в 5 минут? | [docs/security/tiers-and-anchoring.md](./docs/security/tiers-and-anchoring.md) |
-| Когда запускается автоматическая резервная копия? Как админ запускает её вручную? | [docs/backup-recovery/overview.md](./docs/backup-recovery/overview.md) |
 | Чем отличаются два HTML-инструмента? | [tools/README.ru.md](./tools/README.ru.md) |
-| База полностью удалена. Как восстановить? | [docs/backup-recovery/emergency-restore.md](./docs/backup-recovery/emergency-restore.md) |
 
 ---
 

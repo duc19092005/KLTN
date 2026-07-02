@@ -4,7 +4,6 @@ import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { useAuth } from '../../../providers/AuthProvider';
 import { auditService } from '../apis/auditService';
-import { FaceStepUpModal } from '../../auth';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
 import {
@@ -157,7 +156,6 @@ export default function AuditLogsPage() {
   const [batchFilter, setBatchFilter] = useState('');
   const [anchoring, setAnchoring] = useState(false);
   const [proof, setProof] = useState(null);
-  const [stepUpOpen, setStepUpOpen] = useState(false);
 
   const [logsPage, setLogsPage] = useState(1);
   const [logsTotalPages, setLogsTotalPages] = useState(1);
@@ -250,15 +248,10 @@ export default function AuditLogsPage() {
     };
   }, [logsTotal, batchesTotal, chain]);
 
-  const handleAnchorNow = () => {
-    setStepUpOpen(true);
-  };
-
-  const handleStepUpSuccess = async (ticket) => {
-    setStepUpOpen(false);
+  const handleAnchorNow = async () => {
     setAnchoring(true);
     try {
-      const res = await auditService.anchorNow(ticket);
+      const res = await auditService.anchorNow();
       const d = res.data || {};
       if (d.committed) {
         toast.success(`Đã neo lô #${d.batchId} (${d.leafCount} bản ghi) lên blockchain.`);
@@ -296,7 +289,7 @@ export default function AuditLogsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">Nhật ký hệ thống tối cao</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Giám sát tính toàn vẹn, định danh sinh trắc học và lịch sử biến động dữ liệu.</p>
+            <p className="text-sm text-slate-500 mt-0.5">Giám sát tính toàn vẹn, nhật ký kiểm toán và lịch sử biến động dữ liệu.</p>
           </div>
           <button
             id="audit-anchor-now-button"
@@ -381,15 +374,6 @@ export default function AuditLogsPage() {
 
       {proof && <ProofModal proof={proof} onClose={() => setProof(null)} />}
 
-      {stepUpOpen && (
-        <FaceStepUpModal
-          action="ANCHOR_BLOCKCHAIN"
-          title="Xác thực ký số chuỗi"
-          description="Hành động này sẽ tính toán mã băm Merkle Root của toàn bộ logs hiện tại và đẩy lên sổ cái bất biến. Vui lòng quét FaceID để xác minh danh quyền quản trị."
-          onSuccess={handleStepUpSuccess}
-          onClose={() => setStepUpOpen(false)}
-        />
-      )}
     </DashboardLayout>
   );
 }
@@ -769,17 +753,15 @@ function ActorCell({ log }) {
 
 function LogDetailModal({ summaryLog, onClose, onProof }) {
   const [log, setLog] = useState(summaryLog);
-  const [stepUpOpen, setStepUpOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
   const actor = log.actor;
 
-  const loadDetail = async (ticket) => {
-    setStepUpOpen(false);
+  const loadDetail = async () => {
     setDetailLoading(true);
     setDetailError('');
     try {
-      const res = await auditService.detail(summaryLog.seq, ticket);
+      const res = await auditService.detail(summaryLog.seq);
       setLog(res.data || summaryLog);
     } catch (err) {
       setDetailError(err?.response?.data?.message || err.message || 'Không tải được chi tiết audit đã giải mã.');
@@ -883,7 +865,7 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
               {!sensitiveDetailUnlocked && (
                 <button
                   type="button"
-                  onClick={() => setStepUpOpen(true)}
+                  onClick={loadDetail}
                   disabled={detailLoading}
                   className="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-600 hover:text-cyan-700 bg-cyan-50 px-2.5 py-1 rounded-md border border-cyan-100 transition-all"
                 >
@@ -954,15 +936,6 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
         </div>
       </div>
 
-      {stepUpOpen && (
-        <FaceStepUpModal
-          action="DECRYPT_AUDIT_LOG"
-          title="Yêu cầu xác quyền sinh trắc"
-          description="Để phòng chống rò rỉ dữ liệu y khoa nhạy cảm, bạn cần hoàn thành FaceID để giải mã sâu các trường thông tin ẩn."
-          onSuccess={loadDetail}
-          onClose={() => setStepUpOpen(false)}
-        />
-      )}
     </div>
   );
 }

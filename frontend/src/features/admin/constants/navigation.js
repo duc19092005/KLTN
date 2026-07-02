@@ -5,7 +5,6 @@ export const ADMIN_NAV_ITEMS = [
   { id: 'doctors', label: 'Bác sĩ', icon: 'stethoscope' },
   { id: 'aiModels', label: 'Mô hình AI', icon: 'activity' },
   { id: 'audit', label: 'Nhật ký', icon: 'shield' },
-  { id: 'backup', label: 'Sao lưu', icon: 'database' },
   { id: 'profile', label: 'Thông tin cá nhân', icon: 'user' },
 ];
 
@@ -16,7 +15,6 @@ export const ADMIN_ROUTES = {
   doctors: '/admin/doctors',
   aiModels: '/admin/ai-models',
   audit: '/admin/audit',
-  backup: '/admin/backup',
   profile: '/profile',
 };
 

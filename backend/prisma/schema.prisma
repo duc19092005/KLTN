@@ -735,42 +735,6 @@ model AuditBatch {
   @@index([createdAt])
 }
 
-/// One database backup, self-verifying via the blockchain audit trail.
-/// This is the queryable DB mirror of the authoritative append-only JSONL ledger written offsite
-/// (so it survives even when the DB is destroyed/encrypted). Each backup records:
-///  - sha256: SHA256 of the produced dump file, so we can later prove the file was not altered.
-///  - maxSeq: the largest BlockchainLogger.seq the dump is known to contain, so we know how "fresh"
-///    (and up to which audited change) the backup is - key to diagnosing a poisoned backup.
-///  - anchorSeq/anchorTxHash: the BlockchainLogger seq + on-chain tx that anchored this manifest,
-///    sealing the (sha256, maxSeq, createdAt) tuple immutably at creation time (Tier-A: anchored now).
-///  - prevHash/entryHash: hash-chain over the backup ledger itself, mirroring the JSONL chain, so
-///    silently deleting a backup record is provable.
-model BackupRecord {
-  id          String   @id @default(uuid())
-  backupCode  String   @unique // human-readable id, e.g. BK-20260606-0001
-  fileName    String           // dump file name on disk / object store
-  storagePath String?          // absolute path or object key
-  sha256      String           // SHA256(dump file) at creation
-  sizeBytes   Int      @default(0)
-  maxSeq      Int?             // largest BlockchainLogger.seq contained in the dump
-
-  // Hash-chain over the backup ledger (mirrors the offsite JSONL chain)
-  prevHash    String?          // entryHash of the previous BackupRecord; genesis = 64 zeros
-  entryHash   String?          // SHA256(pepper | backupCode | sha256 | maxSeq | createdAtIso | prevHash)
-
-  // On-chain anchoring of THIS backup manifest (via the shared AuditAnchor / BlockchainLogger)
-  anchorSeq   Int?             // BlockchainLogger.seq of the SystemBackup manifest entry
-  anchorTxHash String?         // tx that committed the Merkle batch containing the manifest
-
-  status      String   @default("CREATED") // CREATED | ANCHORED | VERIFIED | CORRUPT | FAILED
-  error       String?
-  createdBy   String?
-  createdAt   DateTime @default(now())
-
-  @@index([status])
-  @@index([createdAt])
-}
-
 /// Short-lived, single-use proof that a user re-authenticated with their face immediately
 /// before performing a highly sensitive action (e.g. deleting a doctor, committing a blockchain
 /// anchor). This is step-up / re-authentication: even though the user already holds a valid

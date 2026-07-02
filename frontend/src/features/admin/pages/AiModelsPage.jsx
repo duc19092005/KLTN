@@ -7,7 +7,6 @@ import { useAuth } from '../../../providers/AuthProvider';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { aiModelService } from '../apis/aiModelService';
 import { useToast } from '../../../providers/ToastProvider';
-import { FaceStepUpModal } from '../../auth';
 import AiModelDetailModal from '../components/AiModelDetailModal';
 
 // A provider is either a managed cloud API (endpoint auto-filled, key required) or a
@@ -100,7 +99,6 @@ export default function AiModelsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingModel, setEditingModel] = useState(null);
   const [detailModelId, setDetailModelId] = useState(null);
-  const [pendingDelete, setPendingDelete] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -246,15 +244,11 @@ export default function AiModelsPage() {
     finally { setSaving(false); }
   };
 
-  const requestDelete = (model) => setPendingDelete(model);
-
-  const handleDeleteStepUp = async (ticket) => {
-    const model = pendingDelete;
-    setPendingDelete(null);
+  const requestDelete = async (model) => {
     if (!model?.id) return;
     setSaving(true);
     try {
-      await aiModelService.remove(model.id, ticket);
+      await aiModelService.remove(model.id);
       toast.success(`Đã xóa mềm mô hình ${model.modelName}.`);
       await load(pagination.page);
     } catch (err) {
@@ -423,16 +417,6 @@ export default function AiModelsPage() {
       </div>
       {showCreateModal && <CreateModelModal form={form} updateForm={updateForm} onSubmit={submit} onClose={closeCreateModal} saving={saving} testing={testing} testApi={testApi} testResult={testResult} editing={Boolean(editingModel)} />}
       {detailModelId && <AiModelDetailModal modelId={detailModelId} onClose={() => setDetailModelId(null)} />}
-      {pendingDelete && (
-        <FaceStepUpModal
-          action="DELETE_AI_MODEL"
-          resourceId={pendingDelete.id}
-          title="Xác nhận xóa mô hình AI"
-          description={`Xóa mềm mô hình "${pendingDelete.modelName || pendingDelete.id}" sẽ ẩn khỏi luồng bác sĩ và được ghi audit blockchain. Vui lòng quét khuôn mặt để xác nhận.`}
-          onSuccess={handleDeleteStepUp}
-          onClose={() => setPendingDelete(null)}
-        />
-      )}
     </DashboardLayout>
   );
 }

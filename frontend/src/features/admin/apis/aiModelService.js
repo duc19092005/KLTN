@@ -4,8 +4,7 @@ export const aiModelService = {
   list: (params = {}) => api.get('/ai-models', { params }),
   create: (payload) => api.post('/ai-models', payload),
   update: (id, payload) => api.patch(`/ai-models/${id}`, payload),
-  remove: (id, stepUpTicket) =>
-    api.delete(`/ai-models/${id}`, stepUpTicket ? { headers: { 'x-stepup-ticket': stepUpTicket } } : undefined),
+  remove: (id) => api.delete(`/ai-models/${id}`),
   testApi: (payload) => api.post('/ai-models/test-api', payload),
   get: (id) => api.get(`/ai-models/${id}`),
   verifyOne: (id) => api.get(`/ai-models/${id}/audit/verify`),

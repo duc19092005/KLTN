@@ -160,8 +160,6 @@ export default function DoctorsPage() {
     });
   };
   const close = () => { setEditing(null); setIsCreateOpen(false); setForm(emptyForm); };
-  // Create/update anchor on-chain via a step-up SESSION: the axios interceptor prompts one face
-  // scan when needed and replays the request, so the admin scans once per session, not per save.
   const submit = async (event) => {
     event.preventDefault();
     if (!form.avatarUrl) {

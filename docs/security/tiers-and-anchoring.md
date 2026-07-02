@@ -27,8 +27,6 @@ Hai chính sách dùng cùng tên "Tier A/B" vì đi đôi với nhau, nhưng l�
 | `DELETE /departments/:id` | Xóa phòng ban: không thể đảo |
 | `DELETE /staff/:id` | Vô hiệu nhân sự: ảnh hưởng quyền truy cập |
 | `POST /audit/anchor-now` | Neo blockchain thủ công: ghi không thể xóa |
-| `POST /backup` | Tạo bản sao toàn hệ thống |
-| `POST /backup/restore` (surgical) | Khôi phục bản ghi đã bị tampered |
 
 **Tiêu chí Tier A:** thao tác **không thể đảo ngược** HOẶC **ảnh hưởng diện rộng**. Hiếm khi xảy ra (vài lần/tháng), nên ép quét mặt mỗi lần là chấp nhận được về UX.
 
@@ -74,7 +72,6 @@ Hai chính sách dùng cùng tên "Tier A/B" vì đi đôi với nhau, nhưng l�
 
 ## 2. Chu kỳ neo Blockchain: anchorNow vs anchorChange
 
-Mọi entity nhạy cảm (Patient, Staff, Doctor, Department, AiModel, MedicalConclusion, ParaclinicalShift, Backup) đều ghi event vào `BlockchainLogger` rồi neo Merkle root lên contract `AuditRegistry`. Khác biệt nằm ở **khi nào** Merkle root được gửi lên chain.
 
 ### Tier-A Anchoring — `anchorNow()` (neo ngay)
 
@@ -90,8 +87,6 @@ Niêm phong + commit batch hiện tại lên blockchain **ngay trong cùng reque
 |---|---|---|
 | Tạo medical conclusion | `clinical-decision/...create-medical-conclusion.use-case.ts` | Giá trị pháp lý cao, neo trễ = mất bằng chứng tức thời |
 | Verify handover face B | `paraclinical-shift/...verify-handover-face-b.use-case.ts` | Bàn giao ca = chuyển trách nhiệm, phải có dấu thời gian on-chain |
-| Tạo backup | `backup/...create-backup.use-case.ts` | Backup phải được seal ngay (sha256, maxSeq, prevHash) để chống sửa hậu kỳ |
-| Surgical restore | `backup/...surgical-restore.use-case.ts` | Khôi phục bản ghi tampered, phải neo ngay để evidence chain liên tục |
 | Anchor manual | `audit/audit.controller.ts` `anchor-now` | Admin chủ động ép neo (debug / chứng minh trực tiếp) |
 
 ### Tier-B Anchoring — `anchorChange()` (gom batch)
@@ -125,7 +120,6 @@ Append event vào AuditLog ledger; **chờ batch flush theo định kỳ hoặc 
 ```mermaid
 flowchart TD
     A[User thực hiện thao tác ghi] --> B{Loại thao tác}
-    B -->|Tier-A: kết luận, backup,<br/>handover, restore| C[anchorChange ledger]
     C --> D[anchorNow ngay lập tức]
     D --> E[1 transaction lên AuditRegistry]
     B -->|Tier-B: tạo/sửa<br/>bệnh nhân, NV, PB...| F[anchorChange ledger]
@@ -136,12 +130,8 @@ flowchart TD
     J -.proof khi cần.-> H
 ```
 
-### Daily backup cron — System-initiated
 
-Một flow đặc biệt: backup tự động mỗi 02:00 sáng (`backup-scheduler.service.ts`).
 - **Không yêu cầu step-up** (không có user thao tác → không có ai để xác thực).
-- Backup **luôn `anchorNow()`** — Tier-A anchoring dù là cron, vì backup phải seal kết quả immutable ngay.
-- Bật/tắt qua `BACKUP_CRON_ENABLED`, đổi giờ qua `BACKUP_CRON_HOUR`.
 
 ---
 
@@ -151,7 +141,6 @@ Một flow đặc biệt: backup tự động mỗi 02:00 sáng (`backup-schedul
 |---|---|
 | **Step-up Tier A** (quét mặt mỗi lần) | Thao tác phá hủy / không thể đảo / hiếm |
 | **Step-up Tier B** (phiên đặc quyền) | Thao tác lặp lại nhiều lần trong ca |
-| **Anchor `anchorNow()`** (neo ngay) | Bằng chứng phải có trên chain ngay (kết luận, backup, bàn giao) |
 | **Anchor `anchorChange()` + batch 5'** | Hành chính hàng loạt — tiết kiệm gas, vẫn truy vết được |
 
 > **Lưu ý quan trọng:** Step-up Tier và Anchor Tier KHÔNG luôn trùng nhau. Ví dụ:
@@ -171,5 +160,3 @@ Một flow đặc biệt: backup tự động mỗi 02:00 sáng (`backup-schedul
 | `AUDIT_BATCH_INTERVAL_MS` | 300000 (5 phút) | Chu kỳ flush batch anchor |
 | `AUDIT_BATCH_MAX_LEAVES` | 500 | Ép neo sớm khi đầy lá |
 | `AUDIT_BATCH_DISABLED` | `false` | Tắt batch anchor (debug only) |
-| `BACKUP_CRON_ENABLED` | `true` | Bật cron backup hằng ngày |
-| `BACKUP_CRON_HOUR` | `2` | Giờ chạy backup (0–23) |

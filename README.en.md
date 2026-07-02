@@ -5,7 +5,6 @@
 > A modern, full-stack healthcare platform pursuing the **Triple Aim**: better patient experience, sharper clinical outcomes, and unassailable data integrity.
 
 > [!TIP]
-> **For a fast technical overview** (architecture, security model, backup/recovery on one page), read [`docs/SUMMARY.en.md`](./docs/SUMMARY.en.md).
 
 ## Overview
 
@@ -18,7 +17,6 @@ A hospital management system that combines **biometric authentication**, **AI-as
 | **Reception** | Patient intake, queue management, ID verification |
 | **Doctor** | Medical records + AI diagnostic suggestions + on-chain anchored conclusions |
 | **Laboratory** | Process medical orders, upload results to private AWS S3 |
-| **Admin** | Manage departments, staff, AI models, audit logs, backups |
 
 ### Distinctive security mechanisms
 
@@ -36,7 +34,6 @@ The blockchain layer now separates three roles:
 |---|---|---|
 | **Owner / root governance** | `BLOCKCHAIN_OWNER_PRIVATE_KEY` for local/dev; cold wallet or multisig for production | Authorize/revoke Admin wallets, add/remove relayers, transfer ownership |
 | **Relayer / backend writer** | `BLOCKCHAIN_RELAYER_PRIVATE_KEY` | Sign routine backend transactions such as `AuditAnchor.commitRoot()` and `FaceRegistry.setFaceHash()` |
-| **Admin wallet** | User-controlled MetaMask/hardware wallet | Login, step-up approval, emergency restore challenges |
 
 Admin wallets prove human authority. The backend relayer pays gas and writes routine audit/hash transactions. The owner governs who is allowed to act as admin or relayer.
 
@@ -122,12 +119,9 @@ Full table of contents in [`docs/README.en.md`](./docs/README.en.md).
 |---|---|
 | **Architecture** | [Backend Clean Architecture](./docs/architecture/backend.md) · [File Structure](./docs/architecture/backend-file-structure.md) · [Frontend UI](./docs/architecture/frontend-ui-guidelines.md) |
 | **Security** | [Tiers & Anchoring Policy](./docs/security/tiers-and-anchoring.md) · [Audit Logging](./docs/security/audit-logging.md) |
-| **Backup & DR** | [Overview](./docs/backup-recovery/overview.md) · [Backup CLI](./docs/backup-recovery/backup-restore-cli.md) · [Emergency Restore](./docs/backup-recovery/emergency-restore.md) |
-| **Standalone tools** | [Break-Glass Viewer](./tools/break-glass-viewer/README.en.md) · [Recovery Signer](./tools/recovery-signer/README.en.md) |
 | **For AI/Agents** | [AGENTS.md](./AGENTS.md) |
 
 > [!NOTE]
-> The deep technical docs under `docs/architecture/`, `docs/security/`, and `docs/backup-recovery/` are kept in Vietnamese only. Multi-language coverage is limited to the README set above.
 
 ### FAQ
 
@@ -135,9 +129,7 @@ Full table of contents in [`docs/README.en.md`](./docs/README.en.md).
 |---|---|
 | What are Tier A vs Tier B step-up? | [docs/security/tiers-and-anchoring.md](./docs/security/tiers-and-anchoring.md) |
 | When does anchoring happen immediately vs in 5-min batches? | [docs/security/tiers-and-anchoring.md](./docs/security/tiers-and-anchoring.md) |
-| When do automatic backups run? How does Admin trigger one? | [docs/backup-recovery/overview.md](./docs/backup-recovery/overview.md) |
 | How do the two HTML tools differ? | [tools/README.en.md](./tools/README.en.md) |
-| The DB was wiped completely. How do I restore? | [docs/backup-recovery/emergency-restore.md](./docs/backup-recovery/emergency-restore.md) |
 
 ---
 

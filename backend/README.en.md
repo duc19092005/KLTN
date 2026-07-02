@@ -28,4 +28,3 @@ npm run start:dev
 
 ## Documentation
 - **Audit logging:** for the blockchain audit trail and Merkle anchoring details, see [AUDIT_LOGGING.md](./AUDIT_LOGGING.md).
-- **Database restore:** for verified data restoration after tampering, see [BACKUP_RESTORE.md](./BACKUP_RESTORE.md).

@@ -16,7 +16,6 @@
 | Cơ bản | `SHA256(pepper + salt + data)` | "Data có khớp hash không?" |
 | Chuỗi | **Hash-chain** (`seq` + `prevHash` + `entryHash`) | "Có dòng nào bị sửa/xóa/chèn không?" |
 | Neo | **Merkle root** trên `AuditAnchor.sol` | "Bằng chứng có bị chính admin/insider sửa không?" |
-| Khôi phục | Backup + PITR (ngoài phạm vi code này) | "Lấy lại data thế nào sau tấn công?" |
 
 Điểm mấu chốt về chi phí: **gom log thành lô (batch), build cây Merkle, chỉ neo 1 ROOT/lô lên chain**. Gas **cố định** bất kể lô có 10 hay 10.000 log.
 

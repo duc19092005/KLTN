@@ -20,20 +20,14 @@ Mục lục tài liệu KLTN Hospital Management System, sắp xếp theo chủ 
 | [Tiers & Anchoring Policy](./security/tiers-and-anchoring.md) | Backend + Frontend | Step-up Tier A/B, anchor immediate vs batch 5' |
 | [Audit Logging & Tamper-Evidence](./security/audit-logging.md) | Backend | Cơ chế hash chain + Merkle anchoring |
 
-## 💾 [Backup & Recovery](./backup-recovery/) — Sao lưu & khôi phục
 
 | Tài liệu | Phạm vi | Nội dung |
 |---|---|---|
-| [Backup & Recovery Overview](./backup-recovery/overview.md) | Backend + Frontend | Cron 02:00, manual backup, surgical restore, 2 công cụ HTML |
-| [Backup & Restore CLI](./backup-recovery/backup-restore-cli.md) | Backend | `npm run db:backup` & restore workflow chuẩn |
-| [Emergency Restore (out-of-band)](./backup-recovery/emergency-restore.md) | Backend + Tools | Phương án cuối: SSH + recovery-signer ngoại băng |
 
 ## 🛠️ Standalone Tools
 
 | Công cụ | Mục đích |
 |---|---|
-| [tools/break-glass-viewer](../tools/break-glass-viewer/README.md) | Xác minh sổ backup offline (read-only) |
-| [tools/recovery-signer](../tools/recovery-signer/README.md) | Ký Web3 ngoại băng để restore DB (write) |
 
 ## 📦 Module-level READMEs
 

@@ -10,8 +10,7 @@ export const staffService = {
   update: (id, payload) => api.patch(`/staff/${id}`, payload),
   lock: (id) => api.patch(`/staff/${id}/lock`),
   unlock: (id) => api.patch(`/staff/${id}/unlock`),
-  remove: (id, stepUpTicket) =>
-    api.delete(`/staff/${id}`, stepUpTicket ? { headers: { 'x-stepup-ticket': stepUpTicket } } : undefined),
+  remove: (id) => api.delete(`/staff/${id}`),
   uploadAvatar: (file) => {
     const formData = new FormData();
     formData.append('file', file);

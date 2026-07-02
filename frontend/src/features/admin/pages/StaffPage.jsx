@@ -7,7 +7,6 @@ import BlockchainStatusBadge from '../../../shared/components/BlockchainStatusBa
 import { useAuth } from '../../../providers/AuthProvider';
 import { departmentService } from '../apis/departmentService';
 import { staffService } from '../apis/staffService';
-import { FaceStepUpModal } from '../../auth';
 import StaffDetailModal from '../components/StaffDetailModal';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
@@ -49,7 +48,6 @@ export default function StaffPage() {
   const [editingStaff, setEditingStaff] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState(null); // staff awaiting face step-up
   const [detailStaffId, setDetailStaffId] = useState(null);
 
   const totalLabel = useMemo(() => `${pagination.total} hồ sơ`, [pagination.total]);
@@ -123,17 +121,11 @@ export default function StaffPage() {
     catch (err) { toast.error(getError(err)); }
     finally { setBusy(false); }
   };
-  // Deleting/deactivating a staff (incl. doctors) is sensitive -> require a fresh face scan.
-  const removeStaff = (staff) => {
-    setPendingDelete(staff);
-  };
-  const handleDeleteStepUp = async (ticket) => {
-    const staff = pendingDelete;
-    setPendingDelete(null);
+  const removeStaff = async (staff) => {
     if (!staff?.id) return;
     setBusy(true);
     try {
-      await staffService.remove(staff.id, ticket);
+      await staffService.remove(staff.id);
       toast.success('Xóa nhân sự thành công!');
       await load(pagination.page);
     }
@@ -153,16 +145,6 @@ export default function StaffPage() {
         )}
         {isFormOpen && <StaffModal departments={departments} form={form} setForm={setForm} onSubmit={submitStaff} onClose={closeForm} busy={busy} editingStaff={editingStaff} />}
         {detailStaffId && <StaffDetailModal staffId={detailStaffId} onClose={() => setDetailStaffId(null)} />}
-        {pendingDelete && (
-          <FaceStepUpModal
-            action="DELETE_STAFF"
-            resourceId={pendingDelete.id}
-            title="Xác nhận xóa nhân sự"
-            description={`Xóa/ẩn nhân sự "${pendingDelete.fullName || pendingDelete.id}" là thao tác nhạy cảm. Vui lòng quét khuôn mặt để xác nhận chính bạn thực hiện.`}
-            onSuccess={handleDeleteStepUp}
-            onClose={() => setPendingDelete(null)}
-          />
-        )}
       </div>
     </DashboardLayout>
   );

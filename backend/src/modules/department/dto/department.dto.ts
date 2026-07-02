@@ -1,24 +1,32 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DepartmentType, OperationalStatus } from '@prisma/client';
-import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { PaginationQueryDto } from '../../shared/pagination.dto';
 
 export class CreateDepartmentDto {
-  @ApiProperty({ example: 'PB-XRAY', maxLength: 32 })
+  @ApiProperty({ example: 'PB-XRAY', minLength: 2, maxLength: 20, description: 'Mã phòng ban chỉ gồm chữ in hoa, số và dấu gạch ngang' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toUpperCase() : value))
   @IsString()
-  @MaxLength(32)
+  @MinLength(2)
+  @MaxLength(20)
+  @Matches(/^[A-Z0-9-]+$/, { message: 'Mã phòng ban chỉ được chứa chữ in hoa, số và dấu gạch ngang.' })
   departmentCode!: string;
 
-  @ApiProperty({ example: 'Phòng khám tổng quát', maxLength: 120 })
+  @ApiProperty({ example: 'Phòng khám tổng quát', minLength: 2, maxLength: 100 })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @MaxLength(120)
+  @MinLength(2)
+  @MaxLength(100)
+  @Matches(/^[\p{L}\p{N}\s/&().,-]+$/u, { message: 'Tên phòng ban chứa ký tự không hợp lệ.' })
   name!: string;
 
-  @ApiPropertyOptional({ example: '2' })
+  @ApiPropertyOptional({ example: '2', maxLength: 2, description: 'Tầng là số từ 0 đến 99, không nhập chữ' })
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @MaxLength(40)
+  @MaxLength(2)
+  @Matches(/^\d{1,2}$/, { message: 'Tầng chỉ được nhập số từ 0 đến 99.' })
   floor?: string;
 
   @ApiPropertyOptional({ enum: OperationalStatus, example: OperationalStatus.ACTIVE })
@@ -39,9 +47,11 @@ export class CreateDepartmentDto {
   @IsBoolean()
   canReceiveOrders?: boolean;
 
-  @ApiPropertyOptional({ example: 'Heart and vascular disease department' })
+  @ApiPropertyOptional({ example: 'Heart and vascular disease department', maxLength: 500 })
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @MaxLength(500)
   description?: string;
 
   @ApiPropertyOptional({ example: '0d82b56f-5d0a-4501-bd18-bb9af91e90d7' })
@@ -52,22 +62,30 @@ export class CreateDepartmentDto {
 }
 
 export class UpdateDepartmentDto {
-  @ApiPropertyOptional({ example: 'PB-XRAY', maxLength: 32 })
+  @ApiPropertyOptional({ example: 'PB-XRAY', minLength: 2, maxLength: 20, description: 'Mã phòng ban chỉ gồm chữ in hoa, số và dấu gạch ngang' })
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toUpperCase() : value))
   @IsString()
-  @MaxLength(32)
+  @MinLength(2)
+  @MaxLength(20)
+  @Matches(/^[A-Z0-9-]+$/, { message: 'Mã phòng ban chỉ được chứa chữ in hoa, số và dấu gạch ngang.' })
   departmentCode?: string;
 
-  @ApiPropertyOptional({ example: 'Phòng khám tổng quát', maxLength: 120 })
+  @ApiPropertyOptional({ example: 'Phòng khám tổng quát', minLength: 2, maxLength: 100 })
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @MaxLength(120)
+  @MinLength(2)
+  @MaxLength(100)
+  @Matches(/^[\p{L}\p{N}\s/&().,-]+$/u, { message: 'Tên phòng ban chứa ký tự không hợp lệ.' })
   name?: string;
 
-  @ApiPropertyOptional({ example: '2' })
+  @ApiPropertyOptional({ example: '2', maxLength: 2, description: 'Tầng là số từ 0 đến 99, không nhập chữ' })
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @MaxLength(40)
+  @MaxLength(2)
+  @Matches(/^\d{1,2}$/, { message: 'Tầng chỉ được nhập số từ 0 đến 99.' })
   floor?: string;
 
   @ApiPropertyOptional({ enum: OperationalStatus, example: OperationalStatus.ACTIVE })
@@ -88,9 +106,11 @@ export class UpdateDepartmentDto {
   @IsBoolean()
   canReceiveOrders?: boolean;
 
-  @ApiPropertyOptional({ example: 'Updated department description' })
+  @ApiPropertyOptional({ example: 'Updated department description', maxLength: 500 })
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @MaxLength(500)
   description?: string;
 }
 

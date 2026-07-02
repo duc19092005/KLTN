@@ -6,7 +6,6 @@ import BlockchainStatusBadge from '../../../shared/components/BlockchainStatusBa
 import { useAuth } from '../../../providers/AuthProvider';
 import { departmentService } from '../apis/departmentService';
 import { staffService } from '../apis/staffService';
-import { FaceStepUpModal } from '../../auth';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
 
@@ -62,7 +61,6 @@ export default function DepartmentsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState(null); // department awaiting face step-up (Tier A)
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
 
   const load = async (page = pagination.page) => {
@@ -103,9 +101,6 @@ export default function DepartmentsPage() {
     setIsModalOpen(true);
   };
   const closeModal = () => { setForm(emptyForm); setEditingDepartment(null); setIsModalOpen(false); };
-  // Create/update anchor on-chain via a step-up SESSION: if none is active the axios interceptor
-  // transparently prompts one face scan and replays the request, so the admin scans once per
-  // session rather than for every save.
   const submitDepartment = async (event) => {
     event.preventDefault(); if (!form.departmentCode.trim() || !form.name.trim()) return;
     const payload = {
@@ -142,19 +137,10 @@ export default function DepartmentsPage() {
     } catch (err) { toast.error(getError(err, 'Không gán được phụ trách')); }
     finally { setBusy(false); }
   };
-  // Deleting a department is irreversible -> require a fresh face scan. Open the step-up modal
-  // for the chosen department; the actual delete runs in handleDeleteStepUp once a ticket exists.
-  const removeDepartment = (id) => {
-    const dep = departments.find((d) => d.id === id) || { id };
-    setPendingDelete(dep);
-  };
-  const handleDeleteStepUp = async (ticket) => {
-    const id = pendingDelete?.id;
-    setPendingDelete(null);
-    if (!id) return;
+  const removeDepartment = async (id) => {
     setBusy(true);
     try {
-      await departmentService.remove(id, ticket);
+      await departmentService.remove(id);
       if (selectedDepartment?.id === id) setSelectedDepartment(null);
       toast.success('Xóa phòng ban thành công!');
       await load(pagination.page);
@@ -181,16 +167,6 @@ export default function DepartmentsPage() {
           />
         )}
         {isModalOpen && <DepartmentModal form={form} setForm={setForm} onSubmit={submitDepartment} onClose={closeModal} busy={busy} editing={Boolean(editingDepartment)} />}
-        {pendingDelete && (
-          <FaceStepUpModal
-            action="DELETE_DEPARTMENT"
-            resourceId={pendingDelete.id}
-            title="Xác nhận xóa phòng ban"
-            description={`Xóa phòng ban "${pendingDelete.name || pendingDelete.id}" là thao tác không thể hoàn tác. Vui lòng quét khuôn mặt để xác nhận chính bạn thực hiện.`}
-            onSuccess={handleDeleteStepUp}
-            onClose={() => setPendingDelete(null)}
-          />
-        )}
       </div>
     </DashboardLayout>
   );
@@ -227,13 +203,6 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
   return (
     <div className="space-y-5">
       <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-        <div className="mb-4 flex items-start gap-3">
-          <div className="grid h-9 w-9 place-items-center rounded-2xl bg-cyan-50 text-cyan-600">⌕</div>
-          <div>
-            <h3 className="text-base font-black text-slate-950">Bộ lọc phòng ban</h3>
-            <p className="text-xs font-semibold text-slate-400">Lọc theo mã, tên phòng ban, phân loại hoặc quyền nhận chỉ định...</p>
-          </div>
-        </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_1fr_1fr_auto] md:items-end">
           <label className="space-y-1.5">
             <span className="text-xs font-black text-slate-600">Tên / Mã phòng ban</span>
@@ -262,7 +231,6 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
           <div>
             <h3 className="text-xl font-black text-slate-950">Danh sách phòng ban</h3>
-            <p className="mt-1 text-sm font-semibold text-slate-500">Theo dõi phân loại, phụ trách, số nhân sự và trạng thái dữ liệu.</p>
           </div>
           <span className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-1 text-xs font-black text-slate-600">{visibleDepartments.length} / {pagination.total} phòng</span>
         </div>
@@ -443,15 +411,80 @@ function DepartmentHistory({ departmentId }) {
     </div>
   );
 }
-function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing }) { const canReceiveOrders = canDepartmentReceiveOrders(form.type); return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm"><form onSubmit={onSubmit} className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl space-y-4"><div className="flex items-start justify-between"><div><p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.18em]">Thiết lập phòng ban</p><h3 className="text-2xl font-black text-slate-950">{editing ? 'Cập nhật phòng ban' : 'Tạo phòng ban'}</h3><p className="text-sm text-slate-500">Khai báo mã, phân loại, quyền nhận chỉ định và nhiệm vụ. Chuyên khoa được cấu hình ở hồ sơ bác sĩ.</p></div><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500">Đóng</button></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Input label="Mã phòng ban" value={form.departmentCode} onChange={(v) => setForm({ ...form, departmentCode: v })} placeholder="PB-XRAY" required /><Input label="Tên phòng ban" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="X-Ray, MRI, Lễ tân..." required /><Input label="Tầng" value={form.floor} onChange={(v) => setForm({ ...form, floor: v })} placeholder="VD: 2" /><Select label="Loại phòng ban" value={form.type} onChange={(v) => setForm({ ...form, type: v, canReceiveOrders: canDepartmentReceiveOrders(v) ? form.canReceiveOrders : false })} options={DEPARTMENT_TYPES} />{canReceiveOrders && <label className="rounded-2xl border border-cyan-100 bg-cyan-50/60 p-4 flex items-start gap-3"><input type="checkbox" checked={Boolean(form.canReceiveOrders)} onChange={(e) => setForm({ ...form, canReceiveOrders: e.target.checked })} className="mt-1 h-4 w-4" /><span><strong className="block text-sm text-cyan-800">Nhận phiếu chỉ định</strong><small className="mt-1 block text-xs font-semibold text-cyan-600">Bật cho Xét nghiệm, X-Ray, MRI, Siêu âm, Nhà thuốc để hiện trong biểu mẫu bác sĩ.</small></span></label>}</div><Textarea label="Mô tả nhiệm vụ" value={form.description} onChange={(v) => setForm({ ...form, description: v })} placeholder="Mô tả chức năng phòng ban" /><button disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 disabled:opacity-70">{busy && <LoadingIndicator size="sm" tone="white" />}{editing ? 'Lưu thay đổi' : 'Tạo phòng ban'}</button></form></div>; }
+function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing }) {
+  const canReceiveOrders = canDepartmentReceiveOrders(form.type);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+      <form onSubmit={onSubmit} className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl space-y-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="text-2xl font-black text-slate-950">{editing ? 'Cập nhật phòng ban' : 'Tạo phòng ban'}</h3>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500">Đóng</button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input
+            label="Mã phòng ban"
+            value={form.departmentCode}
+            onChange={(v) => setForm({ ...form, departmentCode: v.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 20) })}
+            placeholder="PB-XRAY"
+            required
+            minLength={2}
+            maxLength={20}
+            pattern="[A-Z0-9-]+"
+          />
+          <Input
+            label="Tên phòng ban"
+            value={form.name}
+            onChange={(v) => setForm({ ...form, name: v.slice(0, 100) })}
+            placeholder="X-Ray, MRI, Lễ tân..."
+            required
+            minLength={2}
+            maxLength={100}
+          />
+          <Input
+            label="Tầng"
+            type="number"
+            value={form.floor}
+            onChange={(v) => setForm({ ...form, floor: v.replace(/\D/g, '').slice(0, 2) })}
+            placeholder="VD: 2"
+            min="0"
+            max="99"
+            maxLength={2}
+          />
+          <Select label="Loại phòng ban" value={form.type} onChange={(v) => setForm({ ...form, type: v, canReceiveOrders: canDepartmentReceiveOrders(v) ? form.canReceiveOrders : false })} options={DEPARTMENT_TYPES} />
+          {canReceiveOrders && <label className="rounded-2xl border border-cyan-100 bg-cyan-50/60 p-4 flex items-start gap-3"><input type="checkbox" checked={Boolean(form.canReceiveOrders)} onChange={(e) => setForm({ ...form, canReceiveOrders: e.target.checked })} className="mt-1 h-4 w-4" /><span><strong className="block text-sm text-cyan-800">Nhận phiếu chỉ định</strong><small className="mt-1 block text-xs font-semibold text-cyan-600">Bật cho Xét nghiệm, X-Ray, MRI, Siêu âm, Nhà thuốc để hiện trong biểu mẫu bác sĩ.</small></span></label>}
+        </div>
+        <Textarea label="Mô tả nhiệm vụ" value={form.description} onChange={(v) => setForm({ ...form, description: v.slice(0, 500) })} placeholder="Mô tả chức năng phòng ban" maxLength={500} />
+        <button disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 disabled:opacity-70">{busy && <LoadingIndicator size="sm" tone="white" />}{editing ? 'Lưu thay đổi' : 'Tạo phòng ban'}</button>
+      </form>
+    </div>
+  );
+}
 function InfoBox({ label, value }) { return <div className="rounded-xl bg-white border border-slate-100 p-3"><p className="text-[11px] uppercase tracking-wider font-black text-slate-400">{label}</p><p className="mt-1 text-sm font-bold text-slate-800">{value}</p></div>; }
 function MiniMetric({ label, value }) { return <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className="mt-0.5 text-sm font-black text-slate-800">{value}</p></div>; }
 function Alert({ children }) { return <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">{children}</div>; }
 function Empty({ title, desc }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><strong>{title}</strong><p className="mt-1 text-sm text-slate-500">{desc}</p></div>; }
 function SmallButton({ children, onClick, disabled, danger }) { return <button type="button" disabled={disabled} onClick={onClick} className={`rounded-xl border px-3 py-2 text-xs font-black disabled:opacity-50 ${danger ? 'border-rose-100 bg-rose-50 text-rose-600 hover:bg-rose-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-cyan-50 hover:text-cyan-600'}`}>{children}</button>; }
-function Input({ label, value, onChange, required, placeholder }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><input required={required} value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none" /></label>; }
+function Input({ label, value, onChange, required, placeholder, type = 'text', min, max, minLength, maxLength, pattern, hint }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-[13px] font-bold text-slate-700">{label}</span>
+      <input type={type} required={required} value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} min={min} max={max} minLength={minLength} maxLength={maxLength} pattern={pattern} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none" />
+      {hint && <small className="block text-[11px] font-semibold text-slate-400">{hint}</small>}
+    </label>
+  );
+}
 function Select({ label, value, onChange, options }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><select value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none">{options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>; }
-function Textarea({ label, value, onChange, placeholder }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><textarea rows={4} value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none" /></label>; }
+function Textarea({ label, value, onChange, placeholder, maxLength, hint }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-[13px] font-bold text-slate-700">{label}</span>
+      <textarea rows={4} value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none" />
+      {hint && <small className="block text-[11px] font-semibold text-slate-400">{hint}</small>}
+    </label>
+  );
+}
 function Pagination({ pagination, onPageChange }) {
   return (
     <div className="flex items-center justify-between border-t border-slate-100 p-4">
