@@ -5,7 +5,6 @@ import axios from 'axios';
 import App from './routes/AppRoutes';
 import { AuthProvider } from './providers/AuthProvider';
 import { ToastProvider } from './providers/ToastProvider';
-import { StepUpSessionProvider, ScreenLockProvider } from './features/auth';
 import { PreferencesProvider } from './providers/PreferencesProvider';
 import './index.css';
 
@@ -17,11 +16,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <AuthProvider>
         <PreferencesProvider>
           <ToastProvider>
-            <StepUpSessionProvider>
-              <ScreenLockProvider>
-                <App />
-              </ScreenLockProvider>
-            </StepUpSessionProvider>
+            <App />
           </ToastProvider>
         </PreferencesProvider>
       </AuthProvider>

@@ -24,9 +24,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       this.logger.error(`[${request.method} ${request.url}] ${detail}`);
     }
 
-    // Preserve a machine-readable error code when the thrower supplied one (e.g.
-    // STEPUP_SESSION_REQUIRED). The frontend axios interceptor keys off this code to transparently
-    // open a face-scan and replay the request — dropping it silently breaks the entire step-up flow.
+    // Nest can receive object responses in HttpException. Preserve them instead of coercing to a
+    // plain string so API clients can still read structured error codes when present.
     const code =
       typeof exceptionResponse === 'object' && exceptionResponse && 'code' in exceptionResponse
         ? (exceptionResponse as any).code

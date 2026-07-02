@@ -27,8 +27,6 @@ import { WalletLoginUseCase } from './application/use-cases/wallet-login.use-cas
 import { CreateFaceChallengeUseCase } from './application/use-cases/create-face-challenge.use-case';
 import { VerifyFaceUseCase } from './application/use-cases/verify-face.use-case';
 import { VerifyFaceForStepUpUseCase } from './application/use-cases/verify-face-for-stepup.use-case';
-import { OpenStepUpSessionUseCase } from './application/use-cases/open-stepup-session.use-case';
-import { UpdateAutoLockUseCase } from './application/use-cases/update-auto-lock.use-case';
 import { GenerateMfaSecretUseCase } from './application/use-cases/generate-mfa-secret.use-case';
 import { GetMeUseCase } from './application/use-cases/get-me.use-case';
 import { GetMyProfileUseCase } from './application/use-cases/get-my-profile.use-case';
@@ -87,8 +85,6 @@ import { StepUpTicketIssuerAdapter } from './infrastructure/adapters/stepup-tick
     CreateFaceChallengeUseCase,
     VerifyFaceUseCase,
     VerifyFaceForStepUpUseCase,
-    OpenStepUpSessionUseCase,
-    UpdateAutoLockUseCase,
     GenerateMfaSecretUseCase,
     GetMeUseCase,
     GetMyProfileUseCase,

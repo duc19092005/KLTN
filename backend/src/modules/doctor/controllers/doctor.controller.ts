@@ -8,7 +8,6 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
-import { RequireStepUpSession } from '../../../common/stepup/require-stepup-session.decorator';
 import { CreateDoctorDto, CreateDoctorWithStaffDto, DoctorQueryDto, UpdateDoctorDto } from '../dto/doctor.dto';
 import { DoctorService } from '../services/doctor.service';
 import { uploadAvatarToCloudinary } from '../../../infrastructure/storage/cloudinary-avatar-uploader';
@@ -42,14 +41,12 @@ export class DoctorController {
   }
 
   @Post()
-  @RequireStepUpSession()
   @ApiOperation({ summary: 'Create a doctor profile for a staff profile with DOCTOR role' })
   create(@Body() dto: CreateDoctorDto) {
     return this.service.create(dto);
   }
 
   @Post('full')
-  @RequireStepUpSession()
   @ApiOperation({ summary: 'Create doctor user, staff profile, and doctor profile in one transaction' })
   createFull(@Body() dto: CreateDoctorWithStaffDto) {
     return this.service.createWithStaff(dto);
@@ -93,7 +90,6 @@ export class DoctorController {
   }
 
   @Patch(':id')
-  @RequireStepUpSession()
   @ApiOperation({ summary: 'Update doctor specialty, license, qualification, or experience' })
   update(@Param('id') id: string, @Body() dto: UpdateDoctorDto, @CurrentUser() user: AuthUser) {
     return this.service.update(id, dto, user?.sub);

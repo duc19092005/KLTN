@@ -26,17 +26,7 @@ export default function ChangePasswordPage() {
     try {
       const result = await authService.changePassword(form.currentPassword, form.newPassword);
 
-      if (result.data.stepUpSession?.session) {
-        if (result.data.user) updateSession(result.data.user);
-        window.dispatchEvent(new CustomEvent('hms-stepup-session', { detail: {
-          session: result.data.stepUpSession.session,
-          idleExpiresAt: result.data.stepUpSession.idleExpiresAt,
-          absoluteExpiresAt: result.data.stepUpSession.absoluteExpiresAt,
-        } }));
-        toast.success('Đổi mật khẩu thành công! Chào mừng trở lại.');
-        navigate(getDashboardRoute(result.data.user?.role || 'RECEPTIONIST'), { replace: true });
-        return;
-      }
+      if (result.data.user) updateSession(result.data.user);
 
       toast.success('Đổi mật khẩu thành công.');
       navigate(getDashboardRoute(result.data.user?.role || 'RECEPTIONIST'), { replace: true });

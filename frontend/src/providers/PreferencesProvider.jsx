@@ -9,7 +9,7 @@ import { useAuth } from './AuthProvider';
  * feature self-contained (no migration / API surface) while still being per-account on a shared
  * workstation: signing in as a different operator loads their own prefs.
  *
- * Security-authoritative settings (auto-lock minutes, password) stay on the backend — this only
+ * Account security settings such as passwords stay on the backend — this only
  * covers preferences where the worst case of tampering is a different theme color.
  */
 const PreferencesContext = createContext(null);
@@ -35,7 +35,6 @@ export const DEFAULT_PREFERENCES = {
   reduceMotion: false, // calm UI: kill non-essential animations
   compactTables: false, // denser tables for data-heavy roles
   soundAlerts: true, // audible cue for new queue / results
-  lockOnHidden: false, // lock the screen the moment the tab/window loses focus
   showGreeting: true, // friendly greeting banner on dashboards
   clockFace: 'digital', // 'digital' | 'analog' | 'minimal'
 };

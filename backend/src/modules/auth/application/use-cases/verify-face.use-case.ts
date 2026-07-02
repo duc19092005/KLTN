@@ -2,7 +2,6 @@ import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { AUTH_REPOSITORY, AuthRepositoryPort } from '../ports/auth.repository.port';
 import { ACCESS_TOKEN_SIGNER, AccessTokenSignerPort } from '../ports/access-token-signer.port';
 import { SECURITY_EVENT_LOGGER, SecurityEventLoggerPort } from '../ports/security-event-logger.port';
-import { STEPUP_TICKET_ISSUER, StepUpTicketIssuerPort } from '../ports/stepup-ticket-issuer.port';
 import { AuthUserLookupService } from '../services/auth-user-lookup.service';
 import { FaceMatchService } from '../services/face-match.service';
 import { assertNotFaceLocked, validateFaceDescriptor } from '../../domain/face.util';
@@ -19,7 +18,6 @@ export class VerifyFaceUseCase {
     @Inject(AUTH_REPOSITORY) private readonly repo: AuthRepositoryPort,
     @Inject(ACCESS_TOKEN_SIGNER) private readonly tokenSigner: AccessTokenSignerPort,
     @Inject(SECURITY_EVENT_LOGGER) private readonly audit: SecurityEventLoggerPort,
-    @Inject(STEPUP_TICKET_ISSUER) private readonly stepUp: StepUpTicketIssuerPort,
     private readonly lookup: AuthUserLookupService,
     private readonly faceMatch: FaceMatchService,
   ) {}
@@ -93,24 +91,11 @@ export class VerifyFaceUseCase {
       ip,
     });
 
-    // Face login already proves a live biometric match, so we open a step-up privilege session from
-    // that same proof. The user lands on the dashboard with "sudo mode" already active and does not
-    // have to scan a second time for the first sensitive write. Best-effort: a session hiccup must
-    // never block a valid login. Each sensitive action is still audited individually downstream.
-    let stepUpSession: unknown = null;
-    try {
-      stepUpSession = await this.stepUp.issueSession(userId, 'SENSITIVE_WRITE', ip);
-      await this.audit.write(userId, 'FACE_STEPUP_SESSION_OPEN', 'User', userId, { scope: 'SENSITIVE_WRITE', context: 'LOGIN', ip });
-    } catch (err) {
-      console.warn(`[FaceVerify] auto step-up session open failed for userId=${userId}:`, (err as Error)?.message);
-    }
-
     return {
       access_token: this.tokenSigner.sign(user, { verified: true, walletAddress: user.adminProfile?.walletAddress }),
       verified: true,
       algorithm: 'face-api/euclidean-distance/min-of-multi-sample',
       matchedDescriptorCount: storedDescriptors.length,
-      stepUpSession,
       user: toPublicUser(user, true),
     };
   }

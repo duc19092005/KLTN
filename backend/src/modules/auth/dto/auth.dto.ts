@@ -4,7 +4,6 @@ import {
   IsArray,
   IsEmail,
   IsEthereumAddress,
-  IsNumber,
   IsOptional,
   IsString,
   Length,
@@ -69,25 +68,6 @@ export class StepUpFaceDto {
   @IsString()
   @MaxLength(128)
   resourceId?: string;
-}
-
-export class OpenStepUpSessionDto {
-  @IsArray()
-  embedding: number[];
-
-  @IsString()
-  @Length(32, 128)
-  challenge: string;
-
-  @IsOptional()
-  @IsString()
-  @Length(2, 64)
-  scope?: string;
-}
-
-export class UpdateAutoLockDto {
-  @IsNumber()
-  minutes: number;
 }
 
 export class WalletChallengeDto {

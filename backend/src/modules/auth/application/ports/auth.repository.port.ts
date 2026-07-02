@@ -87,9 +87,6 @@ export interface AuthRepositoryPort {
   consumeFaceChallenge(userId: string, challenge: string, now: Date): Promise<number>;
   updateFaceFailure(userId: string, failedFaceAttempts: number, faceLockedUntil: Date | null): Promise<void>;
   resetFaceFailures(userId: string): Promise<void>;
-
-  /** Persist the user's screen auto-lock preference (idle minutes). Caller clamps the range. */
-  updateAutoLockMinutes(userId: string, minutes: number): Promise<UserWithProfile>;
 }
 
 export type { UserRole };

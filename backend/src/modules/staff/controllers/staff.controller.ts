@@ -10,7 +10,6 @@ import { AuthUser } from '../../../common/types/auth-user.type';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
 import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
-import { RequireStepUpSession } from '../../../common/stepup/require-stepup-session.decorator';
 import { CreateStaffDto, StaffQueryDto, UpdateStaffDto } from '../dto/staff.dto';
 import { StaffService } from '../services/staff.service';
 import { uploadAvatarToCloudinary } from '../../../infrastructure/storage/cloudinary-avatar-uploader';
@@ -24,7 +23,6 @@ export class StaffController {
   constructor(private readonly service: StaffService) {}
 
   @Post()
-  @RequireStepUpSession()
   @ApiOperation({ summary: 'Create staff profile and login user account' })
   create(@Body() dto: CreateStaffDto, @CurrentUser() user: AuthUser) {
     return this.service.create(dto, user?.sub);
@@ -68,21 +66,18 @@ export class StaffController {
   }
 
   @Patch(':id')
-  @RequireStepUpSession()
   @ApiOperation({ summary: 'Update staff profile and linked user account' })
   update(@Param('id') id: string, @Body() dto: UpdateStaffDto, @CurrentUser() user: AuthUser) {
     return this.service.update(id, dto, user?.sub);
   }
 
   @Patch(':id/lock')
-  @RequireStepUpSession()
   @ApiOperation({ summary: 'Lock a staff account' })
   lock(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.service.setStatus(id, UserStatus.INACTIVE, user?.sub);
   }
 
   @Patch(':id/unlock')
-  @RequireStepUpSession()
   @ApiOperation({ summary: 'Unlock a staff account' })
   unlock(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.service.setStatus(id, UserStatus.ACTIVE, user?.sub);

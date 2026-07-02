@@ -8,7 +8,6 @@ import {
   VolumeX,
   Bell,
   Monitor,
-  ScanFace,
   RotateCcw,
   Sun,
   Moon,
@@ -169,27 +168,6 @@ export default function PreferencesPanel() {
         </SettingRow>
       </SettingsCard>
 
-      {/* Privacy on shared workstations */}
-      <SettingsCard
-        icon={ScanFace}
-        title="Quyền riêng tư"
-        description="Bảo vệ phiên làm việc trên máy trạm dùng chung."
-        accent={accentHex}
-      >
-        <SettingRow
-          htmlFor="pref-lock-hidden"
-          icon={ScanFace}
-          title="Khóa ngay khi rời cửa sổ"
-          description="Tự khóa màn hình ngay khi bạn chuyển tab hoặc thu nhỏ cửa sổ, không chờ hết thời gian rảnh."
-        >
-          <Toggle
-            id="pref-lock-hidden"
-            checked={prefs.lockOnHidden}
-            onChange={(v) => setPreference('lockOnHidden', v)}
-            accent={accentHex}
-          />
-        </SettingRow>
-      </SettingsCard>
 
       {/* Reset */}
       <div className="flex justify-end">

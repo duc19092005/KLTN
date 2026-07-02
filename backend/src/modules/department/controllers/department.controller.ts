@@ -7,7 +7,6 @@ import { AuthUser } from '../../../common/types/auth-user.type';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
 import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
-import { RequireStepUpSession } from '../../../common/stepup/require-stepup-session.decorator';
 import { DepartmentService } from '../services/department.service';
 import { AssignManagerDto, CreateDepartmentDto, DepartmentQueryDto, UpdateDepartmentDto } from '../dto/department.dto';
 
@@ -20,7 +19,6 @@ export class DepartmentController {
   constructor(private readonly service: DepartmentService) {}
 
   @Post()
-  @RequireStepUpSession()
   @ApiOperation({ summary: 'Create a department' })
   create(@Body() dto: CreateDepartmentDto, @CurrentUser() user: AuthUser) {
     return this.service.create(dto, user?.sub);
@@ -58,7 +56,6 @@ export class DepartmentController {
   }
 
   @Patch(':id')
-  @RequireStepUpSession()
   @ApiOperation({ summary: 'Update a department' })
   update(@Param('id') id: string, @Body() dto: UpdateDepartmentDto, @CurrentUser() user: AuthUser) {
     return this.service.update(id, dto, user?.sub);

@@ -5,15 +5,11 @@ import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { useAuth } from '../../../providers/AuthProvider';
 import { useToast } from '../../../providers/ToastProvider';
 import { profileService } from '../apis/profileService';
-import { authService } from '../../auth';
 import { getRoleNav } from '../constants/roleNav';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import PreferencesPanel from '../components/PreferencesPanel';
 import { usePreferences } from '../../../providers/PreferencesProvider';
 import { User, SlidersHorizontal } from 'lucide-react';
-
-const AUTO_LOCK_MIN = 1;
-const AUTO_LOCK_MAX = 15;
 
 const TABS = [
   { id: 'profile', label: 'Hồ sơ', icon: User },
@@ -57,25 +53,6 @@ export default function ProfilePage() {
   const requestedTab = location.state?.tab === 'profile' ? 'profile' : (location.state?.tab ? 'settings' : 'profile');
   const [activeTab, setActiveTab] = useState(requestedTab);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [autoLock, setAutoLock] = useState(user?.autoLockMinutes ?? 5);
-  const [savingAutoLock, setSavingAutoLock] = useState(false);
-
-  useEffect(() => { if (user?.autoLockMinutes) setAutoLock(user.autoLockMinutes); }, [user?.autoLockMinutes]);
-
-  const saveAutoLock = async () => {
-    setSavingAutoLock(true);
-    try {
-      const res = await authService.updateAutoLock(autoLock);
-      const saved = res.data?.autoLockMinutes ?? autoLock;
-      setAutoLock(saved);
-      updateSession({ autoLockMinutes: saved });
-      toast.success(`Đã lưu: tự khóa sau ${saved} phút không hoạt động.`);
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Không lưu được cài đặt khóa màn hình');
-    } finally {
-      setSavingAutoLock(false);
-    }
-  };
 
   const roleNav = getRoleNav(user?.role);
 
@@ -254,46 +231,6 @@ export default function ProfilePage() {
               </section>
             )}
 
-            {/* Security: screen auto-lock (all roles) */}
-            <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-              <div className="flex flex-col gap-1">
-                <h3 className="text-lg font-black text-slate-950">Khóa màn hình tự động</h3>
-                <p className="text-sm text-slate-500">
-                  Màn hình sẽ tự khóa sau một khoảng thời gian không thao tác, mở lại bằng quét khuôn mặt.
-                  Vì máy trạm dùng chung trong bệnh viện, hệ thống giới hạn tối đa {AUTO_LOCK_MAX} phút.
-                </p>
-              </div>
-              <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <label htmlFor="auto-lock-range" className="text-[11px] font-black uppercase tracking-wider text-slate-400">Thời gian rảnh trước khi khóa</label>
-                    <span className="text-sm font-black text-cyan-700">{autoLock} phút</span>
-                  </div>
-                  <input
-                    id="auto-lock-range"
-                    type="range"
-                    min={AUTO_LOCK_MIN}
-                    max={AUTO_LOCK_MAX}
-                    step={1}
-                    value={autoLock}
-                    onChange={(e) => setAutoLock(Number(e.target.value))}
-                    className="mt-3 w-full accent-cyan-600"
-                  />
-                  <div className="mt-1 flex justify-between text-[10px] font-bold text-slate-400">
-                    <span>{AUTO_LOCK_MIN} phút</span>
-                    <span>{AUTO_LOCK_MAX} phút</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={saveAutoLock}
-                  disabled={savingAutoLock || autoLock === (user?.autoLockMinutes ?? 5)}
-                  className="shrink-0 rounded-xl bg-cyan-600 px-5 py-2.5 text-sm font-black text-white hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {savingAutoLock ? 'Đang lưu...' : 'Lưu cài đặt'}
-                </button>
-              </div>
-            </section>
             </div>
             )}
           </>

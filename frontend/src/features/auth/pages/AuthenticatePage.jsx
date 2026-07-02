@@ -7,7 +7,6 @@ import { useAuth } from '../../../providers/AuthProvider';
 import FaceCapture from '../components/FaceCapture';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { getDashboardRoute } from '../../../shared/constants/roleRoutes';
-import { stepUpSession } from '../../../shared/stepup/sessionStore';
 
 export default function AuthenticatePage() {
   const navigate = useNavigate();
@@ -87,15 +86,6 @@ export default function AuthenticatePage() {
       const result = await authService.verifyFace(embedding, challenge);
       const verifiedUser = result.data.user || { ...user, verified: true };
       // Login already proved a live face match; the backend opens a step-up privilege session from
-      // that same proof. Seed the in-memory store so the dashboard starts in "sudo mode" and the
-      // user is not asked to scan again for the first sensitive action.
-      const session = result.data.stepUpSession;
-      if (session?.session) {
-        stepUpSession.setSession(session.session, {
-          idleExpiresAt: session.idleExpiresAt,
-          absoluteExpiresAt: session.absoluteExpiresAt,
-        });
-      }
       updateSession(verifiedUser);
       goDashboard(verifiedUser);
     } catch (err) { showStatus(err.response?.data?.message || err.message, true); }

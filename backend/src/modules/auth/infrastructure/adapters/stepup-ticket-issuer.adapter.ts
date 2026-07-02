@@ -14,7 +14,4 @@ export class StepUpTicketIssuerAdapter implements StepUpTicketIssuerPort {
     return this.stepUp.issue(userId, action, resourceId ?? null, ip);
   }
 
-  issueSession(userId: string, scope = 'SENSITIVE_WRITE', ip?: string): Promise<unknown> {
-    return this.stepUp.issueSession(userId, scope, ip);
-  }
 }

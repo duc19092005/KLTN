@@ -125,8 +125,6 @@ model User {
   failedFaceAttempts Int       @default(0)
   faceLockedUntil    DateTime?
 
-  // User preference: idle minutes before the screen auto-locks (clamped 1..15 in code; default 5).
-  autoLockMinutes    Int       @default(5)
 
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
@@ -137,7 +135,6 @@ model User {
   refreshTokens     RefreshToken[]
   performedResults  MedicalResult[]
   stepUpTickets     StepUpTicket[]
-  stepUpSessions    StepUpSession[]
 
   notifications     Notification[]
 
@@ -800,29 +797,6 @@ model StepUpTicket {
   @@index([userId])
   @@index([action])
   @@index([expiresAt])
-}
-
-/// A short-lived "sudo mode" privilege session opened by a single face scan. Unlike StepUpTicket
-/// (single-use, bound to one record), a session authorizes many Tier-B sensitive writes within a
-/// time window so users are not forced to re-scan for every action. It slides on use (idleExpiresAt)
-/// up to a hard ceiling (absoluteExpiresAt), can be revoked early, and only the SHA256 of the raw
-/// session token is stored. Every individual action is still audit-logged with its own actorId.
-model StepUpSession {
-  id                String   @id @default(uuid())
-  tokenHash         String   @unique // SHA256(raw session token); raw token returned to client once
-  userId            String
-  user              User     @relation(fields: [userId], references: [id])
-  scope             String            // e.g. "SENSITIVE_WRITE"
-  ip                String?
-  createdAt         DateTime @default(now())
-  lastUsedAt        DateTime @default(now())
-  idleExpiresAt     DateTime          // sliding: extended on each use
-  absoluteExpiresAt DateTime          // hard cap regardless of activity
-  revokedAt         DateTime?         // set when user locks the session early
-
-  @@index([userId])
-  @@index([scope])
-  @@index([idleExpiresAt])
 }
 
 

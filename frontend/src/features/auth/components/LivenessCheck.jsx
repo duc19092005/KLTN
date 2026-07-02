@@ -56,9 +56,9 @@ export default function LivenessCheck({
   const anchorPendingRef = useRef(false);
 
   // Keep the latest callbacks in refs. The completion effect below arms a 1.5s timer; if it depended
-  // on these callbacks directly, any parent re-render that recreates them (e.g. ScreenLockOverlay's
-  // per-second clock tick) would clear and re-arm the timer before it could fire — hanging forever
-  // on the success screen. Refs let the timer depend only on `allPassedUI`.
+  // on these callbacks directly, any parent re-render that recreates them would clear and re-arm
+  // the timer before it could fire — hanging forever on the success screen. Refs let the timer
+  // depend only on `allPassedUI`.
   const onLivenessPassRef = useRef(onLivenessPass);
   const onErrorRef = useRef(onError);
   onLivenessPassRef.current = onLivenessPass;

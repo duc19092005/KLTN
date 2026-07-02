@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthService } from '../services/auth.service';
 import { AuthRateLimiterService } from '../services/auth-rate-limiter.service';
@@ -16,21 +16,17 @@ import {
   StaffLoginDto,
   ChangePasswordDto,
   StepUpFaceDto,
-  OpenStepUpSessionDto,
-  UpdateAutoLockDto,
   ForgotPasswordChallengeDto,
   ForgotPasswordVerifyFaceDto,
   ForgotPasswordResetDto,
 } from '../dto/auth.dto';
 import { getAuthCookieOptions, getClearAuthCookieOptions } from '../constants/auth-security';
-import { StepUpService } from '../../../common/stepup/stepup.service';
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private authService: AuthService,
     private rateLimiter: AuthRateLimiterService,
-    private stepUpService: StepUpService,
   ) {}
 
   @Post('bootstrap')
@@ -216,53 +212,6 @@ export class AuthController {
       this.rateLimiter.recordFailure(key, 10 * 60 * 1000);
       throw error;
     }
-  }
-
-  /**
-   * Open a step-up SESSION ("sudo mode") with one face scan. Authorizes many Tier-B sensitive
-   * writes within its idle/absolute window so users are not forced to re-scan per record.
-   */
-  @UseGuards(JwtAuthGuard)
-  @Post('stepup-session')
-  async openStepUpSession(@CurrentUser() user: AuthUser, @Body() body: OpenStepUpSessionDto, @Req() request) {
-    const key = this.rateLimitKey(request, 'stepup-session', user.sub);
-    this.rateLimiter.assertAllowed(key, 5, 10 * 60 * 1000);
-    try {
-      const session = await this.authService.openStepUpSession(
-        user.sub,
-        body.embedding as number[],
-        body.challenge,
-        body.scope,
-        this.clientIp(request),
-      );
-      this.rateLimiter.reset(key);
-      return session;
-    } catch (error) {
-      this.rateLimiter.recordFailure(key, 10 * 60 * 1000);
-      throw error;
-    }
-  }
-
-  /** Report the caller's active step-up session deadlines (for the countdown badge), or none. */
-  @UseGuards(JwtAuthGuard)
-  @Get('stepup-session')
-  async getStepUpSession(@CurrentUser() user: AuthUser) {
-    return this.stepUpService.getActiveSession(user.sub);
-  }
-
-  /** Lock (revoke) the caller's active step-up sessions early — important on shared workstations. */
-  @UseGuards(JwtAuthGuard)
-  @Delete('stepup-session')
-  async revokeStepUpSession(@CurrentUser() user: AuthUser) {
-    await this.stepUpService.revokeSessions(user.sub);
-    return { success: true };
-  }
-
-  /** Save the caller's screen auto-lock preference (idle minutes). Server clamps to policy range. */
-  @UseGuards(JwtAuthGuard)
-  @Patch('auto-lock')
-  async updateAutoLock(@CurrentUser() user: AuthUser, @Body() body: UpdateAutoLockDto) {
-    return this.authService.updateAutoLock(user.sub, body.minutes);
   }
 
   @UseGuards(JwtAuthGuard)

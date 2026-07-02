@@ -7,7 +7,6 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
 import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
-import { RequireStepUpSession } from '../../../common/stepup/require-stepup-session.decorator';
 import { AiModelQueryDto, CreateAiModelDto, TestAiModelApiDto, RateAiModelDto, UpdateAiModelDto } from '../dto/ai-model.dto';
 import { AiModelService } from '../services/ai-model.service';
 
@@ -20,7 +19,6 @@ export class AiModelController {
 
   @Roles('ADMIN')
   @Post()
-  @RequireStepUpSession()
   create(@Body() dto: CreateAiModelDto, @CurrentUser() user: AuthUser) {
     return this.service.create(dto, user.sub);
   }
@@ -33,7 +31,6 @@ export class AiModelController {
 
   @Roles('ADMIN')
   @Patch(':id')
-  @RequireStepUpSession()
   update(@Param('id') id: string, @Body() dto: UpdateAiModelDto, @CurrentUser() user: AuthUser) {
     return this.service.update(id, dto, user.sub);
   }
@@ -89,7 +86,6 @@ export class AiModelController {
 
   @Roles('DOCTOR')
   @Post(':id/rate')
-  @RequireStepUpSession()
   rate(@Param('id') id: string, @Body() dto: RateAiModelDto, @CurrentUser() user: AuthUser) {
     return this.service.rateModel(id, user.sub, dto.satisfied, dto.feedback);
   }

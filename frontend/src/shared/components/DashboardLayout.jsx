@@ -20,8 +20,6 @@ import {
   Search,
   LogOut,
 } from 'lucide-react';
-import StepUpSessionBadge from './StepUpSessionBadge';
-import SleepButton from './SleepButton';
 import NotificationBell from './NotificationBell';
 import LiveClock from './LiveClock';
 
@@ -261,9 +259,6 @@ export default function DashboardLayout({
             </div>
 
 
-            {/* Step-up privilege session countdown + lock */}
-            <StepUpSessionBadge />
-
             {/* Notifications */}
             <NotificationBell />
 
@@ -280,9 +275,6 @@ export default function DashboardLayout({
             </div>
 
             <div className="h-5 w-[1px] bg-slate-200"></div>
-
-            {/* Sleep / lock screen */}
-            <SleepButton />
 
             {/* Logout Button */}
             <button
