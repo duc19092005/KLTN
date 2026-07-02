@@ -40,11 +40,15 @@ export class PrismaStaffRepository implements StaffRepositoryPort {
     if (username) checks.push({ username: username.trim() });
     if (email) checks.push({ email: email.trim().toLowerCase() });
     if (checks.length === 0) return null;
-    return this.prisma.user.findFirst({ where: { OR: checks }, select: { id: true } });
+    return this.prisma.user.findFirst({ where: { OR: checks }, select: { id: true, username: true, email: true } });
   }
 
   async findStaffByCitizenId(citizenId: string) {
     return this.prisma.staffProfile.findUnique({ where: { citizenId: citizenId.trim() }, select: { id: true } });
+  }
+
+  async findStaffByPhone(phone: string) {
+    return this.prisma.staffProfile.findFirst({ where: { phone: phone.trim() }, select: { id: true } });
   }
 
   async findStaffByEmployeeCode(employeeCode: string) {

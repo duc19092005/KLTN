@@ -36,6 +36,7 @@ export class CreateStaffUseCase {
     }
     await this.validator.assertUserUnique(dto.username, dto.email);
     await this.validator.assertCitizenIdUnique(dto.citizenId);
+    await this.validator.assertPhoneUnique(dto.phone);
     const employeeCode = dto.employeeCode || (await this.repo.generateEmployeeCode(dto.role));
     await this.validator.assertEmployeeCodeUnique(employeeCode);
     const passwordHash = await this.passwordHasher.hash(DEFAULT_STAFF_PASSWORD);

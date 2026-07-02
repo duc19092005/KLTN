@@ -25,9 +25,9 @@ export class StaffValidator {
 
   /**
    * Cross-check that the staff's role is compatible with the department type:
-   *  - RECEPTIONIST  → ADMINISTRATIVE only
+   *  - RECEPTIONIST  → any non-EXAMINATION department
    *  - DOCTOR        → EXAMINATION only
-   *  - LAB_MANAGER   → LABORATORY | IMAGING | PHARMACY
+   *  - LAB_MANAGER   → any non-EXAMINATION department
    *  - ADMIN         → no department restriction
    * Throws BadRequestException with a Vietnamese message that the UI surfaces directly.
    */
@@ -37,18 +37,18 @@ export class StaffValidator {
     if (!dept) throw new NotFoundException('Không tìm thấy phòng ban.');
 
     const map: Record<string, string[]> = {
-      RECEPTIONIST: ['ADMINISTRATIVE'],
-      DOCTOR: ['EXAMINATION', 'CLINICAL'],
-      LAB_MANAGER: ['LABORATORY', 'IMAGING', 'PHARMACY'],
+      RECEPTIONIST: ['ADMINISTRATIVE', 'CLINICAL', 'LABORATORY', 'IMAGING'],
+      DOCTOR: ['EXAMINATION'],
+      LAB_MANAGER: ['ADMINISTRATIVE', 'CLINICAL', 'LABORATORY', 'IMAGING'],
       ADMIN: [],
     };
     const allowed = map[role] || [];
     if (allowed.length === 0) return; // ADMIN: skip
     if (!allowed.includes(dept.type)) {
       const human: Record<UserRole, string> = {
-        RECEPTIONIST: 'Lễ tân chỉ thuộc phòng ban hành chính.',
+        RECEPTIONIST: 'Nhân sự chỉ thuộc các phòng ban không phải phòng khám.',
         DOCTOR: 'Bác sĩ chỉ thuộc phòng khám.',
-        LAB_MANAGER: 'Kỹ thuật viên cận lâm sàng chỉ thuộc khoa xét nghiệm, chẩn đoán hình ảnh hoặc dược.',
+        LAB_MANAGER: 'Nhân sự chỉ thuộc các phòng ban không phải phòng khám.',
         ADMIN: '',
       } as Record<UserRole, string>;
       throw new BadRequestException(human[role] || 'Vai trò không phù hợp với loại phòng ban.');
@@ -59,6 +59,8 @@ export class StaffValidator {
     if (!username && !email) return;
     const existing = await this.repo.findUserByUsernameOrEmail(username, email);
     if (existing && existing.id !== excludeUserId) {
+      if (username && existing.username === username.trim()) throw new ConflictException('Tên đăng nhập đã tồn tại.');
+      if (email && existing.email === email.trim().toLowerCase()) throw new ConflictException('Email đã tồn tại.');
       throw new ConflictException('Tên đăng nhập hoặc email đã tồn tại.');
     }
   }
@@ -67,6 +69,13 @@ export class StaffValidator {
     const existing = await this.repo.findStaffByCitizenId(citizenId);
     if (existing && existing.id !== excludeStaffId) {
       throw new ConflictException('CCCD/CMND đã tồn tại.');
+    }
+  }
+
+  async assertPhoneUnique(phone: string, excludeStaffId?: string): Promise<void> {
+    const existing = await this.repo.findStaffByPhone(phone);
+    if (existing && existing.id !== excludeStaffId) {
+      throw new ConflictException('Số điện thoại đã tồn tại.');
     }
   }
 

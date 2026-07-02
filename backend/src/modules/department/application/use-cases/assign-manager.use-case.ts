@@ -31,7 +31,7 @@ export class AssignManagerUseCase {
       }
 
       // Role-department compatibility. The manager's user role must match the department type:
-      //   ADMINISTRATIVE → RECEPTIONIST, CLINICAL → DOCTOR, LABORATORY/IMAGING/PHARMACY → LAB_MANAGER.
+      //   ADMINISTRATIVE → RECEPTIONIST, CLINICAL → DOCTOR, LABORATORY/IMAGING → LAB_MANAGER.
       // Mirror the rules already enforced when filing a staff member into a department, so a
       // receptionist cannot accidentally become the head of a paraclinical department or vice versa.
       const role = staff.userRole;
@@ -40,7 +40,6 @@ export class AssignManagerUseCase {
         CLINICAL: ['DOCTOR'],
         LABORATORY: ['LAB_MANAGER'],
         IMAGING: ['LAB_MANAGER'],
-        PHARMACY: ['LAB_MANAGER'],
       };
       const allowed = allowedByType[department.type] || [];
       if (allowed.length > 0 && !allowed.includes(role || '')) {
@@ -49,7 +48,6 @@ export class AssignManagerUseCase {
           CLINICAL: 'Phòng khám lâm sàng chỉ có thể giao cho bác sĩ làm trưởng phòng.',
           LABORATORY: 'Khoa xét nghiệm chỉ có thể giao cho kỹ thuật viên cận lâm sàng làm trưởng khoa.',
           IMAGING: 'Khoa chẩn đoán hình ảnh chỉ có thể giao cho kỹ thuật viên cận lâm sàng làm trưởng khoa.',
-          PHARMACY: 'Khoa dược chỉ có thể giao cho kỹ thuật viên dược/cận lâm sàng làm trưởng khoa.',
         };
         throw new BadRequestException(human[department.type] || 'Vai trò không phù hợp với loại phòng ban.');
       }

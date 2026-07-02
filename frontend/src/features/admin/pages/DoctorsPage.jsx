@@ -10,6 +10,55 @@ import { departmentService } from '../apis/departmentService';
 import DoctorDetailModal from '../components/DoctorDetailModal';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
+import { ExternalLink, MapPin } from 'lucide-react';
+
+const OSM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
+const MIN_BIRTH_YEAR = 1900;
+const VN_PHONE_REGEX = /^(0)(3[2-9]|5[2689]|7[06-9]|8[1-689]|9[0-46-9])\d{7}$/;
+const VN_CITIZEN_ID_REGEX = /^\d{12}$/;
+const VIETNAMESE_NAME_REGEX = /^[A-Za-zÀ-ỹ\s]+$/;
+const USERNAME_REGEX = /^[a-z0-9]+$/;
+const EMAIL_REGEX = /^[a-z0-9]+(?:[._-][a-z0-9]+)*@[a-z0-9]+(?:[-.][a-z0-9]+)*\.[a-z]{2,}$/;
+const MAX_FULL_NAME_LENGTH = 80;
+const MAX_USERNAME_LENGTH = 30;
+const MAX_POSITION_LENGTH = 80;
+const MAX_ADDRESS_LENGTH = 255;
+const MIN_YEARS_EXPERIENCE = 1;
+const MAX_YEARS_EXPERIENCE = 50;
+function buildGoogleMapsDirectionsUrl(lat, lng) { return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`; }
+function buildAddressQueries(query) {
+  const normalized = query.replace(/[\/\\]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return [...new Set([
+    query,
+    `${query}, Việt Nam`,
+    normalized,
+    `${normalized}, Việt Nam`,
+    `${normalized}, Hồ Chí Minh, Việt Nam`,
+  ])].filter((item) => item.length >= 3);
+}
+function getTypedHouseNumber(query) {
+  const match = /^(\d+[\w/-]*)\s+(?=(đường|duong|street|đ|d)\b)/i.exec((query || '').trim());
+  return match?.[1] || '';
+}
+function withTypedHouseNumber(query, displayName) {
+  const houseNumber = getTypedHouseNumber(query);
+  if (!houseNumber || displayName.toLowerCase().startsWith(houseNumber.toLowerCase())) return displayName;
+  return `${houseNumber} ${displayName}`;
+}
+function onlyDigits(value) { return (value || '').replace(/\D/g, ''); }
+function onlyVietnameseNameChars(value) { return (value || '').replace(/[^A-Za-zÀ-ỹ\s]/g, '').replace(/\s{2,}/g, ' ').slice(0, MAX_FULL_NAME_LENGTH); }
+function onlyUsernameChars(value) { return (value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]/g, '').slice(0, MAX_USERNAME_LENGTH); }
+function onlyEmailChars(value) { return (value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9@._-]/g, ''); }
+function limitPosition(value) { return (value || '').slice(0, MAX_POSITION_LENGTH); }
+function limitAddress(value) { return (value || '').slice(0, MAX_ADDRESS_LENGTH); }
+function isValidBirthDate(value) {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date.getFullYear() >= MIN_BIRTH_YEAR && date <= today;
+}
 
 const SPECIALTIES = [
   { value: 'GENERAL_INTERNAL_MEDICINE', label: 'Nội tổng quát' },
@@ -118,8 +167,14 @@ export default function DoctorsPage() {
   const load = async (page = pagination.page) => {
     setLoading(true);
     try {
+      const doctorParams = {
+        page,
+        limit: pagination.limit,
+        ...(filters.specialty ? { specialty: filters.specialty } : {}),
+        ...(filters.search?.trim() ? { search: filters.search.trim() } : {}),
+      };
       const [doctorRes, departmentRes] = await Promise.all([
-        doctorService.search({ ...filters, page, limit: pagination.limit }),
+        doctorService.search(doctorParams),
         departmentService.list({ limit: 100 }),
       ]);
       const data = doctorRes.data || {};
@@ -252,9 +307,145 @@ function DoctorRow({ doctor, onEdit, onViewDetails, busy }) {
 }
 function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy }) {
   const isCreate = mode === 'create';
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [addressSearched, setAddressSearched] = useState(false);
+  const [addressDropdownOpen, setAddressDropdownOpen] = useState(false);
+  const [addressTouched, setAddressTouched] = useState(false);
+
+  useEffect(() => {
+    const query = form.address?.trim();
+    if (!addressTouched || !query || query.length < 3) {
+      setAddressSuggestions([]);
+      setAddressSearched(false);
+      return undefined;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setAddressLoading(true);
+      try {
+        const mergedResults = [];
+        const seenPlaceIds = new Set();
+        for (const addressQuery of buildAddressQueries(query)) {
+          const params = new URLSearchParams({ q: addressQuery, format: 'jsonv2', addressdetails: '1', limit: '5', countrycodes: 'vn' });
+          const response = await fetch(`${OSM_SEARCH_URL}?${params.toString()}`, { signal: controller.signal });
+          if (!response.ok) throw new Error('Không tải được gợi ý địa chỉ');
+          const data = await response.json();
+          for (const item of Array.isArray(data) ? data : []) {
+            if (!seenPlaceIds.has(item.place_id)) {
+              seenPlaceIds.add(item.place_id);
+              mergedResults.push({ ...item, displayName: withTypedHouseNumber(query, item.display_name) });
+            }
+          }
+          if (mergedResults.length >= 5) break;
+        }
+        setAddressSuggestions(mergedResults.slice(0, 5));
+        setAddressSearched(true);
+        setAddressDropdownOpen(true);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          setAddressSuggestions([]);
+          setAddressSearched(true);
+        }
+      } finally {
+        if (!controller.signal.aborted) setAddressLoading(false);
+      }
+    }, 450);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [form.address, addressTouched]);
+
+  const getFieldError = (field, overrideValue) => {
+    const value = overrideValue ?? form[field] ?? '';
+    if (field === 'fullName') {
+      if (!value.trim()) return 'Vui lòng nhập họ tên.';
+      if (!VIETNAMESE_NAME_REGEX.test(value.trim())) return 'Họ tên chỉ được chứa chữ cái tiếng Việt và khoảng trắng.';
+      if (value.trim().length > MAX_FULL_NAME_LENGTH) return `Họ tên không được vượt quá ${MAX_FULL_NAME_LENGTH} ký tự.`;
+    }
+    if (field === 'username' && isCreate) {
+      if (!value) return 'Vui lòng nhập tên đăng nhập.';
+      if (!USERNAME_REGEX.test(value)) return 'Tên đăng nhập chỉ gồm chữ thường không dấu và số.';
+      if (value.length > MAX_USERNAME_LENGTH) return `Tên đăng nhập không được vượt quá ${MAX_USERNAME_LENGTH} ký tự.`;
+    }
+    if (field === 'email' && isCreate) {
+      if (!value) return 'Vui lòng nhập email.';
+      if (value !== onlyEmailChars(value)) return 'Email không được chứa dấu, khoảng trắng hoặc ký tự đặc biệt lạ.';
+      if (!EMAIL_REGEX.test(value)) return 'Email phải đúng định dạng và không chứa dấu/ký tự đặc biệt lạ.';
+    }
+    if (field === 'phone' && !VN_PHONE_REGEX.test(value)) return 'Số điện thoại Việt Nam phải gồm 10 số và đúng đầu số.';
+    if (field === 'citizenId' && !VN_CITIZEN_ID_REGEX.test(value)) return 'CCCD phải gồm đúng 12 chữ số.';
+    if (field === 'birthDate' && !isValidBirthDate(value)) return `Ngày sinh phải hợp lệ, từ năm ${MIN_BIRTH_YEAR} và không lớn hơn hôm nay.`;
+    if (field === 'position') {
+      if (!value.trim()) return 'Vui lòng chọn chức danh.';
+      if (value.length > MAX_POSITION_LENGTH) return `Chức danh không được vượt quá ${MAX_POSITION_LENGTH} ký tự.`;
+    }
+    if (field === 'gender' && !value) return 'Vui lòng chọn giới tính.';
+    if (field === 'departmentId' && !value) return 'Vui lòng chọn phòng ban khám cho bác sĩ.';
+    if (field === 'specialty' && !value) return 'Vui lòng chọn chuyên khoa.';
+    if (field === 'qualification' && !value) return 'Vui lòng chọn trình độ.';
+    if (field === 'address') {
+      if (!value.trim()) return 'Vui lòng nhập địa chỉ.';
+      if (value.length > MAX_ADDRESS_LENGTH) return `Địa chỉ không được vượt quá ${MAX_ADDRESS_LENGTH} ký tự.`;
+    }
+    if (field === 'yearsExperience') {
+      if (value === '') return 'Vui lòng nhập số năm kinh nghiệm.';
+      const years = Number(value);
+      if (!Number.isInteger(years) || years < MIN_YEARS_EXPERIENCE || years > MAX_YEARS_EXPERIENCE) {
+        return `Số năm kinh nghiệm phải từ ${MIN_YEARS_EXPERIENCE} đến ${MAX_YEARS_EXPERIENCE}.`;
+      }
+    }
+    return '';
+  };
+
+  const validateField = (field, overrideValue) => {
+    const error = getFieldError(field, overrideValue);
+    setFieldErrors((current) => ({ ...current, [field]: error }));
+    return !error;
+  };
+
+  const selectAddress = (suggestion) => {
+    const nextAddress = suggestion.displayName || suggestion.display_name;
+    setForm({ ...form, address: nextAddress });
+    setAddressSuggestions([]);
+    setAddressSearched(false);
+    setAddressDropdownOpen(false);
+    validateField('address', nextAddress);
+  };
+
+  const handleAddressBlur = () => {
+    validateField('address');
+    window.setTimeout(() => setAddressDropdownOpen(false), 180);
+  };
+
+  const handleAddressFocus = () => {
+    if (addressTouched && (addressSuggestions.length > 0 || addressLoading || addressSearched)) {
+      setAddressDropdownOpen(true);
+    }
+  };
+
+  const validateFormBeforeSubmit = () => {
+    const fields = ['fullName', ...(isCreate ? ['username', 'email'] : []), 'phone', 'citizenId', 'birthDate', 'gender', 'departmentId', 'position', 'address', 'specialty', 'licenseNumber', 'qualification', 'yearsExperience'];
+    const nextErrors = fields.reduce((errors, field) => {
+      const error = getFieldError(field);
+      if (error) errors[field] = error;
+      return errors;
+    }, {});
+    setFieldErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!validateFormBeforeSubmit()) return;
+    onSubmit(event);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
-      <form onSubmit={onSubmit} className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-5">
+      <form onSubmit={handleSubmit} className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-5">
         <div className="flex justify-between gap-4">
           <div>
             <p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.18em]">Hồ sơ bác sĩ</p>
@@ -269,24 +460,40 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
         </div>
         <SectionTitle title="Thông tin tài khoản và nhân sự" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Input label="Họ tên" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: v })} required />
+          <Input label="Họ tên" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: onlyVietnameseNameChars(v) })} onBlur={() => validateField('fullName')} error={fieldErrors.fullName} required maxLength={MAX_FULL_NAME_LENGTH} />
           <AvatarUpload value={form.avatarUrl} onChange={(url) => setForm({ ...form, avatarUrl: url })} uploadFn={doctorService.uploadAvatar} />
-          <Input label="Tên đăng nhập" value={form.username} onChange={(v) => setForm({ ...form, username: v })} disabled={!isCreate} required />
-          <Input label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} disabled={!isCreate} required />
-          <Input label="Số điện thoại" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} required />
-          <Input label="CCCD/CMND" value={form.citizenId} onChange={(v) => setForm({ ...form, citizenId: v })} required />
-          <Input type="date" label="Ngày sinh" value={form.birthDate} onChange={(v) => setForm({ ...form, birthDate: v })} required />
-          <Select label="Giới tính" value={form.gender} onChange={(v) => setForm({ ...form, gender: v })} empty="Chọn giới tính" required options={['Nam', 'Nữ', 'Khác']} />
-          <Select label="Phòng ban" value={form.departmentId} onChange={(v) => setForm({ ...form, departmentId: v })} empty="Chưa gán phòng ban" options={departments.filter((d) => ['EXAMINATION', 'CLINICAL'].includes(d.type)).map((d) => ({ value: d.id, label: `${d.departmentCode || 'PB'} - ${d.name}` }))} />
-          <Select label="Chức danh" value={form.position} onChange={(v) => setForm({ ...form, position: v })} empty="Chọn chức danh" required options={DOCTOR_POSITIONS} />
-          <Input label="Địa chỉ" value={form.address} onChange={(v) => setForm({ ...form, address: v })} />
+          <Input label="Tên đăng nhập" value={form.username} onChange={(v) => setForm({ ...form, username: onlyUsernameChars(v) })} onBlur={() => validateField('username')} error={fieldErrors.username} disabled={!isCreate} required maxLength={MAX_USERNAME_LENGTH} />
+          <Input label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: onlyEmailChars(v) })} onBlur={() => validateField('email')} error={fieldErrors.email} disabled={!isCreate} required />
+          <Input label="Số điện thoại" value={form.phone} onChange={(v) => setForm({ ...form, phone: onlyDigits(v).slice(0, 10) })} onBlur={() => validateField('phone')} error={fieldErrors.phone} required maxLength={10} />
+          <Input label="CCCD/CMND" value={form.citizenId} onChange={(v) => setForm({ ...form, citizenId: onlyDigits(v).slice(0, 12) })} onBlur={() => validateField('citizenId')} error={fieldErrors.citizenId} required maxLength={12} />
+          <Input type="date" label="Ngày sinh" value={form.birthDate} onChange={(v) => setForm({ ...form, birthDate: v })} onBlur={() => validateField('birthDate')} error={fieldErrors.birthDate} required />
+          <Select label="Giới tính" value={form.gender} onChange={(v) => { setForm({ ...form, gender: v }); validateField('gender', v); }} error={fieldErrors.gender} empty="Chọn giới tính" required options={['Nam', 'Nữ', 'Khác']} />
+          <Select label="Phòng ban" value={form.departmentId} onChange={(v) => { setForm({ ...form, departmentId: v }); validateField('departmentId', v); }} error={fieldErrors.departmentId} empty="Chưa gán phòng ban" required options={departments.filter((d) => ['EXAMINATION', 'CLINICAL'].includes(d.type)).map((d) => ({ value: d.id, label: `${d.departmentCode || 'PB'} - ${d.name}` }))} />
+          <Select label="Chức danh" value={form.position} onChange={(v) => { setForm({ ...form, position: limitPosition(v) }); validateField('position', v); }} error={fieldErrors.position} empty="Chọn chức danh" required options={DOCTOR_POSITIONS} />
+          <AddressInput
+            label="Địa chỉ"
+            value={form.address}
+            onChange={(v) => {
+              setAddressTouched(true);
+              setForm({ ...form, address: limitAddress(v) });
+            }}
+            onBlur={handleAddressBlur}
+            onFocus={handleAddressFocus}
+            error={fieldErrors.address}
+            maxLength={MAX_ADDRESS_LENGTH}
+            suggestions={addressSuggestions}
+            loading={addressLoading}
+            searched={addressSearched}
+            open={addressDropdownOpen}
+            onSelect={selectAddress}
+          />
         </div>
         <SectionTitle title="Thông tin chuyên môn" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select label="Chuyên khoa" value={form.specialty} onChange={(v) => setForm({ ...form, specialty: v })} empty="Chọn chuyên khoa" required options={SPECIALTIES} />
+          <Select label="Chuyên khoa" value={form.specialty} onChange={(v) => { setForm({ ...form, specialty: v }); validateField('specialty', v); }} error={fieldErrors.specialty} empty="Chọn chuyên khoa" required options={SPECIALTIES} />
           <Input label="Số chứng chỉ" value={form.licenseNumber} onChange={(v) => setForm({ ...form, licenseNumber: v })} required />
-          <Select label="Trình độ" value={form.qualification} onChange={(v) => setForm({ ...form, qualification: v })} empty="Chọn trình độ" required options={QUALIFICATIONS} />
-          <Input type="number" label="Số năm kinh nghiệm" value={form.yearsExperience} onChange={(v) => setForm({ ...form, yearsExperience: v })} />
+          <Select label="Trình độ" value={form.qualification} onChange={(v) => { setForm({ ...form, qualification: v }); validateField('qualification', v); }} error={fieldErrors.qualification} empty="Chọn trình độ" required options={QUALIFICATIONS} />
+          <Input type="number" label="Số năm kinh nghiệm" value={form.yearsExperience} onChange={(v) => setForm({ ...form, yearsExperience: onlyDigits(v).slice(0, 2) })} onBlur={() => validateField('yearsExperience')} error={fieldErrors.yearsExperience} required min={MIN_YEARS_EXPERIENCE} max={MAX_YEARS_EXPERIENCE} />
         </div>
         <button disabled={busy} className="w-full rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white hover:bg-cyan-700 disabled:opacity-70">
           {isCreate ? 'Tạo bác sĩ' : 'Lưu thay đổi'}
@@ -301,5 +508,34 @@ function Pagination({ pagination, onPageChange }) { return <div className="flex 
 function Info({ label, value }) { return <div><p className="text-[11px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className="text-sm font-bold text-slate-700">{value}</p></div>; }
 function Alert({ children }) { return <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">{children}</div>; }
 function SmallButton({ children, onClick, disabled }) { return <button type="button" disabled={disabled} onClick={onClick} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 disabled:opacity-50">{children}</button>; }
-function Input({ label, value, onChange, required, placeholder, type = 'text', disabled }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><input type={type} required={required} disabled={disabled} value={value || ''} min={type === 'number' ? '0' : undefined} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none disabled:opacity-60 disabled:cursor-not-allowed" /></label>; }
-function Select({ label, value, onChange, options, empty, required, disabled }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><select required={required} disabled={disabled} value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none disabled:opacity-60 disabled:cursor-not-allowed">{empty && <option value="">{empty}</option>}{options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>; }
+function Input({ label, value, onChange, onBlur, error, required, placeholder, type = 'text', disabled, maxLength }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><input type={type} required={required} disabled={disabled} value={value || ''} maxLength={maxLength} min={type === 'number' ? '0' : undefined} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none disabled:opacity-60 disabled:cursor-not-allowed ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} />{error && <p className="text-xs font-bold text-rose-600">{error}</p>}</label>; }
+function AddressInput({ label, value, onChange, onBlur, onFocus, error, maxLength, suggestions, loading, searched, open, onSelect }) {
+  return (
+    <label className="relative block space-y-1.5">
+      <span className="text-[13px] font-bold text-slate-700">{label}</span>
+      <div className="relative">
+        <input value={value || ''} onChange={(e) => onChange(e.target.value)} onFocus={onFocus} onBlur={onBlur} placeholder="Nhập địa chỉ để gợi ý..." title={value || ''} required maxLength={maxLength} className={`w-full px-3.5 py-2.5 pr-10 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} />
+        <MapPin className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      </div>
+      {open && (loading || searched || suggestions.length > 0) && (
+        <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl">
+          {loading && <p className="px-3.5 py-3 text-sm font-semibold text-slate-500">Đang tìm địa chỉ...</p>}
+          {!loading && searched && suggestions.length === 0 && <p className="px-3.5 py-3 text-sm font-semibold text-slate-500">Chưa tìm thấy trên OpenStreetMap. Thử nhập thêm phường/quận/thành phố.</p>}
+          {!loading && suggestions.map((item) => (
+            <div key={item.place_id} className="flex items-start gap-2 border-b border-slate-100 p-2.5 last:border-b-0 hover:bg-cyan-50/60">
+              <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => onSelect(item)} className="min-w-0 flex-1 text-left">
+                <span className="block text-sm font-bold leading-5 text-slate-800 line-clamp-2" title={item.displayName || item.display_name}>{item.displayName || item.display_name}</span>
+                <span className="mt-1 block text-xs font-semibold text-slate-400">{item.lat}, {item.lon}</span>
+              </button>
+              <a href={buildGoogleMapsDirectionsUrl(item.lat, item.lon)} target="_blank" rel="noreferrer" className="rounded-xl border border-cyan-100 bg-white p-2 text-cyan-600 hover:bg-cyan-600 hover:text-white" title="Mở chỉ đường Google Maps" onClick={(e) => e.stopPropagation()}>
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
+      {error && <p className="text-xs font-bold text-rose-600">{error}</p>}
+    </label>
+  );
+}
+function Select({ label, value, onChange, options, empty, required, disabled, error }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><select required={required} disabled={disabled} value={value || ''} onChange={(e) => onChange(e.target.value)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none disabled:opacity-60 disabled:cursor-not-allowed ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`}>{empty && <option value="">{empty}</option>}{options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select>{error && <p className="text-xs font-bold text-rose-600">{error}</p>}</label>; }

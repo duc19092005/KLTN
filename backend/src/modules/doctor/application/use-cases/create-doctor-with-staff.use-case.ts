@@ -36,7 +36,7 @@ export class CreateDoctorWithStaffUseCase {
       throw new ConflictException('CCCD/CMND đã tồn tại.');
     }
     if (await this.repo.findDoctorByLicense(dto.licenseNumber)) {
-      throw new ConflictException('Số chứng chỉ hành nghề đã tồn tại.');
+      throw new ConflictException('Số Giấy phép / Chứng chỉ hành nghề này đã được đăng ký trên hệ thống.');
     }
 
     const employeeCode = await this.repo.generateEmployeeCode();

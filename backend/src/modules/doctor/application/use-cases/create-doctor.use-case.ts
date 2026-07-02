@@ -31,7 +31,7 @@ export class CreateDoctorUseCase {
     }
 
     const license = await this.repo.findDoctorByLicense(dto.licenseNumber);
-    if (license) throw new ConflictException('Số chứng chỉ hành nghề đã tồn tại.');
+    if (license) throw new ConflictException('Số Giấy phép / Chứng chỉ hành nghề này đã được đăng ký trên hệ thống.');
 
     const doctor = await this.repo.createForExistingStaff(dto);
     await this.integrity.anchorChange(doctor, 'CREATE', undefined, null);

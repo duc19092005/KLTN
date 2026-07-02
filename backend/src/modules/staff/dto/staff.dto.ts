@@ -1,36 +1,56 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsDateString, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { UserRole, UserStatus } from '@prisma/client';
 import { PaginationQueryDto } from '../../shared/pagination.dto';
 
 export class CreateStaffDto {
-  @ApiProperty({ example: 'doctor.nguyen' })
-  @IsString() username!: string;
+  @ApiProperty({ example: 'nguyenvana01', maxLength: 30 })
+  @IsString()
+  @IsNotEmpty({ message: 'Vui lòng nhập tên đăng nhập.' })
+  @MaxLength(30, { message: 'Tên đăng nhập không được vượt quá 30 ký tự.' })
+  @Matches(/^[a-z0-9]+$/, { message: 'Tên đăng nhập chỉ gồm chữ thường không dấu và số.' })
+  username!: string;
 
-  @ApiProperty({ example: 'doctor.nguyen@hospital.local' })
-  @IsEmail() email!: string;
+  @ApiProperty({ example: 'nguyenvana@hospital.local' })
+  @IsEmail({}, { message: 'Email phải đúng định dạng.' })
+  @Matches(/^[a-z0-9]+(?:[._-][a-z0-9]+)*@[a-z0-9]+(?:[-.][a-z0-9]+)*\.[a-z]{2,}$/, { message: 'Email phải đúng định dạng và không chứa dấu/ký tự đặc biệt lạ.' })
+  email!: string;
 
   @ApiProperty({ enum: UserRole, example: UserRole.LAB_MANAGER })
   @IsEnum(UserRole) role!: UserRole;
 
-  @ApiProperty({ example: 'Nguyen Van A', maxLength: 160 })
-  @IsString() @MaxLength(160) fullName!: string;
+  @ApiProperty({ example: 'Nguyễn Văn A', maxLength: 80 })
+  @IsString()
+  @IsNotEmpty({ message: 'Vui lòng nhập họ tên.' })
+  @MaxLength(80, { message: 'Họ tên không được vượt quá 80 ký tự.' })
+  @Matches(/^[A-Za-zÀ-ỹ\s]+$/, { message: 'Họ tên chỉ được chứa chữ cái tiếng Việt và khoảng trắng.' })
+  fullName!: string;
 
   @ApiProperty({ example: '0909123456' })
-  @IsString() phone!: string;
+  @IsString()
+  @Matches(/^(0)(3[2-9]|5[2689]|7[06-9]|8[1-689]|9[0-46-9])\d{7}$/, { message: 'Số điện thoại Việt Nam phải gồm 10 số và đúng đầu số.' })
+  phone!: string;
 
-  @ApiProperty({ example: 'MALE' })
-  @IsString() gender!: string;
+  @ApiProperty({ example: 'Nam' })
+  @IsString()
+  @IsNotEmpty({ message: 'Vui lòng chọn giới tính.' })
+  gender!: string;
 
   @ApiProperty({ example: '012345678901' })
-  @IsString() citizenId!: string;
+  @IsString()
+  @Matches(/^\d{12}$/, { message: 'CCCD phải gồm đúng 12 chữ số.' })
+  citizenId!: string;
 
   @ApiProperty({ example: '1988-01-20' })
-  @IsDateString() birthDate!: string;
+  @IsDateString({}, { message: 'Ngày sinh phải đúng định dạng ngày hợp lệ.' })
+  birthDate!: string;
 
-  @ApiPropertyOptional({ example: 'Ho Chi Minh City' })
-  @IsOptional() @IsString() address?: string;
+  @ApiProperty({ example: 'Ho Chi Minh City', maxLength: 255 })
+  @IsString()
+  @IsNotEmpty({ message: 'Vui lòng nhập địa chỉ.' })
+  @MaxLength(255, { message: 'Địa chỉ không được vượt quá 255 ký tự.' })
+  address!: string;
 
   @ApiProperty({ example: 'https://cdn.hospital.local/avatars/doctor-nguyen.jpg' })
   @IsString() @IsNotEmpty() @MaxLength(500) avatarUrl!: string;
@@ -41,16 +61,26 @@ export class CreateStaffDto {
   @ApiPropertyOptional({ example: '0d82b56f-5d0a-4501-bd18-bb9af91e90d7' })
   @IsOptional() @IsString() @IsUUID() departmentId?: string;
 
-  @ApiPropertyOptional({ example: 'Senior Doctor' })
-  @IsOptional() @IsString() position?: string;
+  @ApiPropertyOptional({ example: 'KTV xét nghiệm', maxLength: 80 })
+  @IsString()
+  @IsNotEmpty({ message: 'Vui lòng nhập chức danh.' })
+  @MaxLength(80, { message: 'Chức danh không được vượt quá 80 ký tự.' })
+  position!: string;
 }
 
 export class UpdateStaffDto {
-  @ApiPropertyOptional({ example: 'doctor.nguyen' })
-  @IsOptional() @IsString() username?: string;
+  @ApiPropertyOptional({ example: 'nguyenvana01', maxLength: 30 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30, { message: 'Tên đăng nhập không được vượt quá 30 ký tự.' })
+  @Matches(/^[a-z0-9]+$/, { message: 'Tên đăng nhập chỉ gồm chữ thường không dấu và số.' })
+  username?: string;
 
-  @ApiPropertyOptional({ example: 'doctor.nguyen@hospital.local' })
-  @IsOptional() @IsEmail() email?: string;
+  @ApiPropertyOptional({ example: 'nguyenvana@hospital.local' })
+  @IsOptional()
+  @IsEmail({}, { message: 'Email phải đúng định dạng.' })
+  @Matches(/^[a-z0-9]+(?:[._-][a-z0-9]+)*@[a-z0-9]+(?:[-.][a-z0-9]+)*\.[a-z]{2,}$/, { message: 'Email phải đúng định dạng và không chứa dấu/ký tự đặc biệt lạ.' })
+  email?: string;
 
   @ApiPropertyOptional({ enum: UserRole })
   @IsOptional() @IsEnum(UserRole) role?: UserRole;
@@ -58,23 +88,36 @@ export class UpdateStaffDto {
   @ApiPropertyOptional({ enum: UserStatus })
   @IsOptional() @IsEnum(UserStatus) status?: UserStatus;
 
-  @ApiPropertyOptional({ example: 'Nguyen Van A' })
-  @IsOptional() @IsString() fullName?: string;
+  @ApiPropertyOptional({ example: 'Nguyễn Văn A', maxLength: 80 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80, { message: 'Họ tên không được vượt quá 80 ký tự.' })
+  @Matches(/^[A-Za-zÀ-ỹ\s]+$/, { message: 'Họ tên chỉ được chứa chữ cái tiếng Việt và khoảng trắng.' })
+  fullName?: string;
 
   @ApiPropertyOptional({ example: '0909123456' })
-  @IsOptional() @IsString() phone?: string;
+  @IsOptional()
+  @IsString()
+  @Matches(/^(0)(3[2-9]|5[2689]|7[06-9]|8[1-689]|9[0-46-9])\d{7}$/, { message: 'Số điện thoại Việt Nam phải gồm 10 số và đúng đầu số.' })
+  phone?: string;
 
-  @ApiPropertyOptional({ example: 'MALE' })
+  @ApiPropertyOptional({ example: 'Nam' })
   @IsOptional() @IsString() gender?: string;
 
   @ApiPropertyOptional({ example: '012345678901' })
-  @IsOptional() @IsString() citizenId?: string;
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{12}$/, { message: 'CCCD phải gồm đúng 12 chữ số.' })
+  citizenId?: string;
 
   @ApiPropertyOptional({ example: '1988-01-20' })
-  @IsOptional() @IsDateString() birthDate?: string;
+  @IsOptional() @IsDateString({}, { message: 'Ngày sinh phải đúng định dạng ngày hợp lệ.' }) birthDate?: string;
 
-  @ApiPropertyOptional({ example: 'Ho Chi Minh City' })
-  @IsOptional() @IsString() address?: string;
+  @ApiPropertyOptional({ example: 'Ho Chi Minh City', maxLength: 255 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255, { message: 'Địa chỉ không được vượt quá 255 ký tự.' })
+  address?: string;
 
   @ApiPropertyOptional({ example: 'https://cdn.hospital.local/avatars/doctor-nguyen.jpg' })
   @IsOptional() @IsString() @IsNotEmpty() @MaxLength(500) avatarUrl?: string;
@@ -82,8 +125,11 @@ export class UpdateStaffDto {
   @ApiPropertyOptional({ example: '0d82b56f-5d0a-4501-bd18-bb9af91e90d7', nullable: true })
   @IsOptional() @IsString() @IsUUID() departmentId?: string;
 
-  @ApiPropertyOptional({ example: 'Senior Doctor' })
-  @IsOptional() @IsString() position?: string;
+  @ApiPropertyOptional({ example: 'KTV xét nghiệm', maxLength: 80 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80, { message: 'Chức danh không được vượt quá 80 ký tự.' })
+  position?: string;
 }
 
 export class StaffQueryDto extends PaginationQueryDto {

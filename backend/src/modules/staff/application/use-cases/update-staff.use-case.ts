@@ -51,6 +51,7 @@ export class UpdateStaffUseCase {
     }
     if (dto.username || dto.email) await this.validator.assertUserUnique(dto.username, dto.email, staff.userId);
     if (dto.citizenId) await this.validator.assertCitizenIdUnique(dto.citizenId, staff.id);
+    if (dto.phone) await this.validator.assertPhoneUnique(dto.phone, staff.id);
 
     const before = buildStaffSnapshot(staff);
     const isDoctor = Boolean(staff.doctorProfile);

@@ -21,7 +21,7 @@ export class UpdateDoctorUseCase {
 
     if (dto.licenseNumber) {
       const license = await this.repo.findDoctorByLicense(dto.licenseNumber);
-      if (license && license.id !== id) throw new ConflictException('Số chứng chỉ hành nghề đã tồn tại.');
+      if (license && license.id !== id) throw new ConflictException('Số Giấy phép / Chứng chỉ hành nghề này đã được đăng ký trên hệ thống.');
     }
     if (dto.citizenId) {
       const existingStaff = await this.repo.findStaffByCitizenId(dto.citizenId);
