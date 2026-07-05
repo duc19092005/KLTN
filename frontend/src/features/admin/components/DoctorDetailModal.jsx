@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { doctorService } from '../apis/doctorService';
 import { useToast } from '../../../providers/ToastProvider';
+import AuditHistoryChanges from './AuditHistoryChanges';
 
 const STATUS_TONE = {
   VERIFIED: { label: 'Xác thực khớp với blockchain', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
@@ -209,6 +210,7 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
                       <span className="font-bold text-slate-700">{shortHash(log.dataHash)}</span>
                     </div>
                   )}
+                  <AuditHistoryChanges log={log} />
                 </div>
               ))}
               {!history.length && (

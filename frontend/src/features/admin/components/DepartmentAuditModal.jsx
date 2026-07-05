@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { departmentService } from '../apis/departmentService';
 import { useToast } from '../../../providers/ToastProvider';
+import AuditHistoryChanges from './AuditHistoryChanges';
 
 const STATUS_TONE = {
   VERIFIED: { label: 'Khớp blockchain', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
@@ -161,6 +162,9 @@ function HistoryList({ items }) {
             </span>
             {log.txHash && <span className="font-mono text-slate-500">tx: {shortHash(log.txHash)}</span>}
             {log.dataHash && <span className="font-mono text-slate-500">hash: {shortHash(log.dataHash)}</span>}
+          </div>
+          <div className="mt-3">
+            <AuditHistoryChanges log={log} />
           </div>
         </div>
       ))}

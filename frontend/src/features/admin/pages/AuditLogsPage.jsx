@@ -103,9 +103,9 @@ const VERIFICATION_LABEL = {
   TAMPERED: 'Nghi sửa đổi',
 };
 
-function renderDiffValue(value, redacted) {
-  if (redacted) return 'Đã ẩn theo chính sách bảo mật';
+function renderDiffValue(value, _redacted) {
   if (value === null || value === undefined || value === '') return '—';
+  if (value === '[REDACTED]') return 'Đã ẩn trong bản ghi cũ';
   if (typeof value === 'boolean') return value ? 'Đúng' : 'Sai';
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
@@ -689,13 +689,7 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
         {/* Header Block */}
         <div className="flex items-start justify-between border-b border-slate-100 p-6">
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full border border-cyan-100 bg-cyan-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-cyan-700">
-                <Fingerprint className="h-3 w-3" /> Nhật ký kiểm toán
-              </span>
-              <span className="text-xs font-semibold text-slate-400">{formatHashVersion(log.hashVersion)}</span>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
+            <div className="mt-1 flex flex-wrap items-center gap-3">
               <h2 className="text-2xl font-black tracking-tight text-slate-950">Bản ghi #{log.seq ?? '—'}</h2>
               <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black ${ACTION_TONE[log.action] || 'bg-slate-50 border-slate-200 text-slate-600'}`}>
                 {ACTION_LABEL[log.action] || log.action}
@@ -755,31 +749,21 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
             <div className="grid grid-cols-1 gap-1.5 pt-1">
               <div className="flex justify-between border-b border-slate-100 pb-1">
                 <span className="text-slate-400">Current Entry Hash:</span>
-                <span className="text-slate-700 font-medium break-all text-right max-w-md">{log.entryHash || '—'}</span>
+                <span className="text-slate-700 font-medium break-all text-right max-w-md">{log.hashes?.entryHash || log.entryHash || '—'}</span>
               </div>
               <div className="flex justify-between pt-0.5">
                 <span className="text-slate-400">Previous Record Hash:</span>
-                <span className="text-slate-700 font-medium break-all text-right max-w-md">{log.prevHash || '—'}</span>
+                <span className="text-slate-700 font-medium break-all text-right max-w-md">{log.hashes?.prevHash || log.prevHash || '—'}</span>
               </div>
             </div>
           </div>
 
           {/* Diff Changes Field Level Section */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div>
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
                 <FileDiff className="h-3.5 w-3.5 text-cyan-600" /> Thay đổi dữ liệu
               </h3>
-              {!sensitiveDetailUnlocked && (
-                <button
-                  type="button"
-                  onClick={loadDetail}
-                  disabled={detailLoading}
-                  className="inline-flex items-center gap-1 rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-2 text-[11px] font-black text-cyan-700 transition-colors hover:bg-cyan-100"
-                >
-                  <LockKeyhole className="h-3 w-3" /> {detailLoading ? 'Đang mở...' : 'Xem dữ liệu ẩn'}
-                </button>
-              )}
             </div>
 
             {Array.isArray(log.diff) && log.diff.length > 0 ? (
@@ -1029,7 +1013,7 @@ function ProofModal({ proof, onClose }) {
             <div className="space-y-4">
               <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                 <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Merkle Root</p>
-                <p className="mt-2 break-all font-mono text-xs font-bold text-slate-700">{proof.data?.root || '—'}</p>
+                <p className="mt-2 break-all font-mono text-xs font-bold text-slate-700">{proof.data?.merkleRoot || proof.data?.root || '—'}</p>
               </div>
 
               <div className="rounded-2xl border border-slate-100 bg-white">

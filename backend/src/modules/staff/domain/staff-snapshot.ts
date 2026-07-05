@@ -14,5 +14,6 @@ export function buildStaffSnapshot(staff: any) {
     avatarUrl: staff.avatarUrl,
     departmentId: staff.departmentId ?? null,
     position: staff.position ?? null,
+    status: staff.user?.status ?? null,
   };
 }

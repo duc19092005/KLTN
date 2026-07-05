@@ -8,5 +8,5 @@ export const DOCTOR_REANCHOR = Symbol('DOCTOR_REANCHOR');
  * DoctorService.reanchorForStaffUpdate().
  */
 export interface DoctorReanchorPort {
-  reanchorForStaffUpdate(staffProfileId: string, actorId?: string): Promise<void>;
+  reanchorForStaffUpdate(staffProfileId: string, actorId?: string, beforeSnapshot?: Record<string, unknown> | null): Promise<void>;
 }

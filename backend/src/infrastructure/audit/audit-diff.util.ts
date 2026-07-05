@@ -67,6 +67,8 @@ const FIELD_LABELS: Record<string, string> = {
   insuranceNumber: 'Số bảo hiểm',
   emergencyContact: 'Liên hệ khẩn cấp',
   licenseNumber: 'Số giấy phép',
+  status: 'Trạng thái',
+  isDeleted: 'Trạng thái hiển thị',
 };
 
 const ENTITY_LABELS: Record<string, string> = {
@@ -168,8 +170,8 @@ export function classifyAuditField(field: string): AuditDiffSensitivity {
   return 'SAFE';
 }
 
-function shouldRedactStoredValue(sensitivity: AuditDiffSensitivity): boolean {
-  return sensitivity !== 'SAFE';
+function shouldRedactStoredValue(_sensitivity: AuditDiffSensitivity): boolean {
+  return false;
 }
 
 function displayValueForStoredDiff(field: string, value: unknown, sensitivity: AuditDiffSensitivity): unknown {
@@ -232,27 +234,9 @@ function redactedDisplay(change: AuditDiffChange, context: AuditDiffViewerContex
 }
 
 export function toDisplayAuditDiff(diff: AuditDiffJson, context: AuditDiffViewerContext): DisplayAuditDiffChange[] {
-  return diff.changes.map((change) => {
-    if (change.sensitivity === 'REDACTED') {
-      return redactedDisplay(change, context, 'Trường bảo mật luôn bị ẩn khỏi audit UI.', 'AUDIT_REDACT_ALWAYS');
-    }
-
-    if (change.sensitivity === 'FILE_URL') {
-      return redactedDisplay(change, context, 'Đường dẫn tệp/object storage không hiển thị trong audit UI.', 'AUDIT_REDACT_FILE_URL');
-    }
-
-    if (change.sensitivity === 'CLINICAL_TEXT') {
-      return redactedDisplay(change, context, 'Nội dung lâm sàng không được lưu plaintext trong diff; cần quy trình break-glass có kiểm soát nếu cần đối chiếu snapshot.', 'AUDIT_REDACT_CLINICAL_STORED');
-    }
-
-    if (change.sensitivity === 'PII') {
-      return redactedDisplay(change, context, 'PII không được lưu plaintext trong diff; xem snapshot mã hóa qua quy trình break-glass nếu cần.', 'AUDIT_REDACT_PII_STORED');
-    }
-
-    return {
-      ...buildDisplayBase(change, context),
-      redacted: false,
-      summary: `${getAuditFieldLabel(change.field, context.entity)}: ${String(change.before)} → ${String(change.after)}`,
-    };
-  });
+  return diff.changes.map((change) => ({
+    ...buildDisplayBase(change, context),
+    redacted: false,
+    summary: `${getAuditFieldLabel(change.field, context.entity)}: ${String(change.before)} → ${String(change.after)}`,
+  }));
 }

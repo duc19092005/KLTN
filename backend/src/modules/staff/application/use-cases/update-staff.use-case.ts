@@ -7,6 +7,7 @@ import { StaffValidator } from '../services/staff.validator';
 import { buildStaffSnapshot } from '../../domain/staff-snapshot';
 import { DOCTOR_REANCHOR, DoctorReanchorPort } from '../../../doctor/application/ports/doctor-reanchor.port';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { buildUnifiedDoctorSnapshot } from '../../../doctor/domain/doctor-snapshot';
 
 /**
  * Updates a staff profile + linked user account. Behavior copied verbatim from
@@ -55,6 +56,7 @@ export class UpdateStaffUseCase {
 
     const before = buildStaffSnapshot(staff);
     const isDoctor = Boolean(staff.doctorProfile);
+    const doctorBefore = isDoctor ? buildUnifiedDoctorSnapshot(staff.doctorProfile) : null;
 
     try {
       const updated = await this.repo.updateStaffUser(
@@ -94,7 +96,7 @@ export class UpdateStaffUseCase {
 
       if (isDoctor) {
         // Staff is a doctor → re-anchor the unified doctor hash (staff + doctor)
-        await this.doctorReanchor.reanchorForStaffUpdate(id, actorId);
+        await this.doctorReanchor.reanchorForStaffUpdate(id, actorId, doctorBefore);
       } else if (updated.staffProfile) {
         // Regular staff → anchor just the staff profile
         await this.integrity.anchorChange(updated.staffProfile, 'UPDATE', actorId, before);

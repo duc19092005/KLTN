@@ -17,6 +17,7 @@ export function buildUnifiedDoctorSnapshot(doctor: any) {
     avatarUrl: staff.avatarUrl ?? null,
     departmentId: staff.departmentId ?? null,
     position: staff.position ?? null,
+    status: staff.user?.status ?? null,
     // Doctor professional fields
     staffProfileId: doctor.staffProfileId,
     specialty: doctor.specialty,

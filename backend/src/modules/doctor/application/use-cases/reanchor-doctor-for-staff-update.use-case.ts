@@ -18,11 +18,11 @@ export class ReanchorDoctorForStaffUpdateUseCase implements DoctorReanchorPort {
     @Inject(DOCTOR_INTEGRITY_ANCHOR) private readonly integrity: DoctorIntegrityAnchorPort,
   ) {}
 
-  async reanchorForStaffUpdate(staffProfileId: string, actorId?: string): Promise<void> {
+  async reanchorForStaffUpdate(staffProfileId: string, actorId?: string, beforeSnapshot?: Record<string, unknown> | null): Promise<void> {
     const doctor = await this.repo.findByStaffProfileId(staffProfileId);
     if (!doctor) return; // Not a doctor, nothing to re-anchor
 
-    const before = buildUnifiedDoctorSnapshot(doctor);
+    const before = beforeSnapshot ?? buildUnifiedDoctorSnapshot(doctor);
     // Re-fetch after staff update to get latest staff data
     const refreshed = await this.repo.findByIdWithRelations(doctor.id);
     if (!refreshed) return;

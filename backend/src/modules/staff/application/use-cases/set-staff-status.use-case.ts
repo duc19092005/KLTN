@@ -6,6 +6,7 @@ import { STAFF_INTEGRITY_ANCHOR, StaffIntegrityAnchorPort } from '../ports/staff
 import { StaffValidator } from '../services/staff.validator';
 import { buildStaffSnapshot } from '../../domain/staff-snapshot';
 import { DOCTOR_REANCHOR, DoctorReanchorPort } from '../../../doctor/application/ports/doctor-reanchor.port';
+import { buildUnifiedDoctorSnapshot } from '../../../doctor/domain/doctor-snapshot';
 
 /**
  * Sets a staff account status (lock/unlock) and re-anchors. Behavior copied
@@ -26,15 +27,16 @@ export class SetStaffStatusUseCase {
     const staff = await this.validator.ensureStaff(id);
     const before = buildStaffSnapshot(staff);
     const isDoctor = Boolean(staff.doctorProfile);
+    const doctorBefore = isDoctor ? buildUnifiedDoctorSnapshot({ ...staff.doctorProfile, staffProfile: staff }) : null;
     const updated = await this.repo.setUserStatus(staff.userId, status);
 
     if (isDoctor) {
       // Staff is a doctor → re-anchor the unified doctor hash
-      await this.doctorReanchor.reanchorForStaffUpdate(id, actorId);
+      await this.doctorReanchor.reanchorForStaffUpdate(id, actorId, doctorBefore);
     } else if (updated.staffProfile) {
-      // Anchor the status change for regular staff
-      const action: AuditAction = status === UserStatus.INACTIVE ? 'DELETE' : 'UPDATE';
-      await this.integrity.anchorChange(updated.staffProfile, action, actorId, before);
+      // Ẩn/hiện tài khoản là thay đổi trạng thái mềm, không phải xóa hồ sơ.
+      // Truyền kèm user mới để snapshot after có `status` thay vì null.
+      await this.integrity.anchorChange({ ...updated.staffProfile, user: updated }, 'UPDATE', actorId, before);
     }
 
     return updated;

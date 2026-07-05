@@ -8,6 +8,8 @@ import { departmentService } from '../apis/departmentService';
 import { staffService } from '../apis/staffService';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
+import { Search } from 'lucide-react';
+import AuditHistoryChanges from '../components/AuditHistoryChanges';
 
 const DEPARTMENT_TYPES = [
   { value: 'EXAMINATION', label: 'Phòng khám' },
@@ -162,7 +164,7 @@ export default function DepartmentsPage() {
 
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="departments" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="mx-auto max-w-7xl space-y-5">
         <Hero onCreate={openCreate} />
         {loading ? <LoadingIndicator size="lg" label="Đang tải phòng ban..." /> : (
           <DepartmentDirectory departments={departments} staffs={staffs} busy={busy} selectedDepartment={selectedDepartment} onSelect={handleSelectDepartment} onAssignManager={assignManager} onEdit={openEdit} onDelete={removeDepartment} pagination={pagination} onPageChange={load} />
@@ -211,28 +213,42 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_1fr_1fr_auto] md:items-end">
+      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600">
+              <Search className="h-4 w-4" strokeWidth={2.5} />
+            </span>
+          </div>
+          {(search || typeFilter || orderFilter) && (
+            <button type="button" onClick={() => { setSearch(''); setTypeFilter(''); setOrderFilter(''); }} className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-50">Xóa lọc</button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="space-y-1.5">
             <span className="text-xs font-black text-slate-600">Tên / Mã phòng ban</span>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nhập tên hoặc mã phòng ban..." className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nhập tên hoặc mã phòng ban..." className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold outline-none focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100" />
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-black text-slate-600">Phân loại</span>
-            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100">
+            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold outline-none focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100">
               <option value="">Tất cả phân loại</option>
               {DEPARTMENT_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
             </select>
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-black text-slate-600">Chỉ định</span>
-            <select value={orderFilter} onChange={(e) => setOrderFilter(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100">
+            <select value={orderFilter} onChange={(e) => setOrderFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold outline-none focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100">
               <option value="">Tất cả</option>
               <option value="true">Nhận chỉ định</option>
               <option value="false">Không nhận chỉ định</option>
             </select>
           </label>
-          <button type="button" onClick={() => { setSearch(''); setTypeFilter(''); setOrderFilter(''); }} className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600 hover:bg-slate-50">Xóa lọc</button>
+        </div>
+        <div className="flex justify-end">
+          <button type="button" className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-600 px-6 py-2.5 text-sm font-black text-white shadow-sm hover:bg-cyan-700">
+            <Search className="h-4 w-4" strokeWidth={2.5} /> Tìm kiếm
+          </button>
         </div>
       </section>
 
@@ -249,42 +265,35 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
             const depStaffs = staffs.filter((s) => s.departmentId === dep.id);
             const active = selectedDepartment?.id === dep.id;
             return (
-              <article key={dep.id} onClick={() => onSelect(dep)} className={`cursor-pointer px-5 py-4 transition-colors hover:bg-cyan-50/40 ${active ? 'bg-cyan-50/60' : 'bg-white'}`}>
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.35fr_1fr_0.8fr_1fr_220px] lg:items-center">
+              <article key={dep.id} onClick={() => onSelect(dep)} className={`cursor-pointer p-5 transition-colors hover:bg-slate-50/70 ${active ? 'bg-cyan-50/60' : 'bg-white'}`}>
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_0.95fr_0.55fr_0.55fr_0.8fr_300px] xl:items-center">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-[11px] font-black uppercase tracking-wider text-cyan-600">{dep.departmentCode}</span>
-                      <span className={`rounded-lg border px-2 py-0.5 text-[10px] font-black ${statusTone[dep.status] || statusTone.ACTIVE}`}>{getStatusLabel(dep.status)}</span>
+                      <span className={`rounded-md border px-2 py-0.5 text-[10px] font-black ${statusTone[dep.status] || statusTone.ACTIVE}`}>{getStatusLabel(dep.status)}</span>
                     </div>
                     <h4 className="mt-1 truncate text-base font-black text-slate-950">{dep.name}</h4>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      <span className="rounded-lg bg-cyan-50 px-2 py-1 text-[10px] font-black text-cyan-700">{getTypeLabel(dep.type)}</span>
-
-                      <span className={`rounded-lg border px-2 py-1 text-[10px] font-black ${orderTone[String(Boolean(dep.canReceiveOrders))]}`}>{dep.canReceiveOrders ? 'Nhận chỉ định' : 'Không nhận chỉ định'}</span>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      <span className="rounded-md bg-cyan-50 px-2 py-0.5 text-[10px] font-black text-cyan-700">{getTypeLabel(dep.type)}</span>
+                      <span className={`rounded-md border px-2 py-0.5 text-[10px] font-black ${orderTone[String(Boolean(dep.canReceiveOrders))]}`}>{dep.canReceiveOrders ? 'Nhận chỉ định' : 'Không nhận chỉ định'}</span>
                     </div>
-                    <p className="mt-2 line-clamp-1 text-xs font-semibold text-slate-400">{dep.description || 'Chưa có mô tả'}</p>
+                    <p className="mt-1 line-clamp-1 text-xs font-semibold text-slate-400">{dep.description || 'Chưa có mô tả'}</p>
                   </div>
 
+                  <Info label="Phụ trách" value={dep.manager?.fullName || 'Chưa gán'} />
+                  <Info label="Tầng" value={dep.floor || '—'} mono />
+                  <Info label="Nhân sự" value={`${depStaffs.length} NV`} mono />
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Phụ trách</p>
-                    <p className="mt-1 truncate text-sm font-black text-slate-800">{dep.manager?.fullName || 'Chưa gán'}</p>
+                    <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Trạng thái dữ liệu</p>
+                    <BlockchainStatusBadge status={dep.blockchainStatus} size="xs" />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 lg:block lg:space-y-2">
-                    <MiniMetric label="Tầng" value={dep.floor || '—'} />
-                    <MiniMetric label="Nhân sự" value={`${depStaffs.length} NV`} />
-                  </div>
-
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Trạng thái dữ liệu</p>
-                    <div className="mt-1"><BlockchainStatusBadge status={dep.blockchainStatus} size="xs" /></div>
-                  </div>
-
-                  <div className="flex flex-wrap justify-start gap-2 lg:justify-end" onClick={(e) => e.stopPropagation()}>
-                    <select disabled={busy} value={dep.managerId || ''} onChange={(e) => onAssignManager(dep.id, e.target.value)} className="min-w-[150px] flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 lg:flex-none">
+                  <div className="flex flex-wrap gap-2 xl:justify-end" onClick={(e) => e.stopPropagation()}>
+                    <select disabled={busy} value={dep.managerId || ''} onChange={(e) => onAssignManager(dep.id, e.target.value)} className="min-w-[150px] flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 xl:flex-none">
                       <option value="">Chọn phụ trách</option>
                       {depStaffs.map((staff) => <option key={staff.id} value={staff.id}>{staff.fullName}</option>)}
                     </select>
+                    <SmallButton onClick={() => onSelect(dep)} disabled={busy}>Chi tiết</SmallButton>
                     <SmallButton onClick={() => onEdit(dep)} disabled={busy}>Sửa</SmallButton>
                     <SmallButton danger onClick={() => onDelete(dep.id)} disabled={busy}>Xóa</SmallButton>
                   </div>
@@ -302,49 +311,77 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
 }
 
 function DepartmentDetail({ department, staffs, onGoStaff, onClose }) {
+  const [activeTab, setActiveTab] = useState('info');
   if (!department) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm" onClick={onClose}>
-      <aside className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-white/70 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" onClick={onClose}>
+      <aside className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl" onClick={(event) => event.stopPropagation()}>
+        <div className="shrink-0 border-b border-slate-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.22em] text-cyan-600">Chi tiết phòng ban</p>
-            <h3 className="mt-2 text-2xl font-black text-slate-950">{department.name}</h3>
-            <p className="mt-1 text-sm font-semibold text-slate-500">{department.departmentCode} · {department.description || 'Chưa có mô tả'}</p>
+            <h3 className="mt-1 text-2xl font-black text-slate-950">{department.name}</h3>
+            <p className="mt-1 text-sm text-slate-500">{department.departmentCode} · {department.description || 'Chưa có mô tả'}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 hover:bg-slate-50">Đóng</button>
+          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50">Đóng</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`rounded-xl border px-3 py-1 text-xs font-black ${statusTone[department.status] || statusTone.ACTIVE}`}>{getStatusLabel(department.status)}</span>
-            <BlockchainStatusBadge status={department.blockchainStatus} prefix="Blockchain: " />
-            <span className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-1.5 text-xs font-black text-cyan-700">{getTypeLabel(department.type)}</span>
+        <div className="shrink-0 px-6 py-2 border-b border-slate-100 flex gap-2">
+          <button onClick={() => setActiveTab('info')} className={`px-4 py-2 text-xs font-black rounded-xl border transition-colors ${activeTab === 'info' ? 'bg-cyan-600 text-white border-cyan-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+            Hồ sơ & Xác thực blockchain
+          </button>
+          <button onClick={() => setActiveTab('history')} className={`px-4 py-2 text-xs font-black rounded-xl border transition-colors ${activeTab === 'history' ? 'bg-cyan-600 text-white border-cyan-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+            Lịch sử cập nhật
+          </button>
+        </div>
 
-            <span className={`rounded-xl border px-3 py-1.5 text-xs font-black ${orderTone[String(Boolean(department.canReceiveOrders))]}`}>{department.canReceiveOrders ? 'Có thể nhận phiếu chỉ định' : 'Không nhận phiếu chỉ định'}</span>
-          </div>
-
-          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <InfoBox label="Tầng" value={department.floor || 'Chưa gán'} />
-            <InfoBox label="Nhân sự" value={`${staffs.length} NV`} />
-            <InfoBox label="Phụ trách" value={department.manager?.fullName || 'Chưa gán'} />
-          </div>
-
-          <div className="mt-6 space-y-3">
-            <h4 className="text-sm font-black text-slate-700">Nhân sự trong phòng ban</h4>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {staffs.map((staff) => (
-                <div key={staff.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                  <strong className="block text-slate-950">{staff.fullName}</strong>
-                  <span className="mt-1 block text-xs font-semibold text-slate-500">{staff.employeeCode}</span>
+        <div className="flex-1 overflow-y-auto bg-slate-50/60 p-6">
+          {activeTab === 'info' ? (
+            <div className="space-y-6">
+              <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full border px-3 py-1 text-xs font-black ${statusTone[department.status] || statusTone.ACTIVE}`}>{getStatusLabel(department.status)}</span>
+                    <BlockchainStatusBadge status={department.blockchainStatus} prefix="Blockchain: " />
+                  </div>
+                  <span className="text-[11px] font-black uppercase text-cyan-700 tracking-wider">Xác thực bằng hợp đồng thông minh Solidity</span>
                 </div>
-              ))}
-            </div>
-            {!staffs.length && <Empty title="Chưa có nhân sự" desc="Phòng ban này chưa được gán nhân sự." />}
-          </div>
+              </div>
 
-          <DepartmentHistory departmentId={department.id} />
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+                  <h4 className="text-sm font-black uppercase tracking-wider text-slate-700">Thông tin phòng ban</h4>
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Info label="Mã phòng ban" value={department.departmentCode} mono />
+                    <Info label="Tên phòng ban" value={department.name} />
+                    <Info label="Phân loại" value={getTypeLabel(department.type)} />
+                    <Info label="Tầng" value={department.floor || 'Chưa gán'} mono />
+                    <Info label="Nhận chỉ định" value={department.canReceiveOrders ? 'Có' : 'Không'} />
+                    <Info label="Trạng thái" value={getStatusLabel(department.status)} />
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+                  <h4 className="text-sm font-black uppercase tracking-wider text-slate-700">Nhân sự & phụ trách</h4>
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Info label="Phụ trách" value={department.manager?.fullName || 'Chưa gán'} />
+                    <Info label="Số nhân sự" value={`${staffs.length} NV`} mono />
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    {staffs.map((staff) => (
+                      <div key={staff.id} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                        <strong className="block text-sm text-slate-950">{staff.fullName}</strong>
+                        <span className="text-xs font-semibold text-slate-500">{staff.employeeCode}</span>
+                      </div>
+                    ))}
+                    {!staffs.length && <Empty title="Chưa có nhân sự" desc="Phòng ban này chưa được gán nhân sự." />}
+                  </div>
+                </section>
+              </div>
+            </div>
+          ) : (
+            <DepartmentHistory departmentId={department.id} />
+          )}
         </div>
 
         <div className="border-t border-slate-100 bg-slate-50/70 p-5">
@@ -411,6 +448,9 @@ function DepartmentHistory({ departmentId }) {
                     {log.batchId ? 'Đã neo on-chain' : 'Đang chờ neo'}
                   </span>
                   {log.dataHash && <span className="text-[10px] font-mono text-slate-400 truncate">{log.dataHash.slice(0, 16)}…</span>}
+                </div>
+                <div className="mt-2">
+                  <AuditHistoryChanges log={log} />
                 </div>
               </li>
             );
@@ -523,6 +563,7 @@ function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing }) {
     </div>
   );
 }
+function Info({ label, value, mono }) { return <div><p className="text-[11px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className={`mt-1 truncate text-sm font-black text-slate-800 ${mono ? 'font-mono' : ''}`}>{value || '—'}</p></div>; }
 function InfoBox({ label, value }) { return <div className="rounded-xl bg-white border border-slate-100 p-3"><p className="text-[11px] uppercase tracking-wider font-black text-slate-400">{label}</p><p className="mt-1 text-sm font-bold text-slate-800">{value}</p></div>; }
 function MiniMetric({ label, value }) { return <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className="mt-0.5 text-sm font-black text-slate-800">{value}</p></div>; }
 function Alert({ children }) { return <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">{children}</div>; }

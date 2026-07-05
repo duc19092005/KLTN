@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { aiModelService } from '../apis/aiModelService';
 import { useToast } from '../../../providers/ToastProvider';
+import AuditHistoryChanges from './AuditHistoryChanges';
 
 const STATUS_TONE = {
   VERIFIED: { label: 'Xác thực khớp với blockchain', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
@@ -233,11 +234,7 @@ export default function AiModelDetailModal({ modelId, onClose }) {
                         </div>
                       )}
                     </div>
-                    {changedFields && (
-                      <p className="text-[11px] font-semibold text-slate-500">
-                        Nội dung thay đổi: {changedFields}
-                      </p>
-                    )}
+                    <AuditHistoryChanges log={log} />
                   </div>
                 );
               })}
