@@ -50,6 +50,33 @@ function historyHash(log) {
   return log.afterHash || log.dataHash || log.entryHash || null;
 }
 
+const FIELD_LABELS = {
+  apiEndpoint: 'Điểm cuối API',
+  createdBy: 'Người tạo',
+  ipHashPlain: 'Dấu vân tay cấu hình',
+  modelName: 'Tên mô hình',
+  modelVersion: 'Phiên bản mô hình',
+  provider: 'Nền tảng',
+  recommendedSpecialty: 'Chuyên khoa gợi ý',
+  type: 'Loại tích hợp',
+};
+
+function isRedacted(value) {
+  return typeof value === 'string' && value.toUpperCase().includes('REDACTED');
+}
+
+function auditDisplayName(log) {
+  const rawName = log.afterJson?.modelName || log.beforeJson?.modelName;
+  if (rawName && !isRedacted(rawName)) return rawName;
+  if (log.action === 'CREATE') return 'Tạo cấu hình mô hình AI';
+  if (log.action === 'UPDATE') return 'Cập nhật cấu hình mô hình AI';
+  if (log.action === 'DELETE') return 'Xóa cấu hình mô hình AI';
+  return 'Thay đổi cấu hình mô hình AI';
+}
+
+function fieldLabel(field) {
+  return FIELD_LABELS[field] || field;
+}
 export default function AiModelDetailModal({ modelId, onClose }) {
   const toast = useToast();
   const [loading, setLoading] = useState(true);
@@ -176,7 +203,8 @@ export default function AiModelDetailModal({ modelId, onClose }) {
             <div className="space-y-3">
               {history.map((log) => {
                 const hash = historyHash(log);
-                const name = log.afterJson?.modelName || log.beforeJson?.modelName || log.entityId;
+                const name = auditDisplayName(log);
+                const changedFields = Array.isArray(log.fieldsChanged) ? log.fieldsChanged.map(fieldLabel).join(', ') : '';
                 return (
                   <div key={log.id} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm space-y-2">
                     <div className="flex items-center justify-between gap-3">
@@ -205,9 +233,9 @@ export default function AiModelDetailModal({ modelId, onClose }) {
                         </div>
                       )}
                     </div>
-                    {Array.isArray(log.fieldsChanged) && log.fieldsChanged.length > 0 && (
+                    {changedFields && (
                       <p className="text-[11px] font-semibold text-slate-500">
-                        Trường thay đổi: {log.fieldsChanged.join(', ')}
+                        Nội dung thay đổi: {changedFields}
                       </p>
                     )}
                   </div>

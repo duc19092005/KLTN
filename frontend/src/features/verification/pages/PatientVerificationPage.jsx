@@ -29,7 +29,6 @@ import { LoginPage } from '../../auth';
 function genderLabel(value) {
   if (value === 'MALE' || value === 'Nam') return 'Nam';
   if (value === 'FEMALE' || value === 'Nữ') return 'Nữ';
-  if (value === 'OTHER' || value === 'Khác') return 'Khác';
   return value || 'Chưa rõ';
 }
 function getVisitDepartmentName(visit) { return visit.department?.name || visit.department?.departmentCode || 'Chưa xếp phòng'; }

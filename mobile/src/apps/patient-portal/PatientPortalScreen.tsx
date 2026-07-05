@@ -1322,7 +1322,6 @@ function ProfileDetailScreen({ patient, onBack, onOpenVisits }: { patient: Patie
 function formatGender(value?: string | null) {
   if (value === 'MALE') return 'Nam';
   if (value === 'FEMALE') return 'Nữ';
-  if (value === 'OTHER') return 'Khác';
   return value || 'Chưa cập nhật';
 }
 
@@ -1359,7 +1358,6 @@ function GenderSelector({ value, onChange }: { value: string; onChange: (value: 
   const options = [
     { label: 'Nam', value: 'MALE', icon: 'male-outline' as const },
     { label: 'Nữ', value: 'FEMALE', icon: 'female-outline' as const },
-    { label: 'Khác', value: 'OTHER', icon: 'male-female-outline' as const },
   ];
   const selected = options.find((option) => option.value === value) || options[0];
 

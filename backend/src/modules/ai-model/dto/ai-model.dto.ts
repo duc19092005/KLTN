@@ -1,28 +1,31 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, IsUrl, Matches, MaxLength } from 'class-validator';
 
 import { PaginationQueryDto } from '../../shared/pagination.dto';
 
 export const AI_MODEL_TYPES = ['API', 'IP'] as const;
 export const AI_API_PROVIDERS = ['chatgpt', 'gemini', 'deepseek', 'qwen', 'anthropic', 'local', 'other'] as const;
 
+export const AI_MODEL_VERSION_REGEX = /^[A-Za-z0-9._:/@-]+$/;
+
 export class CreateAiModelDto {
   @ApiProperty({ example: 'GPT-4o Medical Assistant' })
   @IsString()
   @IsNotEmpty()
-  @MaxLength(180)
+  @MaxLength(80)
   modelName!: string;
 
   @ApiProperty({ example: '2026.05' })
   @IsString()
   @IsNotEmpty()
   @MaxLength(80)
+  @Matches(AI_MODEL_VERSION_REGEX, { message: 'modelVersion chỉ được chứa chữ, số và các ký tự ., _, -, /, :, @.' })
   modelVersion!: string;
 
   @ApiPropertyOptional({ example: 'Tim mạch' })
   @IsOptional()
   @IsString()
-  @MaxLength(160)
+  @MaxLength(80)
   recommendedSpecialty?: string;
 
   @ApiProperty({ enum: AI_MODEL_TYPES, description: 'API = model từ nền tảng AI, IP = model nội bộ theo IP/hash' })
@@ -38,6 +41,7 @@ export class CreateAiModelDto {
   @IsOptional()
   @IsString()
   @MaxLength(500)
+  @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
   apiEndpoint?: string;
 
   @ApiPropertyOptional({
@@ -47,12 +51,13 @@ export class CreateAiModelDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   secretOrIpHash?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @MaxLength(1000)
+  @MaxLength(500)
   description?: string;
 }
 
@@ -61,7 +66,7 @@ export class UpdateAiModelDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  @MaxLength(180)
+  @MaxLength(80)
   modelName?: string;
 
   @ApiPropertyOptional({ example: '2026.05' })
@@ -69,12 +74,13 @@ export class UpdateAiModelDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(80)
+  @Matches(AI_MODEL_VERSION_REGEX, { message: 'modelVersion chỉ được chứa chữ, số và các ký tự ., _, -, /, :, @.' })
   modelVersion?: string;
 
   @ApiPropertyOptional({ example: 'Tim mạch' })
   @IsOptional()
   @IsString()
-  @MaxLength(160)
+  @MaxLength(80)
   recommendedSpecialty?: string;
 
   @ApiPropertyOptional({ enum: AI_MODEL_TYPES })
@@ -91,17 +97,19 @@ export class UpdateAiModelDto {
   @IsOptional()
   @IsString()
   @MaxLength(500)
+  @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
   apiEndpoint?: string;
 
   @ApiPropertyOptional({ description: 'New API key/token. Leave blank/omit to keep the current encrypted secret.' })
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   secretOrIpHash?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @MaxLength(1000)
+  @MaxLength(500)
   description?: string;
 }
 
@@ -125,17 +133,21 @@ export class TestAiModelApiDto {
   @ApiProperty({ example: 'gemini-1.5-pro' })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(80)
+  @Matches(AI_MODEL_VERSION_REGEX, { message: 'modelVersion chỉ được chứa chữ, số và các ký tự ., _, -, /, :, @.' })
   modelVersion!: string;
 
   @ApiPropertyOptional({ description: 'API key/token dùng để test, không lưu DB. Tùy chọn cho model local.' })
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   secretOrIpHash?: string;
 
   @ApiPropertyOptional({ description: 'Optional override endpoint' })
   @IsOptional()
   @IsString()
   @MaxLength(500)
+  @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
   apiEndpoint?: string;
 }
 
@@ -147,6 +159,6 @@ export class RateAiModelDto {
   @ApiPropertyOptional({ example: 'Mô hình dự đoán chưa chính xác về kết quả chụp X-quang phổi', description: 'Ghi chú lý do nếu không hài lòng' })
   @IsOptional()
   @IsString()
-  @MaxLength(1000)
+  @MaxLength(500)
   feedback?: string;
 }

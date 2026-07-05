@@ -31,7 +31,6 @@ function formatTime(value) {
 function genderLabel(value) {
   if (value === 'MALE' || value === 'Nam') return 'Nam';
   if (value === 'FEMALE' || value === 'Nữ') return 'Nữ';
-  if (value === 'OTHER' || value === 'Khác') return 'Khác';
   return value || 'Chưa cập nhật';
 }
 
@@ -84,7 +83,6 @@ export default function StaffDetailModal({ staffId, onClose }) {
               </div>
             )}
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-600">Chi tiết nhân sự</p>
               <h3 className="text-2xl font-black text-slate-950">{staff.fullName || 'Nhân viên'}</h3>
               <p className="text-sm text-slate-500">{ROLE_LABEL[user?.role] || user?.role || 'N/A'}</p>
             </div>

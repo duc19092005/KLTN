@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsDateString, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { PaginationQueryDto } from '../../shared/pagination.dto';
+const PATIENT_GENDER_VALUES = ['MALE', 'FEMALE'] as const;
 
 export class CreatePatientDto {
   @ApiPropertyOptional({ example: 'BN-0001' })
@@ -14,9 +15,9 @@ export class CreatePatientDto {
   @MaxLength(160)
   fullName!: string;
 
-  @ApiProperty({ example: 'MALE' })
+  @ApiProperty({ example: 'MALE', enum: PATIENT_GENDER_VALUES })
   @IsString()
-  @MaxLength(20)
+  @IsIn(PATIENT_GENDER_VALUES, { message: 'Giới tính chỉ được chọn Nam hoặc Nữ.' })
   gender!: string;
 
   @ApiProperty({ example: '1990-01-01' })

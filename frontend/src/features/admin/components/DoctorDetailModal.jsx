@@ -15,6 +15,28 @@ const ACTION_LABEL = {
   DELETE: 'Xóa',
 };
 
+const SPECIALTY_LABEL = {
+  GENERAL_INTERNAL_MEDICINE: 'Nội tổng quát',
+  GENERAL_SURGERY: 'Ngoại tổng quát',
+  PEDIATRICS: 'Nhi khoa',
+  OBSTETRICS_GYNECOLOGY: 'Sản phụ khoa',
+  CARDIOLOGY: 'Tim mạch',
+  ENT: 'Tai Mũi Họng',
+  DENTOMAXILLOFACIAL: 'Răng Hàm Mặt',
+  OPHTHALMOLOGY: 'Mắt',
+  DERMATOLOGY: 'Da liễu',
+  NEUROLOGY: 'Thần kinh',
+  ORTHOPEDICS: 'Chấn thương chỉnh hình',
+  GASTROENTEROLOGY: 'Tiêu hóa',
+  ENDOCRINOLOGY: 'Nội tiết',
+  ONCOLOGY: 'Ung bướu',
+  RESPIRATORY: 'Hô hấp',
+};
+
+function getSpecialtyLabel(value) {
+  return SPECIALTY_LABEL[value] || value || 'N/A';
+}
+
 function shortHash(hash) {
   if (!hash) return '—';
   const clean = hash.startsWith('0x') ? hash.slice(2) : hash;
@@ -28,7 +50,6 @@ function formatTime(value) {
 function genderLabel(value) {
   if (value === 'MALE' || value === 'Nam') return 'Nam';
   if (value === 'FEMALE' || value === 'Nữ') return 'Nữ';
-  if (value === 'OTHER' || value === 'Khác') return 'Khác';
   return value || 'Chưa cập nhật';
 }
 
@@ -79,9 +100,8 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
               </div>
             )}
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-600">Thông tin chi tiết</p>
-              <h3 className="text-2xl font-black text-slate-950">{staff.fullName || 'Bác sĩ'}</h3>
-              <p className="text-sm text-slate-500">{detail?.specialty} • {detail?.qualification}</p>
+              <h3 className="text-2xl font-black text-slate-950">{staff.fullName || 'Hồ sơ Bác sĩ'}</h3>
+              <p className="text-sm text-slate-500">{getSpecialtyLabel(detail?.specialty)} • {detail?.qualification}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -151,7 +171,7 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
                   <h4 className="text-sm font-black text-slate-900 border-b pb-2 tracking-wide uppercase">Thông tin chuyên môn</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <Field label="Số CCHN" value={detail.licenseNumber} colSpan={2} />
-                    <Field label="Chuyên khoa" value={detail.specialty} />
+                    <Field label="Chuyên khoa" value={getSpecialtyLabel(detail.specialty)} />
                     <Field label="Học hàm/Học vị" value={detail.qualification} />
                     <Field label="Kinh nghiệm" value={`${detail.yearsExperience ?? 0} năm`} />
                     <Field label="Phòng khám" value={staff.department ? `${staff.department.departmentCode} - ${staff.department.name}` : 'Chưa gán'} />
@@ -220,7 +240,7 @@ function Field({ label, value, colSpan = 1 }) {
   return (
     <div className={colSpan === 2 ? 'col-span-2' : ''}>
       <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">{label}</span>
-      <p className="mt-0.5 text-sm font-bold text-slate-800">{value || '—'}</p>
+      <p className="mt-0.5 break-words text-sm font-bold text-slate-800">{value || '—'}</p>
     </div>
   );
 }

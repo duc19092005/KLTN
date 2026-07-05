@@ -6,6 +6,7 @@ import AvatarUpload from '../../../shared/components/AvatarUpload';
 import BlockchainStatusBadge from '../../../shared/components/BlockchainStatusBadge';
 import { useAuth } from '../../../providers/AuthProvider';
 import { doctorService } from '../apis/doctorService';
+import { staffService } from '../apis/staffService';
 import { departmentService } from '../apis/departmentService';
 import DoctorDetailModal from '../components/DoctorDetailModal';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
@@ -26,6 +27,8 @@ const MAX_ADDRESS_LENGTH = 255;
 const MIN_YEARS_EXPERIENCE = 1;
 const MAX_YEARS_EXPERIENCE = 50;
 const MAX_LICENSE_NUMBER_LENGTH = 30;
+const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100', INACTIVE: 'bg-rose-50 text-rose-700 border-rose-100', PENDING: 'bg-amber-50 text-amber-700 border-amber-100' };
+const statusLabel = { ACTIVE: 'Đang hoạt động', INACTIVE: 'Ngưng hoạt động', PENDING: 'Chờ kích hoạt' };
 function buildGoogleMapsDirectionsUrl(lat, lng) { return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`; }
 function buildAddressQueries(query) {
   const normalized = query.replace(/[\/\\]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -276,6 +279,41 @@ export default function DoctorsPage() {
     finally { setBusy(false); }
   };
 
+  const toggleDoctorStatus = async (doctor) => {
+    const staffId = doctor?.staffProfile?.id;
+    if (!staffId) {
+      toast.error('Không tìm thấy hồ sơ nhân sự của bác sĩ.');
+      return;
+    }
+    setBusy(true);
+    try {
+      if (doctor.staffProfile?.user?.status === 'INACTIVE') {
+        await staffService.unlock(staffId);
+        toast.success('Hiện bác sĩ thành công!');
+      } else {
+        await staffService.lock(staffId);
+        toast.success('Ẩn bác sĩ thành công!');
+      }
+      await load(pagination.page);
+    } catch (err) { toast.error(getError(err)); }
+    finally { setBusy(false); }
+  };
+
+  const removeDoctor = async (doctor) => {
+    const staffId = doctor?.staffProfile?.id;
+    if (!staffId) {
+      toast.error('Không tìm thấy hồ sơ nhân sự của bác sĩ.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await staffService.remove(staffId);
+      toast.success('Xóa bác sĩ thành công!');
+      await load(pagination.page);
+    } catch (err) { toast.error(getError(err)); }
+    finally { setBusy(false); }
+  };
+
   const search = async (event) => { event.preventDefault(); await load(1); };
 
   return (
@@ -291,7 +329,7 @@ export default function DoctorsPage() {
                 <p className="text-sm text-slate-500">Quản lý hồ sơ chuyên môn và phòng khám phụ trách.</p>
               </div>
               <div className="divide-y divide-slate-100">
-                {doctors.map((doctor) => <DoctorRow key={doctor.id} doctor={doctor} onEdit={openEdit} onViewDetails={setDetailDoctorId} busy={busy} />)}
+                {doctors.map((doctor) => <DoctorRow key={doctor.id} doctor={doctor} onEdit={openEdit} onToggleStatus={toggleDoctorStatus} onRemove={removeDoctor} onViewDetails={setDetailDoctorId} busy={busy} />)}
                 {!doctors.length && <div className="p-6 text-center text-sm text-slate-500">Chưa có bác sĩ.</div>}
               </div>
               <Pagination pagination={pagination} onPageChange={load} />
@@ -307,10 +345,10 @@ export default function DoctorsPage() {
 
 function Hero({ totalLabel, onCreate }) { return <div className="flex items-center justify-between gap-3"><span className="rounded-xl bg-white px-3 py-1 text-xs font-black text-cyan-700 border border-cyan-100">{totalLabel}</span><button onClick={onCreate} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ Thêm bác sĩ</button></div>; }
 function SearchBar({ filters, setFilters, onSearch }) { return <form onSubmit={onSearch} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-3 items-end"><Select label="Chuyên khoa" value={filters.specialty} onChange={(v) => setFilters({ ...filters, specialty: v })} empty="Tất cả chuyên khoa" options={SPECIALTIES} /><Input label="Tìm kiếm" value={filters.search} onChange={(v) => setFilters({ ...filters, search: v })} placeholder="Tên bác sĩ, chứng chỉ..." /><button className="rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-black text-white hover:bg-cyan-700">Tìm kiếm</button></form>; }
-function DoctorRow({ doctor, onEdit, onViewDetails, busy }) {
+function DoctorRow({ doctor, onEdit, onToggleStatus, onRemove, onViewDetails, busy }) {
   return (
     <article className="p-5 hover:bg-slate-50/70">
-      <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr_1fr_0.9fr_240px] gap-4 lg:items-center">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_0.9fr_0.9fr_0.85fr_0.9fr_230px] xl:items-center">
         <div className="flex items-center gap-3">
           <img src={doctor.staffProfile?.avatarUrl} alt={doctor.staffProfile?.fullName || 'Bác sĩ'} className="w-11 h-11 rounded-2xl object-cover border border-cyan-100 bg-cyan-50" />
           <div>
@@ -320,13 +358,16 @@ function DoctorRow({ doctor, onEdit, onViewDetails, busy }) {
         </div>
         <Info label="Chuyên khoa" value={getSpecialtyLabel(doctor.specialty)} />
         <Info label="Phòng khám" value={doctor.staffProfile?.department?.name || 'Chưa gán'} />
+        <span className={`w-fit rounded-lg border px-2.5 py-1 text-xs font-black ${statusTone[doctor.staffProfile?.user?.status] || statusTone.ACTIVE}`}>{statusLabel[doctor.staffProfile?.user?.status] || 'Không rõ'}</span>
         <div>
           <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Trạng thái dữ liệu</p>
           <BlockchainStatusBadge status={doctor.blockchainStatus} size="xs" />
         </div>
-        <div className="lg:text-right flex justify-end gap-2">
-          <button type="button" disabled={busy} onClick={() => onViewDetails(doctor.id)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-cyan-600 hover:bg-cyan-50 disabled:opacity-50">Xem chi tiết</button>
+        <div className="flex flex-wrap gap-2 xl:justify-end">
+          <button type="button" disabled={busy} onClick={() => onViewDetails(doctor.id)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-cyan-600 hover:bg-cyan-50 disabled:opacity-50">Chi tiết</button>
           <button type="button" disabled={busy} onClick={() => onEdit(doctor)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 disabled:opacity-50">Sửa</button>
+          <button type="button" disabled={busy} onClick={() => onToggleStatus(doctor)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 disabled:opacity-50">{doctor.staffProfile?.user?.status === 'INACTIVE' ? 'Hiện' : 'Ẩn'}</button>
+          <button type="button" disabled={busy} onClick={() => onRemove(doctor)} className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-100 disabled:opacity-50">Xóa</button>
         </div>
       </div>
     </article>
@@ -479,11 +520,10 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
       <form onSubmit={handleSubmit} className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-5">
         <div className="flex justify-between gap-4">
           <div>
-            <p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.18em]">Hồ sơ bác sĩ</p>
             <h3 className="text-2xl font-black text-slate-950">{isCreate ? 'Thêm bác sĩ' : 'Cập nhật bác sĩ'}</h3>
             <p className="text-sm text-slate-500">
               {isCreate
-                ? 'Nhập đầy đủ thông tin tài khoản, nhân sự và chuyên môn bác sĩ. Mật khẩu mặc định là 123456 và được mã hóa trước khi lưu.'
+                ? ''
                 : 'Cập nhật thông tin nhân sự, chuyên môn và phòng khám phụ trách.'}
             </p>
           </div>
@@ -539,7 +579,29 @@ function Pagination({ pagination, onPageChange }) { return <div className="flex 
 function Info({ label, value }) { return <div><p className="text-[11px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className="text-sm font-bold text-slate-700">{value}</p></div>; }
 function Alert({ children }) { return <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">{children}</div>; }
 function SmallButton({ children, onClick, disabled }) { return <button type="button" disabled={disabled} onClick={onClick} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 disabled:opacity-50">{children}</button>; }
-function Input({ label, value, onChange, onBlur, error, required, placeholder, type = 'text', disabled, maxLength, inputMode, pattern }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><input type={type} required={required} disabled={disabled} value={value || ''} maxLength={maxLength} inputMode={inputMode} pattern={pattern} min={type === 'number' ? '0' : undefined} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none disabled:opacity-60 disabled:cursor-not-allowed ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} />{error && <p className="text-xs font-bold text-rose-600">{error}</p>}</label>; }
+function Input({ label, value, onChange, onBlur, error, required, placeholder, type = 'text', disabled, maxLength, inputMode, pattern }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-[13px] font-bold text-slate-700">{label}</span>
+      <input
+        type={type}
+        required={required}
+        disabled={disabled}
+        value={value || ''}
+        maxLength={maxLength}
+        inputMode={inputMode}
+        pattern={pattern}
+        min={type === 'number' ? '0' : undefined}
+        aria-invalid={Boolean(error)}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        placeholder={placeholder}
+        className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none disabled:opacity-60 disabled:cursor-not-allowed transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`}
+      />
+      <FieldError message={error} />
+    </label>
+  );
+}
 function DateInput({ label, value, onChange, onBlur, error, required }) {
   const pickerRef = useRef(null);
   const openPicker = () => {
@@ -564,12 +626,13 @@ function DateInput({ label, value, onChange, onBlur, error, required }) {
           type="text"
           required={required}
           value={value || ''}
+          aria-invalid={Boolean(error)}
           onChange={(e) => onChange(sanitizeDateTyping(e.target.value))}
           onBlur={handleBlur}
           placeholder="dd/mm/yyyy"
           inputMode="numeric"
           maxLength={10}
-          className={`w-full px-3.5 py-2.5 pr-10 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`}
+          className={`w-full px-3.5 py-2.5 pr-10 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`}
         />
         <button type="button" onClick={openPicker} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-500 hover:bg-cyan-50 hover:text-cyan-600" title="Chọn ngày sinh">
           <Calendar className="h-4 w-4" />
@@ -585,7 +648,7 @@ function DateInput({ label, value, onChange, onBlur, error, required }) {
           tabIndex={-1}
         />
       </div>
-      {error && <p className="text-xs font-bold text-rose-600">{error}</p>}
+      <FieldError message={error} />
     </label>
   );
 }
@@ -594,7 +657,7 @@ function AddressInput({ label, value, onChange, onBlur, onFocus, error, maxLengt
     <label className="relative block space-y-1.5">
       <span className="text-[13px] font-bold text-slate-700">{label}</span>
       <div className="relative">
-        <input value={value || ''} onChange={(e) => onChange(e.target.value)} onFocus={onFocus} onBlur={onBlur} placeholder="Nhập địa chỉ để gợi ý..." title={value || ''} required maxLength={maxLength} className={`w-full px-3.5 py-2.5 pr-10 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} />
+        <input value={value || ''} onChange={(e) => onChange(e.target.value)} onFocus={onFocus} onBlur={onBlur} placeholder="Nhập địa chỉ để gợi ý..." title={value || ''} required maxLength={maxLength} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 pr-10 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} />
         <MapPin className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
       </div>
       {open && (loading || searched || suggestions.length > 0) && (
@@ -614,8 +677,22 @@ function AddressInput({ label, value, onChange, onBlur, onFocus, error, maxLengt
           ))}
         </div>
       )}
-      {error && <p className="text-xs font-bold text-rose-600">{error}</p>}
+      <FieldError message={error} />
     </label>
   );
 }
-function Select({ label, value, onChange, options, empty, required, disabled, error }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><select required={required} disabled={disabled} value={value || ''} onChange={(e) => onChange(e.target.value)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none disabled:opacity-60 disabled:cursor-not-allowed ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`}>{empty && <option value="">{empty}</option>}{options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select>{error && <p className="text-xs font-bold text-rose-600">{error}</p>}</label>; }
+function Select({ label, value, onChange, options, empty, required, disabled, error }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-[13px] font-bold text-slate-700">{label}</span>
+      <select required={required} disabled={disabled} value={value || ''} aria-invalid={Boolean(error)} onChange={(e) => onChange(e.target.value)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none disabled:opacity-60 disabled:cursor-not-allowed transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`}>
+        {empty && <option value="">{empty}</option>}
+        {options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+      </select>
+      <FieldError message={error} />
+    </label>
+  );
+}
+function FieldError({ message }) {
+  return <p className={`min-h-[2rem] text-xs font-bold leading-4 transition-colors ${message ? 'text-rose-600' : 'text-transparent'}`}>{message || 'Không có lỗi'}</p>;
+}

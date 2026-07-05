@@ -22,6 +22,7 @@ These are strict, unbreakable rules. If your code violates these, it is incorrec
 - **AI Diagnosis CANNOT finalize a diagnosis; it only suggests.**
 - **A MedicalResult must belong to a valid MedicalOrder, which in turn belongs to a Visit.**
 - **BlockchainAudit (`BlockchainLogger`) records are completely immutable once created.**
+- **Department is not Doctor Specialty.** `Department` is an operational unit/clinic/lab/imaging/service area for routing staff, rooms, orders, and workflows. Doctor `specialty` is a clinical expertise label (`Nội tổng quát`, `Tim mạch`, `Hô hấp`, etc.) used on doctor profiles and AI model recommendation selectors. Do not use `/departments` as the source for specialty dropdowns unless the user explicitly requests restructuring the domain model.
 
 ## 2. Core Workflows
 

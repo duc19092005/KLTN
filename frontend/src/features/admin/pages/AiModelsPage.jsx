@@ -70,6 +70,62 @@ const emptyForm = {
   description: '',
 };
 
+const SPECIALTIES = [
+  'Nội tổng quát',
+  'Ngoại tổng quát',
+  'Nhi khoa',
+  'Sản phụ khoa',
+  'Tim mạch',
+  'Tai Mũi Họng',
+  'Răng Hàm Mặt',
+  'Mắt',
+  'Da liễu',
+  'Thần kinh',
+  'Chấn thương chỉnh hình',
+  'Tiêu hóa',
+  'Nội tiết',
+  'Ung bướu',
+  'Hô hấp',
+];
+
+const MAX_MODEL_NAME_LENGTH = 80;
+const MAX_MODEL_VERSION_LENGTH = 80;
+const MAX_SPECIALTY_LENGTH = 80;
+const MAX_ENDPOINT_LENGTH = 500;
+const MAX_SECRET_LENGTH = 2000;
+const MAX_DESCRIPTION_LENGTH = 500;
+const MODEL_VERSION_REGEX = /^[A-Za-z0-9._:/@-]+$/;
+const URL_REGEX = /^https?:\/\/.+/i;
+
+function limitText(value, max) { return (value || '').slice(0, max); }
+function normalizeModelVersion(value) { return (value || '').trim().replace(/\s+/g, '-').slice(0, MAX_MODEL_VERSION_LENGTH); }
+function validateAiModelForm(form, { editing = false } = {}) {
+  const errors = {};
+  const modelName = form.modelName.trim();
+  const modelVersion = form.modelVersion.trim();
+  const specialty = form.recommendedSpecialty.trim();
+  const endpoint = form.apiEndpoint.trim();
+  const secret = form.secretOrIpHash.trim();
+  const description = form.description.trim();
+  const manualEndpoint = needsManualEndpoint(form.provider);
+  const keyRequiredForSubmit = requiresKey(form.provider) && !editing;
+
+  if (!modelName) errors.modelName = 'Vui lòng nhập tên mô hình.';
+  else if (modelName.length > MAX_MODEL_NAME_LENGTH) errors.modelName = `Tên mô hình không vượt quá ${MAX_MODEL_NAME_LENGTH} ký tự.`;
+  if (specialty.length > MAX_SPECIALTY_LENGTH) errors.recommendedSpecialty = `Chuyên khoa không vượt quá ${MAX_SPECIALTY_LENGTH} ký tự.`;
+  if (!form.provider) errors.provider = 'Vui lòng chọn nền tảng.';
+  if (!modelVersion) errors.modelVersion = 'Vui lòng chọn hoặc nhập ID mô hình.';
+  else if (!MODEL_VERSION_REGEX.test(modelVersion)) errors.modelVersion = 'ID mô hình chỉ gồm chữ, số, dấu ., _, -, /, :, @.';
+  else if (modelVersion.length > MAX_MODEL_VERSION_LENGTH) errors.modelVersion = `ID mô hình không vượt quá ${MAX_MODEL_VERSION_LENGTH} ký tự.`;
+  if (manualEndpoint && !endpoint) errors.apiEndpoint = 'Vui lòng nhập điểm cuối API.';
+  else if (endpoint && !URL_REGEX.test(endpoint)) errors.apiEndpoint = 'Điểm cuối API phải bắt đầu bằng http:// hoặc https://.';
+  else if (endpoint.length > MAX_ENDPOINT_LENGTH) errors.apiEndpoint = `Điểm cuối API không vượt quá ${MAX_ENDPOINT_LENGTH} ký tự.`;
+  if (keyRequiredForSubmit && !secret) errors.secretOrIpHash = 'Vui lòng nhập khóa API/token.';
+  else if (secret.length > MAX_SECRET_LENGTH) errors.secretOrIpHash = `Khóa API/token không vượt quá ${MAX_SECRET_LENGTH} ký tự.`;
+  if (description.length > MAX_DESCRIPTION_LENGTH) errors.description = `Mô tả không vượt quá ${MAX_DESCRIPTION_LENGTH} ký tự.`;
+  return errors;
+}
+
 function getItems(data) { return Array.isArray(data) ? data : data?.items || []; }
 function providerInfo(provider) { return PROVIDERS.find((p) => p.value === provider) || PROVIDERS[0]; }
 function modelOptions(provider) { return MODEL_OPTIONS[provider] || []; }
@@ -217,6 +273,11 @@ export default function AiModelsPage() {
 
   const submit = async (event) => {
     event.preventDefault();
+    const validationErrors = validateAiModelForm(form, { editing: Boolean(editingModel) });
+    if (Object.keys(validationErrors).length > 0) {
+      toast.error('Vui lòng kiểm tra lại thông tin mô hình AI.');
+      return;
+    }
     setSaving(true);
     try {
       // Unified flow: every model is registered as an API endpoint. Self-hosted (local) just
@@ -274,7 +335,6 @@ export default function AiModelsPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="text-xl font-black text-slate-950">Danh mục hiện tại</h2>
-                <p className="text-sm text-slate-500">Danh sách mô hình đã đăng ký trong hệ thống.</p>
               </div>
               <select value={filter} onChange={(event) => handleFilterChange(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold outline-none">
                 <option value="">Tất cả</option>
@@ -299,9 +359,7 @@ export default function AiModelsPage() {
         {statsData && (
           <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm space-y-6">
             <div>
-              <span className="text-[10px] uppercase tracking-[0.2em] font-black text-cyan-600 bg-cyan-50 px-2.5 py-1 rounded-md">Kiểm định chất lượng và bảo mật AI</span>
-              <h2 className="text-xl font-black text-slate-950 mt-2">Bảng điều khiển Chất lượng & Xác thực Đánh giá AI</h2>
-              <p className="text-xs text-slate-500 mt-1">Đánh giá thực tế từ các bác sĩ và kết quả đối soát chữ ký số/blockchain của từng phản hồi.</p>
+              <h2 className="text-xl font-black text-slate-950">Bảng điều khiển Chất lượng & Xác thực Đánh giá AI</h2>
             </div>
 
             {/* Top & Bottom Models */}
@@ -422,125 +480,94 @@ export default function AiModelsPage() {
 }
 
 function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing, testApi, testResult, editing = false }) {
-  const endpoint = resolvedEndpoint(form);
-  const selectedProvider = providerInfo(form.provider);
   const manualEndpoint = needsManualEndpoint(form.provider);
   const keyRequired = requiresKey(form.provider);
   const keyRequiredForSubmit = keyRequired && !editing;
   const canTest = Boolean(form.provider && form.modelVersion && (manualEndpoint ? form.apiEndpoint : true) && (keyRequired ? form.secretOrIpHash : true));
+  const specialtyOptions = SPECIALTIES.map((specialty) => ({ value: specialty, label: specialty }));
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const getFieldError = (field, overrideValue) => validateAiModelForm({ ...form, [field]: overrideValue ?? form[field] }, { editing })[field] || '';
+  const validateField = (field, overrideValue) => {
+    const error = getFieldError(field, overrideValue);
+    setFieldErrors((current) => ({ ...current, [field]: error }));
+    return !error;
+  };
+  const handleSubmit = (event) => {
+    const errors = validateAiModelForm(form, { editing });
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      event.preventDefault();
+      return;
+    }
+    onSubmit(event);
+  };
+  const changeField = (field, value) => {
+    updateForm(field, value);
+    if (fieldErrors[field]) setFieldErrors((current) => ({ ...current, [field]: getFieldError(field, value) }));
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-      <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/60 bg-white shadow-xl">
-        <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 p-6 backdrop-blur">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-	              <p className="text-[10px] uppercase tracking-[0.24em] font-black text-cyan-500">{editing ? 'Cập nhật mô hình AI' : 'Tạo mô hình AI'}</p>
-              <h2 className="mt-1 text-2xl font-black text-slate-950">{editing ? 'Sửa mô hình AI' : 'Thêm mô hình AI'}</h2>
-	              <p className="mt-1 text-sm text-slate-500">{editing ? 'Cập nhật cấu hình. Để trống khóa API nếu muốn giữ khóa đang mã hóa.' : 'Chọn nền tảng. Nền tảng đám mây tự điền điểm cuối API; mô hình tự lưu trữ chỉ cần dán điểm cuối API.'}</p>
-            </div>
-            <button type="button" onClick={onClose} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-black text-slate-600">Đóng</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+      <form onSubmit={handleSubmit} noValidate className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-5">
+        <div className="flex justify-between gap-4">
+          <div>
+            <h3 className="text-2xl font-black text-slate-950">{editing ? 'Cập nhật mô hình AI' : 'Thêm mô hình AI'}</h3>
           </div>
+          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500">Đóng</button>
         </div>
 
-        <form onSubmit={onSubmit} className="space-y-4 p-6">
+        <SectionTitle title="Thông tin mô hình" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Field label="Tên mô hình" value={form.modelName} onChange={(v) => changeField('modelName', limitText(v, MAX_MODEL_NAME_LENGTH))} onBlur={() => validateField('modelName')} error={fieldErrors.modelName} required placeholder="VD: OpenAI" maxLength={MAX_MODEL_NAME_LENGTH} />
+          <SelectField label="Nền tảng" value={form.provider} onChange={(v) => changeField('provider', v)} onBlur={() => validateField('provider')} error={fieldErrors.provider} options={PROVIDERS.map((p) => ({ value: p.value, label: p.label }))} required />
+          <ModelPicker form={form} updateForm={changeField} errors={fieldErrors} validateField={validateField} />
+          <SelectField label="Chuyên khoa" value={form.recommendedSpecialty} onChange={(v) => changeField('recommendedSpecialty', v)} onBlur={() => validateField('recommendedSpecialty')} error={fieldErrors.recommendedSpecialty} empty="Chọn chuyên khoa hệ thống" options={specialtyOptions} />
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Tên mô hình hiển thị" value={form.modelName} onChange={(v) => updateForm('modelName', v)} required placeholder="VD: Trợ lý nội tổng quát" />
-            <Field label="Chuyên khoa khuyến nghị" value={form.recommendedSpecialty} onChange={(v) => updateForm('recommendedSpecialty', v)} placeholder="VD: Nội tổng quát" />
-          </div>
+        <SectionTitle title="Kết nối và bảo mật" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {manualEndpoint && <div className="md:col-span-2"><Field label="Điểm cuối API" value={form.apiEndpoint} onChange={(v) => changeField('apiEndpoint', limitText(v.trim(), MAX_ENDPOINT_LENGTH))} onBlur={() => validateField('apiEndpoint')} error={fieldErrors.apiEndpoint} required placeholder="http://localhost:11434/v1/chat/completions" maxLength={MAX_ENDPOINT_LENGTH} /></div>}
+          <TextAreaField label="Khóa API / Token" value={form.secretOrIpHash} onChange={(v) => changeField('secretOrIpHash', limitText(v, MAX_SECRET_LENGTH))} onBlur={() => validateField('secretOrIpHash')} error={fieldErrors.secretOrIpHash} required={keyRequiredForSubmit} optional={!keyRequiredForSubmit} rows={3} maxLength={MAX_SECRET_LENGTH} className="md:col-span-2" />
+          <TextAreaField label="Mô tả" value={form.description} onChange={(v) => changeField('description', limitText(v, MAX_DESCRIPTION_LENGTH))} onBlur={() => validateField('description')} error={fieldErrors.description} rows={3} maxLength={MAX_DESCRIPTION_LENGTH} className="md:col-span-2" />
+        </div>
 
-          <label className="block">
-            <span className="text-xs font-black text-slate-600">Nền tảng</span>
-            <select value={form.provider} onChange={(event) => updateForm('provider', event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100">
-              {PROVIDERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-            </select>
-            <p className="mt-1 text-[11px] font-semibold text-slate-400">{selectedProvider.hint}</p>
-          </label>
-
-          <ModelPicker form={form} updateForm={updateForm} />
-
-          {/* Endpoint: cloud auto-resolves and shows a read-only preview + optional override.
-              Self-hosted/custom requires the admin to paste the URL. */}
-          {manualEndpoint ? (
-            <Field
-	              label="Điểm cuối API"
-              value={form.apiEndpoint}
-              onChange={(v) => updateForm('apiEndpoint', v)}
-              required
-              placeholder="http://localhost:11434/v1/chat/completions"
-            />
-          ) : (
-            <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4">
-              <div className="flex items-center justify-between gap-3">
-	                <p className="text-xs font-black text-slate-600">Điểm cuối API</p>
-	                <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-cyan-700">{form.apiEndpoint ? 'GHI ĐÈ' : 'TỰ ĐỘNG'}</span>
-              </div>
-              <p className="mt-2 break-all rounded-xl bg-white px-3 py-3 text-sm font-bold text-slate-700 border border-cyan-100">{endpoint || 'Tự động theo nền tảng'}</p>
-              <div className="mt-3">
-	                <Field label="Ghi đè điểm cuối API (tùy chọn)" value={form.apiEndpoint} onChange={(v) => updateForm('apiEndpoint', v)} placeholder="Để trống để dùng điểm cuối mặc định" />
-              </div>
-            </div>
-          )}
-
-          <label className="block">
-            <span className="text-xs font-black text-slate-600">
-	              Khóa API / Token {keyRequiredForSubmit ? <span className="text-rose-500">*</span> : <span className="font-bold text-slate-400">(tùy chọn)</span>}
-            </span>
-            <textarea
-              required={keyRequiredForSubmit}
-              value={form.secretOrIpHash}
-              onChange={(event) => updateForm('secretOrIpHash', event.target.value)}
-              rows={2}
-	              placeholder={editing ? 'Để trống để giữ khóa hiện tại, nhập giá trị mới nếu cần đổi' : keyRequired ? 'sk-... / token nhà cung cấp' : 'Mô hình tự lưu trữ thường không cần khóa - để trống nếu vậy'}
-              className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100"
-            />
-            <p className="mt-1 text-[11px] font-semibold text-emerald-600">Nếu nhập, giá trị sẽ được mã hóa AES-256 bằng ENCRYPTION_KEY trước khi lưu.</p>
-          </label>
-
-          <label className="block">
-            <span className="text-xs font-black text-slate-600">Mô tả</span>
-            <textarea value={form.description} onChange={(event) => updateForm('description', event.target.value)} rows={2} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100" />
-          </label>
-
-          <button type="button" disabled={testing || !canTest} onClick={testApi} className="w-full rounded-2xl border border-cyan-200 bg-cyan-50 px-5 py-3 text-sm font-black text-cyan-700 disabled:opacity-50">
+        <SectionTitle title="Kiểm tra kết nối" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <button type="button" disabled={testing || !canTest} onClick={testApi} className="w-full rounded-2xl border border-cyan-200 bg-cyan-50 px-5 py-3 text-sm font-black text-cyan-700 hover:bg-cyan-100 disabled:opacity-50">
             {testing ? 'Đang kiểm tra kết nối...' : 'Kiểm tra kết nối mô hình'}
           </button>
           {testResult && <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-bold text-emerald-700">Thành công · {testResult.provider} · {testResult.latencyMs}ms · {testResult.endpoint}</div>}
+        </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600">Hủy</button>
-            <button disabled={saving} className="flex-1 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-cyan-700 disabled:opacity-60">{saving ? 'Đang lưu...' : editing ? 'Lưu thay đổi' : 'Thêm mô hình AI'}</button>
-          </div>
-        </form>
-      </div>
+        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          <button type="button" onClick={onClose} className="flex-1 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600 hover:bg-slate-50">Hủy</button>
+          <button disabled={saving} className="flex-1 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-cyan-700 disabled:opacity-60">{saving ? 'Đang lưu...' : editing ? 'Lưu thay đổi' : 'Thêm mô hình AI'}</button>
+        </div>
+      </form>
     </div>
   );
 }
 
-function ModelPicker({ form, updateForm }) {
+function SectionTitle({ title }) { return <h4 className="border-t border-slate-100 pt-4 text-sm font-black text-slate-800 first:border-t-0 first:pt-0">{title}</h4>; }
+
+function ModelPicker({ form, updateForm, errors = {}, validateField = () => true }) {
   const options = modelOptions(form.provider);
-  // Providers with presets (cloud + local) show a dropdown plus a free-text escape hatch.
-  // Providers without presets (other) are pure free-text.
-  if (!options.length) {
-    return <Field label="ID mô hình" value={form.modelVersion} onChange={(v) => updateForm('modelVersion', v)} required placeholder="VD: mo-hinh-tuy-chinh" />;
-  }
+  if (!options.length) return <Field label="ID mô hình" value={form.modelVersion} onChange={(v) => updateForm('modelVersion', normalizeModelVersion(v))} onBlur={() => validateField('modelVersion')} error={errors.modelVersion} required placeholder="VD: mo-hinh-tuy-chinh" maxLength={MAX_MODEL_VERSION_LENGTH} />;
   const useCustom = !isKnownModel(form.provider, form.modelVersion);
-  return (
-    <div className="space-y-2">
-      <label className="block">
-        <span className="text-xs font-black text-slate-600">Mô hình</span>
-        <select value={useCustom ? '__custom__' : form.modelVersion} onChange={(event) => updateForm('modelVersion', event.target.value === '__custom__' ? '' : event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100">
-          {options.map((model) => <option key={model.value} value={model.value}>{model.label}</option>)}
-          <option value="__custom__">Tùy chỉnh ID mô hình</option>
-        </select>
-      </label>
-      {useCustom && <Field label="Nhập ID mô hình" value={form.modelVersion} onChange={(v) => updateForm('modelVersion', v)} required placeholder="VD: llama3.1 hoặc gpt-5.2" />}
-    </div>
-  );
+  return <div className="space-y-1.5"><SelectField label="Mô hình" value={useCustom ? '__custom__' : form.modelVersion} onChange={(v) => updateForm('modelVersion', v === '__custom__' ? '' : v)} options={[...options, { value: '__custom__', label: 'Tùy chỉnh ID mô hình' }]} />{useCustom && <Field label="Nhập ID mô hình" value={form.modelVersion} onChange={(v) => updateForm('modelVersion', normalizeModelVersion(v))} onBlur={() => validateField('modelVersion')} error={errors.modelVersion} required placeholder="VD: llama3.1 hoặc gpt-5.2" maxLength={MAX_MODEL_VERSION_LENGTH} />}</div>;
 }
 
-function Field({ label, value, onChange, required = false, placeholder = '' }) { return <label className="block"><span className="text-xs font-black text-slate-600">{label}{required && <span className="text-rose-500"> *</span>}</span><input required={required} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100" /></label>; }
+function Field({ label, value, onChange, onBlur, error, required = false, placeholder = '', maxLength }) {
+  return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}{required && <span className="text-rose-500"> *</span>}</span><input required={required} value={value || ''} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} placeholder={placeholder} maxLength={maxLength} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} /><FieldError message={error} /></label>;
+}
+function SelectField({ label, value, onChange, onBlur, options, empty, required, error }) {
+  return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}{required && <span className="text-rose-500"> *</span>}</span><select required={required} value={value || ''} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`}>{empty && <option value="">{empty}</option>}{options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select><FieldError message={error} /></label>;
+}
+function TextAreaField({ label, value, onChange, onBlur, error, required = false, optional = false, rows = 2, maxLength, className = '' }) {
+  return <label className={`block space-y-1.5 ${className}`}><span className="text-[13px] font-bold text-slate-700">{label}{required && <span className="text-rose-500"> *</span>}{optional && <span className="font-semibold text-slate-400"> (tùy chọn)</span>}</span><textarea required={required} value={value || ''} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} rows={rows} maxLength={maxLength} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} /><FieldError message={error} /></label>;
+}
+function FieldError({ message }) { return <p className={`min-h-[2rem] text-xs font-bold leading-4 transition-colors ${message ? 'text-rose-600' : 'text-transparent'}`}>{message || 'Không có lỗi'}</p>; }
 function ModelCard({ model, onViewDetails, onEdit, onDelete, busy }) {
   const isLocal = model.provider === 'local';
   const badgeCls = isLocal ? 'bg-cyan-50 text-cyan-700 border-cyan-100' : 'bg-cyan-50 text-cyan-700 border-cyan-100';

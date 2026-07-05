@@ -56,6 +56,7 @@ When writing code for this project, adhere to the following standards:
 - **Controllers**: No business logic in controllers. Controllers handle HTTP routing and DTOs; Services handle business logic.
 - **Folder Structure**: Strictly feature-based folder structure on both frontend (`features/admin`, `features/receptionist`) and backend (`modules/visit`, `modules/department`).
 - **Soft Deletes**: Use soft deletes (status flags) for business entities where possible, rather than hard deleting records.
+- **Terminology Boundary**: Never translate or model `Department` as doctor `specialty`. In this system, `Department` means an operational hospital unit/clinic/lab/imaging area that owns staff, rooms, orders, and workflow capacity. Doctor `specialty` is a clinical expertise label such as `Nội tổng quát`, `Tim mạch`, or `Hô hấp`, currently used as a profile/form classification and AI model recommendation tag.
 
 ## 4. Core Domain Model
 
@@ -67,7 +68,8 @@ This is the canonical representation of the system's entities based on the Prism
 - **Profiles**: `AdminProfile`, `StaffProfile`, `DoctorProfile` (DoctorProfile belongs to StaffProfile).
 
 ### Hospital Structure
-- **Department**: Logical groupings (`type`: CLINICAL, LABORATORY, IMAGING, etc.). Can receive orders if `canReceiveOrders` is true. Contains `StaffProfile`s.
+- **Department**: An operational hospital unit or service area (`type`: CLINICAL, LABORATORY, IMAGING, etc.). It can contain `StaffProfile`s, receive orders if `canReceiveOrders` is true, and represent places/workflows where patients are routed. **Do NOT treat Department as a doctor's medical specialty.** A clinical department/clinic may have doctors working inside it, but it is not the canonical list of specialties.
+- **Doctor Specialty**: A doctor-facing clinical expertise/category label stored on `DoctorProfile` and reused by AI model recommendation fields. Examples: `Nội tổng quát`, `Ngoại tổng quát`, `Nhi khoa`, `Sản phụ khoa`, `Tim mạch`, `Tai Mũi Họng`, `Răng Hàm Mặt`, `Mắt`, `Da liễu`, `Thần kinh`, `Chấn thương chỉnh hình`, `Tiêu hóa`, `Nội tiết`, `Ung bướu`, `Hô hấp`. Use this specialty list for doctor forms and AI recommended specialty selectors; do not fetch Departments for this purpose.
 - **ClinicalRoom**: Physical rooms where visits happen. Belongs to a specific `DoctorProfile`.
 
 ### Core Clinical Flow (The Visit Tree)
