@@ -15,12 +15,14 @@ async function test() {
       gender: 'Nam',
       citizenId: '999999999999',
       birthDate: '1990-01-01',
+      address: 'Ho Chi Minh City',
       avatarUrl: 'https://avatar.url',
+      departmentId: '00000000-0000-0000-0000-000000000000',
+      position: 'Bác sĩ',
       specialty: MedicalSpecialty.PEDIATRICS,
       licenseNumber: 'VN-MOH-999999',
       qualification: 'MD',
       yearsExperience: 5,
-      departmentId: '00000000-0000-0000-0000-000000000000'
     });
     console.log('Doctor created successfully:', JSON.stringify(res, null, 2));
   } catch (err) {

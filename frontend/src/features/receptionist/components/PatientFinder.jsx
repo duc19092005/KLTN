@@ -4,7 +4,7 @@ import { patientService } from '../apis/patientService';
 import { useToast } from '../../../providers/ToastProvider';
 
 const emptyPatient = { fullName: '', gender: 'MALE', birthDate: '', citizenId: '', phone: '', address: '', insuranceNumber: '', emergencyContact: '' };
-const GENDERS = [{ value: 'MALE', label: 'Nam' }, { value: 'FEMALE', label: 'Nữ' }, { value: 'OTHER', label: 'Khác' }];
+const GENDERS = [{ value: 'MALE', label: 'Nam' }, { value: 'FEMALE', label: 'Nữ' }];
 const genderLabel = (value) => GENDERS.find((item) => item.value === value)?.label || value || 'Chưa rõ';
 function Input({ id, label, value, onChange, required, type = 'text', placeholder }) { return <label htmlFor={id} className="block space-y-1"><span className="text-[12px] font-bold text-slate-600">{label}{required && <span className="text-rose-500 ml-0.5">*</span>}</span><input id={id} type={type} value={value || ''} required={required} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none" /></label>; }
 function Select({ id, label, value, onChange, options }) { return <label htmlFor={id} className="block space-y-1"><span className="text-[12px] font-bold text-slate-600">{label}</span><select id={id} value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none">{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></label>; }

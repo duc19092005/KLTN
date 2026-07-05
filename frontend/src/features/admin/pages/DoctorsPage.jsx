@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
@@ -10,7 +10,7 @@ import { departmentService } from '../apis/departmentService';
 import DoctorDetailModal from '../components/DoctorDetailModal';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { ExternalLink, MapPin } from 'lucide-react';
+import { Calendar, ExternalLink, MapPin } from 'lucide-react';
 
 const OSM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
 const MIN_BIRTH_YEAR = 1900;
@@ -25,6 +25,7 @@ const MAX_POSITION_LENGTH = 80;
 const MAX_ADDRESS_LENGTH = 255;
 const MIN_YEARS_EXPERIENCE = 1;
 const MAX_YEARS_EXPERIENCE = 50;
+const MAX_LICENSE_NUMBER_LENGTH = 30;
 function buildGoogleMapsDirectionsUrl(lat, lng) { return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`; }
 function buildAddressQueries(query) {
   const normalized = query.replace(/[\/\\]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -51,13 +52,39 @@ function onlyUsernameChars(value) { return (value || '').toLowerCase().normalize
 function onlyEmailChars(value) { return (value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9@._-]/g, ''); }
 function limitPosition(value) { return (value || '').slice(0, MAX_POSITION_LENGTH); }
 function limitAddress(value) { return (value || '').slice(0, MAX_ADDRESS_LENGTH); }
+function formatDateInput(value) {
+  const digits = onlyDigits(value).slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+function sanitizeDateTyping(value) {
+  return (value || '').replace(/[^\d/]/g, '').slice(0, 10);
+}
+function isoToDisplayDate(value) {
+  if (!value) return '';
+  const [year, month, day] = value.slice(0, 10).split('-');
+  return year && month && day ? `${day}/${month}/${year}` : '';
+}
+function displayDateToIso(value) {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value || '');
+  if (!match) return null;
+  const [, day, month, year] = match;
+  return `${year}-${month}-${day}`;
+}
 function isValidBirthDate(value) {
-  if (!value) return false;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value || '');
+  if (!match) return false;
+  const [, dayText, monthText, yearText] = match;
+  const day = Number(dayText);
+  const month = Number(monthText);
+  const year = Number(yearText);
+  if (year < MIN_BIRTH_YEAR) return false;
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  return date.getFullYear() >= MIN_BIRTH_YEAR && date <= today;
+  return date <= today;
 }
 
 const SPECIALTIES = [
@@ -126,7 +153,7 @@ function getError(err) { return err?.response?.data?.message || err.message || '
 function buildDoctorPayload(form) {
   return {
     specialty: form.specialty,
-    licenseNumber: form.licenseNumber,
+    licenseNumber: form.licenseNumber.trim(),
     qualification: form.qualification,
     yearsExperience: form.yearsExperience === '' ? undefined : Number(form.yearsExperience),
   };
@@ -141,7 +168,7 @@ function buildFullDoctorPayload(form) {
     phone: form.phone,
     gender: form.gender,
     citizenId: form.citizenId,
-    birthDate: form.birthDate,
+    birthDate: displayDateToIso(form.birthDate),
     address: form.address || undefined,
     position: form.position || undefined,
     ...buildDoctorPayload(form),
@@ -195,7 +222,7 @@ export default function DoctorsPage() {
     setIsCreateOpen(false);
     setEditing(doctor);
     const staff = doctor.staffProfile || {};
-    const formattedBirthDate = staff.birthDate ? new Date(staff.birthDate).toISOString().split('T')[0] : '';
+    const formattedBirthDate = isoToDisplayDate(staff.birthDate);
     setForm({
       username: staff.user?.username || '',
       email: staff.user?.email || '',
@@ -235,7 +262,7 @@ export default function DoctorsPage() {
           avatarUrl: form.avatarUrl,
           departmentId: form.departmentId || undefined,
           position: form.position || undefined,
-          birthDate: form.birthDate,
+          birthDate: displayDateToIso(form.birthDate),
         };
         await doctorService.update(editing.id, payload);
         toast.success('Cập nhật thông tin bác sĩ thành công!');
@@ -377,7 +404,7 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
     }
     if (field === 'phone' && !VN_PHONE_REGEX.test(value)) return 'Số điện thoại Việt Nam phải gồm 10 số và đúng đầu số.';
     if (field === 'citizenId' && !VN_CITIZEN_ID_REGEX.test(value)) return 'CCCD phải gồm đúng 12 chữ số.';
-    if (field === 'birthDate' && !isValidBirthDate(value)) return `Ngày sinh phải hợp lệ, từ năm ${MIN_BIRTH_YEAR} và không lớn hơn hôm nay.`;
+    if (field === 'birthDate' && !isValidBirthDate(value)) return `Ngày sinh phải là dd/mm/yyyy, từ năm ${MIN_BIRTH_YEAR} và không lớn hơn hôm nay.`;
     if (field === 'position') {
       if (!value.trim()) return 'Vui lòng chọn chức danh.';
       if (value.length > MAX_POSITION_LENGTH) return `Chức danh không được vượt quá ${MAX_POSITION_LENGTH} ký tự.`;
@@ -386,6 +413,10 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
     if (field === 'departmentId' && !value) return 'Vui lòng chọn phòng ban khám cho bác sĩ.';
     if (field === 'specialty' && !value) return 'Vui lòng chọn chuyên khoa.';
     if (field === 'qualification' && !value) return 'Vui lòng chọn trình độ.';
+    if (field === 'licenseNumber') {
+      if (!value.trim()) return 'Vui lòng nhập số chứng chỉ.';
+      if (value.trim().length > MAX_LICENSE_NUMBER_LENGTH) return `Số chứng chỉ không được vượt quá ${MAX_LICENSE_NUMBER_LENGTH} ký tự.`;
+    }
     if (field === 'address') {
       if (!value.trim()) return 'Vui lòng nhập địa chỉ.';
       if (value.length > MAX_ADDRESS_LENGTH) return `Địa chỉ không được vượt quá ${MAX_ADDRESS_LENGTH} ký tự.`;
@@ -466,8 +497,8 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
           <Input label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: onlyEmailChars(v) })} onBlur={() => validateField('email')} error={fieldErrors.email} disabled={!isCreate} required />
           <Input label="Số điện thoại" value={form.phone} onChange={(v) => setForm({ ...form, phone: onlyDigits(v).slice(0, 10) })} onBlur={() => validateField('phone')} error={fieldErrors.phone} required maxLength={10} />
           <Input label="CCCD/CMND" value={form.citizenId} onChange={(v) => setForm({ ...form, citizenId: onlyDigits(v).slice(0, 12) })} onBlur={() => validateField('citizenId')} error={fieldErrors.citizenId} required maxLength={12} />
-          <Input type="date" label="Ngày sinh" value={form.birthDate} onChange={(v) => setForm({ ...form, birthDate: v })} onBlur={() => validateField('birthDate')} error={fieldErrors.birthDate} required />
-          <Select label="Giới tính" value={form.gender} onChange={(v) => { setForm({ ...form, gender: v }); validateField('gender', v); }} error={fieldErrors.gender} empty="Chọn giới tính" required options={['Nam', 'Nữ', 'Khác']} />
+          <DateInput label="Ngày sinh" value={form.birthDate} onChange={(v) => setForm({ ...form, birthDate: v })} onBlur={(nextValue) => validateField('birthDate', nextValue)} error={fieldErrors.birthDate} required />
+          <Select label="Giới tính" value={form.gender} onChange={(v) => { setForm({ ...form, gender: v }); validateField('gender', v); }} error={fieldErrors.gender} empty="Chọn giới tính" required options={['Nam', 'Nữ']} />
           <Select label="Phòng ban" value={form.departmentId} onChange={(v) => { setForm({ ...form, departmentId: v }); validateField('departmentId', v); }} error={fieldErrors.departmentId} empty="Chưa gán phòng ban" required options={departments.filter((d) => ['EXAMINATION', 'CLINICAL'].includes(d.type)).map((d) => ({ value: d.id, label: `${d.departmentCode || 'PB'} - ${d.name}` }))} />
           <Select label="Chức danh" value={form.position} onChange={(v) => { setForm({ ...form, position: limitPosition(v) }); validateField('position', v); }} error={fieldErrors.position} empty="Chọn chức danh" required options={DOCTOR_POSITIONS} />
           <AddressInput
@@ -491,9 +522,9 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
         <SectionTitle title="Thông tin chuyên môn" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Select label="Chuyên khoa" value={form.specialty} onChange={(v) => { setForm({ ...form, specialty: v }); validateField('specialty', v); }} error={fieldErrors.specialty} empty="Chọn chuyên khoa" required options={SPECIALTIES} />
-          <Input label="Số chứng chỉ" value={form.licenseNumber} onChange={(v) => setForm({ ...form, licenseNumber: v })} required />
+          <Input label="Số chứng chỉ" value={form.licenseNumber} onChange={(v) => setForm({ ...form, licenseNumber: v.slice(0, MAX_LICENSE_NUMBER_LENGTH) })} onBlur={() => validateField('licenseNumber')} error={fieldErrors.licenseNumber} required maxLength={MAX_LICENSE_NUMBER_LENGTH} />
           <Select label="Trình độ" value={form.qualification} onChange={(v) => { setForm({ ...form, qualification: v }); validateField('qualification', v); }} error={fieldErrors.qualification} empty="Chọn trình độ" required options={QUALIFICATIONS} />
-          <Input type="number" label="Số năm kinh nghiệm" value={form.yearsExperience} onChange={(v) => setForm({ ...form, yearsExperience: onlyDigits(v).slice(0, 2) })} onBlur={() => validateField('yearsExperience')} error={fieldErrors.yearsExperience} required min={MIN_YEARS_EXPERIENCE} max={MAX_YEARS_EXPERIENCE} />
+          <Input type="text" label="Số năm kinh nghiệm" value={form.yearsExperience} onChange={(v) => setForm({ ...form, yearsExperience: onlyDigits(v).slice(0, 2) })} onBlur={() => validateField('yearsExperience')} error={fieldErrors.yearsExperience} required maxLength={2} inputMode="numeric" pattern="[0-9]*" />
         </div>
         <button disabled={busy} className="w-full rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white hover:bg-cyan-700 disabled:opacity-70">
           {isCreate ? 'Tạo bác sĩ' : 'Lưu thay đổi'}
@@ -508,7 +539,56 @@ function Pagination({ pagination, onPageChange }) { return <div className="flex 
 function Info({ label, value }) { return <div><p className="text-[11px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className="text-sm font-bold text-slate-700">{value}</p></div>; }
 function Alert({ children }) { return <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">{children}</div>; }
 function SmallButton({ children, onClick, disabled }) { return <button type="button" disabled={disabled} onClick={onClick} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 disabled:opacity-50">{children}</button>; }
-function Input({ label, value, onChange, onBlur, error, required, placeholder, type = 'text', disabled, maxLength }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><input type={type} required={required} disabled={disabled} value={value || ''} maxLength={maxLength} min={type === 'number' ? '0' : undefined} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none disabled:opacity-60 disabled:cursor-not-allowed ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} />{error && <p className="text-xs font-bold text-rose-600">{error}</p>}</label>; }
+function Input({ label, value, onChange, onBlur, error, required, placeholder, type = 'text', disabled, maxLength, inputMode, pattern }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><input type={type} required={required} disabled={disabled} value={value || ''} maxLength={maxLength} inputMode={inputMode} pattern={pattern} min={type === 'number' ? '0' : undefined} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none disabled:opacity-60 disabled:cursor-not-allowed ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} />{error && <p className="text-xs font-bold text-rose-600">{error}</p>}</label>; }
+function DateInput({ label, value, onChange, onBlur, error, required }) {
+  const pickerRef = useRef(null);
+  const openPicker = () => {
+    if (pickerRef.current) {
+      pickerRef.current.value = isValidBirthDate(value) ? displayDateToIso(value) : '';
+    }
+    if (pickerRef.current?.showPicker) pickerRef.current.showPicker();
+    else pickerRef.current?.click();
+  };
+
+  const handleBlur = () => {
+    const formattedValue = formatDateInput(value);
+    if (formattedValue !== value) onChange(formattedValue);
+    onBlur?.(formattedValue);
+  };
+
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-[13px] font-bold text-slate-700">{label}</span>
+      <div className="relative">
+        <input
+          type="text"
+          required={required}
+          value={value || ''}
+          onChange={(e) => onChange(sanitizeDateTyping(e.target.value))}
+          onBlur={handleBlur}
+          placeholder="dd/mm/yyyy"
+          inputMode="numeric"
+          maxLength={10}
+          className={`w-full px-3.5 py-2.5 pr-10 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`}
+        />
+        <button type="button" onClick={openPicker} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-500 hover:bg-cyan-50 hover:text-cyan-600" title="Chọn ngày sinh">
+          <Calendar className="h-4 w-4" />
+        </button>
+        <input
+          ref={pickerRef}
+          type="date"
+          defaultValue=""
+          min={`${MIN_BIRTH_YEAR}-01-01`}
+          max={new Date().toISOString().slice(0, 10)}
+          onChange={(e) => onChange(isoToDisplayDate(e.target.value))}
+          className="pointer-events-none absolute right-0 top-full h-0 w-0 opacity-0"
+          tabIndex={-1}
+        />
+      </div>
+      {error && <p className="text-xs font-bold text-rose-600">{error}</p>}
+    </label>
+  );
+}
 function AddressInput({ label, value, onChange, onBlur, onFocus, error, maxLength, suggestions, loading, searched, open, onSelect }) {
   return (
     <label className="relative block space-y-1.5">

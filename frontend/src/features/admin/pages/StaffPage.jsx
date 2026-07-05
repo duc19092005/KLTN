@@ -494,7 +494,7 @@ function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editi
           <Input label="Số điện thoại" value={form.phone} onChange={(v) => setForm({ ...form, phone: onlyDigits(v).slice(0, 10) })} onBlur={() => validateField('phone')} error={fieldErrors.phone} placeholder="0xxxxxxxxx" inputMode="numeric" maxLength={10} pattern="0[0-9]{9}" required />
           <Input label="CCCD/CMND" value={form.citizenId} onChange={(v) => setForm({ ...form, citizenId: onlyDigits(v).slice(0, 12) })} onBlur={() => validateField('citizenId')} error={fieldErrors.citizenId} placeholder="12 chữ số CCCD" inputMode="numeric" maxLength={12} pattern="[0-9]{12}" required />
           <DateInput label="Ngày sinh" value={form.birthDate} onChange={(v) => setForm({ ...form, birthDate: v })} onBlur={(nextValue) => validateField('birthDate', nextValue)} error={fieldErrors.birthDate} required />
-          <Select label="Giới tính" value={form.gender} onChange={(v) => setForm({ ...form, gender: v })} options={['Nam', 'Nữ', 'Khác']} empty="Chọn giới tính" required />
+          <Select label="Giới tính" value={form.gender} onChange={(v) => setForm({ ...form, gender: v })} options={['Nam', 'Nữ']} empty="Chọn giới tính" required />
           <Select label="Phòng ban" value={form.departmentId} onChange={(v) => setForm({ ...form, departmentId: v })} options={departmentOptions} empty="Chưa gán phòng ban" />
           <Input label="Chức danh" value={form.position} onChange={(v) => setForm({ ...form, position: limitPosition(v) })} onBlur={() => validateField('position')} error={fieldErrors.position} placeholder="Lễ tân, KTV xét nghiệm, KTV chẩn đoán hình ảnh..." maxLength={MAX_POSITION_LENGTH} required />
           <AddressInput

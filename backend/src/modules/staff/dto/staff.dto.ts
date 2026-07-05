@@ -1,8 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsDateString, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsEmail, IsEnum, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { UserRole, UserStatus } from '@prisma/client';
 import { PaginationQueryDto } from '../../shared/pagination.dto';
+const STAFF_GENDER_VALUES = ['Nam', 'Nữ'] as const;
 
 export class CreateStaffDto {
   @ApiProperty({ example: 'nguyenvana01', maxLength: 30 })
@@ -32,9 +33,10 @@ export class CreateStaffDto {
   @Matches(/^(0)(3[2-9]|5[2689]|7[06-9]|8[1-689]|9[0-46-9])\d{7}$/, { message: 'Số điện thoại Việt Nam phải gồm 10 số và đúng đầu số.' })
   phone!: string;
 
-  @ApiProperty({ example: 'Nam' })
+  @ApiProperty({ example: 'Nam', enum: STAFF_GENDER_VALUES })
   @IsString()
   @IsNotEmpty({ message: 'Vui lòng chọn giới tính.' })
+  @IsIn(STAFF_GENDER_VALUES, { message: 'Giới tính chỉ được chọn Nam hoặc Nữ.' })
   gender!: string;
 
   @ApiProperty({ example: '012345678901' })
@@ -101,8 +103,8 @@ export class UpdateStaffDto {
   @Matches(/^(0)(3[2-9]|5[2689]|7[06-9]|8[1-689]|9[0-46-9])\d{7}$/, { message: 'Số điện thoại Việt Nam phải gồm 10 số và đúng đầu số.' })
   phone?: string;
 
-  @ApiPropertyOptional({ example: 'Nam' })
-  @IsOptional() @IsString() gender?: string;
+  @ApiPropertyOptional({ enum: STAFF_GENDER_VALUES })
+  @IsOptional() @IsString() @IsIn(STAFF_GENDER_VALUES, { message: 'Giới tính chỉ được chọn Nam hoặc Nữ.' }) gender?: string;
 
   @ApiPropertyOptional({ example: '012345678901' })
   @IsOptional()
