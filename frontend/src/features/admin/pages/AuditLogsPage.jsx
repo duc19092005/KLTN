@@ -30,16 +30,16 @@ import {
 // ---- Display helpers --------------------------------------------------------
 
 const ACTION_TONE = {
-  CREATE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  UPDATE: 'bg-amber-50 text-amber-700 border-amber-200',
-  DELETE: 'bg-rose-50 text-rose-700 border-rose-200',
-  LOGIN_PASSWORD: 'bg-slate-50 text-slate-700 border-slate-200',
-  LOGIN_INVITE: 'bg-slate-50 text-slate-700 border-slate-200',
-  LOGIN_FAIL: 'bg-rose-50 text-rose-700 border-rose-200',
-  FACE_VERIFY_PASS: 'bg-cyan-50 text-cyan-700 border-cyan-200',
-  FACE_VERIFY_FAIL: 'bg-orange-50 text-orange-700 border-orange-200',
-  FACE_INTEGRITY_FAIL: 'bg-red-50 text-red-700 border-red-200',
-  FACE_ENROLL: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  CREATE: 'bg-slate-50 text-slate-600 border-slate-200',
+  UPDATE: 'bg-slate-50 text-slate-600 border-slate-200',
+  DELETE: 'bg-slate-50 text-slate-600 border-slate-200',
+  LOGIN_PASSWORD: 'bg-slate-50 text-slate-600 border-slate-200',
+  LOGIN_INVITE: 'bg-slate-50 text-slate-600 border-slate-200',
+  LOGIN_FAIL: 'bg-slate-50 text-slate-600 border-slate-200',
+  FACE_VERIFY_PASS: 'bg-slate-50 text-slate-600 border-slate-200',
+  FACE_VERIFY_FAIL: 'bg-slate-50 text-slate-600 border-slate-200',
+  FACE_INTEGRITY_FAIL: 'bg-slate-50 text-slate-600 border-slate-200',
+  FACE_ENROLL: 'bg-slate-50 text-slate-600 border-slate-200',
 };
 
 const ACTION_LABEL = {
@@ -69,10 +69,10 @@ const ROLE_LABELS = {
 };
 
 const ROLE_TONE = {
-  ADMIN: 'bg-purple-50 text-purple-700 border-purple-200',
-  RECEPTIONIST: 'bg-blue-50 text-blue-700 border-blue-200',
-  DOCTOR: 'bg-teal-50 text-teal-700 border-teal-200',
-  LAB_MANAGER: 'bg-orange-50 text-orange-700 border-orange-200',
+  ADMIN: 'bg-slate-50 text-slate-600 border-slate-200',
+  RECEPTIONIST: 'bg-slate-50 text-slate-600 border-slate-200',
+  DOCTOR: 'bg-slate-50 text-slate-600 border-slate-200',
+  LAB_MANAGER: 'bg-slate-50 text-slate-600 border-slate-200',
 };
 
 function shortHash(hash) {
@@ -92,9 +92,9 @@ function formatHashVersion(version) {
 }
 
 const VERIFICATION_TONE = {
-  VERIFIED: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  PENDING: 'border-amber-200 bg-amber-50 text-amber-700',
-  TAMPERED: 'border-rose-200 bg-rose-50 text-rose-700',
+  VERIFIED: 'border-slate-200 bg-slate-50 text-slate-600',
+  PENDING: 'border-slate-200 bg-slate-50 text-slate-600',
+  TAMPERED: 'border-rose-100 bg-rose-50 text-rose-600',
 };
 
 const VERIFICATION_LABEL = {
@@ -284,59 +284,38 @@ export default function AuditLogsPage() {
       onNavigate={(id) => navigateAdmin(navigate, id)}
       onLogout={logout}
     >
-      <div className="max-w-7xl mx-auto space-y-6 p-4 md:p-6 text-slate-800">
-        {/* Header Action */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Nhật ký hệ thống tối cao</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Giám sát tính toàn vẹn, nhật ký kiểm toán và lịch sử biến động dữ liệu.</p>
-          </div>
+      <div className="mx-auto max-w-7xl space-y-5">
+        <div className="flex justify-end">
           <button
             id="audit-anchor-now-button"
+            type="button"
             onClick={handleAnchorNow}
             disabled={anchoring}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-cyan-700 active:scale-98 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-cyan-700 disabled:opacity-60"
           >
             <LockKeyhole className="h-4 w-4" />
-            {anchoring ? 'Đang kiểm chứng & neo…' : 'Neo Blockchain Ngay'}
+            {anchoring ? 'Đang neo dữ liệu...' : 'Neo blockchain ngay'}
           </button>
         </div>
 
-        {/* Integrity banner */}
-        <ChainBanner chain={chain} loading={loading} />
-
-        {/* Stats Grid */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Tổng số bản ghi" value={stats.total} hint="Lịch sử toàn hệ thống" icon={History} color="text-slate-700" />
-          <StatCard label="Lô Blockchain" value={stats.batches} hint="Khối Merkle đã đóng" icon={Layers} color="text-cyan-600" />
-          <StatCard
-            label="Tính toàn vẹn"
-            value={stats.isChainOk ? 'Đạt' : 'Lỗi'}
-            hint={stats.isChainOk ? 'Chuỗi mã hóa an toàn' : 'Phát hiện sửa đổi trái phép!'}
-            icon={stats.isChainOk ? CheckCircle2 : AlertTriangle}
-            color={stats.isChainOk ? 'text-emerald-600' : 'text-rose-600'}
-            bg={stats.isChainOk ? 'bg-emerald-50/50' : 'bg-rose-50'}
-          />
-          <StatCard label="Sức mạnh chuỗi" value={stats.chainLength} hint="Bản ghi kiểm toán sâu" icon={Fingerprint} color="text-indigo-600" />
-        </section>
-
         {/* Navigation Tabs */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-100/80 p-1.5 rounded-xl">
-          <div className="flex gap-1">
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+          <div className="flex flex-wrap gap-2">
             <TabButton active={tab === 'logs'} onClick={() => setTab('logs')}>
-              Hoạt động hệ thống ({logsTotal})
+              Hoạt động ({logsTotal})
             </TabButton>
             <TabButton active={tab === 'batches'} onClick={() => setTab('batches')}>
-              Khối lưu trữ ({batchesTotal})
+              Lô blockchain ({batchesTotal})
             </TabButton>
           </div>
           <button
+            type="button"
             onClick={refreshAll}
             disabled={loading}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50 shadow-sm"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 transition-colors hover:bg-cyan-50 hover:text-cyan-700 disabled:opacity-50"
           >
-            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
-            Đồng bộ dữ liệu
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Đồng bộ
           </button>
         </div>
 
@@ -513,15 +492,10 @@ function LogsTable({
   };
 
   return (
-    <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden transition-all">
-      {/* Filters Blueprint Panel */}
-      <div className="p-4 bg-slate-50/60 border-b border-slate-100 space-y-4">
-        {/* Chips */}
-        <div className="space-y-2">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-            <SlidersHorizontal className="h-3 w-3" /> Phân loại cấu trúc đối tượng
-          </label>
-          <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-2 custom-scrollbar">
+    <section className="space-y-4">
+      <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
             <FilterChip active={!entity} onClick={() => setEntity('')}>Tất cả dữ liệu</FilterChip>
             {Object.entries(ENTITY_LABELS).map(([key, value]) => (
               <FilterChip key={key} active={entity === key} onClick={() => setEntity(key)}>
@@ -529,167 +503,101 @@ function LogsTable({
               </FilterChip>
             ))}
           </div>
-        </div>
 
-        {/* Meta filters bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Sort order toggle */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-400">Thứ tự Sequence:</span>
-              <button
-                type="button"
-                onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-cyan-300 hover:bg-cyan-50/50 transition-all shadow-sm"
-              >
-                {sortOrder === 'desc' ? <ArrowDown className="h-3.5 w-3.5 text-cyan-600" /> : <ArrowUp className="h-3.5 w-3.5 text-cyan-600" />}
-                {sortOrder === 'desc' ? 'Giảm dần (Mới nhất)' : 'Tăng dần (Cũ nhất)'}
-              </button>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_160px_96px]">
+            <button
+              type="button"
+              onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-black text-slate-600 transition-colors hover:bg-cyan-50 hover:text-cyan-700"
+            >
+              {sortOrder === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />}
+              {sortOrder === 'desc' ? 'Mới nhất trước' : 'Cũ nhất trước'}
+            </button>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">#</span>
+              <input
+                type="text"
+                value={batchInput}
+                onChange={(e) => setBatchInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') applyBatch(); }}
+                placeholder="Số lô"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-7 pr-2 text-xs font-semibold text-slate-700 outline-none transition-colors focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100"
+              />
             </div>
-
-            {/* Batch code search */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-400 flex items-center gap-0.5">
-                <Layers className="h-3 w-3" /> Lọc theo số lô:
-              </span>
-              <div className="flex items-center gap-1.5">
-                <div className="relative">
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">#</span>
-                  <input
-                    type="text"
-                    value={batchInput}
-                    onChange={(e) => setBatchInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') applyBatch(); }}
-                    placeholder="Tất cả lô"
-                    className="w-24 rounded-lg border border-slate-200 bg-white py-1.5 pl-6 pr-2 text-xs font-semibold text-slate-700 outline-none focus:border-cyan-500 transition-all shadow-sm"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={applyBatch}
-                  className="rounded-lg bg-slate-800 hover:bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition-colors shadow-sm"
-                >
-                  Tìm
-                </button>
-                {batchFilter !== '' && (
-                  <button
-                    type="button"
-                    onClick={() => { setBatchInput(''); setBatchFilter(''); }}
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 transition-colors"
-                  >
-                    Xóa
-                  </button>
-                )}
-              </div>
-            </div>
+            <button type="button" onClick={applyBatch} className="rounded-xl bg-cyan-600 px-3 py-2.5 text-xs font-black text-white hover:bg-cyan-700">Tìm</button>
           </div>
-
-          <div className="text-xs text-slate-400 font-medium bg-slate-100 px-2.5 py-1 rounded-md">
-            Tìm thấy <span className="font-bold text-slate-700">{total}</span> kết quả phù hợp
-          </div>
+          {batchFilter !== '' && (
+            <button type="button" onClick={() => { setBatchInput(''); setBatchFilter(''); }} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-500 hover:bg-slate-50">Xóa lọc lô #{batchFilter}</button>
+          )}
         </div>
       </div>
 
-      {!logs.length ? (
-        <Empty
-          title="Không tìm thấy bản ghi tương thích"
-          desc={entity || batchFilter !== '' ? 'Không có dữ liệu audit nào khớp với tiêu chí bộ lọc của bạn hiện tại. Hãy thử đặt lại cấu hình lọc bộ gõ.' : 'Hệ thống chưa ghi nhận các hoạt động thay đổi cấu trúc dữ liệu.'}
-        />
-      ) : (
-        <>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/70 border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  <th className="px-4 py-3.5 text-center w-14">Seq</th>
-                  <th className="px-4 py-3.5 w-40">Hành động</th>
-                  <th className="px-4 py-3.5 w-60">Đối tượng tác động</th>
-                  <th className="px-4 py-3.5">Nội dung tóm lược</th>
-                  <th className="px-4 py-3.5 w-48">Tác nhân ký lệnh</th>
-                  <th className="px-4 py-3.5 w-44">Thời điểm (Hệ thống)</th>
-                  <th className="px-4 py-3.5 w-24 text-center">Trạng thái</th>
-                  <th className="px-4 py-3.5 w-28 text-center">Xác minh</th>
-                  <th className="px-4 py-3.5 w-32 text-right pr-6">Sổ cái</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
-                {logs.map((log) => (
-                  <tr
-                    key={log.id}
-                    onClick={() => setDetail(log)}
-                    className="group cursor-pointer hover:bg-slate-50/80 transition-colors"
-                  >
-                    <td className="px-4 py-4 text-center font-mono font-bold text-slate-400 group-hover:text-cyan-600 transition-colors">
-                      {log.seq ?? '—'}
-                    </td>
-                    <td className="px-4 py-4">
-                      <span className={`inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium tracking-wide shadow-sm ${ACTION_TONE[log.action] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+      <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <div>
+            <h2 className="text-lg font-black text-slate-950">Danh sách nhật ký</h2>
+            <p className="text-sm font-semibold text-slate-400">Theo dõi thay đổi dữ liệu và trạng thái toàn vẹn.</p>
+          </div>
+          <span className="rounded-full bg-slate-50 px-3 py-1 text-[11px] font-black text-slate-500">{total} bản ghi</span>
+        </div>
+
+        {!logs.length ? (
+          <Empty
+            title="Không tìm thấy nhật ký"
+            desc={entity || batchFilter !== '' ? 'Không có bản ghi nào khớp với bộ lọc hiện tại.' : 'Hệ thống chưa ghi nhận hoạt động thay đổi dữ liệu.'}
+          />
+        ) : (
+          <>
+            <div className="divide-y divide-slate-100">
+              {logs.map((log) => (
+                <article key={log.id} className="grid gap-5 px-6 py-4 transition-colors hover:bg-slate-50 xl:grid-cols-[1.35fr_1.25fr_1fr_0.95fr_auto] xl:items-center">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">SEQ {log.seq ?? '—'}</span>
+                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-black ${ACTION_TONE[log.action] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
                         {ACTION_LABEL[log.action] || log.action}
                       </span>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="font-semibold text-slate-900 truncate max-w-[220px]">{subjectTitle(log)}</div>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className="inline-flex rounded bg-slate-100 text-slate-500 px-1 py-0.2 text-[10px] font-medium font-mono">
-                          {ENTITY_LABELS[log.entity] || log.subject?.label || log.entity}
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-medium">
-                          {formatHashVersion(log.hashVersion)}
-                        </span>
-                      </div>
-                      <div className="text-[10px] font-mono text-slate-400 mt-0.5 truncate max-w-[220px]">
-                        ID: {subjectSubtitle(log)}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 max-w-xs md:max-w-sm">
-                      <DiffPreview log={log} />
-                    </td>
-                    <td className="px-4 py-4">
-                      <ActorCell log={log} />
-                    </td>
-                    <td className="px-4 py-4 text-slate-500 font-medium">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3 text-slate-300" />
-                        {formatTime(log.createdAt)}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <span className={`inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-bold ${log.onChainStatus === 'ANCHORED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
+                    </div>
+                    <h3 className="mt-1 truncate text-sm font-black text-slate-950">{subjectTitle(log)}</h3>
+                    <p className="mt-1 truncate text-xs font-semibold text-slate-400">{ENTITY_LABELS[log.entity] || log.subject?.label || log.entity} · {subjectSubtitle(log)}</p>
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Nội dung thay đổi</p>
+                    <DiffPreview log={log} />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Người thao tác</p>
+                    <ActorCell log={log} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Thời điểm</p>
+                      <p className="text-xs font-bold text-slate-600">{formatTime(log.createdAt)}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-black ${log.onChainStatus === 'ANCHORED' ? 'bg-slate-50 text-slate-600 border-slate-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                         {log.onChainStatus === 'ANCHORED' ? `Lô #${log.batchId}` : 'Hàng đợi'}
                       </span>
-                    </td>
-                    <td className="px-4 py-4 text-center">
                       <VerificationBadge status={log.blockchainStatus} />
-                    </td>
-                    <td className="px-4 py-4 text-right pr-6" onClick={(e) => e.stopPropagation()}>
-                      {log.onChainStatus === 'ANCHORED' ? (
-                        <button
-                          onClick={() => onProof(log.seq)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:border-cyan-300 hover:text-cyan-600 shadow-sm transition-all active:scale-95"
-                        >
-                          <Eye className="h-3 w-3" /> Chứng chỉ
-                        </button>
-                      ) : (
-                        <span className="text-xs text-slate-300 italic">Chưa kết khối</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            total={total}
-            label="bản ghi dữ liệu"
-            onPrev={onPrev}
-            onNext={onNext}
-          />
-        </>
-      )}
+                    </div>
+                  </div>
 
-      {detail && <LogDetailModal summaryLog={detail} onClose={() => setDetail(null)} onProof={onProof} />}
+                  <div className="flex flex-wrap gap-2 xl:justify-end">
+                    <button type="button" onClick={() => setDetail(log)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-cyan-600 hover:bg-cyan-50">Chi tiết</button>
+                    {log.onChainStatus === 'ANCHORED' && <button type="button" onClick={() => onProof(log.seq)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600">Chứng chỉ</button>}
+                  </div>
+                </article>
+              ))}
+            </div>
+            <Pagination page={page} totalPages={totalPages} total={total} label="bản ghi" onPrev={onPrev} onNext={onNext} />
+          </>
+        )}
+
+        {detail && <LogDetailModal summaryLog={detail} onClose={() => setDetail(null)} onProof={onProof} />}
+      </section>
     </section>
   );
 }
@@ -779,17 +687,17 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Block */}
-        <div className="p-6 bg-slate-900 text-white flex items-start justify-between border-b border-slate-800">
+        <div className="flex items-start justify-between border-b border-slate-100 p-6">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 text-[10px] font-bold tracking-widest uppercase text-cyan-400">
-                <Fingerprint className="h-3 w-3" /> Audit Trace Ledger
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full border border-cyan-100 bg-cyan-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-cyan-700">
+                <Fingerprint className="h-3 w-3" /> Nhật ký kiểm toán
               </span>
-              <span className="text-xs text-slate-400 font-mono">Hash Version: {formatHashVersion(log.hashVersion)}</span>
+              <span className="text-xs font-semibold text-slate-400">{formatHashVersion(log.hashVersion)}</span>
             </div>
-            <div className="mt-3 flex items-center gap-3">
-              <h2 className="text-xl font-bold font-mono tracking-tight text-white">Sequence ID #{log.seq ?? '—'}</h2>
-              <span className={`inline-flex rounded border px-2 py-0.5 text-xs font-semibold ${ACTION_TONE[log.action] || 'bg-slate-800 border-slate-700 text-white'}`}>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <h2 className="text-2xl font-black tracking-tight text-slate-950">Bản ghi #{log.seq ?? '—'}</h2>
+              <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black ${ACTION_TONE[log.action] || 'bg-slate-50 border-slate-200 text-slate-600'}`}>
                 {ACTION_LABEL[log.action] || log.action}
               </span>
               <VerificationBadge status={log.blockchainStatus} />
@@ -797,14 +705,14 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg border border-slate-800 bg-slate-800 text-slate-400 hover:text-white transition-colors"
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500 transition-colors hover:bg-slate-50"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Modal Main Content Container */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
           {detailError && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs font-semibold text-rose-700 flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-rose-500" />
@@ -815,7 +723,7 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
           {/* Quick Stats Summary Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Subject Data Meta */}
-            <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl space-y-3">
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3">
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
                 <Layers className="h-3.5 w-3.5" /> Đối tượng chịu tác động
               </h4>
@@ -828,9 +736,9 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
             </div>
 
             {/* Actor Identity Profile */}
-            <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl space-y-3">
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3">
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
-                <UserIcon className="h-3.5 w-3.5" /> Biên bản kiểm toán mật mã
+                <UserIcon className="h-3.5 w-3.5" /> Người thao tác
               </h4>
               <div className="space-y-2">
                 <DetailField label="Người thực thi" value={actor?.displayName || 'Hệ thống tự động'} highlight={Boolean(actor)} />
@@ -843,7 +751,7 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
 
           {/* Security Hash Segment */}
           <div className="p-4 border border-slate-100 rounded-xl space-y-2 bg-slate-50/50 font-mono text-[11px]">
-            <div className="text-xs font-bold text-slate-400 uppercase font-sans tracking-wide">Chữ ký số kiểm định (Hashes)</div>
+            <div className="text-xs font-black text-slate-400 uppercase font-sans tracking-wide">Mã kiểm tra toàn vẹn</div>
             <div className="grid grid-cols-1 gap-1.5 pt-1">
               <div className="flex justify-between border-b border-slate-100 pb-1">
                 <span className="text-slate-400">Current Entry Hash:</span>
@@ -860,16 +768,16 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
-                <FileDiff className="h-3.5 w-3.5 text-cyan-600" /> Bảng phân rã biến động thuộc tính (Field-level Diff)
+                <FileDiff className="h-3.5 w-3.5 text-cyan-600" /> Thay đổi dữ liệu
               </h3>
               {!sensitiveDetailUnlocked && (
                 <button
                   type="button"
                   onClick={loadDetail}
                   disabled={detailLoading}
-                  className="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-600 hover:text-cyan-700 bg-cyan-50 px-2.5 py-1 rounded-md border border-cyan-100 transition-all"
+                  className="inline-flex items-center gap-1 rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-2 text-[11px] font-black text-cyan-700 transition-colors hover:bg-cyan-100"
                 >
-                  <LockKeyhole className="h-3 w-3" /> {detailLoading ? 'Đang giải mã...' : 'Mở khóa dữ liệu nhạy cảm'}
+                  <LockKeyhole className="h-3 w-3" /> {detailLoading ? 'Đang mở...' : 'Xem dữ liệu ẩn'}
                 </button>
               )}
             </div>
@@ -911,7 +819,7 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
         </div>
 
         {/* Footer Action */}
-        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+        <div className="border-t border-slate-100 bg-slate-50 p-4 flex items-center justify-between">
           <div className="text-xs text-slate-400 font-medium">
             Mã định danh bản ghi cơ sở dữ liệu nội bộ: <span className="font-mono text-slate-600 font-bold">{log.id}</span>
           </div>
@@ -922,13 +830,13 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
                 onClick={() => { onClose(); onProof(log.seq); }}
                 className="px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:border-slate-300 rounded-xl text-xs font-semibold transition-all shadow-sm"
               >
-                Trích xuất Merkle Proof
+                Xem bằng chứng blockchain
               </button>
             )}
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold transition-all shadow-sm"
+              className="rounded-xl bg-cyan-600 px-4 py-2 text-xs font-black text-white transition-colors hover:bg-cyan-700"
             >
               Đóng cửa sổ
             </button>
@@ -1023,10 +931,10 @@ function BatchesTable({ batches, page, totalPages, total, onPrev, onNext }) {
 
 function StatCard({ label, value, hint, icon: Icon, color = 'text-slate-900', bg = 'bg-white' }) {
   return (
-    <div className={`p-5 rounded-2xl border border-slate-100 shadow-sm flex items-start justify-between transition-all hover:shadow-md ${bg}`}>
+    <div className={`rounded-2xl border border-slate-100 bg-white p-4 shadow-sm flex items-start justify-between ${bg}`}>
       <div className="space-y-1">
         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label}</p>
-        <p className={`text-2xl font-bold font-mono tracking-tight ${color}`}>{value}</p>
+        <p className={`text-2xl font-black tracking-tight ${color}`}>{value}</p>
         <p className="text-[11px] text-slate-500 font-medium opacity-80">{hint}</p>
       </div>
       {Icon && (
@@ -1043,9 +951,9 @@ function TabButton({ active, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${active
-        ? 'bg-white text-slate-900 shadow-sm font-bold'
-        : 'text-slate-500 hover:text-slate-800'
+      className={`rounded-xl px-3 py-2 text-xs font-black transition-colors ${active
+        ? 'bg-cyan-50 text-cyan-700 border border-cyan-100'
+        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800 border border-transparent'
         }`}
     >
       {children}
@@ -1058,9 +966,9 @@ function FilterChip({ active, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all shadow-sm shrink-0 border ${active
-        ? 'bg-cyan-600 text-white border-cyan-600 font-semibold'
-        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+      className={`rounded-xl border px-2.5 py-1 text-xs font-black transition-colors shrink-0 ${active
+        ? 'bg-cyan-600 text-white border-cyan-600'
+        : 'bg-white text-slate-600 border-slate-200 hover:bg-cyan-50 hover:text-cyan-700'
         }`}
     >
       {children}
@@ -1070,27 +978,11 @@ function FilterChip({ active, onClick, children }) {
 
 function Pagination({ page, totalPages, total, label = 'bản ghi', onPrev, onNext }) {
   return (
-    <div className="p-4 bg-slate-50/70 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-medium">
-      <div>
-        Hiển thị trang <span className="text-slate-800 font-bold">{page}</span> / <span className="text-slate-800 font-bold">{totalPages}</span> trang tổng (Tổng cộng {total} {label})
-      </div>
-      <div className="flex gap-2 w-full sm:w-auto">
-        <button
-          type="button"
-          onClick={onPrev}
-          disabled={page <= 1}
-          className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white text-xs font-semibold transition-all shadow-sm"
-        >
-          Trang trước
-        </button>
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={page >= totalPages}
-          className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white text-xs font-semibold transition-all shadow-sm"
-        >
-          Trang sau
-        </button>
+    <div className="flex items-center justify-between border-t border-slate-100 p-4">
+      <p className="text-sm font-semibold text-slate-500">Trang {page}/{totalPages} · {total} {label}</p>
+      <div className="flex gap-2">
+        <button type="button" onClick={onPrev} disabled={page <= 1} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 disabled:opacity-50">Trước</button>
+        <button type="button" onClick={onNext} disabled={page >= totalPages} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 disabled:opacity-50">Sau</button>
       </div>
     </div>
   );
@@ -1110,46 +1002,59 @@ function Empty({ title, desc }) {
 
 function ProofModal({ proof, onClose }) {
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden flex flex-col max-h-[80vh] text-slate-800 animate-in fade-in zoom-in-95 duration-150"
+        className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white text-slate-800 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-            <ShieldCheck className="h-4 w-4 text-emerald-600" /> Bằng chứng mật mã Merkle Proof (Seq #{proof.seq})
-          </h3>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-200 transition-colors text-slate-400 hover:text-slate-600">
+        <div className="flex items-start justify-between border-b border-slate-100 p-6">
+          <div>
+            <span className="inline-flex items-center gap-1 rounded-full border border-cyan-100 bg-cyan-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-cyan-700">
+              <ShieldCheck className="h-3 w-3" /> Bằng chứng blockchain
+            </span>
+            <h3 className="mt-3 text-2xl font-black tracking-tight text-slate-950">Chứng chỉ bản ghi #{proof.seq}</h3>
+            <p className="mt-1 text-sm font-semibold text-slate-400">Dùng để đối chiếu bản ghi trong cây Merkle đã neo.</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500 transition-colors hover:bg-slate-50">
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="p-5 flex-1 overflow-y-auto text-xs space-y-4">
+
+        <div className="flex-1 space-y-4 overflow-y-auto p-6 text-xs">
           {proof.loading ? (
-            <LoadingIndicator size="sm" label="Đang truy xuất cấu trúc cây kiểm toán..." />
+            <LoadingIndicator size="sm" label="Đang tải chứng chỉ..." />
           ) : proof.error ? (
-            <div className="p-3 bg-rose-50 text-rose-700 border border-rose-100 rounded-lg font-semibold">{proof.error}</div>
+            <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 font-bold text-rose-700">{proof.error}</div>
           ) : (
-            <div className="space-y-3">
-              <p className="text-slate-500 leading-relaxed font-medium">
-                Chuỗi bằng chứng băm (Sibling Hashes) chứng minh bản ghi này nằm trong cây Merkle Root đã được neo lên chuỗi khối mà không thể giả mạo:
-              </p>
-              <div className="p-3 bg-slate-900 text-cyan-400 font-mono text-[11px] rounded-xl overflow-x-auto space-y-1 shadow-inner">
-                <div><span className="text-slate-500">// Merkle Root định danh</span></div>
-                <div className="text-white font-bold pb-2 break-all">Root: {proof.data?.root || '—'}</div>
-                <div className="text-slate-500 pt-1">// Danh sách các node băm lân cận</div>
-                {Array.isArray(proof.data?.proof) && proof.data.proof.length > 0 ? (
-                  proof.data.proof.map((p, i) => (
-                    <div key={i} className="break-all py-0.5"><span className="text-slate-500">[{i}]:</span> {typeof p === 'object' ? JSON.stringify(p) : p}</div>
-                  ))
-                ) : (
-                  <div className="text-slate-500 italic">Bản ghi độc lập (Single Leaf Node)</div>
-                )}
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Merkle Root</p>
+                <p className="mt-2 break-all font-mono text-xs font-bold text-slate-700">{proof.data?.root || '—'}</p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 bg-white">
+                <div className="border-b border-slate-100 px-4 py-3">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Node băm liên quan</p>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {Array.isArray(proof.data?.proof) && proof.data.proof.length > 0 ? (
+                    proof.data.proof.map((p, i) => (
+                      <div key={i} className="grid gap-2 px-4 py-3 md:grid-cols-[56px_1fr]">
+                        <span className="text-xs font-black text-cyan-600">#{i + 1}</span>
+                        <span className="break-all font-mono text-xs font-semibold text-slate-600">{typeof p === 'object' ? JSON.stringify(p) : p}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="px-4 py-5 text-center text-sm font-semibold text-slate-400">Bản ghi độc lập, không có node lân cận.</p>
+                  )}
+                </div>
               </div>
             </div>
           )}
         </div>
-        <div className="p-3 bg-slate-50 border-t border-slate-100 flex justify-end">
-          <button onClick={onClose} className="px-4 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-semibold hover:bg-slate-900 transition-colors">
+
+        <div className="flex justify-end border-t border-slate-100 bg-slate-50 p-4">
+          <button type="button" onClick={onClose} className="rounded-xl bg-cyan-600 px-4 py-2 text-xs font-black text-white transition-colors hover:bg-cyan-700">
             Xác nhận
           </button>
         </div>

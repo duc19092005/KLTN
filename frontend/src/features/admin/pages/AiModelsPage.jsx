@@ -509,7 +509,7 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
-      <form onSubmit={handleSubmit} noValidate className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-5">
+      <form onSubmit={handleSubmit} noValidate className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-4">
         <div className="flex justify-between gap-4">
           <div>
             <h3 className="text-2xl font-black text-slate-950">{editing ? 'Cập nhật mô hình AI' : 'Thêm mô hình AI'}</h3>
@@ -518,7 +518,7 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
         </div>
 
         <SectionTitle title="Thông tin mô hình" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Field label="Tên mô hình" value={form.modelName} onChange={(v) => changeField('modelName', limitText(v, MAX_MODEL_NAME_LENGTH))} onBlur={() => validateField('modelName')} error={fieldErrors.modelName} required placeholder="VD: OpenAI" maxLength={MAX_MODEL_NAME_LENGTH} />
           <SelectField label="Nền tảng" value={form.provider} onChange={(v) => changeField('provider', v)} onBlur={() => validateField('provider')} error={fieldErrors.provider} options={PROVIDERS.map((p) => ({ value: p.value, label: p.label }))} required />
           <ModelPicker form={form} updateForm={changeField} errors={fieldErrors} validateField={validateField} />
@@ -526,10 +526,10 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
         </div>
 
         <SectionTitle title="Kết nối và bảo mật" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {manualEndpoint && <div className="md:col-span-2"><Field label="Điểm cuối API" value={form.apiEndpoint} onChange={(v) => changeField('apiEndpoint', limitText(v.trim(), MAX_ENDPOINT_LENGTH))} onBlur={() => validateField('apiEndpoint')} error={fieldErrors.apiEndpoint} required placeholder="http://localhost:11434/v1/chat/completions" maxLength={MAX_ENDPOINT_LENGTH} /></div>}
-          <TextAreaField label="Khóa API / Token" value={form.secretOrIpHash} onChange={(v) => changeField('secretOrIpHash', limitText(v, MAX_SECRET_LENGTH))} onBlur={() => validateField('secretOrIpHash')} error={fieldErrors.secretOrIpHash} required={keyRequiredForSubmit} optional={!keyRequiredForSubmit} rows={3} maxLength={MAX_SECRET_LENGTH} className="md:col-span-2" />
-          <TextAreaField label="Mô tả" value={form.description} onChange={(v) => changeField('description', limitText(v, MAX_DESCRIPTION_LENGTH))} onBlur={() => validateField('description')} error={fieldErrors.description} rows={3} maxLength={MAX_DESCRIPTION_LENGTH} className="md:col-span-2" />
+          <TextAreaField label="Khóa API / Token" value={form.secretOrIpHash} onChange={(v) => changeField('secretOrIpHash', limitText(v, MAX_SECRET_LENGTH))} onBlur={() => validateField('secretOrIpHash')} error={fieldErrors.secretOrIpHash} required={keyRequiredForSubmit} optional={!keyRequiredForSubmit} rows={2} maxLength={MAX_SECRET_LENGTH} className="md:col-span-2" />
+          <TextAreaField label="Mô tả" value={form.description} onChange={(v) => changeField('description', limitText(v, MAX_DESCRIPTION_LENGTH))} onBlur={() => validateField('description')} error={fieldErrors.description} rows={2} maxLength={MAX_DESCRIPTION_LENGTH} className="md:col-span-2" />
         </div>
 
         <SectionTitle title="Kiểm tra kết nối" />
@@ -549,7 +549,7 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
   );
 }
 
-function SectionTitle({ title }) { return <h4 className="border-t border-slate-100 pt-4 text-sm font-black text-slate-800 first:border-t-0 first:pt-0">{title}</h4>; }
+function SectionTitle({ title }) { return <h4 className="border-t border-slate-100 pt-3 text-sm font-black text-slate-800 first:border-t-0 first:pt-0">{title}</h4>; }
 
 function ModelPicker({ form, updateForm, errors = {}, validateField = () => true }) {
   const options = modelOptions(form.provider);
@@ -567,7 +567,7 @@ function SelectField({ label, value, onChange, onBlur, options, empty, required,
 function TextAreaField({ label, value, onChange, onBlur, error, required = false, optional = false, rows = 2, maxLength, className = '' }) {
   return <label className={`block space-y-1.5 ${className}`}><span className="text-[13px] font-bold text-slate-700">{label}{required && <span className="text-rose-500"> *</span>}{optional && <span className="font-semibold text-slate-400"> (tùy chọn)</span>}</span><textarea required={required} value={value || ''} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} rows={rows} maxLength={maxLength} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} /><FieldError message={error} /></label>;
 }
-function FieldError({ message }) { return <p className={`min-h-[2rem] text-xs font-bold leading-4 transition-colors ${message ? 'text-rose-600' : 'text-transparent'}`}>{message || 'Không có lỗi'}</p>; }
+function FieldError({ message }) { return <p className={`min-h-[1rem] text-xs font-bold leading-4 transition-colors ${message ? 'text-rose-600' : 'text-transparent'}`}>{message || 'Không có lỗi'}</p>; }
 function ModelCard({ model, onViewDetails, onEdit, onDelete, busy }) {
   const isLocal = model.provider === 'local';
   const badgeCls = isLocal ? 'bg-cyan-50 text-cyan-700 border-cyan-100' : 'bg-cyan-50 text-cyan-700 border-cyan-100';

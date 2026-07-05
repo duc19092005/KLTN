@@ -517,7 +517,7 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
-      <form onSubmit={handleSubmit} className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-5">
+      <form onSubmit={handleSubmit} className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-4">
         <div className="flex justify-between gap-4">
           <div>
             <h3 className="text-2xl font-black text-slate-950">{isCreate ? 'Thêm bác sĩ' : 'Cập nhật bác sĩ'}</h3>
@@ -530,7 +530,7 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
           <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500">Đóng</button>
         </div>
         <SectionTitle title="Thông tin tài khoản và nhân sự" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Input label="Họ tên" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: onlyVietnameseNameChars(v) })} onBlur={() => validateField('fullName')} error={fieldErrors.fullName} required maxLength={MAX_FULL_NAME_LENGTH} />
           <AvatarUpload value={form.avatarUrl} onChange={(url) => setForm({ ...form, avatarUrl: url })} uploadFn={doctorService.uploadAvatar} />
           <Input label="Tên đăng nhập" value={form.username} onChange={(v) => setForm({ ...form, username: onlyUsernameChars(v) })} onBlur={() => validateField('username')} error={fieldErrors.username} disabled={!isCreate} required maxLength={MAX_USERNAME_LENGTH} />
@@ -560,7 +560,7 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
           />
         </div>
         <SectionTitle title="Thông tin chuyên môn" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Select label="Chuyên khoa" value={form.specialty} onChange={(v) => { setForm({ ...form, specialty: v }); validateField('specialty', v); }} error={fieldErrors.specialty} empty="Chọn chuyên khoa" required options={SPECIALTIES} />
           <Input label="Số chứng chỉ" value={form.licenseNumber} onChange={(v) => setForm({ ...form, licenseNumber: v.slice(0, MAX_LICENSE_NUMBER_LENGTH) })} onBlur={() => validateField('licenseNumber')} error={fieldErrors.licenseNumber} required maxLength={MAX_LICENSE_NUMBER_LENGTH} />
           <Select label="Trình độ" value={form.qualification} onChange={(v) => { setForm({ ...form, qualification: v }); validateField('qualification', v); }} error={fieldErrors.qualification} empty="Chọn trình độ" required options={QUALIFICATIONS} />
@@ -574,7 +574,7 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
   );
 }
 
-function SectionTitle({ title }) { return <h4 className="border-t border-slate-100 pt-4 text-sm font-black text-slate-800 first:border-t-0 first:pt-0">{title}</h4>; }
+function SectionTitle({ title }) { return <h4 className="border-t border-slate-100 pt-3 text-sm font-black text-slate-800 first:border-t-0 first:pt-0">{title}</h4>; }
 function Pagination({ pagination, onPageChange }) { return <div className="flex items-center justify-between border-t border-slate-100 p-4"><p className="text-sm font-semibold text-slate-500">Trang {pagination.page}/{pagination.totalPages}</p><div className="flex gap-2"><SmallButton disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>Trước</SmallButton><SmallButton disabled={pagination.page >= pagination.totalPages} onClick={() => onPageChange(pagination.page + 1)}>Sau</SmallButton></div></div>; }
 function Info({ label, value }) { return <div><p className="text-[11px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className="text-sm font-bold text-slate-700">{value}</p></div>; }
 function Alert({ children }) { return <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">{children}</div>; }
@@ -694,5 +694,5 @@ function Select({ label, value, onChange, options, empty, required, disabled, er
   );
 }
 function FieldError({ message }) {
-  return <p className={`min-h-[2rem] text-xs font-bold leading-4 transition-colors ${message ? 'text-rose-600' : 'text-transparent'}`}>{message || 'Không có lỗi'}</p>;
+  return <p className={`min-h-[1rem] text-xs font-bold leading-4 transition-colors ${message ? 'text-rose-600' : 'text-transparent'}`}>{message || 'Không có lỗi'}</p>;
 }
