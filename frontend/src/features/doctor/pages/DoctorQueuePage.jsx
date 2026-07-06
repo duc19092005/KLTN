@@ -11,6 +11,7 @@ import { medicalOrderService } from '../../medical-order/apis/medicalOrderServic
 import { clinicalDecisionService } from '../../medical-order/apis/clinicalDecisionService';
 import { aiModelService } from '../../admin/apis/aiModelService';
 import { useToast } from '../../../providers/ToastProvider';
+import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock';
 
 const STATUS = {
   WAITING: { label: 'Chờ khám', color: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-400' },
@@ -176,6 +177,8 @@ export default function DoctorQueuePage() {
   const [ratingFeedback, setRatingFeedback] = useState('');
   const [ratingSelected, setRatingSelected] = useState(null);
   const [pauseCountdown, setPauseCountdown] = useState(false);
+
+  useBodyScrollLock(showWorkflowModal || showRatingPopup);
 
   const loadVisits = async () => {
     setLoading(true);
@@ -622,17 +625,17 @@ function VisitRow({ visit, active, busy, onSelect, onStart, onOpenWorkflow }) {
       <td className="px-5 py-4 text-right">
         <div className="flex justify-end gap-2">
           {canStart && (
-            <button type="button" disabled={busy} onClick={onStart} className="rounded-xl bg-cyan-600 px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-cyan-700 disabled:opacity-50">
+            <button type="button" disabled={busy} onClick={onStart} className="min-h-[38px] rounded-xl bg-cyan-600 px-3.5 py-2 text-xs font-black text-white shadow-sm transition-colors hover:bg-cyan-700 disabled:opacity-50">
               Bắt đầu khám
             </button>
           )}
           {canOpenWorkflow && (
-            <button type="button" disabled={busy} onClick={onOpenWorkflow} className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-100 disabled:opacity-50">
+            <button type="button" disabled={busy} onClick={onOpenWorkflow} className="min-h-[38px] rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-black text-slate-700 shadow-sm transition-colors hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700 disabled:opacity-50">
               {getQueueActionLabel(visit.status)}
             </button>
           )}
           {!canStart && !canOpenWorkflow && (
-            <button type="button" disabled className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-400">
+            <button type="button" disabled className="min-h-[38px] rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-black text-slate-400 shadow-sm">
               Đã hoàn tất
             </button>
           )}
@@ -673,10 +676,10 @@ function VisitHeader({ visit, detailLoading, onStart, onContinue, busy }) {
         <div className="flex items-center gap-2">
           {detailLoading && <span className="text-xs text-slate-400 animate-pulse mr-2">Đang đồng bộ dữ liệu...</span>}
           {canStart && (
-            <button type="button" disabled={busy} onClick={onStart} className="w-full sm:w-auto rounded-xl bg-cyan-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-cyan-700 transition-colors disabled:opacity-50">Tiếp nhận & Khám</button>
+            <button type="button" disabled={busy} onClick={onStart} className="min-h-[44px] w-full rounded-xl bg-cyan-600 px-5 py-2.5 text-xs font-black text-white shadow-sm transition-colors hover:bg-cyan-700 disabled:opacity-50 sm:w-auto">Tiếp nhận & Khám</button>
           )}
           {canContinue && (
-            <button type="button" disabled={busy} onClick={onContinue} className="w-full sm:w-auto rounded-xl bg-cyan-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-cyan-700 transition-colors disabled:opacity-50">Mở Quy trình điều trị</button>
+            <button type="button" disabled={busy} onClick={onContinue} className="min-h-[44px] w-full rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-black text-slate-700 shadow-sm transition-colors hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700 disabled:opacity-50 sm:w-auto">Mở quy trình điều trị</button>
           )}
         </div>
       </div>

@@ -31,6 +31,7 @@ html {
   min-width: 320px;
   min-height: 100%;
   background: var(--color-background);
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -43,6 +44,11 @@ body {
   color: var(--color-text);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  scrollbar-gutter: stable;
+}
+
+body.modal-scroll-locked {
+  overflow: hidden;
 }
 
 button,

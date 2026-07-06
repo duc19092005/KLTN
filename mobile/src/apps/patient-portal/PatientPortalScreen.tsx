@@ -22,6 +22,7 @@ import {
   PatientSummary,
   PatientVisitDetail,
   PatientVisitSummary,
+  PatientAiDiagnosis,
 } from '../../shared/api/patientPortalClient';
 import { ActionButton } from '../../shared/components/ActionButton';
 import { StatusPanel } from '../../shared/components/StatusPanel';
@@ -1837,13 +1838,20 @@ function VisitDetailScreen({ visitDetail, previewUrls, fileBusyId, onBack, onOpe
       </DetailSection>
 
       {visitDetail.conclusion ? (
-        <DetailSection title="Kết luận bác sĩ" icon="pulse-outline">
-          <Info label="Chẩn đoán" value={visitDetail.conclusion.finalDiagnosis} />
-          {visitDetail.conclusion.treatmentPlan ? <Info label="Điều trị" value={visitDetail.conclusion.treatmentPlan} /> : null}
-          {visitDetail.conclusion.prescription ? <Info label="Đơn thuốc" value={visitDetail.conclusion.prescription} /> : null}
-          {visitDetail.conclusion.followUpNote ? <Info label="Tái khám" value={visitDetail.conclusion.followUpNote} /> : null}
+        <DetailSection title="Hồ sơ chẩn đoán chính thức" icon="pulse-outline">
+          <Info label="Chẩn đoán xác định" value={visitDetail.conclusion.finalDiagnosis} />
+          {visitDetail.conclusion.treatmentPlan ? <Info label="Hướng điều trị" value={visitDetail.conclusion.treatmentPlan} /> : null}
+          {visitDetail.conclusion.prescription ? <Info label="Đơn thuốc / chỉ định" value={visitDetail.conclusion.prescription} /> : null}
+          {visitDetail.conclusion.followUpNote ? <Info label="Dặn dò tái khám" value={visitDetail.conclusion.followUpNote} /> : null}
+          {visitDetail.conclusion.doctorNote ? <Info label="Ghi chú bác sĩ" value={visitDetail.conclusion.doctorNote} /> : null}
         </DetailSection>
-      ) : <View style={styles.detailSection}><EmptyState text="Chưa có kết luận." /></View>}
+      ) : <View style={styles.detailSection}><EmptyState text="Chưa có kết luận chính thức từ bác sĩ." /></View>}
+
+      <DetailSection title="Gợi ý AI hỗ trợ bác sĩ" icon="sparkles-outline">
+        {visitDetail.aiDiagnoses?.length ? visitDetail.aiDiagnoses.map((aiDiagnosis, index) => (
+          <AiDiagnosisCard key={aiDiagnosis.id || index} aiDiagnosis={aiDiagnosis} index={index} />
+        )) : <EmptyState text="Không có bản phân tích AI được công bố cho lượt khám này." />}
+      </DetailSection>
 
       <DetailSection title="Chỉ định & kết quả cận lâm sàng" icon="flask-outline">
         {visitDetail.orders.length ? visitDetail.orders.map((order) => (
@@ -1886,6 +1894,60 @@ function VisitDetailScreen({ visitDetail, previewUrls, fileBusyId, onBack, onOpe
       </DetailSection>
     </View>
   );
+}
+
+function AiDiagnosisCard({ aiDiagnosis, index }: { aiDiagnosis: PatientAiDiagnosis; index: number }) {
+  const parsed = parseMobileAiDiagnosis(aiDiagnosis.result);
+  const primary = parsed.probabilities[0];
+  const confidence = formatMobileConfidence(aiDiagnosis.confidence);
+  return (
+    <View style={styles.aiDiagnosisCard}>
+      <View style={styles.aiDiagnosisHeader}>
+        <Text style={styles.aiDiagnosisTitle}>Phân tích AI #{index + 1}</Text>
+        {confidence ? <Text style={styles.aiConfidencePill}>{confidence}</Text> : null}
+      </View>
+      <Text style={styles.aiSummaryText}>{parsed.summary}</Text>
+      {primary ? (
+        <View style={styles.aiPrimaryBox}>
+          <Text style={styles.aiPrimaryLabel}>Gợi ý chính</Text>
+          <Text style={styles.aiPrimaryText}>{primary.condition || 'Chẩn đoán gợi ý'}{primary.probability != null ? ` · ${primary.probability}%` : ''}</Text>
+          {primary.reason ? <Text style={styles.aiReasonText}>{primary.reason}</Text> : null}
+        </View>
+      ) : null}
+      {parsed.nextSteps.length ? (
+        <View style={styles.aiNextBox}>
+          <Text style={styles.aiPrimaryLabel}>Khuyến nghị tiếp theo</Text>
+          {parsed.nextSteps.map((step, stepIndex) => <Text key={stepIndex} style={styles.aiReasonText}>• {step}</Text>)}
+        </View>
+      ) : null}
+      <Text style={styles.aiMetaText}>
+        {aiDiagnosis.aiModel?.modelName || 'AI'} {aiDiagnosis.aiModel?.modelVersion ? `(v${aiDiagnosis.aiModel.modelVersion})` : ''}
+        {aiDiagnosis.createdAt ? ` · ${formatDateTime(aiDiagnosis.createdAt)}` : ''}
+      </Text>
+    </View>
+  );
+}
+
+function parseMobileAiDiagnosis(raw?: string | null) {
+  if (!raw) return { summary: 'Chưa có nội dung gợi ý.', probabilities: [] as Array<any>, nextSteps: [] as string[] };
+  try {
+    const parsed = JSON.parse(raw);
+    const analysis = parsed.analysis && typeof parsed.analysis === 'object' ? parsed.analysis : parsed;
+    return {
+      summary: analysis.summary || parsed.summary || analysis.diagnosis || parsed.diagnosis || 'AI đã phân tích nhưng chưa có tóm tắt.',
+      probabilities: Array.isArray(analysis.diagnosticProbabilities) ? analysis.diagnosticProbabilities.slice(0, 3) : [],
+      nextSteps: Array.isArray(analysis.recommendedNextSteps) ? analysis.recommendedNextSteps.slice(0, 3) : [],
+    };
+  } catch {
+    return { summary: raw, probabilities: [] as Array<any>, nextSteps: [] as string[] };
+  }
+}
+
+function formatMobileConfidence(value?: number | null) {
+  const raw = Number(value);
+  if (!Number.isFinite(raw)) return null;
+  const percent = raw <= 1 ? raw * 100 : raw;
+  return `${Math.max(0, Math.min(100, percent)).toFixed(1)}%`;
 }
 
 function DetailSection({ title, icon, children }: { title: string; icon: keyof typeof Ionicons.glyphMap; children: React.ReactNode }) {
@@ -2290,6 +2352,17 @@ const styles = StyleSheet.create({
   detailFileIcon: { width: 52, height: 52, borderRadius: 14, backgroundColor: '#eef6ff', alignItems: 'center', justifyContent: 'center' },
   detailFileButtonSecondary: { borderRadius: 12, backgroundColor: '#eaf8ff', paddingHorizontal: 10, paddingVertical: 9 },
   detailFileButtonSecondaryText: { color: colors.primaryDark, fontSize: 12, fontWeight: '900' },
+  aiDiagnosisCard: { gap: 10, borderRadius: 18, borderWidth: 1, borderColor: '#bae6fd', backgroundColor: '#f8fdff', padding: 13 },
+  aiDiagnosisHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  aiDiagnosisTitle: { flex: 1, color: colors.primaryDark, fontSize: 14, lineHeight: 19, fontWeight: '900' },
+  aiConfidencePill: { borderRadius: 999, backgroundColor: '#dcfce7', paddingHorizontal: 10, paddingVertical: 5, color: '#047857', fontSize: 11, fontWeight: '900' },
+  aiSummaryText: { color: colors.text, fontSize: 13, lineHeight: 19, fontWeight: '700' },
+  aiPrimaryBox: { gap: 4, borderRadius: 14, borderWidth: 1, borderColor: '#dbeafe', backgroundColor: '#ffffff', padding: 10 },
+  aiNextBox: { gap: 4, borderRadius: 14, borderWidth: 1, borderColor: '#bbf7d0', backgroundColor: '#f0fdf4', padding: 10 },
+  aiPrimaryLabel: { color: '#64748b', fontSize: 10.5, fontWeight: '900', textTransform: 'uppercase' },
+  aiPrimaryText: { color: colors.primaryDark, fontSize: 13, lineHeight: 18, fontWeight: '900' },
+  aiReasonText: { color: '#475569', fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  aiMetaText: { color: '#94a3b8', fontSize: 11.5, lineHeight: 16, fontWeight: '800' },
   qrPayload: { marginTop: 10, borderRadius: 16, borderWidth: 1, borderColor: '#bae6fd', backgroundColor: '#f0f9ff', padding: 12, color: colors.primaryDark, fontSize: 12, lineHeight: 18, fontWeight: '900' },
   bookingScreen: { marginHorizontal: -24, marginTop: 0, marginBottom: -24, minHeight: '100%', backgroundColor: '#f6f8fc', paddingTop: 6, paddingBottom: 28 },
   bookingHero: { minHeight: 240, paddingHorizontal: 24, paddingTop: 30, paddingBottom: 46, borderBottomLeftRadius: 34, borderBottomRightRadius: 34, backgroundColor: '#075985', overflow: 'hidden' },

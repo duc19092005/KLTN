@@ -187,10 +187,27 @@ export class HttpAiProviderGateway implements AiProviderGatewayPort {
   }
 
   private extractConfidence(parsed?: Record<string, any>) {
-    const value = Number(parsed?.confidence);
-    if (!Number.isFinite(value)) return undefined;
-    if (value < 0 || value > 1) return undefined;
-    return value;
+    const direct = this.normalizeConfidenceValue(parsed?.confidence);
+    if (direct !== undefined) return direct;
+
+    const probabilities = Array.isArray(parsed?.diagnosticProbabilities)
+      ? parsed.diagnosticProbabilities
+      : [];
+    const strongestProbability = probabilities
+      .map((item: any) => this.normalizeConfidenceValue(item?.probability))
+      .filter((value: number | undefined): value is number => value !== undefined)
+      .sort((a: number, b: number) => b - a)[0];
+
+    return strongestProbability;
+  }
+
+  private normalizeConfidenceValue(raw: unknown) {
+    if (raw === null || raw === undefined || raw === '') return undefined;
+    const value = Number(String(raw).replace('%', '').trim());
+    if (!Number.isFinite(value) || value < 0) return undefined;
+    if (value <= 1) return value;
+    if (value <= 100) return value / 100;
+    return undefined;
   }
 
   private extractProviderError(responseJson: any, responseText: string) {

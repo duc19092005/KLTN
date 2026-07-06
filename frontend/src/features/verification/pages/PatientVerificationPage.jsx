@@ -46,19 +46,39 @@ function getVisitConclusion(visit) {
 }
 function parseAiDiagnosisResult(aiDiagnosis) {
   const raw = aiDiagnosis?.result || aiDiagnosis?.diagnosisResult || '';
-  if (!raw) return { summary: 'Chưa có nội dung gợi ý.', probabilities: [], nextSteps: [] };
+  if (!raw) return { summary: 'Chưa có nội dung gợi ý.', probabilities: [], nextSteps: [], limitations: [] };
   try {
     const parsed = JSON.parse(raw);
-    const analysis = parsed.analysis || parsed;
+    const analysis = parsed.analysis && typeof parsed.analysis === 'object' ? parsed.analysis : parsed;
     return {
       summary: analysis.summary || parsed.summary || analysis.diagnosis || parsed.diagnosis || 'AI đã phân tích nhưng chưa có tóm tắt.',
-      probabilities: Array.isArray(analysis.diagnosticProbabilities) ? analysis.diagnosticProbabilities.slice(0, 3) : [],
-      nextSteps: Array.isArray(analysis.recommendedNextSteps) ? analysis.recommendedNextSteps.slice(0, 3) : [],
+      probabilities: Array.isArray(analysis.diagnosticProbabilities)
+        ? analysis.diagnosticProbabilities.slice(0, 3)
+        : [],
+      nextSteps: Array.isArray(analysis.recommendedNextSteps)
+        ? analysis.recommendedNextSteps.slice(0, 3)
+        : [],
+      limitations: Array.isArray(analysis.limitations)
+        ? analysis.limitations.slice(0, 3)
+        : (analysis.limitations ? [analysis.limitations] : []),
       disclaimer: analysis.disclaimer || parsed.disclaimer || '',
     };
   } catch {
-    return { summary: raw, probabilities: [], nextSteps: [] };
+    return { summary: raw, probabilities: [], nextSteps: [], limitations: [] };
   }
+}
+function formatConfidenceValue(value) {
+  const raw = Number(value);
+  if (!Number.isFinite(raw)) return null;
+  const percent = raw <= 1 ? raw * 100 : raw;
+  return `${Math.max(0, Math.min(100, percent)).toFixed(1)}%`;
+}
+function conclusionField(conclusion, ...keys) {
+  for (const key of keys) {
+    const value = conclusion?.[key];
+    if (value !== undefined && value !== null && String(value).trim()) return value;
+  }
+  return null;
 }
 
 export default function PatientVerificationPage() {
@@ -445,6 +465,7 @@ export default function PatientVerificationPage() {
                 <div className="space-y-6">
                   {data.visits.map((visit) => {
                     const verification = visit.blockchainVerification || { status: 'unanchored' };
+                    const aiDiagnoses = (visit.aiDiagnoses?.length ? visit.aiDiagnoses : (visit.aiDiagnosis ? [visit.aiDiagnosis] : []));
                     
                     return (
                       <div key={visit.id || visit.visitCode} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-colors hover:border-slate-300">
@@ -522,19 +543,17 @@ export default function PatientVerificationPage() {
                             </div>
 
                             {getVisitConclusion(visit) ? (
-                              <div className="p-4 bg-[#f9f9ff] border border-[#c2c6d4]/30 rounded-xl space-y-1.5">
-                                <span className="text-[10px] font-bold text-[#0891b2] uppercase tracking-widest block">
-                                  Kết luận lâm sàng
+                              <div className="rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50/70 to-white p-4 shadow-sm">
+                                <span className="text-[10px] font-black text-cyan-700 uppercase tracking-widest block">
+                                  Hồ sơ chẩn đoán chính thức
                                 </span>
-                                <p className="text-sm font-bold text-[#020617]">
-                                  Chẩn đoán: {getVisitConclusion(visit).finalDiagnosis}
-                                </p>
-                                <p className="text-xs font-semibold text-[#475569] leading-relaxed">
-                                  Hướng điều trị: {getVisitConclusion(visit).treatmentPlan || 'Chưa ghi nhận'}
-                                </p>
-                                <p className="text-xs font-semibold text-[#475569] leading-relaxed">
-                                  Ghi chú: {getVisitConclusion(visit).doctorNote || getVisitConclusion(visit).notes || 'Không có ghi chú thêm'}
-                                </p>
+                                <div className="mt-3 space-y-3">
+                                  <DiagnosisInfo label="Chẩn đoán xác định" value={conclusionField(getVisitConclusion(visit), 'finalDiagnosis', 'diagnosis', 'summary')} highlight />
+                                  <DiagnosisInfo label="Hướng điều trị" value={conclusionField(getVisitConclusion(visit), 'treatmentPlan', 'plan')} />
+                                  <DiagnosisInfo label="Đơn thuốc / chỉ định" value={conclusionField(getVisitConclusion(visit), 'prescription')} />
+                                  <DiagnosisInfo label="Dặn dò tái khám" value={conclusionField(getVisitConclusion(visit), 'followUpNote', 'followUp')} />
+                                  <DiagnosisInfo label="Ghi chú bác sĩ" value={conclusionField(getVisitConclusion(visit), 'doctorNote', 'notes')} fallback="Không có ghi chú thêm" />
+                                </div>
                               </div>
                             ) : (
                               <div className="p-4 bg-amber-50/50 border border-amber-100 rounded-xl text-amber-700 text-xs font-bold flex items-center gap-1.5">
@@ -547,28 +566,24 @@ export default function PatientVerificationPage() {
                           {/* AI Dermatological Diagnosis */}
                           <div className="space-y-4 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">
-                              Trợ lý AI chẩn đoán hình ảnh
+                              Gợi ý AI hỗ trợ bác sĩ
                             </span>
 
-                            {visit.aiDiagnosis ? (
+                            {aiDiagnoses.length ? (
                               <div className="space-y-3">
-                                <div className="flex gap-4 items-center">
-                                  {visit.aiDiagnosis.imageUrl && (
-                                    <img
-                                      src={visit.aiDiagnosis.imageUrl}
-                                      alt="Ảnh quét da liễu"
-                                      className="w-16 h-16 rounded-xl object-cover border border-slate-200 shadow-sm"
-                                    />
-                                  )}
-                                  <AiDiagnosisSummary aiDiagnosis={visit.aiDiagnosis} />
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[11px] font-black text-cyan-700">{aiDiagnoses.length} bản phân tích</span>
+                                  <span className="rounded-full border border-cyan-100 bg-cyan-50 px-2.5 py-1 text-[10px] font-black text-cyan-700">Mới nhất trước</span>
                                 </div>
-                                <p className="text-[11px] font-semibold text-slate-400">
-                                  Mô hình: {visit.aiDiagnosis.aiModel?.modelName} (v{visit.aiDiagnosis.aiModel?.modelVersion})
-                                </p>
+                                <div className="space-y-2">
+                                  {aiDiagnoses.map((aiDiagnosis, index) => (
+                                    <AiDiagnosisSummary key={aiDiagnosis.id || index} aiDiagnosis={aiDiagnosis} index={index} />
+                                  ))}
+                                </div>
                               </div>
                             ) : (
                               <p className="text-xs font-medium text-slate-400 italic">
-                                Không có ảnh chụp bệnh da liễu hoặc chẩn đoán từ AI.
+                                Không có bản phân tích AI được công bố cho lượt khám này.
                               </p>
                             )}
                           </div>
@@ -768,10 +783,22 @@ export default function PatientVerificationPage() {
     </div>
   );
 }
-function AiDiagnosisSummary({ aiDiagnosis }) {
-  const [expanded, setExpanded] = useState(false);
+function DiagnosisInfo({ label, value, fallback = 'Chưa ghi nhận', highlight = false }) {
+  return (
+    <div>
+      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</span>
+      <p className={`mt-0.5 whitespace-pre-wrap text-xs leading-relaxed ${highlight ? 'font-black text-slate-950' : 'font-semibold text-slate-600'}`}>
+        {value || fallback}
+      </p>
+    </div>
+  );
+}
+
+function AiDiagnosisSummary({ aiDiagnosis, index = 0 }) {
+  const [expanded, setExpanded] = useState(index === 0);
   const parsed = parseAiDiagnosisResult(aiDiagnosis);
   const primaryProbability = parsed.probabilities[0];
+  const confidence = formatConfidenceValue(aiDiagnosis.confidence);
 
   return (
     <div className="min-w-0 flex-1 rounded-xl border border-cyan-100 bg-white shadow-sm overflow-hidden">
@@ -782,7 +809,11 @@ function AiDiagnosisSummary({ aiDiagnosis }) {
         aria-expanded={expanded}
       >
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-wider text-cyan-600">Tóm tắt AI</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[10px] font-black uppercase tracking-wider text-cyan-600">Phân tích AI #{index + 1}</p>
+            <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-black text-slate-500">{aiDiagnosis.aiModel?.modelName || 'AI'}</span>
+            {confidence && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700">{confidence}</span>}
+          </div>
           <p className="mt-1 line-clamp-3 text-xs font-semibold leading-relaxed text-slate-700">
             {parsed.summary}
           </p>
@@ -823,9 +854,16 @@ function AiDiagnosisSummary({ aiDiagnosis }) {
             </div>
           )}
 
-          <p className="text-xs font-bold text-[#006b5b]">
-            Độ tin cậy: {aiDiagnosis.confidence != null ? `${(aiDiagnosis.confidence * 100).toFixed(1)}%` : 'Theo từng gợi ý bên trên'}
-          </p>
+          <div className="rounded-xl border border-slate-100 bg-white p-3">
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Thông tin mô hình</p>
+            <p className="mt-1 text-[11px] font-semibold text-slate-600">
+              {aiDiagnosis.aiModel?.modelName || 'AI'} {aiDiagnosis.aiModel?.modelVersion ? `(v${aiDiagnosis.aiModel.modelVersion})` : ''}
+              {aiDiagnosis.createdAt ? ` · ${new Date(aiDiagnosis.createdAt).toLocaleString('vi-VN')}` : ''}
+            </p>
+            <p className="mt-1 text-xs font-bold text-[#006b5b]">
+              Độ tin cậy: {confidence || 'Theo từng gợi ý bên trên'}
+            </p>
+          </div>
         </div>
       )}
     </div>

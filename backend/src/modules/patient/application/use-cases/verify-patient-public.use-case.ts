@@ -81,6 +81,7 @@ export class VerifyPatientPublicUseCase {
             }
           : null,
         aiDiagnosis: this.mapAiDiagnosis(conclusion?.aiDiagnosis || visit.aiDiagnoses?.[0] || null),
+        aiDiagnoses: (visit.aiDiagnoses || []).map((item: any) => this.mapAiDiagnosis(item)).filter(Boolean),
         blockchainVerification,
       };
     });

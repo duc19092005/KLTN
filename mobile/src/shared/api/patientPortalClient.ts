@@ -56,6 +56,15 @@ export type PatientFileDownload = {
   expiresAt: string;
 };
 
+export type PatientAiDiagnosis = {
+  id: string;
+  result?: string | null;
+  confidence?: number | null;
+  status?: string | null;
+  createdAt?: string | null;
+  aiModel?: { id: string; modelName?: string | null; modelVersion?: string | null; provider?: string | null } | null;
+};
+
 export type PatientVisitDetail = PatientVisitSummary & {
   patient: PatientSummary;
   conclusion?: {
@@ -68,6 +77,7 @@ export type PatientVisitDetail = PatientVisitSummary & {
     concludedAt: string;
     doctor?: string | null;
   } | null;
+  aiDiagnoses?: PatientAiDiagnosis[];
   orders: Array<{
     id: string;
     orderCode: string;

@@ -165,6 +165,7 @@ export class PatientPortalService {
         department: true,
         staff: { include: { doctorProfile: true } },
         finalConclusion: { include: { doctor: { include: { staffProfile: true } } } },
+        aiDiagnoses: { include: { aiModel: true }, orderBy: { createdAt: 'desc' } },
         medicalOrders: {
           include: {
             targetDepartment: true,
@@ -202,6 +203,7 @@ export class PatientPortalService {
         concludedAt: visit.finalConclusion.concludedAt,
         doctor: visit.finalConclusion.doctor?.staffProfile?.fullName ?? null,
       } : null,
+      aiDiagnoses: visit.aiDiagnoses.map((item) => this.toAiDiagnosisSummary(item)),
       orders: visit.medicalOrders.map((order) => ({
         id: order.id,
         orderCode: order.orderCode,
@@ -228,6 +230,22 @@ export class PatientPortalService {
           })),
         })) : [],
       })),
+    };
+  }
+
+  private toAiDiagnosisSummary(aiDiagnosis: any) {
+    return {
+      id: aiDiagnosis.id,
+      result: aiDiagnosis.result,
+      confidence: aiDiagnosis.confidence,
+      status: aiDiagnosis.status,
+      createdAt: aiDiagnosis.createdAt,
+      aiModel: aiDiagnosis.aiModel ? {
+        id: aiDiagnosis.aiModel.id,
+        modelName: aiDiagnosis.aiModel.modelName,
+        modelVersion: aiDiagnosis.aiModel.modelVersion,
+        provider: aiDiagnosis.aiModel.provider,
+      } : null,
     };
   }
 

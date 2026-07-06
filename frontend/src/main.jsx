@@ -7,6 +7,7 @@ import { AuthProvider } from './providers/AuthProvider';
 import { ToastProvider } from './providers/ToastProvider';
 import { PreferencesProvider } from './providers/PreferencesProvider';
 import './index.css';
+import ModalScrollLockObserver from './shared/components/ModalScrollLockObserver';
 
 axios.defaults.withCredentials = true;
 
@@ -16,6 +17,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <AuthProvider>
         <PreferencesProvider>
           <ToastProvider>
+            <ModalScrollLockObserver />
             <App />
           </ToastProvider>
         </PreferencesProvider>

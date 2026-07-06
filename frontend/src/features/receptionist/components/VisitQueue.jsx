@@ -216,8 +216,9 @@ function VisitDetailModal({ visit, busyId, onCancel, onClose }) {
   const canCancel = visit.status === 'WAITING';
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = 'unset'; };
+    return () => { document.body.style.overflow = previousOverflow; };
   }, []);
 
   return (

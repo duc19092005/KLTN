@@ -185,8 +185,9 @@ function OrderModal({ order, onClose, onStatusChange, onReload, onOpenFile }) {
   const isResultReady = order.status === 'RESULT_READY';
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = 'unset'; };
+    return () => { document.body.style.overflow = previousOverflow; };
   }, []);
 
   const submitResult = async () => {
