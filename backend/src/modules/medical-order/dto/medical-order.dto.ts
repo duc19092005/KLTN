@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MedicalOrderStatus } from '@prisma/client';
-import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
+import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, ValidateNested, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateMedicalOrderDto {
@@ -109,8 +109,9 @@ export class CreateMedicalResultDto {
   @IsString()
   note?: string;
 
-  @ApiProperty({ type: [MedicalResultFileDto], description: 'Danh sách ảnh/PDF kết quả đã upload' })
+  @ApiProperty({ type: [MedicalResultFileDto], minItems: 1, description: 'Danh sách ảnh/PDF kết quả đã upload. Bắt buộc có ít nhất 1 file.' })
   @IsArray()
+  @ArrayMinSize(1, { message: 'Vui lòng cung cấp ít nhất một file kết quả PDF hoặc hình ảnh.' })
   @ValidateNested({ each: true })
   @Type(() => MedicalResultFileDto)
   files!: MedicalResultFileDto[];

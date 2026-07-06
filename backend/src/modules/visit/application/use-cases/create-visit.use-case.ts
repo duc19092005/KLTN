@@ -30,6 +30,22 @@ export class CreateVisitUseCase {
       throw new BadRequestException('Lễ tân chỉ có thể chọn phòng ban loại phòng khám đang hoạt động.');
     }
 
+    let assignedStaffId = dto.staffId;
+    if (assignedStaffId) {
+      const doctorStaff = await this.prisma.staffProfile.findFirst({
+        where: {
+          id: assignedStaffId,
+          departmentId: dto.departmentId,
+          user: { role: 'DOCTOR', status: 'ACTIVE' },
+          doctorProfile: { isNot: null },
+        },
+        select: { id: true },
+      });
+      if (!doctorStaff) {
+        throw new BadRequestException('Bác sĩ phụ trách không thuộc phòng khám đã chọn hoặc không còn hoạt động.');
+      }
+    }
+
     const result = await this.repo.createVisitWithOptionalPatient({
       patientId: dto.patientId,
       patient: dto.patient
@@ -45,6 +61,7 @@ export class CreateVisitUseCase {
           }
         : undefined,
       departmentId: dto.departmentId,
+      staffId: assignedStaffId ?? null,
     });
 
     try {

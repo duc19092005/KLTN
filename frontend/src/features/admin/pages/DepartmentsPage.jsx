@@ -265,7 +265,7 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
             const depStaffs = staffs.filter((s) => s.departmentId === dep.id);
             const active = selectedDepartment?.id === dep.id;
             return (
-              <article key={dep.id} onClick={() => onSelect(dep)} className={`cursor-pointer p-5 transition-colors hover:bg-slate-50/70 ${active ? 'bg-cyan-50/60' : 'bg-white'}`}>
+              <article key={dep.id} className={`p-5 transition-colors hover:bg-slate-50/70 ${active ? 'bg-cyan-50/60' : 'bg-white'}`}>
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_0.95fr_0.55fr_0.55fr_0.8fr_300px] xl:items-center">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -288,7 +288,7 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
                     <BlockchainStatusBadge status={dep.blockchainStatus} size="xs" />
                   </div>
 
-                  <div className="flex flex-wrap gap-2 xl:justify-end" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex flex-wrap gap-2 xl:justify-end">
                     <select disabled={busy} value={dep.managerId || ''} onChange={(e) => onAssignManager(dep.id, e.target.value)} className="min-w-[150px] flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 xl:flex-none">
                       <option value="">Chọn phụ trách</option>
                       {depStaffs.map((staff) => <option key={staff.id} value={staff.id}>{staff.fullName}</option>)}

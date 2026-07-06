@@ -17,6 +17,11 @@ export class CreateVisitDto {
   @ApiProperty({ example: 'department-id' })
   @IsUUID()
   departmentId!: string;
+
+  @ApiPropertyOptional({ description: 'Bác sĩ phụ trách được tự động chọn từ phòng khám' })
+  @IsOptional()
+  @IsUUID()
+  staffId?: string;
 }
 
 export class UpdateVisitStatusDto {

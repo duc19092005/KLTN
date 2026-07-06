@@ -189,8 +189,6 @@ export class PatientPortalService {
       completedAt: visit.completedAt,
       reason: visit.reason,
       symptoms: visit.symptoms,
-      initialDiagnosis: visit.initialDiagnosis,
-      note: visit.note,
       patient: this.toPatientSummary(visit.patient),
       department: visit.department ? { id: visit.department.id, name: visit.department.name, type: visit.department.type } : null,
       doctor: visit.staff ? { id: visit.staff.id, fullName: visit.staff.fullName } : null,

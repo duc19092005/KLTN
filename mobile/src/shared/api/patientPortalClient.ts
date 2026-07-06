@@ -57,8 +57,6 @@ export type PatientFileDownload = {
 };
 
 export type PatientVisitDetail = PatientVisitSummary & {
-  initialDiagnosis?: string | null;
-  note?: string | null;
   patient: PatientSummary;
   conclusion?: {
     id: string;

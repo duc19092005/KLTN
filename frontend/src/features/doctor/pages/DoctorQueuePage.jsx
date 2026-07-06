@@ -14,7 +14,7 @@ import { useToast } from '../../../providers/ToastProvider';
 
 const STATUS = {
   WAITING: { label: 'Chờ khám', color: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-400' },
-  IN_PROGRESS: { label: 'Đang khám', color: 'bg-cyan-50 text-cyan-700 border-cyan-200', dot: 'bg-cyan-500' },
+  IN_PROGRESS: { label: 'Tạo chỉ định lâm sàng', color: 'bg-cyan-50 text-cyan-700 border-cyan-200', dot: 'bg-cyan-500' },
   WAITING_TEST_RESULT: { label: 'Chờ kết quả cận lâm sàng', color: 'bg-cyan-50 text-cyan-700 border-cyan-200', dot: 'bg-cyan-500' },
   WAITING_CONCLUSION: { label: 'Chờ kết luận', color: 'bg-cyan-50 text-cyan-700 border-cyan-200', dot: 'bg-cyan-500' },
   COMPLETED: { label: 'Hoàn tất', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
@@ -24,7 +24,7 @@ const STATUS = {
 const FILTERS = [
   { id: '', label: 'Tất cả' },
   { id: 'WAITING', label: 'Chờ khám' },
-  { id: 'IN_PROGRESS', label: 'Đang khám' },
+  { id: 'IN_PROGRESS', label: 'Tạo chỉ định lâm sàng' },
   { id: 'WAITING_TEST_RESULT', label: 'Chờ XN/Cận lâm sàng' },
   { id: 'WAITING_CONCLUSION', label: 'Chờ kết luận' },
   { id: 'COMPLETED', label: 'Hoàn tất' },
@@ -34,11 +34,17 @@ const emptyOrder = { targetDepartmentId: '', orderType: '', priority: 'NORMAL', 
 const emptyConclusion = { finalDiagnosis: '', treatmentPlan: '', prescription: '', followUpNote: '', doctorNote: '' };
 
 function getItems(data) { return Array.isArray(data) ? data : data?.items || []; }
-function formatDate(value) { return value ? new Date(value).toLocaleDateString('vi-VN') : 'N/A'; }
+function formatDate(value) { return value ? new Date(value).toLocaleDateString('vi-VN') : 'Chưa cập nhật'; }
 function formatTime(value) { return value ? new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--'; }
 function parseAiResult(value) { try { return JSON.parse(value || '{}'); } catch { return { summary: value }; } }
-function getVisitDepartmentName(visit) { return visit?.department?.name || visit?.department?.departmentCode || 'N/A'; }
-function getVisitStaffName(visit) { return visit?.staff?.fullName || visit?.staff?.user?.username || 'N/A'; }
+function getVisitDepartmentName(visit) { return visit?.department?.name || visit?.department?.departmentCode || 'Chưa có phòng'; }
+function getVisitStaffName(visit) { return visit?.staff?.fullName || visit?.staff?.user?.username || 'Chưa phân công'; }
+function getQueueActionLabel(status) {
+  if (status === 'IN_PROGRESS') return 'Tạo chỉ định lâm sàng';
+  if (status === 'WAITING_TEST_RESULT') return 'Tạo thêm chỉ định lâm sàng';
+  if (status === 'WAITING_CONCLUSION') return 'Xem kết quả & kết luận';
+  return 'Mở hồ sơ';
+}
 
 // Function to print doctor's conclusion with QR code
 function printConclusionWithQR(visit, conclusion, qrData) {
@@ -305,7 +311,7 @@ export default function DoctorQueuePage() {
     setBusy(true);
     try {
       await doctorVisitService.updateStatus(targetVisit.id, 'IN_PROGRESS');
-      toast.success('Đã tiếp nhận bệnh nhân. Hệ thống chuyển sang Bước 1: Chỉ định cận lâm sàng.');
+      toast.success('Đã tiếp nhận bệnh nhân. Hệ thống chuyển sang bước tạo chỉ định lâm sàng.');
       await Promise.all([loadVisits(), loadDecision(targetVisit.id)]);
       setActiveStep(1);
       setShowWorkflowModal(true);
@@ -397,24 +403,12 @@ export default function DoctorQueuePage() {
   return (
     <DashboardLayout user={user} navItems={DOCTOR_NAV_ITEMS} activeItem="queue" onNavigate={(id) => navigateDoctor(navigate, id)} onLogout={logout}>
       <div className="max-w-7xl mx-auto space-y-6 pb-12">
-        {/* Banner tiêu đề */}
-        <section className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-slate-50 to-cyan-50/30 p-6 shadow-sm">
-          <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-cyan-600 bg-cyan-50 px-2.5 py-1 rounded-md">Doctor Workspace</span>
-              <h1 className="mt-2 text-2xl font-black text-slate-900 tracking-tight">Hàng đợi khám & Quản lý điều trị</h1>
-              <p className="mt-1 text-xs text-slate-500">Tiếp nhận, chỉ định, xem kết quả và hoàn tất điều trị.</p>
-            </div>
-            <button onClick={loadVisits} className="self-start md:self-auto h-10 px-4 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-sm flex items-center gap-2 transition-colors">
-              {loading ? <LoadingIndicator size="sm" /> : <span>Làm mới danh sách</span>}
-            </button>
-          </div>
-        </section>
-
-
-
         {/* Danh sách hàng đợi */}
-        <QueueList query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} loading={loading} visits={pagedVisits} activeVisit={activeVisit} setActiveVisit={setActiveVisit} page={page} setPage={setPage} totalPages={totalPages} totalItems={filteredVisits.length} busy={busy} onStart={startVisit} onOpenWorkflow={(visit) => { setActiveVisit(visit); setShowWorkflowModal(true); }} />
+        <QueueList query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} loading={loading} visits={pagedVisits} activeVisit={activeVisit} setActiveVisit={setActiveVisit} page={page} setPage={setPage} totalPages={totalPages} totalItems={filteredVisits.length} busy={busy} onStart={startVisit} onOpenWorkflow={(visit) => {
+          setActiveVisit(visit);
+          setActiveStep(['IN_PROGRESS', 'WAITING_TEST_RESULT'].includes(visit.status) ? 1 : 2);
+          setShowWorkflowModal(true);
+        }} />
 
         {/* Modal Quy trình khám Step-by-Step Chuẩn hóa */}
         {showWorkflowModal && activeVisit && (
@@ -537,26 +531,24 @@ export default function DoctorQueuePage() {
 
 function QueueList({ query, setQuery, filter, setFilter, loading, visits, activeVisit, setActiveVisit, page, setPage, totalPages, totalItems, busy, onStart, onOpenWorkflow }) {
   return (
-    <section className="rounded-2xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
-      <div className="p-6 border-b border-slate-100 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+      <div className="space-y-4 border-b border-slate-100 p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">Danh sách hàng đợi lâm sàng</h2>
-
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-600">Hàng đợi lâm sàng</p>
+            <h2 className="mt-1 text-lg font-black text-slate-950">Danh sách lượt khám</h2>
+            <p className="mt-1 text-xs font-semibold text-slate-500">Lọc nhanh theo trạng thái hoặc thông tin bệnh nhân.</p>
           </div>
-          <div className="px-3 py-1.5 rounded-full bg-cyan-50 border border-cyan-100 text-xs font-bold text-cyan-700 w-fit">
+          <div className="w-fit rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1.5 text-xs font-black text-cyan-700">
             Tổng số: {totalItems} ca bệnh
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3">
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-base"></span>
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nhập tên bệnh nhân, mã BN, CCCD hoặc số điện thoại..." className="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-3 pl-11 pr-4 text-xs font-medium outline-none focus:bg-white focus:border-cyan-500 focus:ring-4 focus:ring-cyan-50/50 transition-colors" />
-          </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin lg:max-w-[620px]">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(280px,1fr)_auto]">
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm tên bệnh nhân, mã BN, CCCD hoặc số điện thoại..." className="min-h-[44px] w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-50" />
+          <div className="flex gap-2 overflow-x-auto pb-1 xl:max-w-[720px]">
             {FILTERS.map((item) => (
-              <button key={item.id || 'ALL'} onClick={() => setFilter(item.id)} className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors whitespace-nowrap ${filter === item.id ? 'bg-cyan-600 text-white border-cyan-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>{item.label}</button>
+              <button type="button" key={item.id || 'ALL'} onClick={() => setFilter(item.id)} className={`whitespace-nowrap rounded-xl border px-3.5 py-2 text-xs font-black transition-colors ${filter === item.id ? 'border-cyan-600 bg-cyan-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>{item.label}</button>
             ))}
           </div>
         </div>
@@ -564,8 +556,8 @@ function QueueList({ query, setQuery, filter, setFilter, loading, visits, active
 
       <div className="overflow-x-auto">
         <table className="ui-table min-w-full text-left">
-          <thead className="bg-slate-50 border-b border-slate-100">
-            <tr className="text-[10px] uppercase tracking-wider text-slate-400 font-black">
+          <thead className="border-b border-slate-100 bg-slate-50">
+            <tr className="text-[11px] font-black uppercase tracking-wider text-slate-500">
               <th className="px-5 py-3">Bệnh nhân</th>
               <th className="px-5 py-3">Mã lượt</th>
               <th className="px-5 py-3">Phòng khám</th>
@@ -587,11 +579,11 @@ function QueueList({ query, setQuery, filter, setFilter, loading, visits, active
         </table>
       </div>
 
-      <div className="flex items-center justify-between border-t border-slate-100 p-4 text-xs bg-white">
-        <span className="font-medium text-slate-500">Trang <strong className="text-slate-800">{page}</strong> / {totalPages}</span>
+      <div className="flex flex-col gap-3 border-t border-slate-100 bg-white p-4 text-xs sm:flex-row sm:items-center sm:justify-between">
+        <span className="font-bold text-slate-500">Trang <strong className="text-slate-800">{page}</strong> / {totalPages}</span>
         <div className="flex gap-2">
-          <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="rounded-lg border border-slate-200 px-3 py-1.5 font-bold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-40 transition-colors"> Trước</button>
-          <button type="button" disabled={page >= totalPages} onClick={() => setPage(page + 1)} className="rounded-lg border border-slate-200 px-3 py-1.5 font-bold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-40 transition-colors">Sau </button>
+          <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="rounded-xl border border-slate-200 bg-white px-4 py-2 font-black text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40">Trước</button>
+          <button type="button" disabled={page >= totalPages} onClick={() => setPage(page + 1)} className="rounded-xl border border-slate-200 bg-white px-4 py-2 font-black text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40">Sau</button>
         </div>
       </div>
     </section>
@@ -604,29 +596,30 @@ function VisitRow({ visit, active, busy, onSelect, onStart, onOpenWorkflow }) {
   const canOpenWorkflow = !['WAITING', 'COMPLETED', 'CANCELLED'].includes(visit.status);
 
   return (
-    <tr onClick={onSelect} className={`cursor-pointer transition-colors ${active ? 'bg-cyan-50/70' : 'bg-white hover:bg-slate-50'}`}>
-      <td className="px-5 py-4 min-w-[260px]">
+    <tr className="bg-white transition-colors hover:bg-slate-50">
+      <td className="min-w-[260px] px-5 py-4">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-cyan-100 to-cyan-100 text-xs font-black text-cyan-700">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-50 text-xs font-black text-cyan-700 ring-1 ring-cyan-100">
             {(visit.patient?.fullName || 'BN').slice(0, 2).toUpperCase()}
           </div>
           <div className="min-w-0">
             <h3 className="truncate text-sm font-black text-slate-900">{visit.patient?.fullName || 'Chưa có tên'}</h3>
-            <p className="mt-0.5 text-[11px] font-semibold text-slate-400">{visit.patient?.patientCode || 'N/A'} - {visit.patient?.phone || 'Không có SĐT'}</p>
+            <p className="mt-0.5 text-[11px] font-semibold text-slate-500">{visit.patient?.patientCode || 'Chưa có mã BN'} · {visit.patient?.phone || 'Không có SĐT'}</p>
           </div>
         </div>
       </td>
-      <td className="px-5 py-4 whitespace-nowrap">
-        <span className="rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-mono font-bold text-slate-600">{visit.visitCode}</span>
+      <td className="whitespace-nowrap px-5 py-4">
+        <span className="rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-mono font-black text-slate-600">{visit.visitCode}</span>
       </td>
-      <td className="px-5 py-4 whitespace-nowrap text-xs font-bold text-slate-700">{getVisitDepartmentName(visit)}</td>
-      <td className="px-5 py-4 whitespace-nowrap text-xs font-semibold text-slate-500">{formatTime(visit.checkInAt)}</td>
-      <td className="px-5 py-4 whitespace-nowrap">
-        <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-black ${st.color}`}>
-          <span className={`mr-1.5 h-1.5 w-1.5 rounded-full ${st.dot}`} /> {st.label}
-        </span>
+      <td className="whitespace-nowrap px-5 py-4 text-xs font-black text-slate-700">{getVisitDepartmentName(visit)}</td>
+      <td className="whitespace-nowrap px-5 py-4 text-xs font-semibold text-slate-500">{formatTime(visit.checkInAt)}</td>
+      <td className="whitespace-nowrap px-5 py-4">
+        <div className="flex items-center gap-2">
+          {active && <span className="h-7 w-1 rounded-full bg-cyan-500" />}
+          <StatusBadge status={st} />
+        </div>
       </td>
-      <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+      <td className="px-5 py-4 text-right">
         <div className="flex justify-end gap-2">
           {canStart && (
             <button type="button" disabled={busy} onClick={onStart} className="rounded-xl bg-cyan-600 px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-cyan-700 disabled:opacity-50">
@@ -634,8 +627,8 @@ function VisitRow({ visit, active, busy, onSelect, onStart, onOpenWorkflow }) {
             </button>
           )}
           {canOpenWorkflow && (
-            <button type="button" disabled={busy} onClick={onOpenWorkflow} className="rounded-xl bg-cyan-600 px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-cyan-700 disabled:opacity-50">
-              Quy trình điều trị
+            <button type="button" disabled={busy} onClick={onOpenWorkflow} className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-100 disabled:opacity-50">
+              {getQueueActionLabel(visit.status)}
             </button>
           )}
           {!canStart && !canOpenWorkflow && (
@@ -646,6 +639,15 @@ function VisitRow({ visit, active, busy, onSelect, onStart, onOpenWorkflow }) {
         </div>
       </td>
     </tr>
+  );
+}
+
+function StatusBadge({ status }) {
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-black ${status.color}`}>
+      <span className={`mr-1.5 h-1.5 w-1.5 rounded-full ${status.dot}`} />
+      {status.label}
+    </span>
   );
 }
 
@@ -1061,7 +1063,7 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
             {aiModels.map((model) => <option key={model.id} value={model.id}>{model.modelName || model.name || 'Mô hình AI'} {model.modelVersion ? `(${model.modelVersion})` : ''} - {model.provider || 'khác'}</option>)}
           </select>
           <button type="button" onClick={onGenerate} disabled={busy || !selectedAiModelId} className="rounded-xl bg-cyan-600 px-5 py-3 text-xs font-black uppercase tracking-wider text-white shadow-sm hover:bg-cyan-700 disabled:opacity-50 disabled:shadow-none whitespace-nowrap transition-colors flex items-center justify-center gap-2">
-            {busy ? (<><LoadingIndicator size="sm" /><span>Đang phân tích...</span></>) : (`Chạy ${selectedModel?.provider || 'AI'}`)}
+            {busy ? (<><LoadingIndicator size="sm" /><span>Đang phân tích...</span></>) : 'Chạy mô hình'}
           </button>
         </div>
       </div>

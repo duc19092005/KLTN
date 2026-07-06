@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import { useAuth } from '../../../providers/AuthProvider';
 import PatientFinder from '../components/PatientFinder';
@@ -10,8 +10,9 @@ import { useToast } from '../../../providers/ToastProvider';
 export default function ReceptionistIntakePage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
-  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [selectedPatient, setSelectedPatient] = useState(() => location.state?.patient || null);
   const handleVisitCreated = (visit) => {
     toast.success(`Đã tạo lượt khám ${visit.visitCode} thành công!`);
     setSelectedPatient(null);
