@@ -16,6 +16,7 @@ export type StaffListFilter = {
   /** When true, only include staff that head a department (StaffProfile.managedDepartment != null). */
   isManager?: boolean;
   search?: string;
+  status?: UserStatus;
   includeDeleted?: boolean;
 };
 

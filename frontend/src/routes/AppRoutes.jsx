@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../providers/AuthProvider';
 import { LoginPage, AuthenticatePage, ChangePasswordPage, ForgotPasswordPage } from '../features/auth';
-import { AdminPage, DepartmentsPage, StaffPage, DoctorsPage, AiModelsPage, AuditLogsPage } from '../features/admin';
+import { AdminPage, DepartmentsPage, StaffPage, DoctorsPage, AiModelsPage, DeletedRecordsPage, AuditLogsPage } from '../features/admin';
 import { ReceptionistDashboard, DoctorDashboard, LabManagerDashboard } from '../features/role-dashboard';
 import ReceptionistIntakePage from '../features/receptionist/pages/ReceptionistIntakePage';
 import ReceptionistQueuePage from '../features/receptionist/pages/ReceptionistQueuePage';
@@ -54,6 +54,7 @@ export default function App() {
         <Route path="/admin/staff" element={<ProtectedRoute requireVerified roles={['ADMIN']}><StaffPage /></ProtectedRoute>} />
         <Route path="/admin/doctors" element={<ProtectedRoute requireVerified roles={['ADMIN']}><DoctorsPage /></ProtectedRoute>} />
         <Route path="/admin/ai-models" element={<ProtectedRoute requireVerified roles={['ADMIN']}><AiModelsPage /></ProtectedRoute>} />
+        <Route path="/admin/deleted-records" element={<ProtectedRoute requireVerified roles={['ADMIN']}><DeletedRecordsPage /></ProtectedRoute>} />
         <Route path="/admin/audit" element={<ProtectedRoute requireVerified roles={['ADMIN']}><AuditLogsPage /></ProtectedRoute>} />
         <Route path="/receptionist" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST']}><Navigate to="/receptionist/intake" replace /></ProtectedRoute>} />
         <Route path="/receptionist/intake" element={<ProtectedRoute requireVerified roles={['RECEPTIONIST']}><ReceptionistIntakePage /></ProtectedRoute>} />

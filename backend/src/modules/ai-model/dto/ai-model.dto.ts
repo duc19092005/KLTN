@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, IsUrl, Matches, MaxLength } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 import { PaginationQueryDto } from '../../shared/pagination.dto';
 
@@ -123,6 +124,11 @@ export class AiModelQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   provider?: string;
+
+  @ApiPropertyOptional({ example: true, description: 'Include soft-deleted AI models' })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  includeDeleted?: boolean;
 }
 
 export class TestAiModelApiDto {

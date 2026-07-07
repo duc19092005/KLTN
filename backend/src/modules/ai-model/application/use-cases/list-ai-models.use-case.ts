@@ -15,7 +15,7 @@ export class ListAiModelsUseCase {
   async execute(query: AiModelQueryDto) {
     const { page, limit, skip } = getPagination(query);
     const { items, total } = await this.repo.findManyPaginated(
-      { type: query.type, search: query.search, provider: query.provider },
+      { type: query.type, search: query.search, provider: query.provider, includeDeleted: query.includeDeleted },
       skip,
       limit,
     );
@@ -25,7 +25,7 @@ export class ListAiModelsUseCase {
         const totalRatings = model.aiQualities?.length || 0;
         const positiveRatings = model.aiQualities?.filter((q: any) => q.trustablePercent === 100).length || 0;
         const averageAccuracy = totalRatings > 0 ? Math.round((positiveRatings / totalRatings) * 100) : null;
-        
+
         let integrityEval;
         try {
           integrityEval = await this.integrity.evaluate(model, true);

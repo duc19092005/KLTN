@@ -41,14 +41,14 @@ export class DoctorController {
 
   @Post()
   @ApiOperation({ summary: 'Create a doctor profile for a staff profile with DOCTOR role' })
-  create(@Body() dto: CreateDoctorDto) {
-    return this.service.create(dto);
+  create(@Body() dto: CreateDoctorDto, @CurrentUser() user: AuthUser) {
+    return this.service.create(dto, user?.sub);
   }
 
   @Post('full')
   @ApiOperation({ summary: 'Create doctor user, staff profile, and doctor profile in one transaction' })
-  createFull(@Body() dto: CreateDoctorWithStaffDto) {
-    return this.service.createWithStaff(dto);
+  createFull(@Body() dto: CreateDoctorWithStaffDto, @CurrentUser() user: AuthUser) {
+    return this.service.createWithStaff(dto, user?.sub);
   }
 
   @Get()

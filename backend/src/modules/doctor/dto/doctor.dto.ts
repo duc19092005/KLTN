@@ -220,4 +220,7 @@ export class UpdateDoctorDto {
 export class DoctorQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ enum: MedicalSpecialty, example: MedicalSpecialty.CARDIOLOGY })
   @IsOptional() @IsEnum(MedicalSpecialty) specialty?: MedicalSpecialty;
+
+  @ApiPropertyOptional({ example: true, description: 'Include soft-deleted doctors' })
+  @IsOptional() @Transform(({ value }) => value === true || value === 'true') includeDeleted?: boolean;
 }

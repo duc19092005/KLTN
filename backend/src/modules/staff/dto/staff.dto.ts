@@ -158,4 +158,10 @@ export class StaffQueryDto extends PaginationQueryDto {
 
   @ApiPropertyOptional({ example: true, description: 'When true, only staff heading a department' })
   @IsOptional() @Transform(({ value }) => value === true || value === 'true') @IsBoolean() isManager?: boolean;
+
+  @ApiPropertyOptional({ enum: UserStatus })
+  @IsOptional() @IsEnum(UserStatus) status?: UserStatus;
+
+  @ApiPropertyOptional({ example: true, description: 'Include soft-deleted staff records' })
+  @IsOptional() @Transform(({ value }) => value === true || value === 'true') @IsBoolean() includeDeleted?: boolean;
 }

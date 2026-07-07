@@ -25,12 +25,12 @@ export class DoctorService {
     private readonly reanchorUseCase: ReanchorDoctorForStaffUpdateUseCase,
   ) {}
 
-  create(dto: CreateDoctorDto) {
-    return this.createDoctorUseCase.execute(dto);
+  create(dto: CreateDoctorDto, actorId?: string) {
+    return this.createDoctorUseCase.execute(dto, actorId);
   }
 
-  createWithStaff(dto: CreateDoctorWithStaffDto) {
-    return this.createDoctorWithStaffUseCase.execute(dto);
+  createWithStaff(dto: CreateDoctorWithStaffDto, actorId?: string) {
+    return this.createDoctorWithStaffUseCase.execute(dto, actorId);
   }
 
   findAll(query: DoctorQueryDto) {

@@ -15,7 +15,7 @@ export class CreateDoctorUseCase {
     @Inject(DOCTOR_INTEGRITY_ANCHOR) private readonly integrity: DoctorIntegrityAnchorPort,
   ) {}
 
-  async execute(dto: CreateDoctorDto) {
+  async execute(dto: CreateDoctorDto, actorId?: string) {
     const staff = await this.repo.findStaffForDoctorCreate(dto.staffProfileId);
     if (!staff) throw new NotFoundException('Không tìm thấy hồ sơ nhân sự.');
     if (staff.userRole !== UserRole.DOCTOR) throw new BadRequestException('Nhân sự phải có vai trò bác sĩ.');
@@ -34,7 +34,7 @@ export class CreateDoctorUseCase {
     if (license) throw new ConflictException('Số Giấy phép / Chứng chỉ hành nghề này đã được đăng ký trên hệ thống.');
 
     const doctor = await this.repo.createForExistingStaff(dto);
-    await this.integrity.anchorChange(doctor, 'CREATE', undefined, null);
+    await this.integrity.anchorChange(doctor, 'CREATE', actorId, null);
     return doctor;
   }
 }

@@ -117,7 +117,8 @@ export class PrismaStaffRepository implements StaffRepositoryPort {
           ],
         }
         : {}),
-      ...(filter.includeDeleted ? {} : { AND: [{ user: { status: { not: UserStatus.DELETE } } }] }),
+      ...(filter.status ? { user: { status: filter.status } } : {}),
+      ...(filter.includeDeleted || filter.status ? {} : { AND: [{ user: { status: { not: UserStatus.DELETE } } }] }),
     };
     const [items, total] = await this.prisma.$transaction([
       this.prisma.staffProfile.findMany({ where, include: this.includeStaff(), orderBy: { createdAt: 'desc' }, skip, take }),

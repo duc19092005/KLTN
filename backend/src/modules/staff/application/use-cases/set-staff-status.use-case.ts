@@ -10,8 +10,8 @@ import { buildUnifiedDoctorSnapshot } from '../../../doctor/domain/doctor-snapsh
 /**
  * Sets a staff account status (lock/unlock) and re-anchors. Behavior copied
  * verbatim from the former StaffService.setStatus(): bump tokenVersion on the
- * user, then re-anchor (doctor) or anchor UPDATE/DELETE (regular staff,
- * DELETE when going INACTIVE). remove() is setStatus(INACTIVE).
+ * user, then re-anchor (doctor) or anchor UPDATE/DELETE (regular staff).
+ * remove() uses DELETE; lock/hide uses INACTIVE.
  */
 @Injectable()
 export class SetStaffStatusUseCase {

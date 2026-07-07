@@ -14,7 +14,7 @@ export class ListDoctorsUseCase {
 
   async execute(query: DoctorQueryDto) {
     const { page, limit, skip } = getPagination(query);
-    const { items, total } = await this.repo.findManyPaginated({ specialty: query.specialty, search: query.search }, skip, limit);
+    const { items, total } = await this.repo.findManyPaginated({ specialty: query.specialty, search: query.search, includeDeleted: query.includeDeleted }, skip, limit);
 
     const validatedItems = await Promise.all(
       items.map(async (doctor: any) => {

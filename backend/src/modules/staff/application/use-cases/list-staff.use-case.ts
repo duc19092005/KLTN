@@ -25,6 +25,8 @@ export class ListStaffUseCase {
         excludeRole: query.excludeRole,
         isManager: query.isManager,
         search: query.search,
+        status: query.status,
+        includeDeleted: query.includeDeleted,
       },
       skip,
       limit,

@@ -18,7 +18,7 @@ export class CreateDoctorWithStaffUseCase {
     @Inject(DOCTOR_INTEGRITY_ANCHOR) private readonly integrity: DoctorIntegrityAnchorPort,
   ) {}
 
-  async execute(dto: CreateDoctorWithStaffDto) {
+  async execute(dto: CreateDoctorWithStaffDto, actorId?: string) {
     if (!dto.departmentId) {
       throw new BadRequestException('Vui lòng chọn phòng ban khám cho bác sĩ.');
     }
@@ -47,7 +47,7 @@ export class CreateDoctorWithStaffUseCase {
 
     try {
       const doctor = await this.repo.createWithStaff(dto, employeeCode, passwordHash);
-      await this.integrity.anchorChange(doctor, 'CREATE', undefined, null);
+      await this.integrity.anchorChange(doctor, 'CREATE', actorId, null);
       return doctor;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {

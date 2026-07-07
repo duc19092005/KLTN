@@ -19,6 +19,7 @@ import {
   Menu,
   Search,
   LogOut,
+  Trash2,
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import LiveClock from './LiveClock';
@@ -54,6 +55,7 @@ const ICON_COMPONENTS = {
   database: Database,
   stethoscope: Stethoscope,
   building: Building2,
+  trash: Trash2,
 };
 
 function SidebarIcon({ name, isActive, compact = false }) {
@@ -120,7 +122,7 @@ export default function DashboardLayout({
 
       {/* SIDEBAR */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 
+        fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0
         transition-colors duration-300 ease-in-out lg:static lg:translate-x-0
         ${isSidebarCollapsed ? 'lg:w-[92px]' : 'lg:w-[260px]'} w-[260px]
         ${isSidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full'}

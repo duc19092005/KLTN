@@ -14,12 +14,15 @@ export class SetAiModelStatusUseCase {
 
   async execute(id: string, status: 'ACTIVE' | 'INACTIVE', actorId?: string) {
     const existing = await this.repo.findById(id);
-    if (!existing || existing.isDeleted || existing.status === OperationalStatus.DELETE) {
+    if (!existing) {
+      throw new NotFoundException('Không tìm thấy mô hình AI.');
+    }
+    if (status === 'INACTIVE' && (existing.isDeleted || existing.status === OperationalStatus.DELETE)) {
       throw new NotFoundException('Không tìm thấy mô hình AI.');
     }
 
     const before = buildAiModelSnapshot(existing);
-    const updated = await this.repo.update(id, { status, isDeleted: false });
+    const updated = await this.repo.update(id, { status, isDeleted: status === 'ACTIVE' ? false : existing.isDeleted });
     await this.integrity.anchorChange(updated, 'UPDATE', actorId, before);
     return updated;
   }
