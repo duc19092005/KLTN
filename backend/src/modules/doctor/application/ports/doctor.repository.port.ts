@@ -7,6 +7,7 @@ export const DOCTOR_REPOSITORY = Symbol('DOCTOR_REPOSITORY');
 export type DoctorListFilter = {
   specialty?: MedicalSpecialty;
   search?: string;
+  includeDeleted?: boolean;
 };
 
 export type StaffForDoctorCreate = {

@@ -31,10 +31,8 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
     const snapshot = buildStaffSnapshot(staff);
 
     try {
-      if (action !== 'DELETE') {
-        const { salt, hash } = this.audit.hashSnapshot(snapshot);
-        await this.prisma.staffProfile.update({ where: { id: staff.id }, data: { hash256: hash, dataSalt: salt } });
-      }
+      const { salt, hash } = this.audit.hashSnapshot(snapshot);
+      await this.prisma.staffProfile.update({ where: { id: staff.id }, data: { hash256: hash, dataSalt: salt } });
     } catch {
       // Hash computation failed; log entry will still be created below with null hashes.
     }
@@ -45,7 +43,7 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
       action,
       actorId,
       before: this.toAuditSnapshot(before),
-      after: action === 'DELETE' ? null : snapshot,
+      after: snapshot,
       onChainStatus: 'PENDING',
     });
   }

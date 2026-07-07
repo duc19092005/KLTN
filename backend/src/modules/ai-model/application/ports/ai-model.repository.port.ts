@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { OperationalStatus, Prisma } from '@prisma/client';
 
 /** DI token for the AI model repository port. */
 export const AI_MODEL_REPOSITORY = Symbol('AI_MODEL_REPOSITORY');
@@ -26,6 +26,7 @@ export type UpdateAiModelData = {
   ipHashEncrypted?: string;
   ipHashPlain?: string;
   description?: string | null;
+  status?: OperationalStatus;
 };
 
 export type AiModelListFilter = {
@@ -53,7 +54,7 @@ export interface AiModelRepositoryPort {
 /** Builds the where clause for AI model listing, shared by repo internals. */
 export function buildAiModelWhere(filter: AiModelListFilter): Prisma.AiModelRegistryWhereInput {
   return {
-    ...(filter.includeDeleted ? {} : { isDeleted: false }),
+    ...(filter.includeDeleted ? {} : { status: { not: OperationalStatus.DELETE }, isDeleted: false }),
     ...(filter.type ? { type: filter.type } : {}),
     ...(filter.provider
       ? filter.provider === 'cloud'

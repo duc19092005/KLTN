@@ -15,7 +15,7 @@ export class FindAiModelUseCase {
 
   async execute(id: string) {
     const model = await this.repo.findByIdOrThrow(id);
-    if (model.isDeleted) throw new NotFoundException('Không tìm thấy mô hình AI.');
+    if (model.isDeleted || model.status === 'DELETE') throw new NotFoundException('Không tìm thấy mô hình AI.');
     const integrity = await this.integrity.evaluate(model);
     
     const totalRatings = model.aiQualities?.length || 0;

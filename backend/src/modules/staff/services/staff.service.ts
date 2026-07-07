@@ -42,7 +42,7 @@ export class StaffService {
   }
 
   remove(id: string, actorId?: string) {
-    return this.setStaffStatusUseCase.execute(id, UserStatus.INACTIVE, actorId);
+    return this.setStaffStatusUseCase.execute(id, UserStatus.DELETE, actorId);
   }
 
   getHistory(id?: string) {

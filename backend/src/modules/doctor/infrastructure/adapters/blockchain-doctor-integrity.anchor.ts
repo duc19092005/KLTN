@@ -28,10 +28,8 @@ export class BlockchainDoctorIntegrityAnchor implements DoctorIntegrityAnchorPor
     const snapshot = buildUnifiedDoctorSnapshot(doctor);
 
     try {
-      if (action !== 'DELETE') {
-        const { salt, hash } = this.audit.hashSnapshot(snapshot);
-        await this.prisma.doctorProfile.update({ where: { id: doctor.id }, data: { hash256: hash, dataSalt: salt } });
-      }
+      const { salt, hash } = this.audit.hashSnapshot(snapshot);
+      await this.prisma.doctorProfile.update({ where: { id: doctor.id }, data: { hash256: hash, dataSalt: salt } });
     } catch (err) {
       console.error('Error computing doctor hash:', err);
     }
@@ -42,7 +40,7 @@ export class BlockchainDoctorIntegrityAnchor implements DoctorIntegrityAnchorPor
       action,
       actorId,
       before: this.toAuditSnapshot(before),
-      after: action === 'DELETE' ? null : snapshot,
+      after: snapshot,
       onChainStatus: 'PENDING',
     });
   }

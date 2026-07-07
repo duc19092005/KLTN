@@ -1,6 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { UserStatus } from '@prisma/client';
-import { AuditAction } from '../../../../infrastructure/audit/audit-logger.service';
 import { STAFF_REPOSITORY, StaffRepositoryPort } from '../ports/staff.repository.port';
 import { STAFF_INTEGRITY_ANCHOR, StaffIntegrityAnchorPort } from '../ports/staff-integrity-anchor.port';
 import { StaffValidator } from '../services/staff.validator';
@@ -32,11 +31,13 @@ export class SetStaffStatusUseCase {
 
     if (isDoctor) {
       // Staff is a doctor → re-anchor the unified doctor hash
-      await this.doctorReanchor.reanchorForStaffUpdate(id, actorId, doctorBefore);
+      const action = status === UserStatus.DELETE ? 'DELETE' : 'UPDATE';
+      await this.doctorReanchor.reanchorForStaffUpdate(id, actorId, doctorBefore, action);
     } else if (updated.staffProfile) {
       // Ẩn/hiện tài khoản là thay đổi trạng thái mềm, không phải xóa hồ sơ.
       // Truyền kèm user mới để snapshot after có `status` thay vì null.
-      await this.integrity.anchorChange({ ...updated.staffProfile, user: updated }, 'UPDATE', actorId, before);
+      const action = status === UserStatus.DELETE ? 'DELETE' : 'UPDATE';
+      await this.integrity.anchorChange({ ...updated.staffProfile, user: updated }, action, actorId, before);
     }
 
     return updated;

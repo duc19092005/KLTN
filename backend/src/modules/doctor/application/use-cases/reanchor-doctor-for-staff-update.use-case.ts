@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DoctorReanchorPort } from '../ports/doctor-reanchor.port';
 import { DOCTOR_REPOSITORY, DoctorRepositoryPort } from '../ports/doctor.repository.port';
-import { DOCTOR_INTEGRITY_ANCHOR, DoctorIntegrityAnchorPort } from '../ports/doctor-integrity-anchor.port';
+import { DOCTOR_INTEGRITY_ANCHOR, DoctorAnchorAction, DoctorIntegrityAnchorPort } from '../ports/doctor-integrity-anchor.port';
 import { buildUnifiedDoctorSnapshot } from '../../domain/doctor-snapshot';
 
 /**
@@ -18,7 +18,12 @@ export class ReanchorDoctorForStaffUpdateUseCase implements DoctorReanchorPort {
     @Inject(DOCTOR_INTEGRITY_ANCHOR) private readonly integrity: DoctorIntegrityAnchorPort,
   ) {}
 
-  async reanchorForStaffUpdate(staffProfileId: string, actorId?: string, beforeSnapshot?: Record<string, unknown> | null): Promise<void> {
+  async reanchorForStaffUpdate(
+    staffProfileId: string,
+    actorId?: string,
+    beforeSnapshot?: Record<string, unknown> | null,
+    action: DoctorAnchorAction = 'UPDATE',
+  ): Promise<void> {
     const doctor = await this.repo.findByStaffProfileId(staffProfileId);
     if (!doctor) return; // Not a doctor, nothing to re-anchor
 
@@ -26,6 +31,6 @@ export class ReanchorDoctorForStaffUpdateUseCase implements DoctorReanchorPort {
     // Re-fetch after staff update to get latest staff data
     const refreshed = await this.repo.findByIdWithRelations(doctor.id);
     if (!refreshed) return;
-    await this.integrity.anchorChange(refreshed, 'UPDATE', actorId, before);
+    await this.integrity.anchorChange(refreshed, action, actorId, before);
   }
 }

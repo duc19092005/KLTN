@@ -112,6 +112,7 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
     const where: Prisma.DoctorProfileWhereInput = {
       ...(filter.specialty ? { specialty: filter.specialty } : {}),
       ...(filter.search ? { OR: [{ licenseNumber: { contains: filter.search, mode: 'insensitive' } }, { staffProfile: { fullName: { contains: filter.search, mode: 'insensitive' } } }] } : {}),
+      ...(filter.includeDeleted ? {} : { staffProfile: { user: { status: { not: UserStatus.DELETE } } } }),
     };
     const [items, total] = await this.prisma.$transaction([
       this.prisma.doctorProfile.findMany({ where, include: this.includeRelations(), orderBy: { createdAt: 'desc' }, skip, take }),

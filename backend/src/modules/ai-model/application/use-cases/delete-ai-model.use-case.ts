@@ -13,7 +13,7 @@ export class DeleteAiModelUseCase {
 
   async execute(id: string, actorId?: string) {
     const existing = await this.repo.findById(id);
-    if (!existing || existing.isDeleted) throw new NotFoundException('Không tìm thấy mô hình AI.');
+    if (!existing || existing.isDeleted || existing.status === 'DELETE') throw new NotFoundException('Không tìm thấy mô hình AI.');
 
     const before = buildAiModelSnapshot(existing);
     const deleted = await this.repo.softDelete(id);

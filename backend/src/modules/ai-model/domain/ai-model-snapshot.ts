@@ -13,6 +13,7 @@ export function buildAiModelSnapshot(m: any) {
     apiEndpoint: m.apiEndpoint ?? null,
     ipHashPlain: m.ipHashPlain ?? null,
     description: m.description ?? null,
+    status: m.status ?? (m.isDeleted === true ? 'DELETE' : 'ACTIVE'),
     createdBy: m.createdBy,
   };
   if (m.isDeleted === true) snapshot.isDeleted = true;

@@ -21,7 +21,7 @@ export class UpdateAiModelUseCase {
 
   async execute(id: string, dto: UpdateAiModelDto, actorId?: string) {
     const existing = await this.repo.findById(id);
-    if (!existing || existing.isDeleted) throw new NotFoundException('Không tìm thấy mô hình AI.');
+    if (!existing || existing.isDeleted || existing.status === 'DELETE') throw new NotFoundException('Không tìm thấy mô hình AI.');
 
     const type = dto.type ?? existing.type ?? 'API';
     if (type === 'API' && !(dto.provider ?? existing.provider)) {

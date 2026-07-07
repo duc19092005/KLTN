@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { OperationalStatus } from '@prisma/client';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import {
   AiModelListFilter,
@@ -55,7 +56,7 @@ export class PrismaAiModelRepository implements AiModelRepositoryPort {
   async softDelete(id: string): Promise<any> {
     return this.prisma.aiModelRegistry.update({
       where: { id },
-      data: { isDeleted: true },
+      data: { status: OperationalStatus.DELETE, isDeleted: true },
       include: this.includeRelations(),
     });
   }

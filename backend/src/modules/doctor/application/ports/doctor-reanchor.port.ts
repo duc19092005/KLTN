@@ -1,3 +1,5 @@
+import { DoctorAnchorAction } from './doctor-integrity-anchor.port';
+
 /** DI token for the doctor re-anchor port (used by StaffModule to avoid forwardRef). */
 export const DOCTOR_REANCHOR = Symbol('DOCTOR_REANCHOR');
 
@@ -8,5 +10,10 @@ export const DOCTOR_REANCHOR = Symbol('DOCTOR_REANCHOR');
  * DoctorService.reanchorForStaffUpdate().
  */
 export interface DoctorReanchorPort {
-  reanchorForStaffUpdate(staffProfileId: string, actorId?: string, beforeSnapshot?: Record<string, unknown> | null): Promise<void>;
+  reanchorForStaffUpdate(
+    staffProfileId: string,
+    actorId?: string,
+    beforeSnapshot?: Record<string, unknown> | null,
+    action?: DoctorAnchorAction,
+  ): Promise<void>;
 }

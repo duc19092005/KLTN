@@ -19,6 +19,7 @@ enum UserStatus {
   ACTIVE
   INACTIVE
   PENDING
+  DELETE
 }
 
 enum OtpPurpose {
@@ -513,6 +514,7 @@ model AiModelRegistry {
   description          String?
   createdBy            String
   type                 String?
+  status               OperationalStatus @default(ACTIVE)
   isDeleted            Boolean  @default(false)
 
   createdAt            DateTime @default(now())
@@ -528,6 +530,7 @@ model AiModelRegistry {
 
   @@index([modelId])
   @@index([isActiveOnChain])
+  @@index([status])
   @@index([isDeleted])
   @@index([type])
   @@index([provider])
