@@ -12,7 +12,7 @@ export class SetAiModelStatusUseCase {
     @Inject(AI_MODEL_INTEGRITY_ANCHOR) private readonly integrity: AiModelIntegrityAnchorPort,
   ) {}
 
-  async execute(id: string, status: OperationalStatus.ACTIVE | OperationalStatus.INACTIVE, actorId?: string) {
+  async execute(id: string, status: 'ACTIVE' | 'INACTIVE', actorId?: string) {
     const existing = await this.repo.findById(id);
     if (!existing || existing.isDeleted || existing.status === OperationalStatus.DELETE) {
       throw new NotFoundException('Không tìm thấy mô hình AI.');
