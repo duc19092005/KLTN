@@ -34,6 +34,18 @@ export class AiModelController {
   }
 
   @Roles('ADMIN')
+  @Patch(':id/hide')
+  hide(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.service.hide(id, user.sub);
+  }
+
+  @Roles('ADMIN')
+  @Patch(':id/restore')
+  restore(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.service.restore(id, user.sub);
+  }
+
+  @Roles('ADMIN')
   @Delete(':id')
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.service.remove(id, user.sub);

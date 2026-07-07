@@ -48,6 +48,8 @@ export class PrismaAiModelRepository implements AiModelRepositoryPort {
         ...(data.ipHashEncrypted !== undefined ? { ipHashEncrypted: data.ipHashEncrypted } : {}),
         ...(data.ipHashPlain !== undefined ? { ipHashPlain: data.ipHashPlain } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
+        ...(data.status !== undefined ? { status: data.status } : {}),
+        ...(data.isDeleted !== undefined ? { isDeleted: data.isDeleted } : {}),
       },
       include: this.includeRelations(),
     });

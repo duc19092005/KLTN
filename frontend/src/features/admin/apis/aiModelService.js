@@ -4,6 +4,8 @@ export const aiModelService = {
   list: (params = {}) => api.get('/ai-models', { params }),
   create: (payload) => api.post('/ai-models', payload),
   update: (id, payload) => api.patch(`/ai-models/${id}`, payload),
+  hide: (id) => api.patch(`/ai-models/${id}/hide`),
+  restore: (id) => api.patch(`/ai-models/${id}/restore`),
   remove: (id) => api.delete(`/ai-models/${id}`),
   testApi: (payload) => api.post('/ai-models/test-api', payload),
   get: (id) => api.get(`/ai-models/${id}`),

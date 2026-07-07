@@ -187,10 +187,10 @@ export default function AiModelsPage() {
         });
       }
       setStatsData(statsRes.data);
-    } catch (err) { 
-      toast.error(err.response?.data?.message || 'Không tải được danh mục mô hình AI'); 
-    } finally { 
-      setLoading(false); 
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Không tải được danh mục mô hình AI');
+    } finally {
+      setLoading(false);
       setStatsLoading(false);
     }
   };
@@ -319,6 +319,25 @@ export default function AiModelsPage() {
     }
   };
 
+  const toggleModelStatus = async (model) => {
+    if (!model?.id) return;
+    setSaving(true);
+    try {
+      if (model.status === 'INACTIVE') {
+        await aiModelService.restore(model.id);
+        toast.success(`Đã hiện mô hình ${model.modelName}.`);
+      } else {
+        await aiModelService.hide(model.id);
+        toast.success(`Đã ẩn mô hình ${model.modelName}.`);
+      }
+      await load(pagination.page);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Không đổi được trạng thái mô hình AI');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="aiModels" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
       <div className="mx-auto max-w-7xl space-y-5">
@@ -349,7 +368,7 @@ export default function AiModelsPage() {
           </div>
           <div className="p-5 space-y-3 max-h-[760px] overflow-y-auto">
             {loading && <LoadingIndicator size="lg" label="Đang tải mô hình AI..." />}
-            {!loading && visibleModels.map((model) => <ModelCard key={model.id} model={model} onViewDetails={setDetailModelId} onEdit={openEditModal} onDelete={requestDelete} busy={saving} />)}
+            {!loading && visibleModels.map((model) => <ModelCard key={model.id} model={model} onViewDetails={setDetailModelId} onEdit={openEditModal} onToggleStatus={toggleModelStatus} onDelete={requestDelete} busy={saving} />)}
             {!loading && !visibleModels.length && <Empty title="Chưa có mô hình AI" desc="Bấm + Thêm mô hình AI để mở cửa sổ đăng ký mô hình." />}
           </div>
           <Pagination pagination={pagination} onPageChange={load} />
@@ -568,11 +587,14 @@ function TextAreaField({ label, value, onChange, onBlur, error, required = false
   return <label className={`block space-y-1.5 ${className}`}><span className="text-[13px] font-bold text-slate-700">{label}{required && <span className="text-rose-500"> *</span>}{optional && <span className="font-semibold text-slate-400"> (tùy chọn)</span>}</span><textarea required={required} value={value || ''} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} rows={rows} maxLength={maxLength} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} /><FieldError message={error} /></label>;
 }
 function FieldError({ message }) { return <p className={`min-h-[1rem] text-xs font-bold leading-4 transition-colors ${message ? 'text-rose-600' : 'text-transparent'}`}>{message || 'Không có lỗi'}</p>; }
-function ModelCard({ model, onViewDetails, onEdit, onDelete, busy }) {
+function ModelCard({ model, onViewDetails, onEdit, onToggleStatus, onDelete, busy }) {
   const isLocal = model.provider === 'local';
   const badgeCls = isLocal ? 'bg-cyan-50 text-cyan-700 border-cyan-100' : 'bg-cyan-50 text-cyan-700 border-cyan-100';
   const badge = isLocal ? 'TỰ LƯU TRỮ' : (providerLabel(model.provider) || model.provider || 'API').toUpperCase();
   const hasAccuracy = model.averageAccuracy !== null && model.averageAccuracy !== undefined;
+  const isInactive = model.status === 'INACTIVE';
+  const statusClass = isInactive ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100';
+  const statusLabel = isInactive ? 'Đang ẩn' : 'Đang hoạt động';
 
   return (
     <article className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
@@ -586,6 +608,7 @@ function ModelCard({ model, onViewDetails, onEdit, onDelete, busy }) {
                 Độ tin cậy: {model.averageAccuracy}% ({model.totalRatings} đánh giá)
               </span>
             )}
+            <span className={`rounded-full border px-2 py-1 text-[10px] font-black ${statusClass}`}>{statusLabel}</span>
           </div>
           <p className="mt-1 text-xs font-semibold text-slate-500">Phiên bản {model.modelVersion} · {model.recommendedSpecialty || 'Chưa gán chuyên khoa'}</p>
         </div>
@@ -608,6 +631,7 @@ function ModelCard({ model, onViewDetails, onEdit, onDelete, busy }) {
       <div className="mt-3 flex flex-wrap justify-end gap-2">
         <button type="button" onClick={() => onViewDetails(model.id)} className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-100">Chi tiết</button>
         <button type="button" disabled={busy} onClick={() => onEdit(model)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-700 disabled:opacity-50">Sửa</button>
+        <button type="button" disabled={busy} onClick={() => onToggleStatus(model)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50">{isInactive ? 'Hiện' : 'Ẩn'}</button>
         <button type="button" disabled={busy} onClick={() => onDelete(model)} className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-100 disabled:opacity-50">Xóa</button>
       </div>
     </article>

@@ -9,6 +9,7 @@ import { ListAiModelsUseCase } from './application/use-cases/list-ai-models.use-
 import { FindAiModelUseCase } from './application/use-cases/find-ai-model.use-case';
 import { TestAiModelApiUseCase } from './application/use-cases/test-ai-model-api.use-case';
 import { VerifyAiModelUseCase } from './application/use-cases/verify-ai-model.use-case';
+import { SetAiModelStatusUseCase } from './application/use-cases/set-ai-model-status.use-case';
 import { AI_MODEL_REPOSITORY } from './application/ports/ai-model.repository.port';
 import { AI_MODEL_CRYPTO } from './application/ports/ai-model-crypto.port';
 import { AI_MODEL_CONNECTIVITY } from './application/ports/ai-model-connectivity.port';
@@ -33,6 +34,7 @@ import { GetAiModelStatsUseCase } from './application/use-cases/get-ai-model-sta
     FindAiModelUseCase,
     TestAiModelApiUseCase,
     VerifyAiModelUseCase,
+    SetAiModelStatusUseCase,
     RateAiModelUseCase,
     GetAiModelStatsUseCase,
     { provide: AI_MODEL_REPOSITORY, useClass: PrismaAiModelRepository },

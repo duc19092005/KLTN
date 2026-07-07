@@ -27,6 +27,7 @@ export type UpdateAiModelData = {
   ipHashPlain?: string;
   description?: string | null;
   status?: OperationalStatus;
+  isDeleted?: boolean;
 };
 
 export type AiModelListFilter = {
