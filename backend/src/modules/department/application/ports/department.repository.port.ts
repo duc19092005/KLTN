@@ -8,6 +8,7 @@ export type DepartmentListFilter = {
   departmentCode?: string;
   name?: string;
   status?: OperationalStatus;
+  excludeStatuses?: OperationalStatus[];
   type?: DepartmentType;
   canReceiveOrders?: boolean;
 };

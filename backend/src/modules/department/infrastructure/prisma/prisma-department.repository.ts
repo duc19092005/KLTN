@@ -88,6 +88,7 @@ export class PrismaDepartmentRepository implements DepartmentRepositoryPort {
       ...(filter.departmentCode ? { departmentCode: { contains: filter.departmentCode, mode: 'insensitive' } } : {}),
       ...(filter.name ? { name: { contains: filter.name, mode: 'insensitive' } } : {}),
       ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.excludeStatuses?.length ? { status: { notIn: filter.excludeStatuses } } : {}),
       ...(filter.type ? { type: filter.type } : {}),
       ...(filter.canReceiveOrders !== undefined ? { canReceiveOrders: filter.canReceiveOrders } : {}),
     };

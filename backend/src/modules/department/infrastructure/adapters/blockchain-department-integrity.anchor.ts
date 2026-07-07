@@ -29,12 +29,10 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
     let dataSalt: string | null = null;
 
     try {
-      if (action !== 'DELETE') {
-        const { salt, hash } = this.audit.hashSnapshot(snapshot);
-        dataHash = hash;
-        dataSalt = salt;
-        await this.prisma.department.update({ where: { id: department.id }, data: { hash256: hash, dataSalt: salt } });
-      }
+      const { salt, hash } = this.audit.hashSnapshot(snapshot);
+      dataHash = hash;
+      dataSalt = salt;
+      await this.prisma.department.update({ where: { id: department.id }, data: { hash256: hash, dataSalt: salt } });
     } catch {
       // Hash computation failed; log entry will still be created below with null hashes.
     }
@@ -47,7 +45,7 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
       dataHash,
       dataSalt,
       before: before ?? null,
-      after: action === 'DELETE' ? null : snapshot,
+      after: snapshot,
       onChainStatus: 'PENDING',
     });
   }

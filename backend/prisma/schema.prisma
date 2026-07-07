@@ -53,6 +53,7 @@ enum DepartmentType {
 enum OperationalStatus {
   ACTIVE
   INACTIVE
+  DELETE
 }
 
 

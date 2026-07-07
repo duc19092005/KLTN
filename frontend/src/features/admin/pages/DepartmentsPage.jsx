@@ -22,8 +22,9 @@ const emptyForm = { departmentCode: '', name: '', floor: '', status: 'ACTIVE', t
 const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100', INACTIVE: 'bg-rose-50 text-rose-700 border-rose-100' };
 const orderTone = { true: 'bg-cyan-50 text-cyan-700 border-cyan-100', false: 'bg-slate-50 text-slate-600 border-slate-100' };
 const STATUS_LABELS = { ACTIVE: 'Đang hoạt động', INACTIVE: 'Ngưng hoạt động', PENDING: 'Chờ kích hoạt' };
-const MAX_DEPARTMENT_CODE_LENGTH = 20;
-const MAX_DEPARTMENT_NAME_LENGTH = 100;
+const MAX_DEPARTMENT_CODE_LENGTH = 10;
+const MAX_DEPARTMENT_NAME_LENGTH = 50;
+const MAX_DEPARTMENT_FLOOR_LENGTH = 3;
 const MAX_DEPARTMENT_DESCRIPTION_LENGTH = 500;
 function getTypeLabel(type) { return DEPARTMENT_TYPES.find((item) => item.value === type)?.label || type || 'Chưa phân loại'; }
 function getStatusLabel(status) { return STATUS_LABELS[status] || status || 'Không rõ'; }
@@ -64,6 +65,7 @@ export default function DepartmentsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [pendingDeleteDepartment, setPendingDeleteDepartment] = useState(null);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
 
   const load = async (page = pagination.page) => {
@@ -110,7 +112,7 @@ export default function DepartmentsPage() {
       toast.error('Vui lòng nhập đầy đủ mã và tên phòng ban.');
       return;
     }
-    if (form.departmentCode.length > MAX_DEPARTMENT_CODE_LENGTH || form.name.length > MAX_DEPARTMENT_NAME_LENGTH || form.description.length > MAX_DEPARTMENT_DESCRIPTION_LENGTH) {
+    if (form.departmentCode.length > MAX_DEPARTMENT_CODE_LENGTH || form.name.length > MAX_DEPARTMENT_NAME_LENGTH || form.floor.length > MAX_DEPARTMENT_FLOOR_LENGTH || form.description.length > MAX_DEPARTMENT_DESCRIPTION_LENGTH) {
       toast.error('Thông tin phòng ban vượt quá giới hạn ký tự cho phép.');
       return;
     }
@@ -148,12 +150,40 @@ export default function DepartmentsPage() {
     } catch (err) { toast.error(getError(err, 'Không gán được phụ trách')); }
     finally { setBusy(false); }
   };
-  const removeDepartment = async (id) => {
+  const hideDepartment = async (id) => {
+    setBusy(true);
+    try {
+      await departmentService.update(id, { status: 'INACTIVE' });
+      if (selectedDepartment?.id === id) setSelectedDepartment(null);
+      toast.success('Đã ẩn phòng ban thành công!');
+      await load(pagination.page);
+    }
+    catch (err) { toast.error(getError(err, 'Không ẩn được phòng ban')); }
+    finally { setBusy(false); }
+  };
+  const restoreDepartment = async (id) => {
+    setBusy(true);
+    try {
+      await departmentService.update(id, { status: 'ACTIVE' });
+      toast.success('Đã hiện lại phòng ban thành công!');
+      await load(pagination.page);
+    }
+    catch (err) { toast.error(getError(err, 'Không hiện lại được phòng ban')); }
+    finally { setBusy(false); }
+  };
+  const confirmRemoveDepartment = (department) => {
+    setPendingDeleteDepartment(department);
+  };
+  const removeDepartment = async () => {
+    if (!pendingDeleteDepartment) return;
+    const id = pendingDeleteDepartment.id;
+
     setBusy(true);
     try {
       await departmentService.remove(id);
       if (selectedDepartment?.id === id) setSelectedDepartment(null);
       toast.success('Xóa phòng ban thành công!');
+      setPendingDeleteDepartment(null);
       await load(pagination.page);
     }
     catch (err) { toast.error(getError(err, 'Không xóa được phòng ban')); }
@@ -167,7 +197,7 @@ export default function DepartmentsPage() {
       <div className="mx-auto max-w-7xl space-y-5">
         <Hero onCreate={openCreate} />
         {loading ? <LoadingIndicator size="lg" label="Đang tải phòng ban..." /> : (
-          <DepartmentDirectory departments={departments} staffs={staffs} busy={busy} selectedDepartment={selectedDepartment} onSelect={handleSelectDepartment} onAssignManager={assignManager} onEdit={openEdit} onDelete={removeDepartment} pagination={pagination} onPageChange={load} />
+          <DepartmentDirectory departments={departments} staffs={staffs} busy={busy} selectedDepartment={selectedDepartment} onSelect={handleSelectDepartment} onAssignManager={assignManager} onEdit={openEdit} onHide={hideDepartment} onRestore={restoreDepartment} onDelete={confirmRemoveDepartment} pagination={pagination} onPageChange={load} />
         )}
         {selectedDepartment && (
           <DepartmentDetail
@@ -178,6 +208,14 @@ export default function DepartmentsPage() {
           />
         )}
         {isModalOpen && <DepartmentModal form={form} setForm={setForm} onSubmit={submitDepartment} onClose={closeModal} busy={busy} editing={Boolean(editingDepartment)} />}
+        {pendingDeleteDepartment && (
+          <DeleteDepartmentModal
+            department={pendingDeleteDepartment}
+            busy={busy}
+            onCancel={() => setPendingDeleteDepartment(null)}
+            onConfirm={removeDepartment}
+          />
+        )}
       </div>
     </DashboardLayout>
   );
@@ -196,7 +234,7 @@ function Hero({ onCreate }) {
   );
 }
 
-function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, onSelect, onAssignManager, onEdit, onDelete, pagination, onPageChange }) {
+function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, onSelect, onAssignManager, onEdit, onHide, onRestore, onDelete, pagination, onPageChange }) {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [orderFilter, setOrderFilter] = useState('');
@@ -295,7 +333,12 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
                     </select>
                     <SmallButton onClick={() => onSelect(dep)} disabled={busy}>Chi tiết</SmallButton>
                     <SmallButton onClick={() => onEdit(dep)} disabled={busy}>Sửa</SmallButton>
-                    <SmallButton danger onClick={() => onDelete(dep.id)} disabled={busy}>Xóa</SmallButton>
+                    {dep.status === 'INACTIVE' ? (
+                      <SmallButton onClick={() => onRestore(dep.id)} disabled={busy}>Hiện</SmallButton>
+                    ) : (
+                      <SmallButton onClick={() => onHide(dep.id)} disabled={busy}>Ẩn</SmallButton>
+                    )}
+                    <SmallButton danger onClick={() => onDelete(dep)} disabled={busy}>Xóa</SmallButton>
                   </div>
                 </div>
               </article>
@@ -418,7 +461,7 @@ function DepartmentHistory({ departmentId }) {
   const actionLabel = {
     CREATE: { label: 'Tạo mới', cls: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
     UPDATE: { label: 'Cập nhật', cls: 'bg-cyan-50 text-cyan-700 border-cyan-100' },
-    DELETE: { label: 'Xóa',     cls: 'bg-rose-50 text-rose-700 border-rose-100' },
+    DELETE: { label: 'Xóa', cls: 'bg-rose-50 text-rose-700 border-rose-100' },
   };
 
   return (
@@ -460,6 +503,48 @@ function DepartmentHistory({ departmentId }) {
     </div>
   );
 }
+function DeleteDepartmentModal({ department, busy, onCancel, onConfirm }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/35 p-4" onClick={busy ? undefined : onCancel}>
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl" onClick={(event) => event.stopPropagation()}>
+        <div className="border-b border-slate-100 p-6">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Xác nhận</p>
+          <h3 className="mt-2 text-lg font-black text-slate-900">Xóa phòng ban?</h3>
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+            Phòng ban sẽ được chuyển sang trạng thái DELETE và không còn hiển thị trong danh sách.
+          </p>
+        </div>
+
+        <div className="space-y-4 p-6">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-sm font-black text-slate-900">{department.name}</p>
+            <p className="mt-1 font-mono text-xs font-bold text-slate-500">{department.departmentCode}</p>
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onCancel}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onConfirm}
+              className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-60"
+            >
+              {busy ? 'Đang xóa...' : 'Xóa'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing }) {
   const canReceiveOrders = canDepartmentReceiveOrders(form.type);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -476,9 +561,11 @@ function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing }) {
       if (!value.trim()) return 'Vui lòng nhập tên phòng ban.';
       if (value.trim().length < 2) return 'Tên phòng ban phải có ít nhất 2 ký tự.';
       if (value.length > MAX_DEPARTMENT_NAME_LENGTH) return `Tên phòng ban không được vượt quá ${MAX_DEPARTMENT_NAME_LENGTH} ký tự.`;
+      if (!/^[\p{L}]+(?:\s+[\p{L}]+)*(?:\s+\d+)?$/u.test(value.trim())) return 'Tên phòng ban phải bắt đầu bằng chữ; số chỉ được đặt ở cuối, ví dụ: Tổng quát 1.';
     }
     if (field === 'floor') {
-      if (value && !/^\d{1,2}$/.test(value)) return 'Tầng chỉ được nhập số từ 0 đến 99.';
+      if (!value.trim()) return 'Vui lòng nhập tầng.';
+      if (!/^[A-Z0-9]{1,3}$/.test(value)) return `Tầng chỉ gồm chữ không dấu và số, tối đa ${MAX_DEPARTMENT_FLOOR_LENGTH} ký tự. VD: 2A, 2B.`;
     }
     if (field === 'description' && value.length > MAX_DEPARTMENT_DESCRIPTION_LENGTH) {
       return `Mô tả không được vượt quá ${MAX_DEPARTMENT_DESCRIPTION_LENGTH} ký tự.`;
@@ -534,25 +621,25 @@ function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing }) {
           <Input
             label="Tên phòng ban"
             value={form.name}
-            onChange={(v) => setForm({ ...form, name: v.slice(0, MAX_DEPARTMENT_NAME_LENGTH) })}
+            onChange={(v) => setForm({ ...form, name: v.replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').slice(0, MAX_DEPARTMENT_NAME_LENGTH) })}
             onBlur={() => validateField('name')}
             error={fieldErrors.name}
-            placeholder="X-Ray, MRI, Lễ tân..."
+            placeholder="X Ray, MRI, Lễ tân..."
             required
             minLength={2}
             maxLength={MAX_DEPARTMENT_NAME_LENGTH}
           />
           <Input
             label="Tầng"
-            type="number"
             value={form.floor}
-            onChange={(v) => setForm({ ...form, floor: v.replace(/\D/g, '').slice(0, 2) })}
+            onChange={(v) => setForm({ ...form, floor: v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, MAX_DEPARTMENT_FLOOR_LENGTH) })}
             onBlur={() => validateField('floor')}
             error={fieldErrors.floor}
-            placeholder="VD: 2"
-            min="0"
-            max="99"
-            maxLength={2}
+            placeholder="VD: 2A"
+            required
+            maxLength={MAX_DEPARTMENT_FLOOR_LENGTH}
+            pattern="[A-Z0-9]{1,3}"
+            hint={`Tối đa ${MAX_DEPARTMENT_FLOOR_LENGTH} ký tự, ví dụ 2A hoặc 2B.`}
           />
           <Select label="Loại phòng ban" value={form.type} onChange={(v) => setForm({ ...form, type: v, canReceiveOrders: canDepartmentReceiveOrders(v) ? form.canReceiveOrders : false })} options={DEPARTMENT_TYPES} />
           {canReceiveOrders && <label className="rounded-2xl border border-cyan-100 bg-cyan-50/60 p-4 flex items-start gap-3"><input type="checkbox" checked={Boolean(form.canReceiveOrders)} onChange={(e) => setForm({ ...form, canReceiveOrders: e.target.checked })} className="mt-1 h-4 w-4" /><span><strong className="block text-sm text-cyan-800">Nhận phiếu chỉ định</strong><small className="mt-1 block text-xs font-semibold text-cyan-600">Bật cho Xét nghiệm, X-Ray, MRI, Siêu âm để hiện trong biểu mẫu bác sĩ.</small></span></label>}

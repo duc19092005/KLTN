@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { OperationalStatus } from '@prisma/client';
 import { DepartmentQueryDto } from '../../dto/department.dto';
 import { getPagination, paginated } from '../../../shared/pagination.dto';
 import { DEPARTMENT_REPOSITORY, DepartmentRepositoryPort } from '../ports/department.repository.port';
@@ -20,6 +21,7 @@ export class ListDepartmentsUseCase {
         departmentCode: query.departmentCode,
         name: query.name,
         status: query.status,
+        excludeStatuses: query.status ? undefined : [OperationalStatus.DELETE],
         type: query.type,
         canReceiveOrders: query.canReceiveOrders,
       },
