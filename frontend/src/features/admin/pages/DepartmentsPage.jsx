@@ -194,7 +194,7 @@ export default function DepartmentsPage() {
 
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="departments" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
-      <div className="mx-auto max-w-7xl space-y-5">
+      <div className="mx-auto max-w-[1600px] space-y-5">
         <Hero onCreate={openCreate} />
         {loading ? <LoadingIndicator size="lg" label="Đang tải phòng ban..." /> : (
           <DepartmentDirectory departments={departments} staffs={staffs} busy={busy} selectedDepartment={selectedDepartment} onSelect={handleSelectDepartment} onAssignManager={assignManager} onEdit={openEdit} onHide={hideDepartment} onRestore={restoreDepartment} onDelete={confirmRemoveDepartment} pagination={pagination} onPageChange={load} />
@@ -357,7 +357,7 @@ function DepartmentDetail({ department, staffs, onGoStaff, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" onClick={onClose}>
-      <aside className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl" onClick={(event) => event.stopPropagation()}>
+      <aside className="flex max-h-[92vh] w-full max-w-[1280px] flex-col overflow-hidden rounded-2xl bg-white shadow-xl" onClick={(event) => event.stopPropagation()}>
         <div className="shrink-0 border-b border-slate-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.22em] text-cyan-600">Chi tiết phòng ban</p>

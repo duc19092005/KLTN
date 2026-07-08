@@ -87,7 +87,7 @@ function printConclusionWithQR(visit, conclusion, qrData) {
           <h1>PHÒNG KHÁM BỆNH VIỆN KLTN</h1>
           <h2>Hệ thống quản lý bệnh án điện tử</h2>
         </div>
-        
+
         <div class="section">
           <h3>THÔNG TIN BỆNH NHÂN</h3>
           <span class="label">Họ tên:</span>
@@ -103,7 +103,7 @@ function printConclusionWithQR(visit, conclusion, qrData) {
           <span class="label">CCCD:</span>
           <span class="value">${visit?.patient?.citizenId || 'N/A'}</span>
         </div>
-        
+
         <div class="section">
           <h3>THÔNG TIN LƯỢT KHÁM</h3>
           <span class="label">Mã lượt khám:</span>
@@ -115,7 +115,7 @@ function printConclusionWithQR(visit, conclusion, qrData) {
           <span class="label">Bác sĩ:</span>
           <span class="value">${getVisitStaffName(visit)}</span>
         </div>
-        
+
         <div class="section">
           <h3>KẾT LUẬN BÁC SĨ</h3>
           <span class="label">Chẩn đoán xác định:</span>
@@ -127,9 +127,9 @@ function printConclusionWithQR(visit, conclusion, qrData) {
           <span class="label">Lời dặn:</span>
           <span class="value">${conclusion?.followUpNote || 'Chưa có lời dặn'}</span>
         </div>
-        
+
         ${qrCodeHtml}
-        
+
         <div class="section no-print" style="text-align: center; margin-top: 30px; padding: 20px;">
           <button onclick="window.print()" style="background: #10b981; color: white; padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; margin: 0 5px;">
             🖨️ In hồ sơ
@@ -405,7 +405,7 @@ export default function DoctorQueuePage() {
 
   return (
     <DashboardLayout user={user} navItems={DOCTOR_NAV_ITEMS} activeItem="queue" onNavigate={(id) => navigateDoctor(navigate, id)} onLogout={logout}>
-      <div className="max-w-7xl mx-auto space-y-6 pb-12">
+      <div className="max-w-[1600px] mx-auto space-y-6 pb-12">
         {/* Danh sách hàng đợi */}
         <QueueList query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} loading={loading} visits={pagedVisits} activeVisit={activeVisit} setActiveVisit={setActiveVisit} page={page} setPage={setPage} totalPages={totalPages} totalItems={filteredVisits.length} busy={busy} onStart={startVisit} onOpenWorkflow={(visit) => {
           setActiveVisit(visit);
@@ -744,7 +744,7 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm animate-fadeIn">
-      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+      <div className="flex max-h-[92vh] w-full max-w-[1280px] flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
         <div className="shrink-0 border-b border-slate-100 px-6 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">

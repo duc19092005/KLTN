@@ -12,7 +12,7 @@ export default function ReceptionistQueuePage() {
 
   return (
     <DashboardLayout user={user} navItems={FRONTDESK_NAV_ITEMS} activeItem="visit-queue" onNavigate={(id) => navigate(frontdeskRouteFor(id))} onLogout={logout}>
-      <div className="max-w-7xl mx-auto space-y-5">
+      <div className="max-w-[1600px] mx-auto space-y-5">
         <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>

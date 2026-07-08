@@ -56,7 +56,7 @@ export default function DoctorDashboard() {
 
   return (
     <DashboardLayout user={user} navItems={DOCTOR_NAV_ITEMS} activeItem="overview" onNavigate={(id) => navigateDoctor(navigate, id)} onLogout={logout}>
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-[1600px] mx-auto space-y-6">
         <div className="flex justify-end">
           <button
             id="doctor-open-queue-button"

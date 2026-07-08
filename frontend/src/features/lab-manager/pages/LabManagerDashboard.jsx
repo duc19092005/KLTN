@@ -53,7 +53,7 @@ export default function LabManagerDashboardPage() {
 
   return (
     <DashboardLayout user={user} navItems={LAB_MANAGER_NAV_ITEMS} activeItem="overview" onNavigate={(id) => navigate(labManagerRouteFor(id))} onLogout={logout}>
-      <div className="mx-auto max-w-7xl space-y-5 pb-12">
+      <div className="mx-auto max-w-[1600px] space-y-5 pb-12">
         {loading ? (
           <section className="rounded-2xl border border-slate-100 bg-white p-16 shadow-sm">
             <LoadingIndicator size="lg" label="Đang tải thống kê..." />

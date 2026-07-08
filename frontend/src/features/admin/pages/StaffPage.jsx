@@ -254,7 +254,7 @@ export default function StaffPage() {
 
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="staff" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-[1600px] mx-auto space-y-6">
         <Hero onCreate={openCreate} />
         {loading ? <LoadingIndicator size="lg" label="Đang tải nhân sự..." /> : (
           <>

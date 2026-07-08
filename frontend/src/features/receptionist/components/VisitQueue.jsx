@@ -224,7 +224,7 @@ function VisitDetailModal({ visit, busyId, onCancel, onClose }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+      <div className="relative flex max-h-[90vh] w-full max-w-[1120px] flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
         <header className="flex items-start justify-between gap-4 border-b border-slate-100 p-5">
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">

@@ -342,7 +342,7 @@ export default function AiModelsPage() {
 
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="aiModels" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
-      <div className="mx-auto max-w-7xl space-y-5">
+      <div className="mx-auto max-w-[1600px] space-y-5">
         <div className="flex justify-end">
           <button type="button" onClick={openCreateModal} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 transition-colors">+ Thêm mô hình AI</button>
         </div>
@@ -548,7 +548,7 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
-      <form onSubmit={handleSubmit} noValidate className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-4">
+      <form onSubmit={handleSubmit} noValidate className="w-full max-w-[1280px] max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-4">
         <div className="flex justify-between gap-4">
           <div>
             <h3 className="text-2xl font-black text-slate-950">{editing ? 'Cập nhật mô hình AI' : 'Thêm mô hình AI'}</h3>

@@ -56,7 +56,7 @@ export default function ReceptionistRecordsPage() {
 
   return (
     <DashboardLayout user={user} navItems={FRONTDESK_NAV_ITEMS} activeItem="patient-records" onNavigate={(id) => navigate(frontdeskRouteFor(id))} onLogout={logout}>
-      <div className="mx-auto max-w-7xl space-y-4">
+      <div className="mx-auto max-w-[1600px] space-y-4">
         <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-600">Hồ sơ</p><h1 className="mt-1 text-2xl font-black text-slate-950">Bệnh nhân</h1></div>
@@ -88,7 +88,7 @@ function PatientDetailModal({ patient, visits, onClose, onCreateVisit }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+      <div className="relative flex max-h-[90vh] w-full max-w-[1280px] flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-5">
           <div className="flex items-center gap-4">
             <div className="grid h-14 w-14 place-items-center rounded-2xl bg-cyan-600 text-base font-black text-white">

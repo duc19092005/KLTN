@@ -319,7 +319,7 @@ export default function DoctorsPage() {
 
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="doctors" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-[1600px] mx-auto space-y-6">
         <Hero totalLabel={totalLabel} onCreate={openCreate} />
         {loading ? <LoadingIndicator size="lg" label="Đang tải bác sĩ..." /> : (
           <>
@@ -542,7 +542,7 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
-      <form onSubmit={handleSubmit} className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-4">
+      <form onSubmit={handleSubmit} className="w-full max-w-[1280px] max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-4">
         <div className="flex justify-between gap-4">
           <div>
             <h3 className="text-2xl font-black text-slate-950">{isCreate ? 'Thêm bác sĩ' : 'Cập nhật bác sĩ'}</h3>

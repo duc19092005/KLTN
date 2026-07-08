@@ -139,7 +139,7 @@ export default function DeletedRecordsPage() {
 
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="trash" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
-      <div className="mx-auto max-w-7xl space-y-5">
+      <div className="mx-auto max-w-[1600px] space-y-5">
         <div className="flex justify-end">
           <button type="button" onClick={() => load(page)} className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white hover:bg-cyan-700">Làm mới</button>
         </div>

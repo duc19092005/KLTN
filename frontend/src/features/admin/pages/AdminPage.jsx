@@ -96,7 +96,7 @@ export default function AdminPage() {
 
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="overview" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="mx-auto max-w-[1600px] space-y-6">
         {loading ? <LoadingIndicator size="lg" label="Đang tải thống kê..." /> : (
           <>
             <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

@@ -102,7 +102,7 @@ export default function ProfilePage() {
       onNavigate={(id) => navigate(roleNav.routeFor(id))}
       onLogout={logout}
     >
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="max-w-[1280px] mx-auto space-y-6">
         {loading ? (
           <LoadingIndicator size="lg" label="Đang tải thông tin cá nhân..." />
         ) : !profile ? (

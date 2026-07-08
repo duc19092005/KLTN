@@ -284,7 +284,7 @@ export default function AuditLogsPage() {
       onNavigate={(id) => navigateAdmin(navigate, id)}
       onLogout={logout}
     >
-      <div className="mx-auto max-w-7xl space-y-5">
+      <div className="mx-auto max-w-[1600px] space-y-5">
         <div className="flex justify-end">
           <button
             id="audit-anchor-now-button"
@@ -683,7 +683,7 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="relative flex flex-col w-full max-w-4xl max-h-[85vh] bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden text-slate-800 animate-in fade-in zoom-in-95 duration-200"
+        className="relative flex flex-col w-full max-w-[1120px] max-h-[85vh] bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden text-slate-800 animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Block */}

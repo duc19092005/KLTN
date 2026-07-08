@@ -49,7 +49,7 @@ export default function ReceptionistDashboard() {
 
   return (
     <DashboardLayout user={user} navItems={RECEPTIONIST_NAV_ITEMS} activeItem="overview" onNavigate={(id) => navigate(receptionistRouteFor(id))} onLogout={logout}>
-      <div className="max-w-7xl mx-auto space-y-4">
+      <div className="max-w-[1600px] mx-auto space-y-4">
         <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-600">Tổng quan</p><h1 className="mt-1 text-2xl font-black text-slate-950">Tiếp nhận</h1></div>

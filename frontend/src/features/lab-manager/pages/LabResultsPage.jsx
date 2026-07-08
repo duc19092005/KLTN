@@ -61,7 +61,7 @@ export default function LabResultsPage() {
 
   return (
     <DashboardLayout user={user} navItems={LAB_MANAGER_NAV_ITEMS} activeItem="results" onNavigate={(id) => navigate(labManagerRouteFor(id))} onLogout={logout}>
-      <div className="mx-auto max-w-7xl space-y-5 pb-12">
+      <div className="mx-auto max-w-[1600px] space-y-5 pb-12">
         <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
           <div className="space-y-4 border-b border-slate-100 p-5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -138,7 +138,7 @@ function ResultModal({ result, onOpenFile, onClose }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+      <div className="relative flex max-h-[90vh] w-full max-w-[1120px] flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-5">
           <div>
             <div className="flex flex-wrap gap-2"><span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700">{result.resultCode || 'Chưa có mã'}</span><StatusBadge status={result.order?.status} /></div>

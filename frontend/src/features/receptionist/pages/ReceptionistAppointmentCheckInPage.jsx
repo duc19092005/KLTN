@@ -141,7 +141,7 @@ export default function ReceptionistAppointmentCheckInPage() {
 
   return (
     <DashboardLayout user={user} navItems={FRONTDESK_NAV_ITEMS} activeItem="appointment-checkin" onNavigate={(id) => navigate(frontdeskRouteFor(id))} onLogout={logout}>
-      <div className="mx-auto max-w-7xl space-y-5">
+      <div className="mx-auto max-w-[1600px] space-y-5">
         <section className="overflow-hidden rounded-2xl border border-cyan-100 bg-white shadow-sm">
           <div className="relative p-6">
             <div className="absolute right-0 top-0 h-28 w-56 rounded-bl-[48px] bg-cyan-50" />

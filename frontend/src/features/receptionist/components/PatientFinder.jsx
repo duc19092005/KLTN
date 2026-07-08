@@ -221,17 +221,17 @@ export default function PatientFinder({ onPatientSelected }) {
           </div>
           {searching && <span className="text-xs font-bold text-slate-400">Đang gợi ý...</span>}
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_150px] lg:items-end">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Nhập CCCD, SĐT hoặc tên bệnh nhân..."
-            className="min-h-[44px] flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-50"
+            className="h-[42px] w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100"
           />
           <button
             type="submit"
             disabled={searching || !query.trim()}
-            className="min-h-[44px] rounded-xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-cyan-700 disabled:opacity-60"
+            className="inline-flex h-[42px] w-full items-center justify-center rounded-xl bg-cyan-600 px-5 text-sm font-black text-white shadow-sm transition-colors hover:bg-cyan-700 disabled:opacity-60 whitespace-nowrap"
           >
             {searching ? <LoadingIndicator size="sm" tone="white" /> : 'Tìm kiếm'}
           </button>
