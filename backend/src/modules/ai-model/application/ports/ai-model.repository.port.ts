@@ -35,6 +35,7 @@ export type AiModelListFilter = {
   search?: string;
   provider?: string;
   includeDeleted?: boolean;
+  status?: OperationalStatus;
 };
 
 /**
@@ -55,7 +56,8 @@ export interface AiModelRepositoryPort {
 /** Builds the where clause for AI model listing, shared by repo internals. */
 export function buildAiModelWhere(filter: AiModelListFilter): Prisma.AiModelRegistryWhereInput {
   return {
-    ...(filter.includeDeleted ? {} : { status: { not: OperationalStatus.DELETE }, isDeleted: false }),
+    ...(filter.status ? { status: filter.status } : {}),
+    ...(filter.includeDeleted || filter.status ? {} : { status: { not: OperationalStatus.DELETE }, isDeleted: false }),
     ...(filter.type ? { type: filter.type } : {}),
     ...(filter.provider
       ? filter.provider === 'cloud'

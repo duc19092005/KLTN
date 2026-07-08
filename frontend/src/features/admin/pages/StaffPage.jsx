@@ -113,7 +113,7 @@ export default function StaffPage() {
   const [departments, setDepartments] = useState([]);
   const [staffs, setStaffs] = useState([]);
   const [form, setForm] = useState(emptyStaff);
-  const [filters, setFilters] = useState({ fullName: '', employeeCode: '', citizenId: '', departmentId: '', role: '', isManager: false });
+  const [filters, setFilters] = useState({ fullName: '', employeeCode: '', citizenId: '', departmentId: '', role: '', status: '', isManager: false });
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
@@ -221,7 +221,7 @@ export default function StaffPage() {
   };
   const search = async (event) => { event.preventDefault(); await load(1); };
   const resetFilters = () => {
-    const cleared = { fullName: '', employeeCode: '', citizenId: '', departmentId: '', role: '', isManager: false };
+    const cleared = { fullName: '', employeeCode: '', citizenId: '', departmentId: '', role: '', status: '', isManager: false };
     setFilters(cleared);
     load(1, cleared);
   };
@@ -280,39 +280,41 @@ function cleanFilters(filters) {
   if (filters.citizenId?.trim()) out.citizenId = filters.citizenId.trim();
   if (filters.departmentId) out.departmentId = filters.departmentId;
   if (filters.role) out.role = filters.role;
+  if (filters.status) out.status = filters.status;
   if (filters.isManager) out.isManager = true;
   return out;
 }
 
 function StaffSearch({ filters, setFilters, onSearch, onReset, departments }) {
-  const activeCount = [filters.fullName, filters.employeeCode, filters.citizenId, filters.departmentId, filters.role, filters.isManager].filter(Boolean).length;
+  const activeCount = [filters.fullName, filters.employeeCode, filters.citizenId, filters.departmentId, filters.role, filters.status, filters.isManager].filter(Boolean).length;
   return (
-    <form onSubmit={onSearch} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600"><Search className="h-4 w-4" strokeWidth={2.5} /></span>
+    <form onSubmit={onSearch} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600"><Search className="h-4 w-4" strokeWidth={2.5} /></span>
           <div>
-            {activeCount > 0 && <p className="text-[11px] font-semibold text-slate-400">{activeCount} bộ lọc đang áp dụng</p>}
+            <p className="text-sm font-black text-slate-800">Bộ lọc nhân sự</p>
+            <p className="text-xs font-semibold text-slate-400">{activeCount > 0 ? `${activeCount} bộ lọc đang áp dụng` : 'Tìm theo hồ sơ, phòng ban, vai trò và trạng thái.'}</p>
           </div>
         </div>
-        {activeCount > 0 && <button type="button" onClick={onReset} className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-50"><X className="h-3.5 w-3.5" /> Xóa lọc</button>}
+        {activeCount > 0 && <button type="button" onClick={onReset} className="inline-flex w-fit items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-500 hover:bg-slate-50"><X className="h-3.5 w-3.5" /> Xóa lọc</button>}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-        <Input label="Họ tên / Mã NV" value={filters.fullName} onChange={(v) => setFilters({ ...filters, fullName: v })} placeholder="Nhập tên hoặc mã NV..." />
-        <Input label="CCCD/CMND" value={filters.citizenId} onChange={(v) => setFilters({ ...filters, citizenId: v })} placeholder="Số căn cước..." />
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.2fr_1fr_1.15fr_1fr_1fr_150px] lg:items-end">
+        <FilterInput label="Họ tên / Mã NV" value={filters.fullName} onChange={(v) => setFilters({ ...filters, fullName: v })} placeholder="Nhập tên hoặc mã NV..." />
+        <FilterInput label="CCCD/CMND" value={filters.citizenId} onChange={(v) => setFilters({ ...filters, citizenId: v })} placeholder="Số căn cước..." />
         <Select label="Phòng ban" value={filters.departmentId} onChange={(v) => setFilters({ ...filters, departmentId: v })} options={departments.map((d) => ({ value: d.id, label: `${d.departmentCode} · ${d.name}` }))} empty="Tất cả phòng ban" />
         <Select label="Vai trò" value={filters.role} onChange={(v) => setFilters({ ...filters, role: v })} options={ROLE_OPTIONS} empty="Tất cả vai trò" />
+        <Select label="Ẩn / hiện" value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })} options={[{ value: 'ACTIVE', label: 'Đang hiện' }, { value: 'INACTIVE', label: 'Đã ẩn' }]} empty="Tất cả trạng thái" />
+        <div className="space-y-1.5"><span className="block text-xs font-black text-transparent">Tìm kiếm</span><button className="inline-flex h-[42px] w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 px-5 text-sm font-black text-white shadow-sm hover:bg-cyan-700 whitespace-nowrap"><Search className="h-4 w-4" strokeWidth={2.5} /> Tìm kiếm</button></div>
       </div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <label className="inline-flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">
-          <input type="checkbox" checked={filters.isManager} onChange={(e) => setFilters({ ...filters, isManager: e.target.checked })} className="h-4 w-4 rounded accent-cyan-600" />
-          <span className="text-sm font-bold text-slate-700">Chỉ hiện trưởng phòng / trưởng khoa</span>
-        </label>
-        <button className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-600 px-6 py-2.5 text-sm font-black text-white shadow-sm hover:bg-cyan-700"><Search className="h-4 w-4" strokeWidth={2.5} /> Tìm kiếm</button>
-      </div>
+      <label className="mt-3 inline-flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">
+        <input type="checkbox" checked={filters.isManager} onChange={(e) => setFilters({ ...filters, isManager: e.target.checked })} className="h-4 w-4 rounded accent-cyan-600" />
+        <span className="text-sm font-bold text-slate-700">Chỉ hiện trưởng phòng / trưởng khoa</span>
+      </label>
     </form>
   );
 }
+function FilterInput({ label, value, onChange, placeholder }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><input value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-[42px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100 outline-none" /></label>; }
 function StaffList({ staffs, totalLabel, onEdit, onToggleStatus, onRemove, onViewDetails, busy, pagination, onPageChange }) { return <section className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden"><div className="p-5 border-b border-slate-100 flex items-center justify-between"><div><h3 className="text-xl font-black text-slate-950">Danh sách nhân sự</h3></div><span className="rounded-xl bg-slate-50 px-3 py-1 text-xs font-black text-slate-600 border border-slate-100">{totalLabel}</span></div><div className="divide-y divide-slate-100">{staffs.map((staff) => <StaffRow key={staff.id} staff={staff} onEdit={onEdit} onToggleStatus={onToggleStatus} onRemove={onRemove} onViewDetails={onViewDetails} busy={busy} />)}{!staffs.length && <div className="p-6"><Empty title="Không có nhân sự" desc="Thử đổi bộ lọc hoặc tạo nhân sự mới." /></div>}</div><Pagination pagination={pagination} onPageChange={onPageChange} /></section>; }
 function StaffRow({ staff, onEdit, onToggleStatus, onRemove, onViewDetails, busy }) {
   return (

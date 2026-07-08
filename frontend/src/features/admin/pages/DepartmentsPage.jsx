@@ -8,7 +8,7 @@ import { departmentService } from '../apis/departmentService';
 import { staffService } from '../apis/staffService';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import AuditHistoryChanges from '../components/AuditHistoryChanges';
 
 const DEPARTMENT_TYPES = [
@@ -253,50 +253,31 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600">
+      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600">
               <Search className="h-4 w-4" strokeWidth={2.5} />
             </span>
+            <div>
+              <p className="text-sm font-black text-slate-800">Bộ lọc phòng ban</p>
+              <p className="text-xs font-semibold text-slate-400">Tìm nhanh theo tên, loại, chỉ định và trạng thái hiển thị.</p>
+            </div>
           </div>
           {(search || typeFilter || orderFilter || statusFilter) && (
-            <button type="button" onClick={() => { setSearch(''); setTypeFilter(''); setOrderFilter(''); setStatusFilter(''); }} className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-50">Xóa lọc</button>
+            <button type="button" onClick={() => { setSearch(''); setTypeFilter(''); setOrderFilter(''); setStatusFilter(''); }} className="inline-flex w-fit items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-500 hover:bg-slate-50">
+              <X className="h-3.5 w-3.5" /> Xóa lọc
+            </button>
           )}
         </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <label className="space-y-1.5">
-            <span className="text-xs font-black text-slate-600">Tên / Mã phòng ban</span>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nhập tên hoặc mã phòng ban..." className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold outline-none focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100" />
-          </label>
-          <label className="space-y-1.5">
-            <span className="text-xs font-black text-slate-600">Phân loại</span>
-            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold outline-none focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100">
-              <option value="">Tất cả phân loại</option>
-              {DEPARTMENT_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
-            </select>
-          </label>
-          <label className="space-y-1.5">
-            <span className="text-xs font-black text-slate-600">Chỉ định</span>
-            <select value={orderFilter} onChange={(e) => setOrderFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold outline-none focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100">
-              <option value="">Tất cả</option>
-              <option value="true">Nhận chỉ định</option>
-              <option value="false">Không nhận chỉ định</option>
-            </select>
-          </label>
-          <label className="space-y-1.5">
-            <span className="text-xs font-black text-slate-600">Ẩn / hiện</span>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold outline-none focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100">
-              <option value="">Tất cả trạng thái</option>
-              <option value="ACTIVE">Đang hiện</option>
-              <option value="INACTIVE">Đã ẩn</option>
-            </select>
-          </label>
-        </div>
-        <div className="flex justify-end">
-          <button type="button" className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-600 px-6 py-2.5 text-sm font-black text-white shadow-sm hover:bg-cyan-700">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr_150px] lg:items-end">
+          <FilterInput label="Tên / Mã phòng ban" value={search} onChange={setSearch} placeholder="Nhập tên hoặc mã phòng ban..." />
+          <FilterSelect label="Phân loại" value={typeFilter} onChange={setTypeFilter} options={DEPARTMENT_TYPES} empty="Tất cả phân loại" />
+          <FilterSelect label="Chỉ định" value={orderFilter} onChange={setOrderFilter} options={[{ value: 'true', label: 'Nhận chỉ định' }, { value: 'false', label: 'Không nhận chỉ định' }]} empty="Tất cả" />
+          <FilterSelect label="Ẩn / hiện" value={statusFilter} onChange={setStatusFilter} options={[{ value: 'ACTIVE', label: 'Đang hiện' }, { value: 'INACTIVE', label: 'Đã ẩn' }]} empty="Tất cả trạng thái" />
+          <div className="space-y-1.5"><span className="block text-xs font-black text-transparent">Tìm kiếm</span><button type="button" className="inline-flex h-[42px] w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 px-5 text-sm font-black text-white shadow-sm hover:bg-cyan-700 whitespace-nowrap">
             <Search className="h-4 w-4" strokeWidth={2.5} /> Tìm kiếm
-          </button>
+          </button></div>
         </div>
       </section>
 
@@ -361,6 +342,13 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
       </section>
     </div>
   );
+}
+
+function FilterInput({ label, value, onChange, placeholder }) {
+  return <label className="block space-y-1.5"><span className="text-xs font-black text-slate-600">{label}</span><input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-[42px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm font-semibold outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100" /></label>;
+}
+function FilterSelect({ label, value, onChange, options, empty }) {
+  return <label className="block space-y-1.5"><span className="text-xs font-black text-slate-600">{label}</span><select value={value} onChange={(e) => onChange(e.target.value)} className="h-[42px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm font-semibold outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100">{empty && <option value="">{empty}</option>}{options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>;
 }
 
 function DepartmentDetail({ department, staffs, onGoStaff, onClose }) {

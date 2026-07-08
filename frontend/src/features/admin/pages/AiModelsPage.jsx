@@ -150,6 +150,7 @@ export default function AiModelsPage() {
   const [models, setModels] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [filter, setFilter] = useState(''); // '' | cloud | local
+  const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -163,7 +164,7 @@ export default function AiModelsPage() {
   const [statsData, setStatsData] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
-  const load = async (page = pagination.page, currentFilter = filter, currentSearch = search) => {
+  const load = async (page = pagination.page, currentFilter = filter, currentSearch = search, currentStatus = statusFilter) => {
     setLoading(true);
     setStatsLoading(true);
     try {
@@ -173,6 +174,7 @@ export default function AiModelsPage() {
           limit: pagination.limit,
           provider: currentFilter || undefined,
           search: currentSearch || undefined,
+          status: currentStatus || undefined,
         }),
         aiModelService.stats(),
       ]);
@@ -208,12 +210,12 @@ export default function AiModelsPage() {
 
   const handleFilterChange = (val) => {
     setFilter(val);
-    load(1, val, search);
+    load(1, val, search, statusFilter);
   };
 
   const handleSearchSubmit = (event) => {
     event.preventDefault();
-    load(1, filter, search);
+    load(1, filter, search, statusFilter);
   };
 
   const openCreateModal = () => {
@@ -351,19 +353,37 @@ export default function AiModelsPage() {
 
         <section className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xl font-black text-slate-950">Danh mục hiện tại</h2>
+                <p className="text-xs font-semibold text-slate-400">Lọc theo nền tảng, trạng thái hiển thị và từ khóa mô hình.</p>
               </div>
-              <select value={filter} onChange={(event) => handleFilterChange(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold outline-none">
-                <option value="">Tất cả</option>
-                <option value="cloud">API đám mây</option>
-                <option value="local">Tự lưu trữ</option>
-              </select>
+              {(filter || statusFilter || search) && (
+                <button type="button" onClick={() => { setFilter(''); setStatusFilter(''); setSearch(''); load(1, '', '', ''); }} className="inline-flex w-fit items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-500 hover:bg-slate-50">Xóa lọc</button>
+              )}
             </div>
-            <form onSubmit={handleSearchSubmit} className="mt-4 flex gap-3">
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm tên mô hình, nền tảng..." className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100" />
-              <button type="submit" className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white hover:bg-cyan-700">Tìm kiếm</button>
+            <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 gap-3 lg:grid-cols-[1.15fr_1fr_1.4fr_150px] lg:items-end">
+              <label className="block space-y-1.5">
+                <span className="text-xs font-black text-slate-600">Nền tảng</span>
+                <select value={filter} onChange={(event) => handleFilterChange(event.target.value)} className="h-[42px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm font-semibold outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100">
+                  <option value="">Tất cả nền tảng</option>
+                  <option value="cloud">API đám mây</option>
+                  <option value="local">Tự lưu trữ</option>
+                </select>
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-black text-slate-600">Ẩn / hiện</span>
+                <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); load(1, filter, search, event.target.value); }} className="h-[42px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm font-semibold outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100">
+                  <option value="">Tất cả trạng thái</option>
+                  <option value="ACTIVE">Đang hiện</option>
+                  <option value="INACTIVE">Đã ẩn</option>
+                </select>
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-black text-slate-600">Tìm kiếm</span>
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm tên mô hình, nền tảng..." className="h-[42px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm font-semibold outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100" />
+              </label>
+              <div className="space-y-1.5"><span className="block text-xs font-black text-transparent">Tìm kiếm</span><button type="submit" className="inline-flex h-[42px] w-full items-center justify-center rounded-xl bg-cyan-600 px-5 text-sm font-black text-white hover:bg-cyan-700 whitespace-nowrap">Tìm kiếm</button></div>
             </form>
           </div>
           <div className="p-5 space-y-3 max-h-[760px] overflow-y-auto">

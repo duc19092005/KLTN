@@ -15,7 +15,7 @@ export class ListAiModelsUseCase {
   async execute(query: AiModelQueryDto) {
     const { page, limit, skip } = getPagination(query);
     const { items, total } = await this.repo.findManyPaginated(
-      { type: query.type, search: query.search, provider: query.provider, includeDeleted: query.includeDeleted },
+      { type: query.type, search: query.search, provider: query.provider, status: query.status, includeDeleted: query.includeDeleted },
       skip,
       limit,
     );

@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, IsUrl, Matches, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { OperationalStatus } from '@prisma/client';
 
 import { PaginationQueryDto } from '../../shared/pagination.dto';
 
@@ -129,6 +130,11 @@ export class AiModelQueryDto extends PaginationQueryDto {
   @IsOptional()
   @Transform(({ value }) => value === true || value === 'true')
   includeDeleted?: boolean;
+
+  @ApiPropertyOptional({ enum: OperationalStatus, description: 'Filter AI models by visibility/status' })
+  @IsOptional()
+  @IsIn([OperationalStatus.ACTIVE, OperationalStatus.INACTIVE])
+  status?: OperationalStatus;
 }
 
 export class TestAiModelApiDto {

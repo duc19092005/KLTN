@@ -11,7 +11,7 @@ import { departmentService } from '../apis/departmentService';
 import DoctorDetailModal from '../components/DoctorDetailModal';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { Calendar, ExternalLink, MapPin } from 'lucide-react';
+import { Calendar, ExternalLink, MapPin, Search } from 'lucide-react';
 
 const OSM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
 const MIN_BIRTH_YEAR = 1900;
@@ -184,7 +184,7 @@ export default function DoctorsPage() {
   const toast = useToast();
   const [doctors, setDoctors] = useState([]);
   const [departments, setDepartments] = useState([]);
-  const [filters, setFilters] = useState({ specialty: '', search: '' });
+  const [filters, setFilters] = useState({ specialty: '', search: '', status: '' });
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
   const [editing, setEditing] = useState(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -202,6 +202,7 @@ export default function DoctorsPage() {
         limit: pagination.limit,
         ...(filters.specialty ? { specialty: filters.specialty } : {}),
         ...(filters.search?.trim() ? { search: filters.search.trim() } : {}),
+        ...(filters.status ? { status: filters.status } : {}),
       };
       const [doctorRes, departmentRes] = await Promise.all([
         doctorService.search(doctorParams),
@@ -322,7 +323,7 @@ export default function DoctorsPage() {
         <Hero totalLabel={totalLabel} onCreate={openCreate} />
         {loading ? <LoadingIndicator size="lg" label="Đang tải bác sĩ..." /> : (
           <>
-            <SearchBar filters={filters} setFilters={setFilters} onSearch={search} />
+            <SearchBar filters={filters} setFilters={setFilters} onSearch={search} onReset={() => setFilters({ specialty: '', search: '', status: '' })} />
             <section className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
               <div className="p-5 border-b border-slate-100">
                 <h3 className="text-xl font-black text-slate-950">Danh sách bác sĩ</h3>
@@ -344,7 +345,31 @@ export default function DoctorsPage() {
 }
 
 function Hero({ totalLabel, onCreate }) { return <div className="flex items-center justify-between gap-3"><span className="rounded-xl bg-white px-3 py-1 text-xs font-black text-cyan-700 border border-cyan-100">{totalLabel}</span><button onClick={onCreate} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ Thêm bác sĩ</button></div>; }
-function SearchBar({ filters, setFilters, onSearch }) { return <form onSubmit={onSearch} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-3 items-end"><Select label="Chuyên khoa" value={filters.specialty} onChange={(v) => setFilters({ ...filters, specialty: v })} empty="Tất cả chuyên khoa" options={SPECIALTIES} /><Input label="Tìm kiếm" value={filters.search} onChange={(v) => setFilters({ ...filters, search: v })} placeholder="Tên bác sĩ, chứng chỉ..." /><button className="rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-black text-white hover:bg-cyan-700">Tìm kiếm</button></form>; }
+function SearchBar({ filters, setFilters, onSearch, onReset }) {
+  const activeCount = [filters.specialty, filters.search, filters.status].filter(Boolean).length;
+  return (
+    <form onSubmit={onSearch} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600"><Search className="h-4 w-4" strokeWidth={2.5} /></span>
+          <div>
+            <p className="text-sm font-black text-slate-800">Bộ lọc bác sĩ</p>
+            <p className="text-xs font-semibold text-slate-400">{activeCount > 0 ? `${activeCount} bộ lọc đang áp dụng` : 'Tìm theo chuyên khoa, từ khóa và trạng thái hiển thị.'}</p>
+          </div>
+        </div>
+        {activeCount > 0 && <button type="button" onClick={onReset} className="inline-flex w-fit items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-500 hover:bg-slate-50">Xóa lọc</button>}
+      </div>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.15fr_1.4fr_1fr_150px] lg:items-end">
+        <FilterSelect label="Chuyên khoa" value={filters.specialty} onChange={(v) => setFilters({ ...filters, specialty: v })} empty="Tất cả chuyên khoa" options={SPECIALTIES} />
+        <FilterInput label="Tìm kiếm" value={filters.search} onChange={(v) => setFilters({ ...filters, search: v })} placeholder="Tên bác sĩ, chứng chỉ..." />
+        <FilterSelect label="Ẩn / hiện" value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })} empty="Tất cả trạng thái" options={[{ value: 'ACTIVE', label: 'Đang hiện' }, { value: 'INACTIVE', label: 'Đã ẩn' }]} />
+        <div className="space-y-1.5"><span className="block text-xs font-black text-transparent">Tìm kiếm</span><button className="inline-flex h-[42px] w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 px-5 text-sm font-black text-white shadow-sm hover:bg-cyan-700 whitespace-nowrap"><Search className="h-4 w-4" strokeWidth={2.5} /> Tìm kiếm</button></div>
+      </div>
+    </form>
+  );
+}
+function FilterInput({ label, value, onChange, placeholder }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><input value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-[42px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100 outline-none" /></label>; }
+function FilterSelect({ label, value, onChange, options, empty }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><select value={value || ''} onChange={(e) => onChange(e.target.value)} className="h-[42px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100 outline-none">{empty && <option value="">{empty}</option>}{options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>; }
 function DoctorRow({ doctor, onEdit, onToggleStatus, onRemove, onViewDetails, busy }) {
   return (
     <article className="p-5 hover:bg-slate-50/70">

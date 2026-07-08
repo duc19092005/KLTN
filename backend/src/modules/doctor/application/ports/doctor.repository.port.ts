@@ -1,4 +1,4 @@
-import { MedicalSpecialty } from '@prisma/client';
+import { MedicalSpecialty, UserStatus } from '@prisma/client';
 import { CreateDoctorDto, CreateDoctorWithStaffDto, UpdateDoctorDto } from '../../dto/doctor.dto';
 
 /** DI token for the Doctor repository port. */
@@ -8,6 +8,7 @@ export type DoctorListFilter = {
   specialty?: MedicalSpecialty;
   search?: string;
   includeDeleted?: boolean;
+  status?: UserStatus;
 };
 
 export type StaffForDoctorCreate = {

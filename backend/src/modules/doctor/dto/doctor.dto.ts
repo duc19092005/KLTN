@@ -1,6 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { MedicalSpecialty } from '@prisma/client';
+import { MedicalSpecialty, UserStatus } from '@prisma/client';
 import {
   IsDateString,
   IsEmail,
@@ -223,4 +223,7 @@ export class DoctorQueryDto extends PaginationQueryDto {
 
   @ApiPropertyOptional({ example: true, description: 'Include soft-deleted doctors' })
   @IsOptional() @Transform(({ value }) => value === true || value === 'true') includeDeleted?: boolean;
+
+  @ApiPropertyOptional({ enum: UserStatus, description: 'Filter doctors by account visibility/status' })
+  @IsOptional() @IsEnum(UserStatus) status?: UserStatus;
 }
