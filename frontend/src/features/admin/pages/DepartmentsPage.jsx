@@ -238,6 +238,7 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [orderFilter, setOrderFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   const visibleDepartments = departments.filter((dep) => {
     const keyword = search.trim().toLowerCase();
@@ -246,7 +247,8 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
       .some((value) => String(value).toLowerCase().includes(keyword));
     const matchesType = !typeFilter || dep.type === typeFilter;
     const matchesOrder = !orderFilter || String(Boolean(dep.canReceiveOrders)) === orderFilter;
-    return matchesKeyword && matchesType && matchesOrder;
+    const matchesStatus = !statusFilter || dep.status === statusFilter;
+    return matchesKeyword && matchesType && matchesOrder && matchesStatus;
   });
 
   return (
@@ -258,8 +260,8 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
               <Search className="h-4 w-4" strokeWidth={2.5} />
             </span>
           </div>
-          {(search || typeFilter || orderFilter) && (
-            <button type="button" onClick={() => { setSearch(''); setTypeFilter(''); setOrderFilter(''); }} className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-50">Xóa lọc</button>
+          {(search || typeFilter || orderFilter || statusFilter) && (
+            <button type="button" onClick={() => { setSearch(''); setTypeFilter(''); setOrderFilter(''); setStatusFilter(''); }} className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-50">Xóa lọc</button>
           )}
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -280,6 +282,14 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
               <option value="">Tất cả</option>
               <option value="true">Nhận chỉ định</option>
               <option value="false">Không nhận chỉ định</option>
+            </select>
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-black text-slate-600">Ẩn / hiện</span>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold outline-none focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100">
+              <option value="">Tất cả trạng thái</option>
+              <option value="ACTIVE">Đang hiện</option>
+              <option value="INACTIVE">Đã ẩn</option>
             </select>
           </label>
         </div>

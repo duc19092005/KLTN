@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, Building2, Download, MoreVertical, ShieldCheck, UserRoundCheck, UserRoundX, UsersRound } from 'lucide-react';
+import { Building2, MoreVertical, ShieldCheck, UserRoundCheck, UserRoundX, UsersRound } from 'lucide-react';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { useAuth } from '../../../providers/AuthProvider';
@@ -99,19 +99,6 @@ export default function AdminPage() {
       <div className="mx-auto max-w-7xl space-y-6">
         {loading ? <LoadingIndicator size="lg" label="Đang tải thống kê..." /> : (
           <>
-            <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="inline-flex items-center gap-2 rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-cyan-700">
-                  <Activity className="h-3.5 w-3.5" /> Hospital OS
-                </p>
-                <h1 className="mt-3 text-2xl font-black tracking-tight text-slate-950 md:text-3xl">Tổng quan vận hành</h1>
-                <p className="mt-1 text-sm font-semibold text-slate-400">Thống kê phòng ban, nhân sự và trạng thái tài khoản trong ngày.</p>
-              </div>
-              <button className="inline-flex w-fit items-center gap-2 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm shadow-cyan-600/20 transition hover:bg-cyan-700">
-                <Download className="h-4 w-4" /> Xuất báo cáo
-              </button>
-            </header>
-
             <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <StatCard label="Phòng ban" value={overview.totalDepartments} unit="chuyên môn" icon={Building2} tone="cyan" />
               <StatCard label="Nhân sự" value={overview.totalStaffs} unit="nhân viên" icon={UsersRound} tone="slate" />
@@ -253,7 +240,7 @@ function DepartmentList({ rows }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
       {rows.map((row, index) => (
-        <div key={row.label} className={`flex items-center justify-between gap-4 border-b border-slate-100 p-4 last:border-b-0 ${row.value === 0 ? 'opacity-45' : ''}`}>
+        <div key={row.label} className={`flex items-center justify-between gap-4 border-b border-slate-100 p-4 last:border-b-0 ${row.value === 0 ? 'bg-slate-50/60' : 'bg-white'}`}>
           <div className="flex min-w-0 items-center gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-slate-50 text-slate-400 ring-1 ring-slate-100">
               {index === 0 ? <Building2 className="h-5 w-5" /> : index === 1 ? <UsersRound className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
