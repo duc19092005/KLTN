@@ -359,8 +359,6 @@ model Visit {
   source         VisitSource  @default(WALK_IN)
   checkInAt      DateTime     @default(now())
   completedAt    DateTime?
-  reason         String?
-  symptoms       String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -390,8 +388,6 @@ model Appointment {
   doctor          DoctorProfile?    @relation(fields: [doctorId], references: [id])
 
   scheduledAt     DateTime
-  reason          String?
-  symptoms        String?
   status          AppointmentStatus @default(CONFIRMED)
 
   qrTokenHash     String            @unique

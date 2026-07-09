@@ -63,18 +63,6 @@ export class CreateAppointmentDto {
   @ApiProperty({ example: '2026-06-30T08:30:00.000Z' })
   @IsISO8601()
   scheduledAt!: string;
-
-  @ApiPropertyOptional({ example: 'Khám đau ngực' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  reason?: string;
-
-  @ApiPropertyOptional({ example: 'Đau ngực nhẹ khi vận động' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  symptoms?: string;
 }
 
 export class AppointmentSlotQueryDto {
@@ -96,16 +84,4 @@ export class VerifyAppointmentQrDto {
   qrPayload!: string;
 }
 
-export class CheckInAppointmentDto extends VerifyAppointmentQrDto {
-  @ApiPropertyOptional({ example: 'Khám theo lịch hẹn' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  reason?: string;
-
-  @ApiPropertyOptional({ example: 'Bệnh nhân khai đau ngực nhẹ' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  symptoms?: string;
-}
+export class CheckInAppointmentDto extends VerifyAppointmentQrDto {}
