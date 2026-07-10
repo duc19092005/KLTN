@@ -155,6 +155,7 @@ function valuesEqual(left: unknown, right: unknown): boolean {
 
 export function getAuditFieldLabel(field: string, entity?: string | null): string {
   if (entity && ENTITY_FIELD_LABELS[entity]?.[field]) return ENTITY_FIELD_LABELS[entity][field];
+  if (!entity && field === 'status') return field;
   return FIELD_LABELS[field] ?? field;
 }
 
@@ -170,8 +171,8 @@ export function classifyAuditField(field: string): AuditDiffSensitivity {
   return 'SAFE';
 }
 
-function shouldRedactStoredValue(_sensitivity: AuditDiffSensitivity): boolean {
-  return false;
+function shouldRedactStoredValue(sensitivity: AuditDiffSensitivity): boolean {
+  return sensitivity !== 'SAFE';
 }
 
 function displayValueForStoredDiff(field: string, value: unknown, sensitivity: AuditDiffSensitivity): unknown {
@@ -234,9 +235,29 @@ function redactedDisplay(change: AuditDiffChange, context: AuditDiffViewerContex
 }
 
 export function toDisplayAuditDiff(diff: AuditDiffJson, context: AuditDiffViewerContext): DisplayAuditDiffChange[] {
-  return diff.changes.map((change) => ({
+  return diff.changes.map((change) => {
+    if (change.sensitivity !== 'SAFE') {
+      const policy = change.sensitivity === 'PII'
+        ? ['PII không được lưu plaintext trong diff; xem snapshot mã hóa qua quy trình break-glass nếu cần.', 'AUDIT_REDACT_PII_STORED']
+        : change.sensitivity === 'CLINICAL_TEXT'
+          ? ['Clinical content is never exposed to audit viewers.', 'AUDIT_REDACT_CLINICAL_STORED']
+          : change.sensitivity === 'FILE_URL'
+            ? ['Private file locations are hidden from audit viewers.', 'AUDIT_REDACT_FILE_URL']
+            : ['Sensitive fields are hidden from audit viewers.', 'AUDIT_ADMIN_REDACTED'];
+      return redactedDisplay(change, context, policy[0], policy[1]);
+    }
+    return {
     ...buildDisplayBase(change, context),
     redacted: false,
     summary: `${getAuditFieldLabel(change.field, context.entity)}: ${String(change.before)} → ${String(change.after)}`,
-  }));
+    };
+  });
+}
+
+export function toDisplayAuditFields(fields: unknown): string[] {
+  if (!Array.isArray(fields)) return [];
+  const display = fields
+    .filter((field): field is string => typeof field === 'string')
+    .map((field) => classifyAuditField(field) === 'SAFE' ? field : 'SENSITIVE_FIELD_CHANGED');
+  return Array.from(new Set(display));
 }

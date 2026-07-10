@@ -21,10 +21,12 @@ contract AuditAnchor {
     string private constant NODE_DOMAIN = "KLTN_AUDIT_NODE_V2";
 
     struct Checkpoint {
-        bytes32 root;
+        bytes32 merkleRoot;
+        bytes32 artifactHash;
+        string artifactUri;
         uint256 leafCount;
         uint256 timestamp;
-        bool exists;
+        bool committed;
     }
 
     // batchId => committed Merkle checkpoint
@@ -32,7 +34,14 @@ contract AuditAnchor {
     uint256 public latestBatchId;
     uint256 public totalBatches;
 
-    event RootCommitted(uint256 indexed batchId, bytes32 root, uint256 leafCount, uint256 timestamp);
+    event CheckpointCommitted(
+        uint256 indexed batchId,
+        bytes32 merkleRoot,
+        bytes32 artifactHash,
+        string artifactUri,
+        uint256 leafCount,
+        uint256 timestamp
+    );
 
     modifier onlyWriter() {
         require(identityRegistry.isRelayerOrOwner(msg.sender), "AuditAnchor: caller is not writer");
@@ -51,25 +60,37 @@ contract AuditAnchor {
 
     /// @notice Commit the Merkle root of a sealed batch of audit logs.
     /// @param batchId Monotonic batch identifier assigned off-chain.
-    /// @param root Merkle root over the batch's leaves.
+    /// @param merkleRoot Merkle root over the batch's leaves.
     /// @param leafCount Number of leaves included.
-    function commitRoot(uint256 batchId, bytes32 root, uint256 leafCount) external onlyWriter {
-        require(root != bytes32(0), "AuditAnchor: empty root");
+    /// @param artifactHash SHA-256 hash of the encrypted IPFS artifact bytes.
+    /// @param artifactUri Content-addressed IPFS URI for recovery.
+    function commitCheckpoint(
+        uint256 batchId,
+        bytes32 merkleRoot,
+        uint256 leafCount,
+        bytes32 artifactHash,
+        string calldata artifactUri
+    ) external onlyWriter {
+        require(merkleRoot != bytes32(0), "AuditAnchor: empty root");
+        require(artifactHash != bytes32(0), "AuditAnchor: empty artifact hash");
+        require(bytes(artifactUri).length > 0, "AuditAnchor: empty artifact uri");
         require(leafCount > 0, "AuditAnchor: empty batch");
-        require(!checkpoints[batchId].exists, "AuditAnchor: batch already committed");
+        require(!checkpoints[batchId].committed, "AuditAnchor: batch already committed");
         require(batchId == latestBatchId + 1, "AuditAnchor: non-sequential batch");
 
         checkpoints[batchId] = Checkpoint({
-            root: root,
+            merkleRoot: merkleRoot,
+            artifactHash: artifactHash,
+            artifactUri: artifactUri,
             leafCount: leafCount,
             timestamp: block.timestamp,
-            exists: true
+            committed: true
         });
 
         latestBatchId = batchId;
         totalBatches += 1;
 
-        emit RootCommitted(batchId, root, leafCount, block.timestamp);
+        emit CheckpointCommitted(batchId, merkleRoot, artifactHash, artifactUri, leafCount, block.timestamp);
     }
 
     /// @notice Solidity-side canonical leaf hash. Matches backend MERKLE_SHA256_BYTES32_V2.
@@ -86,27 +107,34 @@ contract AuditAnchor {
     /// @notice Verify that entryHash belongs to an anchored canonical Merkle root.
     function verifyProof(uint256 batchId, bytes32 entryHash, bytes32[] calldata proof) external view returns (bool) {
         Checkpoint storage cp = checkpoints[batchId];
-        if (!cp.exists) return false;
+        if (!cp.committed) return false;
 
         bytes32 acc = hashLeaf(entryHash);
         for (uint256 i = 0; i < proof.length; i++) {
             acc = hashPair(acc, proof[i]);
         }
-        return acc == cp.root;
+        return acc == cp.merkleRoot;
     }
 
     /// @notice Read the Merkle root for a batch. Returns bytes32(0) if not committed.
     function getRoot(uint256 batchId) external view returns (bytes32) {
-        return checkpoints[batchId].root;
+        return checkpoints[batchId].merkleRoot;
     }
 
     /// @notice Full checkpoint details for a batch.
     function getCheckpoint(uint256 batchId)
         external
         view
-        returns (bytes32 root, uint256 leafCount, uint256 timestamp, bool committed)
+        returns (
+            bytes32 merkleRoot,
+            bytes32 artifactHash,
+            string memory artifactUri,
+            uint256 leafCount,
+            uint256 timestamp,
+            bool committed
+        )
     {
         Checkpoint storage cp = checkpoints[batchId];
-        return (cp.root, cp.leafCount, cp.timestamp, cp.exists);
+        return (cp.merkleRoot, cp.artifactHash, cp.artifactUri, cp.leafCount, cp.timestamp, cp.committed);
     }
 }

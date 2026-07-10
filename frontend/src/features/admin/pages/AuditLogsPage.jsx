@@ -6,6 +6,7 @@ import { useAuth } from '../../../providers/AuthProvider';
 import { auditService } from '../apis/auditService';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
+import { FaceStepUpModal } from '../../auth';
 import {
   ArrowUp,
   ArrowDown,
@@ -156,6 +157,10 @@ export default function AuditLogsPage() {
   const [batchFilter, setBatchFilter] = useState('');
   const [anchoring, setAnchoring] = useState(false);
   const [proof, setProof] = useState(null);
+  const [recoveryTarget, setRecoveryTarget] = useState(null);
+  const [recoveryReason, setRecoveryReason] = useState('');
+  const [recoveryFaceOpen, setRecoveryFaceOpen] = useState(false);
+  const [recoveringBatchId, setRecoveringBatchId] = useState(null);
 
   const [logsPage, setLogsPage] = useState(1);
   const [logsTotalPages, setLogsTotalPages] = useState(1);
@@ -276,6 +281,24 @@ export default function AuditLogsPage() {
     }
   };
 
+  const handleRecoveryTicket = async (ticket) => {
+    if (!recoveryTarget) return;
+    setRecoveryFaceOpen(false);
+    setRecoveringBatchId(recoveryTarget.batchId);
+    try {
+      const res = await auditService.recoverBatch(recoveryTarget.batchId, recoveryReason.trim(), ticket);
+      const data = res.data || {};
+      toast.success(`Đã khôi phục batch #${data.batchId} (${data.restoredCount} audit logs).`);
+      setRecoveryTarget(null);
+      setRecoveryReason('');
+      await refreshAll();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err.message || 'Khôi phục audit batch thất bại.');
+    } finally {
+      setRecoveringBatchId(null);
+    }
+  };
+
   return (
     <DashboardLayout
       user={user}
@@ -345,6 +368,8 @@ export default function AuditLogsPage() {
             page={batchesPage}
             totalPages={batchesTotalPages}
             total={batchesTotal}
+            onRecover={(batch) => { setRecoveryTarget(batch); setRecoveryReason(''); }}
+            recoveringBatchId={recoveringBatchId}
             onPrev={() => setBatchesPage((v) => Math.max(1, v - 1))}
             onNext={() => setBatchesPage((v) => Math.min(batchesTotalPages, v + 1))}
           />
@@ -352,6 +377,25 @@ export default function AuditLogsPage() {
       </div>
 
       {proof && <ProofModal proof={proof} onClose={() => setProof(null)} />}
+      {recoveryTarget && !recoveryFaceOpen && (
+        <RecoveryReasonModal
+          batch={recoveryTarget}
+          reason={recoveryReason}
+          setReason={setRecoveryReason}
+          onClose={() => { setRecoveryTarget(null); setRecoveryReason(''); }}
+          onContinue={() => setRecoveryFaceOpen(true)}
+        />
+      )}
+      {recoveryTarget && recoveryFaceOpen && (
+        <FaceStepUpModal
+          action="RECOVER_AUDIT_BATCH"
+          resourceId={String(recoveryTarget.batchId)}
+          title={`Quét khuôn mặt để khôi phục batch #${recoveryTarget.batchId}`}
+          description="Backend sẽ kiểm chứng blockchain và IPFS trước khi thay audit logs. Nội dung bệnh án không được hiển thị."
+          onSuccess={handleRecoveryTicket}
+          onClose={() => setRecoveryFaceOpen(false)}
+        />
+      )}
 
     </DashboardLayout>
   );
@@ -678,8 +722,6 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
     }
   };
 
-  const sensitiveDetailUnlocked = Boolean(log.sensitiveDetailUnlocked);
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm" onClick={onClose}>
       <div
@@ -846,7 +888,45 @@ function DetailField({ label, value, mono = false, highlight = false }) {
 
 // ---- Batches Ledger Table ---------------------------------------------------
 
-function BatchesTable({ batches, page, totalPages, total, onPrev, onNext }) {
+function RecoveryReasonModal({ batch, reason, setReason, onClose, onContinue }) {
+  const valid = reason.trim().length >= 10;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-lg bg-white shadow-xl" onClick={(event) => event.stopPropagation()}>
+        <div className="border-b border-slate-100 p-5">
+          <h3 className="text-lg font-black text-slate-950">Khôi phục audit batch #{batch.batchId}</h3>
+          <p className="mt-1 text-sm text-slate-500">Thao tác sẽ tải artifact IPFS, đối chiếu blockchain và chỉ phục hồi khi mọi hash đều khớp.</p>
+        </div>
+        <div className="p-5">
+          <label className="text-xs font-bold text-slate-700" htmlFor="audit-recovery-reason">Lý do khôi phục</label>
+          <textarea
+            id="audit-recovery-reason"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            maxLength={500}
+            rows={4}
+            className="mt-2 w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+            placeholder="Mô tả sự cố hoặc dấu hiệu sai lệch của batch..."
+          />
+          <p className="mt-1 text-xs text-slate-400">Tối thiểu 10 ký tự. Lý do được ghi vào audit recovery record.</p>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-slate-100 p-4">
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600">Hủy</button>
+          <button
+            type="button"
+            onClick={onContinue}
+            disabled={!valid}
+            className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-bold text-white hover:bg-cyan-700 disabled:opacity-40"
+          >
+            Tiếp tục quét mặt
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BatchesTable({ batches, page, totalPages, total, onPrev, onNext, onRecover, recoveringBatchId }) {
   return (
     <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
       <div className="p-4 bg-slate-50/60 border-b border-slate-100 flex items-center justify-between">
@@ -880,7 +960,7 @@ function BatchesTable({ batches, page, totalPages, total, onPrev, onNext }) {
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                 {batches.map((b) => (
                   <tr key={b.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 text-center font-mono font-bold text-slate-400">#{b.id}</td>
+                    <td className="px-6 py-4 text-center font-mono font-bold text-slate-400">#{b.batchId}</td>
                     <td className="px-6 py-4 font-mono text-[11px] text-slate-800 break-all max-w-sm">{b.merkleRoot || '—'}</td>
                     <td className="px-6 py-4 text-center font-bold text-cyan-700">{b.leafCount ?? 0} bản ghi</td>
                     <td className="px-6 py-4 text-slate-500">{formatTime(b.createdAt)}</td>
@@ -898,6 +978,15 @@ function BatchesTable({ batches, page, totalPages, total, onPrev, onNext }) {
                         }`}>
                         {BATCH_STATUS_LABEL[b.status] || b.status}
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => onRecover(b)}
+                        disabled={b.status !== 'ANCHORED' || !b.artifactAvailable || recoveringBatchId === b.batchId}
+                        className="mt-2 block w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-700 hover:border-cyan-300 hover:text-cyan-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        title="Khôi phục từ artifact IPFS đã được blockchain xác thực"
+                      >
+                        {recoveringBatchId === b.batchId ? 'Đang chạy...' : 'Khôi phục'}
+                      </button>
                     </td>
                   </tr>
                 ))}

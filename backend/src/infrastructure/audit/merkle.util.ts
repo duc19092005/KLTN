@@ -160,7 +160,7 @@ export function verifyMerkleProofForAlgorithm(entryHashHex: string, proof: strin
     : verifyMerkleProof(entryHashHex, proof, root);
 }
 
-/** Convert a hex SHA256 digest into a 0x-prefixed bytes32 for AuditAnchor.commitRoot. */
+/** Convert a hex SHA256 digest into a 0x-prefixed bytes32 for AuditAnchor.commitCheckpoint. */
 export function rootToBytes32(hexDigest: string): string {
   return `0x${normalizeHex32(hexDigest, 'Merkle root')}`;
 }

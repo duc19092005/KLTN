@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Query, UseGuards, NotFoundException } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, UseGuards, NotFoundException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
@@ -8,9 +8,12 @@ import { AuditAnchorService } from '../../../infrastructure/audit/audit-anchor.s
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
-import { toDisplayAuditDiff } from '../../../infrastructure/audit/audit-diff.util';
+import { toDisplayAuditDiff, toDisplayAuditFields } from '../../../infrastructure/audit/audit-diff.util';
 import { verifyAuditRow } from '../../../infrastructure/audit/audit-verification.util';
-import { buildAuditEncryptionAad, decryptAuditSnapshot } from '../../../infrastructure/audit/audit-encryption.util';
+import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
+import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
+import { AuditRecoveryService } from '../../../infrastructure/audit/audit-recovery.service';
+import { RecoverAuditBatchDto } from '../dto/recover-audit-batch.dto';
 
 /**
  * Admin-only audit + integrity API. Surfaces the tamper-evidence machinery so it can be
@@ -21,7 +24,7 @@ import { buildAuditEncryptionAad, decryptAuditSnapshot } from '../../../infrastr
  *  - proof:      Merkle inclusion proof for a single log, independently verifiable.
  *  - anchorNow:  force-seal+commit the current batch (Tier-A / on-demand).
  */
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
 @Roles('ADMIN')
 @ApiTags('Audit & Integrity')
 @ApiBearerAuth()
@@ -31,6 +34,7 @@ export class AuditController {
     private readonly audit: AuditLoggerService,
     private readonly anchor: AuditAnchorService,
     private readonly prisma: PrismaService,
+    private readonly recovery: AuditRecoveryService,
   ) {}
 
   @Get('logs')
@@ -120,12 +124,34 @@ export class AuditController {
         orderBy: { batchId: 'desc' },
         skip,
         take: limit,
+        select: {
+          id: true,
+          batchId: true,
+          merkleRoot: true,
+          leafCount: true,
+          fromSeq: true,
+          toSeq: true,
+          status: true,
+          algorithmVersion: true,
+          contractVersion: true,
+          artifactHash: true,
+          artifactUri: true,
+          txHash: true,
+          blockNumber: true,
+          error: true,
+          createdAt: true,
+          anchoredAt: true,
+          recoveredAt: true,
+        },
       }),
       this.prisma.auditBatch.count(),
     ]);
 
     return {
-      items,
+      items: items.map(({ artifactUri, ...item }) => ({
+        ...item,
+        artifactAvailable: Boolean(artifactUri && item.artifactHash),
+      })),
       total,
       page,
       limit,
@@ -154,7 +180,7 @@ export class AuditController {
       : null;
 
     const subject = await this.resolveSubjectContext(row);
-    return this.presentAuditRow(row, actor, user, true, true, subject);
+    return this.presentAuditRow(row, actor, user, true, false, subject);
   }
 
   @Get('logs/:seq/proof')
@@ -167,6 +193,17 @@ export class AuditController {
   @ApiOperation({ summary: 'Force-seal the pending batch and commit its Merkle root on-chain' })
   anchorNow() {
     return this.anchor.anchorNow();
+  }
+
+  @Post('recovery/:batchId')
+  @RequireFaceStepUp('RECOVER_AUDIT_BATCH')
+  @ApiOperation({ summary: 'Recover one tampered audit batch from its verified IPFS artifact' })
+  recoverBatch(
+    @Param('batchId', ParseIntPipe) batchId: number,
+    @Body() body: RecoverAuditBatchDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.recovery.recover(batchId, user.sub, body.reason);
   }
 
   private presentAuditRow(row: any, actor: any, user: AuthUser | undefined, includeDetail: boolean, faceVerified = false, subject: any = null) {
@@ -218,7 +255,7 @@ export class AuditController {
           }
         : null,
       diff,
-      fieldsChanged: row.fieldsChanged ?? row.diffJson?.fieldsChanged ?? [],
+      fieldsChanged: toDisplayAuditFields(row.fieldsChanged ?? row.diffJson?.fieldsChanged),
       subject,
       hashes: {
         dataHash: row.dataHash,
@@ -230,40 +267,10 @@ export class AuditController {
       },
     };
 
-    if (!includeDetail) return base;
+    // Audit endpoints never expose encrypted or decrypted snapshots. Recovery decryption is
+    // isolated in the server-side recovery service and is not a viewer capability.
+    return base;
 
-    return {
-      ...base,
-      encryptedSnapshots: {
-        before: this.describeEncryptedSnapshot(row.beforeEncrypted),
-        after: this.describeEncryptedSnapshot(row.afterEncrypted),
-      },
-      decryptedSnapshots: faceVerified
-        ? {
-            before: this.decryptAndParse(row.beforeEncrypted, row),
-            after: this.decryptAndParse(row.afterEncrypted, row),
-          }
-        : null,
-      sensitiveDetailUnlocked: faceVerified,
-    };
-  }
-
-  private decryptAndParse(encrypted: any, row: any): any {
-    if (!encrypted) return null;
-    try {
-      const aad = buildAuditEncryptionAad({
-        seq: row.seq,
-        entity: row.entity,
-        entityId: row.entityId,
-        action: row.action,
-        createdAtIso: row.createdAt instanceof Date ? row.createdAt.toISOString() : new Date(row.createdAt).toISOString(),
-      });
-      const decrypted = decryptAuditSnapshot(encrypted, aad);
-      return JSON.parse(decrypted);
-    } catch (err) {
-      console.warn(`[AuditController] Decryption failed for seq=${row.seq}:`, err);
-      return null;
-    }
   }
 
 
@@ -296,6 +303,16 @@ export class AuditController {
       patientId: null as string | null,
       visitId: null as string | null,
     };
+
+    if (row.entity === 'Patient') {
+      return { ...base, label: 'Patient record', displayName: 'Protected medical subject', patientId: row.entityId };
+    }
+    if (row.entity === 'Visit') {
+      return { ...base, label: 'Visit', displayName: 'Protected medical visit', visitId: row.entityId };
+    }
+    if (row.entity === 'MedicalConclusion' || row.entity === 'MedicalResult' || row.entity === 'MedicalOrder') {
+      return { ...base, label: row.entity, displayName: 'Protected clinical record' };
+    }
 
     if (row.entity === 'StaffProfile') {
       const staff = await this.prisma.staffProfile.findUnique({

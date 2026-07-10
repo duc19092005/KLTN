@@ -15,4 +15,9 @@ export const auditService = {
   detail: (seq) => api.get(`/audit/logs/${seq}`),
   proof: (seq) => api.get(`/audit/logs/${seq}/proof`),
   anchorNow: () => api.post('/audit/anchor-now', {}),
+  recoverBatch: (batchId, reason, stepUpTicket) => api.post(
+    `/audit/recovery/${batchId}`,
+    { reason },
+    { headers: { 'x-stepup-ticket': stepUpTicket } },
+  ),
 };

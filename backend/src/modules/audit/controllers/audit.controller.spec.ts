@@ -127,7 +127,12 @@ describe('AuditController readable V2 diff', () => {
         findUnique: jest.fn().mockResolvedValue(null),
       },
     };
-    const controller = new AuditController({} as any, { getInclusionProof: jest.fn(), anchorNow: jest.fn() } as any, prisma as any);
+    const controller = new AuditController(
+      {} as any,
+      { getInclusionProof: jest.fn(), anchorNow: jest.fn() } as any,
+      prisma as any,
+      { recover: jest.fn() } as any,
+    );
     return { controller, row };
   }
 
@@ -137,7 +142,7 @@ describe('AuditController readable V2 diff', () => {
     const result = await controller.logs(undefined, undefined, undefined, undefined, undefined, { sub: 'admin-1', role: 'ADMIN' } as any);
 
     expect(result.total).toBe(1);
-    expect(result.items[0]).toMatchObject({ blockchainStatus: 'PENDING', fieldsChanged: ['avatarUrl', 'fullName'] });
+    expect(result.items[0]).toMatchObject({ blockchainStatus: 'PENDING', fieldsChanged: ['SENSITIVE_FIELD_CHANGED'] });
     expect(result.items[0].diff).toEqual([
       expect.objectContaining({ field: 'avatarUrl', before: '[REDACTED]', after: '[REDACTED]', redacted: true }),
       expect.objectContaining({ field: 'fullName', before: '[REDACTED]', after: '[REDACTED]', redacted: true }),
@@ -147,14 +152,14 @@ describe('AuditController readable V2 diff', () => {
     expect(item.afterEncrypted).toBeUndefined();
   });
 
-  it('returns detail with verification and decrypted snapshots for admin step-up context', async () => {
+  it('returns detail verification without encrypted or decrypted snapshots', async () => {
     const { controller } = setup();
 
     const result: any = await controller.logDetail('1', { sub: 'admin-1', role: 'ADMIN' } as any);
 
     expect(result.verification).toMatchObject({ ok: true, status: 'VERIFIED', version: 'V2' });
-    expect(result.encryptedSnapshots.before).toMatchObject({ alg: 'AES-256-GCM', keyId: 'audit-key-test', ciphertextPresent: true });
-    expect(result.decryptedSnapshots.before).toEqual({ fullName: 'abc', avatarUrl: 'https://cdn.example/old.png' });
+    expect(result.encryptedSnapshots).toBeUndefined();
+    expect(result.decryptedSnapshots).toBeUndefined();
     expect(JSON.stringify(result.diff)).not.toContain('cdn.example');
   });
 });

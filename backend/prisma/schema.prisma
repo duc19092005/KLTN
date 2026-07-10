@@ -620,6 +620,7 @@ model AiQuality {
 /// (exactly one FK is set per row, the rest are null).
 model BlockchainLogger {
   id        String   @id @default(uuid())
+  eventId   String?  @unique // idempotency key shared with the Kafka audit journal
 
   // Who performed the change, what action, and on which logical entity
   actorId   String?
@@ -718,9 +719,13 @@ model AuditBatch {
   leafCount   Int               // number of logs in the batch
   fromSeq     Int?              // smallest BlockchainLogger.seq in the batch
   toSeq       Int?              // largest BlockchainLogger.seq in the batch
-  status      String    @default("PENDING") // PENDING | ANCHORED | FAILED
+  status      String    @default("PREPARING") // PREPARING | ARTIFACT_READY | ON_CHAIN_CONFIRMED | ANCHORED | FAILED
   algorithmVersion String @default("MERKLE_SHA256_STRING_V1")
   contractVersion  String?
+  artifactHash String?
+  artifactUri  String?
+  artifactCid  String?
+  artifactKeyId String?
   txHash      String?
   blockNumber Int?
   error       String?
@@ -731,6 +736,68 @@ model AuditBatch {
   @@index([status])
   @@index([algorithmVersion])
   @@index([createdAt])
+}
+
+/// Transactional hand-off from PostgreSQL to Kafka. The audit row and this record are created
+/// atomically, so a process crash cannot create a business change without a durable audit event.
+model AuditOutbox {
+  id          String   @id @default(uuid())
+  eventId     String   @unique
+  auditLogId  String   @unique
+  topic       String
+  payload     Json
+  status      String   @default("PENDING") // PENDING | PUBLISHED | FAILED
+  attempts    Int      @default(0)
+  lastError   String?
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, createdAt])
+}
+
+/// Idempotency receipt maintained by the Kafka consumer. Replaying a retained topic is safe.
+model AuditKafkaReceipt {
+  id          String   @id @default(uuid())
+  eventId     String   @unique
+  auditLogId  String
+  topic       String
+  partition   Int
+  offset      String
+  processedAt DateTime @default(now())
+
+  @@index([auditLogId])
+}
+
+/// Operational evidence for face-gated recovery. No artifact plaintext is stored here.
+model AuditRecovery {
+  id             String   @id @default(uuid())
+  batchId        Int
+  requestedById  String
+  reason         String
+  status         String   @default("STARTED") // STARTED | COMPLETED | FAILED | REJECTED
+  restoredCount  Int      @default(0)
+  artifactHash   String?
+  merkleRoot     String?
+  failureReason  String?
+  createdAt      DateTime @default(now())
+  completedAt    DateTime?
+
+  @@index([batchId, createdAt])
+  @@index([requestedById, createdAt])
+}
+
+/// Ephemeral validated rows used inside the same recovery transaction before replacement.
+model AuditRecoveryStageRow {
+  id          String   @id @default(uuid())
+  recoveryId  String
+  seq         Int
+  entryHash   String
+  payload     Json
+  createdAt   DateTime @default(now())
+
+  @@unique([recoveryId, seq])
+  @@index([recoveryId])
 }
 
 /// Short-lived, single-use proof that a user re-authenticated with their face immediately

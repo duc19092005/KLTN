@@ -10,10 +10,11 @@ import {
   verifyMerkleProofForAlgorithm,
 } from './merkle.util';
 import { AUDIT_ENTRY_V2, computeEntryHash, computeEntryHashV2, GENESIS_PREV_HASH } from './audit-hash.util';
+import { AuditArtifactService, AuditRecoveryBundleRow } from './audit-artifact.service';
 
 /**
  * AuditAnchorService periodically seals a batch of not-yet-anchored audit logs, builds a Merkle
- * tree over their entryHashes, and commits ONLY the root on-chain (AuditAnchor.commitRoot).
+ * tree over their entryHashes, uploads an encrypted recovery artifact, and commits a checkpoint.
  *
  * Cost model: one transaction per batch, independent of batch size. 10 logs or 10,000 logs both
  * cost a single ~80-120k-gas commit storing one 32-byte root, so per-log gas falls as volume
@@ -34,15 +35,15 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
   private timer: NodeJS.Timeout | null = null;
   private running = false;
 
-  private readonly intervalMs = Number(process.env.AUDIT_BATCH_INTERVAL_MS ?? 5 * 60 * 1000);
+  private readonly intervalMs = Number(process.env.AUDIT_BATCH_INTERVAL_MS ?? 30 * 1000);
   private readonly maxLeaves = Number(process.env.AUDIT_BATCH_MAX_LEAVES ?? 500);
-  private readonly pendingRecoveryMs = Number(process.env.AUDIT_BATCH_PENDING_RECOVERY_MS ?? 15 * 60 * 1000);
   private readonly merkleAlgorithm = MERKLE_SHA256_BYTES32_V2;
-  private readonly contractVersion = 'AUDIT_ANCHOR';
+  private readonly contractVersion = 'AUDIT_ANCHOR_CHECKPOINT_V2';
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly blockchain: BlockchainService,
+    private readonly artifacts: AuditArtifactService,
   ) {}
 
   onModuleInit() {
@@ -111,11 +112,16 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
       CREATE OR REPLACE FUNCTION "blockchain_logger_append_only"()
       RETURNS TRIGGER AS $$
       BEGIN
+        IF current_setting('app.audit_recovery_authorized', true) = 'true' THEN
+          IF (TG_OP = 'DELETE') THEN RETURN OLD; END IF;
+          RETURN NEW;
+        END IF;
         IF (TG_OP = 'DELETE') THEN
           RAISE EXCEPTION 'BlockchainLogger is append-only: DELETE is forbidden (seq=%).', OLD."seq";
         END IF;
         IF (TG_OP = 'UPDATE') THEN
           IF NEW."id"         IS DISTINCT FROM OLD."id"         OR
+             NEW."eventId"    IS DISTINCT FROM OLD."eventId"    OR
              NEW."actorId"    IS DISTINCT FROM OLD."actorId"    OR
              NEW."action"     IS DISTINCT FROM OLD."action"     OR
              NEW."entity"     IS DISTINCT FROM OLD."entity"     OR
@@ -201,6 +207,10 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
         return { committed: false, reason: 'Chưa cấu hình AuditAnchor.' };
       }
 
+      if (!this.artifacts.isReady()) {
+        return { committed: false, reason: 'Audit recovery IPFS is not configured.' };
+      }
+
       const chainCheck = await this.verifyFullChainBeforeAnchor();
       if (!chainCheck.ok) {
         const reason = chainCheck.reason ?? 'Không xác định được lỗi toàn vẹn chuỗi.';
@@ -215,6 +225,16 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
         this.logger.error(`🚨 ANCHORED BATCH INTEGRITY FAILURE DETECTED: ${reason}. Aborting commit.`);
         await this.sendTelegramAlert('Cảnh báo batch audit đã neo bị lệch', reason);
         return { committed: false, reason: `Kiểm tra batch đã neo thất bại: ${reason}` };
+      }
+
+      await this.recoverPendingBatches();
+      const incomplete = await this.prisma.auditBatch.findFirst({
+        where: { status: { in: ['PREPARING', 'ARTIFACT_READY', 'ON_CHAIN_CONFIRMED'] } },
+        orderBy: { batchId: 'asc' },
+        select: { batchId: true },
+      });
+      if (incomplete) {
+        return { committed: false, batchId: incomplete.batchId, reason: 'An incomplete batch must be resumed before creating a new batch.' };
       }
 
       // Pull unanchored, chained logs in seq order, capped at maxLeaves per batch.
@@ -274,22 +294,63 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
           leafCount: pending.length,
           fromSeq,
           toSeq,
-          status: 'PENDING',
+          status: 'PREPARING',
           algorithmVersion: this.merkleAlgorithm,
           contractVersion: this.contractVersion,
         },
       });
 
-      const res = await this.blockchain.commitAuditRoot(batchId, rootToBytes32(merkleRoot), pending.length);
+      let artifact;
+      try {
+        const logs = await this.loadRecoveryBundleRows(fromSeq, toSeq);
+        artifact = await this.artifacts.createAndUpload({
+          schema: 'KLTN_AUDIT_RECOVERY_BUNDLE_V1',
+          batch: {
+            batchId,
+            merkleRoot,
+            leafCount: pending.length,
+            fromSeq,
+            toSeq,
+            algorithmVersion: this.merkleAlgorithm,
+          },
+          logs,
+        });
+        await this.prisma.auditBatch.update({
+          where: { batchId },
+          data: { ...artifact, status: 'ARTIFACT_READY', error: null },
+        });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'IPFS artifact creation failed.';
+        await this.prisma.auditBatch.update({ where: { batchId }, data: { error: reason } });
+        return { committed: false, batchId, reason };
+      }
+
+      const res = await this.blockchain.commitAuditCheckpoint(
+        batchId,
+        rootToBytes32(merkleRoot),
+        pending.length,
+        artifact.artifactHash,
+        artifact.artifactUri,
+      );
 
       if (!res.success) {
         await this.prisma.auditBatch.update({
           where: { batchId },
-          data: { status: 'FAILED', error: (res as any).error ?? 'Ghi lô lên blockchain thất bại.' },
+          data: { status: 'ARTIFACT_READY', error: (res as any).error ?? 'Blockchain checkpoint commit failed.' },
         });
         this.logger.error(`Batch ${batchId} commit failed: ${(res as any).error}`);
         return { committed: false, batchId, reason: (res as any).error };
       }
+
+      await this.prisma.auditBatch.update({
+        where: { batchId },
+        data: {
+          status: 'ON_CHAIN_CONFIRMED',
+          txHash: (res as any).txHash ?? null,
+          blockNumber: (res as any).blockNumber ?? null,
+          error: null,
+        },
+      });
 
       // Confirmed: mark the batch ANCHORED and stamp every member log (metadata-only update,
       // permitted by the append-only trigger).
@@ -315,10 +376,11 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
 
   private async recoverPendingBatches(): Promise<void> {
     const pendingBatches = await this.prisma.auditBatch.findMany({
-      where: { status: 'PENDING' },
+      where: { status: { in: ['PENDING', 'PREPARING', 'ARTIFACT_READY', 'ON_CHAIN_CONFIRMED'] } },
       orderBy: { batchId: 'asc' },
       select: {
         batchId: true,
+        status: true,
         merkleRoot: true,
         leafCount: true,
         fromSeq: true,
@@ -326,21 +388,86 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
         createdAt: true,
         algorithmVersion: true,
         contractVersion: true,
+        artifactHash: true,
+        artifactUri: true,
+        artifactCid: true,
+        artifactKeyId: true,
       },
     });
 
     if (pendingBatches.length === 0) return;
 
     this.logger.warn(`Found ${pendingBatches.length} pending audit batch(es). Starting recovery check...`);
-    const now = Date.now();
-
     for (const batch of pendingBatches) {
       try {
+        if (batch.status === 'PENDING') {
+          await this.prisma.auditBatch.update({
+            where: { batchId: batch.batchId },
+            data: { status: 'PREPARING' },
+          });
+          continue;
+        }
+
+        if (batch.status === 'PREPARING') {
+          if (batch.fromSeq == null || batch.toSeq == null) throw new Error('Incomplete batch has no sequence range.');
+          const logs = await this.loadRecoveryBundleRows(batch.fromSeq, batch.toSeq);
+          const artifact = await this.artifacts.createAndUpload({
+            schema: 'KLTN_AUDIT_RECOVERY_BUNDLE_V1',
+            batch: {
+              batchId: batch.batchId,
+              merkleRoot: batch.merkleRoot,
+              leafCount: batch.leafCount,
+              fromSeq: batch.fromSeq,
+              toSeq: batch.toSeq,
+              algorithmVersion: batch.algorithmVersion,
+            },
+            logs,
+          });
+          await this.prisma.auditBatch.update({
+            where: { batchId: batch.batchId },
+            data: { ...artifact, status: 'ARTIFACT_READY', error: null },
+          });
+          continue;
+        }
+
         const checkpoint = await this.blockchain.getAuditCheckpoint(batch.batchId);
         const localRootBytes32 = rootToBytes32(batch.merkleRoot).toLowerCase();
         const onChainRoot = checkpoint?.root?.toLowerCase();
 
+        if (batch.status === 'ARTIFACT_READY' && !checkpoint?.committed) {
+          if (!batch.artifactHash || !batch.artifactUri) throw new Error('Prepared batch is missing artifact metadata.');
+          const result = await this.blockchain.commitAuditCheckpoint(
+            batch.batchId,
+            localRootBytes32,
+            batch.leafCount,
+            batch.artifactHash,
+            batch.artifactUri,
+          );
+          if (!result.success) {
+            const reason = 'error' in result ? result.error : 'Blockchain checkpoint commit failed.';
+            await this.prisma.auditBatch.update({ where: { batchId: batch.batchId }, data: { error: reason } });
+            continue;
+          }
+          await this.prisma.auditBatch.update({
+            where: { batchId: batch.batchId },
+            data: {
+              status: 'ON_CHAIN_CONFIRMED',
+              txHash: result.txHash,
+              blockNumber: result.blockNumber,
+              anchoredAt: new Date(),
+              error: null,
+            },
+          });
+          continue;
+        }
+
         if (checkpoint?.committed && onChainRoot === localRootBytes32) {
+          if (!batch.artifactHash || !batch.artifactUri
+            || checkpoint.artifactHash.toLowerCase() !== batch.artifactHash.toLowerCase()
+            || checkpoint.artifactUri !== batch.artifactUri
+            || checkpoint.leafCount !== batch.leafCount) {
+            throw new Error(`Pending batch ${batch.batchId} artifact metadata does not match its on-chain checkpoint.`);
+          }
           const membership = await this.validateRecoverableBatchMembership(batch);
           if (!membership.ok) {
             const reason = membership.reason ?? `Pending batch ${batch.batchId} membership validation failed during recovery.`;
@@ -379,17 +506,51 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
           continue;
         }
 
-        if (now - batch.createdAt.getTime() >= this.pendingRecoveryMs) {
-          await this.prisma.auditBatch.update({
-            where: { batchId: batch.batchId },
-            data: { status: 'FAILED', error: 'Pending batch was not found on-chain before recovery timeout.' },
-          });
-          this.logger.warn(`Marked stale pending audit batch ${batch.batchId} as FAILED for retry.`);
-        }
       } catch (err) {
         this.logger.error(`Failed to recover pending audit batch ${batch.batchId}`, err);
       }
     }
+  }
+
+  private async loadRecoveryBundleRows(fromSeq: number, toSeq: number): Promise<AuditRecoveryBundleRow[]> {
+    const rows = await this.prisma.blockchainLogger.findMany({
+      where: { seq: { gte: fromSeq, lte: toSeq } },
+      orderBy: { seq: 'asc' },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      eventId: row.eventId,
+      seq: row.seq!,
+      prevHash: row.prevHash!,
+      entryHash: row.entryHash!,
+      actorId: row.actorId,
+      action: row.action,
+      entity: row.entity,
+      entityId: row.entityId,
+      metadata: row.metadata,
+      dataHash: row.dataHash,
+      dataSalt: row.dataSalt,
+      beforeJson: row.beforeJson,
+      afterJson: row.afterJson,
+      beforeHash: row.beforeHash,
+      afterHash: row.afterHash,
+      diffHash: row.diffHash,
+      hashVersion: row.hashVersion,
+      beforeEncrypted: row.beforeEncrypted,
+      afterEncrypted: row.afterEncrypted,
+      encryptionVersion: row.encryptionVersion,
+      encryptionKeyId: row.encryptionKeyId,
+      diffJson: row.diffJson,
+      fieldsChanged: row.fieldsChanged,
+      departmentId: row.departmentId,
+      staffProfileId: row.staffProfileId,
+      doctorProfileId: row.doctorProfileId,
+      patientId: row.patientId,
+      aiModelRegistryId: row.aiModelRegistryId,
+      medicalConclusionId: row.medicalConclusionId,
+      aiQualityId: row.aiQualityId,
+      createdAt: row.createdAt.toISOString(),
+    }));
   }
 
   private async validateRecoverableBatchMembership(batch: {

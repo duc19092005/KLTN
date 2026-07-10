@@ -16,10 +16,14 @@ function createPrismaMock() {
         return tail ? { seq: tail.seq, entryHash: tail.entryHash } : null;
       }),
       create: jest.fn(async ({ data }: { data: any }) => {
-        rows.push(data);
-        return data;
+        const row = { id: data.id ?? `log-${rows.length + 1}`, ...data };
+        rows.push(row);
+        return row;
       }),
       findMany: jest.fn(async () => rows),
+    },
+    auditOutbox: {
+      create: jest.fn(async ({ data }: { data: any }) => data),
     },
   };
   return {

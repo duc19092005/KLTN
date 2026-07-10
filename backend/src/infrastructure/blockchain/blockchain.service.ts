@@ -65,9 +65,9 @@ export class BlockchainService implements OnModuleInit {
   ];
 
   private readonly auditAnchorAbi = [
-    'function commitRoot(uint256 batchId, bytes32 root, uint256 leafCount) external',
+    'function commitCheckpoint(uint256 batchId, bytes32 merkleRoot, uint256 leafCount, bytes32 artifactHash, string artifactUri) external',
     'function getRoot(uint256 batchId) external view returns (bytes32)',
-    'function getCheckpoint(uint256 batchId) external view returns (bytes32 root, uint256 leafCount, uint256 timestamp, bool committed)',
+    'function getCheckpoint(uint256 batchId) external view returns (bytes32 merkleRoot, bytes32 artifactHash, string artifactUri, uint256 leafCount, uint256 timestamp, bool committed)',
     'function latestBatchId() external view returns (uint256)',
     'function totalBatches() external view returns (uint256)',
     'function owner() external view returns (address)',
@@ -384,14 +384,20 @@ export class BlockchainService implements OnModuleInit {
    * and monotonic; the contract rejects re-committing an existing batchId.
    * @param rootBytes32 0x-prefixed 32-byte Merkle root over the batch's entryHashes
    */
-  async commitAuditRoot(batchId: number, rootBytes32: string, leafCount: number) {
+  async commitAuditCheckpoint(
+    batchId: number,
+    rootBytes32: string,
+    leafCount: number,
+    artifactHash: string,
+    artifactUri: string,
+  ) {
     return this.enqueueWrite(async () => {
       if (!this.auditAnchor || !this.relayerSigner) {
         return { success: false, error: 'AuditAnchor or blockchain relayer key is not configured.' };
       }
       try {
         const writable = this.auditAnchor.connect(this.relayerSigner) as ethers.Contract;
-        const tx = await writable.commitRoot(batchId, rootBytes32, leafCount);
+        const tx = await writable.commitCheckpoint(batchId, rootBytes32, leafCount, artifactHash, artifactUri);
         const receipt = await tx.wait();
         if (!receipt || receipt.status !== 1) {
           return { success: false, error: 'Audit root transaction failed or was not confirmed.' };
@@ -415,15 +421,24 @@ export class BlockchainService implements OnModuleInit {
     }
   }
 
-  /** Read the full on-chain checkpoint (root, leafCount, timestamp, committed) for a batch. */
+  /** Read the full on-chain checkpoint, including the immutable IPFS recovery artifact. */
   async getAuditCheckpoint(
     batchId: number,
-  ): Promise<{ root: string; leafCount: number; timestamp: number; committed: boolean } | null> {
+  ): Promise<{
+    root: string;
+    artifactHash: string;
+    artifactUri: string;
+    leafCount: number;
+    timestamp: number;
+    committed: boolean;
+  } | null> {
     if (!this.auditAnchor) return null;
     try {
-      const [root, leafCount, timestamp, committed] = await this.auditAnchor.getCheckpoint(batchId);
+      const [root, artifactHash, artifactUri, leafCount, timestamp, committed] = await this.auditAnchor.getCheckpoint(batchId);
       return {
         root,
+        artifactHash,
+        artifactUri,
         leafCount: Number(leafCount),
         timestamp: Number(timestamp),
         committed: Boolean(committed),

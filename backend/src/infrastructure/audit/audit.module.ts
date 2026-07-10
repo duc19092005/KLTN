@@ -2,6 +2,11 @@ import { Global, Module } from '@nestjs/common';
 import { AuditLoggerService } from './audit-logger.service';
 import { AuditAnchorService } from './audit-anchor.service';
 import { BlockchainModule } from '../blockchain/blockchain.module';
+import { AuditRecoveryCryptoService } from './audit-recovery-crypto.service';
+import { IpfsArtifactService } from './ipfs-artifact.service';
+import { AuditArtifactService } from './audit-artifact.service';
+import { AuditRecoveryService } from './audit-recovery.service';
+import { AuditKafkaService } from './audit-kafka.service';
 
 /**
  * Global module exposing the tamper-evident audit infrastructure to every feature module:
@@ -14,7 +19,15 @@ import { BlockchainModule } from '../blockchain/blockchain.module';
 @Global()
 @Module({
   imports: [BlockchainModule],
-  providers: [AuditLoggerService, AuditAnchorService],
-  exports: [AuditLoggerService, AuditAnchorService],
+  providers: [
+    AuditLoggerService,
+    AuditAnchorService,
+    AuditRecoveryCryptoService,
+    IpfsArtifactService,
+    AuditArtifactService,
+    AuditRecoveryService,
+    AuditKafkaService,
+  ],
+  exports: [AuditLoggerService, AuditAnchorService, AuditArtifactService, AuditRecoveryService],
 })
 export class AuditModule {}
