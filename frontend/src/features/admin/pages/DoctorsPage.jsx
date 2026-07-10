@@ -11,7 +11,7 @@ import { departmentService } from '../apis/departmentService';
 import DoctorDetailModal from '../components/DoctorDetailModal';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { Calendar, ExternalLink, MapPin, Search } from 'lucide-react';
+import { Calendar, ExternalLink, MapPin, Search, Trash2 } from 'lucide-react';
 
 const OSM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
 const MIN_BIRTH_YEAR = 1900;
@@ -320,7 +320,7 @@ export default function DoctorsPage() {
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="doctors" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
       <div className="max-w-[1600px] mx-auto space-y-6">
-        <Hero totalLabel={totalLabel} onCreate={openCreate} />
+        <Hero totalLabel={totalLabel} onCreate={openCreate} onTrash={() => navigate('/admin/doctors/trash')} />
         {loading ? <LoadingIndicator size="lg" label="Đang tải bác sĩ..." /> : (
           <>
             <SearchBar filters={filters} setFilters={setFilters} onSearch={search} onReset={() => setFilters({ specialty: '', search: '', status: '' })} />
@@ -344,7 +344,7 @@ export default function DoctorsPage() {
   );
 }
 
-function Hero({ totalLabel, onCreate }) { return <div className="flex items-center justify-between gap-3"><span className="rounded-xl bg-white px-3 py-1 text-xs font-black text-cyan-700 border border-cyan-100">{totalLabel}</span><button onClick={onCreate} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ Thêm bác sĩ</button></div>; }
+function Hero({ totalLabel, onCreate, onTrash }) { return <div className="flex items-center justify-between gap-3"><span className="rounded-xl bg-white px-3 py-1 text-xs font-black text-cyan-700 border border-cyan-100">{totalLabel}</span><div className="flex gap-2"><button type="button" title="Bác sĩ đã xóa" onClick={onTrash} className="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600"><Trash2 size={18} /></button><button onClick={onCreate} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ Thêm bác sĩ</button></div></div>; }
 function SearchBar({ filters, setFilters, onSearch, onReset }) {
   const activeCount = [filters.specialty, filters.search, filters.status].filter(Boolean).length;
   return (

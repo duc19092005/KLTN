@@ -3,7 +3,6 @@ export { default as DepartmentsPage } from './pages/DepartmentsPage';
 export { default as StaffPage } from './pages/StaffPage';
 export { default as DoctorsPage } from './pages/DoctorsPage';
 export { default as AiModelsPage } from './pages/AiModelsPage';
-export { default as DeletedRecordsPage } from './pages/DeletedRecordsPage';
 export { default as AuditLogsPage } from './pages/AuditLogsPage';
 export { departmentService } from './apis/departmentService';
 export { auditService } from './apis/auditService';

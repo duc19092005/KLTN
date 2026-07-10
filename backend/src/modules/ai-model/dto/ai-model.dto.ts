@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, IsUrl, Matches, MaxLength } from 'class-validator';
+import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, IsUrl, IsUUID, Matches, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { OperationalStatus } from '@prisma/client';
 
@@ -116,6 +116,12 @@ export class UpdateAiModelDto {
 }
 
 export class AiModelQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({ example: 'Tim mạch' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  recommendedSpecialty?: string;
+
   @ApiPropertyOptional({ enum: AI_MODEL_TYPES })
   @IsOptional()
   @IsIn(AI_MODEL_TYPES)
@@ -164,6 +170,10 @@ export class TestAiModelApiDto {
 }
 
 export class RateAiModelDto {
+  @ApiProperty({ description: 'Kết quả AI cụ thể đã được bác sĩ sử dụng trong lượt khám' })
+  @IsUUID()
+  aiDiagnosisId!: string;
+
   @ApiProperty({ example: true, description: 'True nếu hài lòng/mô hình dự đoán đúng, False nếu không' })
   @IsBoolean()
   satisfied!: boolean;

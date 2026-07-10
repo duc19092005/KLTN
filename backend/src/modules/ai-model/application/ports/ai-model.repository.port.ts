@@ -34,6 +34,7 @@ export type AiModelListFilter = {
   type?: string;
   search?: string;
   provider?: string;
+  recommendedSpecialty?: string;
   includeDeleted?: boolean;
   status?: OperationalStatus;
 };
@@ -64,6 +65,7 @@ export function buildAiModelWhere(filter: AiModelListFilter): Prisma.AiModelRegi
         ? { provider: { notIn: ['local', 'ip'] } }
         : { provider: filter.provider }
       : {}),
+    ...(filter.recommendedSpecialty ? { recommendedSpecialty: { equals: filter.recommendedSpecialty, mode: 'insensitive' } } : {}),
     ...(filter.search
       ? {
         OR: [

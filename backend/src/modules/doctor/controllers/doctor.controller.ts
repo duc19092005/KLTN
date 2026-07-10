@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -10,6 +10,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { CreateDoctorDto, CreateDoctorWithStaffDto, DoctorQueryDto, UpdateDoctorDto } from '../dto/doctor.dto';
 import { DoctorService } from '../services/doctor.service';
 import { uploadAvatarToCloudinary } from '../../../infrastructure/storage/cloudinary-avatar-uploader';
+import { AdministrativeLifecycleService } from '../../../common/lifecycle/administrative-lifecycle.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
@@ -17,7 +18,7 @@ import { uploadAvatarToCloudinary } from '../../../infrastructure/storage/cloudi
 @ApiBearerAuth()
 @Controller('doctors')
 export class DoctorController {
-  constructor(private readonly service: DoctorService) { }
+  constructor(private readonly service: DoctorService, private readonly lifecycle: AdministrativeLifecycleService) { }
 
   @Post('upload-avatar')
   @UseInterceptors(
@@ -92,6 +93,21 @@ export class DoctorController {
   @ApiOperation({ summary: 'Update doctor specialty, license, qualification, or experience' })
   update(@Param('id') id: string, @Body() dto: UpdateDoctorDto, @CurrentUser() user: AuthUser) {
     return this.service.update(id, dto, user?.sub);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.softDelete('doctors', id, user.sub);
+  }
+
+  @Patch(':id/restore')
+  restore(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.restore('doctors', id, user.sub);
+  }
+
+  @Delete(':id/permanent')
+  permanentDelete(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.permanentDelete('doctors', id, user.sub);
   }
 
 }

@@ -74,8 +74,8 @@ export class AiModelService {
     return this.verifyAiModelUseCase.verifyAll();
   }
 
-  rateModel(modelId: string, userId: string, satisfied: boolean, feedback?: string) {
-    return this.rateAiModelUseCase.execute(modelId, userId, satisfied, feedback);
+  rateModel(modelId: string, userId: string, aiDiagnosisId: string, satisfied: boolean, feedback?: string) {
+    return this.rateAiModelUseCase.execute(modelId, userId, aiDiagnosisId, satisfied, feedback);
   }
 
   getStats() {

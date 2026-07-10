@@ -195,7 +195,7 @@ export default function DepartmentsPage() {
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="departments" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
       <div className="mx-auto max-w-[1600px] space-y-5">
-        <Hero onCreate={openCreate} />
+        <Hero onCreate={openCreate} onTrash={() => navigate('/admin/departments/trash')} />
         {loading ? <LoadingIndicator size="lg" label="Đang tải phòng ban..." /> : (
           <DepartmentDirectory departments={departments} staffs={staffs} busy={busy} selectedDepartment={selectedDepartment} onSelect={handleSelectDepartment} onAssignManager={assignManager} onEdit={openEdit} onHide={hideDepartment} onRestore={restoreDepartment} onDelete={confirmRemoveDepartment} pagination={pagination} onPageChange={load} />
         )}
@@ -221,9 +221,12 @@ export default function DepartmentsPage() {
   );
 }
 
-function Hero({ onCreate }) {
+function Hero({ onCreate, onTrash }) {
   return (
-    <div className="flex justify-end">
+    <div className="flex justify-end gap-2">
+      <button type="button" title="Phòng ban đã xóa" onClick={onTrash} className="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600">
+        <Trash2 size={18} />
+      </button>
       <button
         onClick={onCreate}
         className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-cyan-700"

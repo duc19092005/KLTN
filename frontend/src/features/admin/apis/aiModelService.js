@@ -7,6 +7,7 @@ export const aiModelService = {
   hide: (id) => api.patch(`/ai-models/${id}/hide`),
   restore: (id) => api.patch(`/ai-models/${id}/restore`),
   remove: (id) => api.delete(`/ai-models/${id}`),
+  permanentDelete: (id) => api.delete(`/ai-models/${id}/permanent`),
   testApi: (payload) => api.post('/ai-models/test-api', payload),
   get: (id) => api.get(`/ai-models/${id}`),
   verifyOne: (id) => api.get(`/ai-models/${id}/audit/verify`),

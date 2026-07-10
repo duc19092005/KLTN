@@ -91,7 +91,7 @@ export class PrismaAiModelRepository implements AiModelRepositoryPort {
   }
 
   async findById(id: string): Promise<any | null> {
-    return this.prisma.aiModelRegistry.findUnique({ where: { id } });
+    return this.prisma.aiModelRegistry.findUnique({ where: { id }, include: { _count: { select: { diagnoses: true, aiQualities: true } } } });
   }
 
   async findAllOrdered(): Promise<any[]> {

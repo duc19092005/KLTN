@@ -3,6 +3,7 @@ import { AiModelQueryDto } from '../../dto/ai-model.dto';
 import { AI_MODEL_REPOSITORY, AiModelRepositoryPort } from '../ports/ai-model.repository.port';
 import { AI_MODEL_INTEGRITY_ANCHOR, AiModelIntegrityAnchorPort } from '../ports/ai-model-integrity-anchor.port';
 import { getPagination, paginated } from '../../../shared/pagination.dto';
+import { presentAiModel } from '../../domain/ai-model.presenter';
 
 /** Lists AI models with optional type/search filter. Mirrors AiModelService.findAll(). */
 @Injectable()
@@ -15,7 +16,7 @@ export class ListAiModelsUseCase {
   async execute(query: AiModelQueryDto) {
     const { page, limit, skip } = getPagination(query);
     const { items, total } = await this.repo.findManyPaginated(
-      { type: query.type, search: query.search, provider: query.provider, status: query.status, includeDeleted: query.includeDeleted },
+      { type: query.type, search: query.search, provider: query.provider, recommendedSpecialty: query.recommendedSpecialty, status: query.status, includeDeleted: query.includeDeleted },
       skip,
       limit,
     );
@@ -40,7 +41,7 @@ export class ListAiModelsUseCase {
           };
         }
 
-        return {
+        return presentAiModel({
           ...model,
           averageAccuracy,
           totalRatings,
@@ -53,7 +54,7 @@ export class ListAiModelsUseCase {
             storedHash: integrityEval.storedHash,
             recomputedHash: integrityEval.recomputedHash,
           },
-        };
+        });
       })
     );
 

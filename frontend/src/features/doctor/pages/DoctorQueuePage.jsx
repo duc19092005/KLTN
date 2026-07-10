@@ -387,6 +387,7 @@ export default function DoctorQueuePage() {
     try {
       setBusy(true);
       await aiModelService.rate(ratingModelId, {
+        aiDiagnosisId: selectedAiId,
         satisfied,
         feedback: satisfied ? undefined : ratingFeedback,
       });

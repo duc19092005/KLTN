@@ -95,7 +95,7 @@ describe('UpdateStaffUseCase audit V2', () => {
     await useCase.execute('staff-1', { fullName: 'def' } as any, 'admin-1');
 
     expect(audit.recordV2).not.toHaveBeenCalled();
-    expect(doctorReanchor.reanchorForStaffUpdate).toHaveBeenCalledWith('staff-1', 'admin-1');
+    expect(doctorReanchor.reanchorForStaffUpdate).toHaveBeenCalledWith('staff-1', 'admin-1', expect.any(Object));
   });
 
   it('still blocks role escalation to admin before audit write', async () => {

@@ -10,7 +10,7 @@ import { staffService } from '../apis/staffService';
 import StaffDetailModal from '../components/StaffDetailModal';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { Calendar, ExternalLink, MapPin, Search, X } from 'lucide-react';
+import { Calendar, ExternalLink, MapPin, Search, Trash2, X } from 'lucide-react';
 
 const emptyStaff = { username: '', email: '', fullName: '', avatarUrl: '', departmentId: '', phone: '', gender: '', citizenId: '', birthDate: '', address: '', position: '', role: 'LAB_MANAGER' };
 const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100', INACTIVE: 'bg-rose-50 text-rose-700 border-rose-100', PENDING: 'bg-amber-50 text-amber-700 border-amber-100' };
@@ -209,7 +209,8 @@ export default function StaffPage() {
       }
       const staffPayload = buildStaffPayload(form);
       if (editingStaff) {
-        await staffService.update(editingStaff.id, staffPayload);
+        const { username, role, ...editableProfile } = staffPayload;
+        await staffService.update(editingStaff.id, editableProfile);
         toast.success('Cập nhật nhân sự thành công!');
       } else {
         await staffService.create(staffPayload);
@@ -255,7 +256,7 @@ export default function StaffPage() {
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="staff" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
       <div className="max-w-[1600px] mx-auto space-y-6">
-        <Hero onCreate={openCreate} />
+        <Hero onCreate={openCreate} onTrash={() => navigate('/admin/staff/trash')} />
         {loading ? <LoadingIndicator size="lg" label="Đang tải nhân sự..." /> : (
           <>
             <StaffSearch filters={filters} setFilters={setFilters} onSearch={search} onReset={resetFilters} departments={departments} />
@@ -268,7 +269,7 @@ export default function StaffPage() {
     </DashboardLayout>
   );
 }
-function Hero({ onCreate }) { return <div className="flex justify-end"><button onClick={onCreate} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ Thêm nhân sự</button></div>; }
+function Hero({ onCreate, onTrash }) { return <div className="flex justify-end gap-2"><button type="button" title="Nhân sự đã xóa" onClick={onTrash} className="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600"><Trash2 size={18} /></button><button onClick={onCreate} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ Thêm nhân sự</button></div>; }
 const ROLE_OPTIONS = [{ value: 'RECEPTIONIST', label: 'Lễ tân' }, { value: 'LAB_MANAGER', label: 'Kỹ thuật viên cận lâm sàng' }];
 
 // Remove empty/falsey filter values so we never send blank `departmentId` (the backend
@@ -488,10 +489,10 @@ function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editi
           <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500">Đóng</button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select label="Loại nhân sự" value={form.role} onChange={(v) => setForm({ ...form, role: v })} options={[{ value: 'RECEPTIONIST', label: 'Lễ tân' }, { value: 'LAB_MANAGER', label: 'Kỹ thuật viên cận lâm sàng' }]} required />
+          <Select label="Loại nhân sự" value={form.role} onChange={(v) => setForm({ ...form, role: v })} options={[{ value: 'RECEPTIONIST', label: 'Lễ tân' }, { value: 'LAB_MANAGER', label: 'Kỹ thuật viên cận lâm sàng' }]} required disabled={Boolean(editingStaff)} />
           <Input label="Họ tên" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: onlyVietnameseNameChars(v) })} onBlur={() => validateField('fullName')} error={fieldErrors.fullName} placeholder="Nguyễn Văn A" pattern="[A-Za-zÀ-ỹ\\s]+" maxLength={MAX_FULL_NAME_LENGTH} required />
           <AvatarUpload value={form.avatarUrl} onChange={(url) => setForm({ ...form, avatarUrl: url })} uploadFn={staffService.uploadAvatar} ringTone="cyan" />
-          <Input label="Tên đăng nhập" value={form.username} onChange={(v) => setForm({ ...form, username: onlyUsernameChars(v) })} onBlur={() => validateField('username')} error={fieldErrors.username} placeholder="nguyenvana01" pattern="[a-z0-9]+" maxLength={MAX_USERNAME_LENGTH} required />
+          <Input label="Tên đăng nhập" value={form.username} onChange={(v) => setForm({ ...form, username: onlyUsernameChars(v) })} onBlur={() => validateField('username')} error={fieldErrors.username} placeholder="nguyenvana01" pattern="[a-z0-9]+" maxLength={MAX_USERNAME_LENGTH} required disabled={Boolean(editingStaff)} />
           <Input label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} onBlur={handleEmailBlur} error={fieldErrors.email} placeholder="example@gmail.com" type="text" inputMode="email" pattern="[a-z0-9._%\\-]+@[a-z0-9.\\-]+\\.[a-z]{2,}" required />
           <Input label="Số điện thoại" value={form.phone} onChange={(v) => setForm({ ...form, phone: onlyDigits(v).slice(0, 10) })} onBlur={() => validateField('phone')} error={fieldErrors.phone} placeholder="0xxxxxxxxx" inputMode="numeric" maxLength={10} pattern="0[0-9]{9}" required />
           <Input label="CCCD/CMND" value={form.citizenId} onChange={(v) => setForm({ ...form, citizenId: onlyDigits(v).slice(0, 12) })} onBlur={() => validateField('citizenId')} error={fieldErrors.citizenId} placeholder="12 chữ số CCCD" inputMode="numeric" maxLength={12} pattern="[0-9]{12}" required />
@@ -529,7 +530,7 @@ function Pagination({ pagination, onPageChange }) { return <div className="flex 
 function Info({ label, value, mono }) { return <div><p className="text-[11px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className={`text-sm text-slate-700 ${mono ? 'font-mono' : 'font-bold'}`}>{value}</p></div>; }
 function Empty({ title, desc }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><strong>{title}</strong><p className="mt-1 text-sm text-slate-500">{desc}</p></div>; }
 function SmallButton({ children, onClick, disabled, danger }) { return <button type="button" disabled={disabled} onClick={onClick} className={`rounded-xl border px-3 py-2 text-xs font-black disabled:opacity-50 ${danger ? 'border-rose-100 bg-rose-50 text-rose-600 hover:bg-rose-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-cyan-50 hover:text-cyan-600'}`}>{children}</button>; }
-function Input({ label, value, onChange, onBlur, error, required, placeholder, type = 'text', inputMode, maxLength, pattern }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><input type={type} required={required} value={value || ''} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder} inputMode={inputMode} maxLength={maxLength} pattern={pattern} min={type === 'number' ? '0' : undefined} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} /><p className={`min-h-[16px] text-xs font-semibold leading-4 ${error ? 'text-rose-600' : 'text-transparent'}`}>{error || 'Không có lỗi'}</p></label>; }
+function Input({ label, value, onChange, onBlur, error, required, placeholder, type = 'text', inputMode, maxLength, pattern, disabled = false }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><input type={type} required={required} disabled={disabled} value={value || ''} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder} inputMode={inputMode} maxLength={maxLength} pattern={pattern} min={type === 'number' ? '0' : undefined} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none disabled:cursor-not-allowed disabled:opacity-60 ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} /><p className={`min-h-[16px] text-xs font-semibold leading-4 ${error ? 'text-rose-600' : 'text-transparent'}`}>{error || 'Không có lỗi'}</p></label>; }
 function DateInput({ label, value, onChange, onBlur, error, required }) {
   const pickerRef = useRef(null);
   const openPicker = () => {
@@ -608,4 +609,4 @@ function AddressInput({ label, value, onChange, onBlur, onFocus, error, maxLengt
     </label>
   );
 }
-function Select({ label, value, onChange, options, empty, required }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><select required={required} value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none">{empty && <option value="">{empty}</option>}{options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>; }
+function Select({ label, value, onChange, options, empty, required, disabled = false }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><select required={required} disabled={disabled} value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none disabled:cursor-not-allowed disabled:opacity-60">{empty && <option value="">{empty}</option>}{options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>; }

@@ -8,6 +8,7 @@ import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { aiModelService } from '../apis/aiModelService';
 import { useToast } from '../../../providers/ToastProvider';
 import AiModelDetailModal from '../components/AiModelDetailModal';
+import { Trash2 } from 'lucide-react';
 
 // A provider is either a managed cloud API (endpoint auto-filled, key required) or a
 // self-hosted / custom endpoint (admin types the URL, key optional). "local" covers
@@ -343,7 +344,8 @@ export default function AiModelsPage() {
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="aiModels" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
       <div className="mx-auto max-w-[1600px] space-y-5">
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <button type="button" title="Mô hình AI đã xóa" onClick={() => navigate('/admin/ai-models/trash')} className="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"><Trash2 size={18} /></button>
           <button type="button" onClick={openCreateModal} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 transition-colors">+ Thêm mô hình AI</button>
         </div>
 

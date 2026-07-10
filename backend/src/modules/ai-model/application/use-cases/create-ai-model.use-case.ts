@@ -4,6 +4,7 @@ import { AI_MODEL_REPOSITORY, AiModelRepositoryPort } from '../ports/ai-model.re
 import { AI_MODEL_CRYPTO, AiModelCryptoPort } from '../ports/ai-model-crypto.port';
 import { AI_MODEL_CONNECTIVITY, AiModelConnectivityPort } from '../ports/ai-model-connectivity.port';
 import { AI_MODEL_INTEGRITY_ANCHOR, AiModelIntegrityAnchorPort } from '../ports/ai-model-integrity-anchor.port';
+import { presentAiModel } from '../../domain/ai-model.presenter';
 
 /**
  * Registers a new AI model. Behavior copied verbatim from the former
@@ -46,6 +47,6 @@ export class CreateAiModelUseCase {
     });
 
     await this.integrity.anchorChange(model, 'CREATE', adminUserId, null);
-    return model;
+    return presentAiModel(model);
   }
 }

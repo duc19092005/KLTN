@@ -41,6 +41,11 @@ export class AuditController {
   @ApiOperation({ summary: 'List audit log entries (hash-chained) with pagination, sort & batch filter' })
   async logs(
     @Query('entity') entity?: string,
+    @Query('action') action?: string,
+    @Query('actorId') actorId?: string,
+    @Query('from') fromRaw?: string,
+    @Query('to') toRaw?: string,
+    @Query('verificationStatus') verificationStatus?: string,
     @Query('batch') batchRaw?: string,
     @Query('sort') sortRaw?: string,
     @Query('page') pageRaw?: string,
@@ -53,8 +58,19 @@ export class AuditController {
     // Display order only — the tamper-evident chain itself is always keyed by the monotonic seq.
     const sort: 'asc' | 'desc' = sortRaw === 'asc' ? 'asc' : 'desc';
 
-    const where: { entity?: string; batchId?: number } = {};
+    const where: any = {};
     if (entity) where.entity = entity;
+    if (action) where.action = action;
+    if (actorId) where.actorId = actorId;
+    if (verificationStatus) where.onChainStatus = verificationStatus;
+    const from = fromRaw ? new Date(fromRaw) : null;
+    const to = toRaw ? new Date(toRaw) : null;
+    if ((from && !Number.isNaN(from.getTime())) || (to && !Number.isNaN(to.getTime()))) {
+      where.createdAt = {
+        ...(from && !Number.isNaN(from.getTime()) ? { gte: from } : {}),
+        ...(to && !Number.isNaN(to.getTime()) ? { lte: to } : {}),
+      };
+    }
     if (batchRaw !== undefined && batchRaw !== '' && Number.isFinite(Number(batchRaw))) {
       where.batchId = Number(batchRaw);
     }
@@ -321,33 +337,6 @@ export class AuditController {
       });
       if (!staff) return base;
       return { ...base, label: 'Nhân sự', code: staff.employeeCode, displayName: staff.fullName, linkedUserId: staff.userId, departmentId: staff.departmentId, departmentName: staff.department?.name ?? null };
-    }
-
-    if (row.entity === 'Patient') {
-      const patient = await this.prisma.patient.findUnique({
-        where: { id: row.entityId },
-        select: { id: true, patientCode: true, fullName: true },
-      });
-      if (!patient) return base;
-      return { ...base, label: 'Bệnh nhân', code: patient.patientCode, displayName: patient.fullName, patientId: patient.id };
-    }
-
-    if (row.entity === 'Visit') {
-      const visit = await this.prisma.visit.findUnique({
-        where: { id: row.entityId },
-        select: { id: true, visitCode: true, patientId: true, departmentId: true, patient: { select: { fullName: true, patientCode: true } }, department: { select: { name: true } } },
-      });
-      if (!visit) return base;
-      return { ...base, label: 'Lượt khám', code: visit.visitCode, displayName: `${visit.patient?.fullName ?? 'Bệnh nhân'} · ${visit.visitCode}`, departmentId: visit.departmentId, departmentName: visit.department?.name ?? null, patientId: visit.patientId, visitId: visit.id };
-    }
-
-    if (row.entity === 'MedicalConclusion') {
-      const conclusion = await this.prisma.medicalConclusion.findUnique({
-        where: { id: row.entityId },
-        select: { id: true, visitId: true, visit: { select: { visitCode: true, patientId: true, patient: { select: { fullName: true } }, departmentId: true, department: { select: { name: true } } } } },
-      });
-      if (!conclusion) return base;
-      return { ...base, label: 'Kết luận khám', code: conclusion.visit?.visitCode ?? null, displayName: `${conclusion.visit?.patient?.fullName ?? 'Bệnh nhân'} · Kết luận`, departmentId: conclusion.visit?.departmentId ?? null, departmentName: conclusion.visit?.department?.name ?? null, patientId: conclusion.visit?.patientId ?? null, visitId: conclusion.visitId };
     }
 
     if (row.entity === 'Department') {

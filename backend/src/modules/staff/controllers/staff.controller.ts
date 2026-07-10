@@ -11,6 +11,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { CreateStaffDto, StaffQueryDto, UpdateStaffDto } from '../dto/staff.dto';
 import { StaffService } from '../services/staff.service';
 import { uploadAvatarToCloudinary } from '../../../infrastructure/storage/cloudinary-avatar-uploader';
+import { AdministrativeLifecycleService } from '../../../common/lifecycle/administrative-lifecycle.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
@@ -18,7 +19,7 @@ import { uploadAvatarToCloudinary } from '../../../infrastructure/storage/cloudi
 @ApiBearerAuth()
 @Controller('staff')
 export class StaffController {
-  constructor(private readonly service: StaffService) {}
+  constructor(private readonly service: StaffService, private readonly lifecycle: AdministrativeLifecycleService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create staff profile and login user account' })
@@ -84,7 +85,17 @@ export class StaffController {
   @Delete(':id')
   @ApiOperation({ summary: 'Soft-delete staff by marking account inactive' })
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.service.remove(id, user?.sub);
+    return this.lifecycle.softDelete('staff', id, user.sub);
+  }
+
+  @Patch(':id/restore')
+  restore(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.restore('staff', id, user.sub);
+  }
+
+  @Delete(':id/permanent')
+  permanentDelete(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.permanentDelete('staff', id, user.sub);
   }
 
   @Post('upload-avatar')

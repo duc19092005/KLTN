@@ -7,13 +7,14 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { AiModelQueryDto, CreateAiModelDto, TestAiModelApiDto, RateAiModelDto, UpdateAiModelDto } from '../dto/ai-model.dto';
 import { AiModelService } from '../services/ai-model.service';
+import { AdministrativeLifecycleService } from '../../../common/lifecycle/administrative-lifecycle.service';
 
 @ApiTags('AI Model Registry')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('ai-models')
 export class AiModelController {
-  constructor(private readonly service: AiModelService) {}
+  constructor(private readonly service: AiModelService, private readonly lifecycle: AdministrativeLifecycleService) {}
 
   @Roles('ADMIN')
   @Post()
@@ -42,13 +43,19 @@ export class AiModelController {
   @Roles('ADMIN')
   @Patch(':id/restore')
   restore(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.service.restore(id, user.sub);
+    return this.lifecycle.restore('ai-models', id, user.sub);
+  }
+
+  @Roles('ADMIN')
+  @Delete(':id/permanent')
+  permanentDelete(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.permanentDelete('ai-models', id, user.sub);
   }
 
   @Roles('ADMIN')
   @Delete(':id')
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.service.remove(id, user.sub);
+    return this.lifecycle.softDelete('ai-models', id, user.sub);
   }
 
   @Roles('ADMIN')
@@ -96,7 +103,7 @@ export class AiModelController {
   @Roles('DOCTOR')
   @Post(':id/rate')
   rate(@Param('id') id: string, @Body() dto: RateAiModelDto, @CurrentUser() user: AuthUser) {
-    return this.service.rateModel(id, user.sub, dto.satisfied, dto.feedback);
+    return this.service.rateModel(id, user.sub, dto.aiDiagnosisId, dto.satisfied, dto.feedback);
   }
 }
 

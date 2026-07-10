@@ -18,8 +18,11 @@ export class CreateStaffDto {
   @Matches(/^[a-z0-9]+(?:[._-][a-z0-9]+)*@[a-z0-9]+(?:[-.][a-z0-9]+)*\.[a-z]{2,}$/, { message: 'Email phải đúng định dạng và không chứa dấu/ký tự đặc biệt lạ.' })
   email!: string;
 
-  @ApiProperty({ enum: UserRole, example: UserRole.LAB_MANAGER })
-  @IsEnum(UserRole) role!: UserRole;
+  @ApiProperty({ enum: [UserRole.RECEPTIONIST, UserRole.LAB_MANAGER], example: UserRole.LAB_MANAGER })
+  @IsIn([UserRole.RECEPTIONIST, UserRole.LAB_MANAGER], {
+    message: 'Nhân sự chỉ gồm Lễ tân hoặc Kỹ thuật viên cận lâm sàng.',
+  })
+  role!: UserRole;
 
   @ApiProperty({ example: 'Nguyễn Văn A', maxLength: 80 })
   @IsString()
@@ -71,24 +74,11 @@ export class CreateStaffDto {
 }
 
 export class UpdateStaffDto {
-  @ApiPropertyOptional({ example: 'nguyenvana01', maxLength: 30 })
-  @IsOptional()
-  @IsString()
-  @MaxLength(30, { message: 'Tên đăng nhập không được vượt quá 30 ký tự.' })
-  @Matches(/^[a-z0-9]+$/, { message: 'Tên đăng nhập chỉ gồm chữ thường không dấu và số.' })
-  username?: string;
-
   @ApiPropertyOptional({ example: 'nguyenvana@hospital.local' })
   @IsOptional()
   @IsEmail({}, { message: 'Email phải đúng định dạng.' })
   @Matches(/^[a-z0-9]+(?:[._-][a-z0-9]+)*@[a-z0-9]+(?:[-.][a-z0-9]+)*\.[a-z]{2,}$/, { message: 'Email phải đúng định dạng và không chứa dấu/ký tự đặc biệt lạ.' })
   email?: string;
-
-  @ApiPropertyOptional({ enum: UserRole })
-  @IsOptional() @IsEnum(UserRole) role?: UserRole;
-
-  @ApiPropertyOptional({ enum: UserStatus })
-  @IsOptional() @IsEnum(UserStatus) status?: UserStatus;
 
   @ApiPropertyOptional({ example: 'Nguyễn Văn A', maxLength: 80 })
   @IsOptional()

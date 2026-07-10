@@ -130,6 +130,9 @@ model User {
 
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
+  deletedAt         DateTime?
+  deletedBy         String?
+  restoredAt        DateTime?
 
   staffProfile      StaffProfile?
   adminProfile      AdminProfile?
@@ -172,10 +175,14 @@ model Department {
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+  deletedBy      String?
+  restoredAt     DateTime?
 
   @@index([status])
   @@index([type])
   @@index([canReceiveOrders])
+  @@index([deletedAt])
 }
 
 model StaffProfile {
@@ -515,6 +522,9 @@ model AiModelRegistry {
 
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+  deletedAt            DateTime?
+  deletedBy            String?
+  restoredAt           DateTime?
 
   diagnoses            AiDiagnosis[]
   aiQualities          AiQuality[]
@@ -530,6 +540,7 @@ model AiModelRegistry {
   @@index([isDeleted])
   @@index([type])
   @@index([provider])
+  @@index([deletedAt])
 }
 
 model AiDiagnosis {
@@ -550,6 +561,7 @@ model AiDiagnosis {
   reviewedByDoctor   DoctorProfile? @relation(fields: [reviewedByDoctorId], references: [id])
   doctorFeedback String?
   conclusions    MedicalConclusion[]
+  quality        AiQuality?
 
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
@@ -597,6 +609,9 @@ model AiQuality {
 
   aiModelId                  String
   aiModel                    AiModelRegistry @relation(fields: [aiModelId], references: [id])
+
+  aiDiagnosisId              String?         @unique
+  aiDiagnosis                AiDiagnosis?    @relation(fields: [aiDiagnosisId], references: [id])
 
   doctorConclusionAboutModel String
   trustablePercent           Float
@@ -666,19 +681,19 @@ model BlockchainLogger {
 
   // Foreign keys to the audited entities (nullable; exactly one set per row)
   departmentId        String?
-  department          Department?        @relation(fields: [departmentId], references: [id])
+  department          Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
   staffProfileId      String?
-  staffProfile        StaffProfile?      @relation(fields: [staffProfileId], references: [id])
+  staffProfile        StaffProfile?      @relation(fields: [staffProfileId], references: [id], onDelete: SetNull)
 
   doctorProfileId     String?
-  doctorProfile       DoctorProfile?     @relation(fields: [doctorProfileId], references: [id])
+  doctorProfile       DoctorProfile?     @relation(fields: [doctorProfileId], references: [id], onDelete: SetNull)
 
   patientId           String?
   patient             Patient?           @relation(fields: [patientId], references: [id])
 
   aiModelRegistryId   String?
-  aiModelRegistry     AiModelRegistry?   @relation(fields: [aiModelRegistryId], references: [id])
+  aiModelRegistry     AiModelRegistry?   @relation(fields: [aiModelRegistryId], references: [id], onDelete: SetNull)
 
   medicalConclusionId String?
   medicalConclusion   MedicalConclusion? @relation(fields: [medicalConclusionId], references: [id])

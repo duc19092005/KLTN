@@ -5,6 +5,7 @@ import { AI_MODEL_CRYPTO, AiModelCryptoPort } from '../ports/ai-model-crypto.por
 import { AI_MODEL_INTEGRITY_ANCHOR, AiModelIntegrityAnchorPort } from '../ports/ai-model-integrity-anchor.port';
 import { AI_MODEL_REPOSITORY, AiModelRepositoryPort, UpdateAiModelData } from '../ports/ai-model.repository.port';
 import { buildAiModelSnapshot } from '../../domain/ai-model-snapshot';
+import { presentAiModel } from '../../domain/ai-model.presenter';
 
 /**
  * Updates an AI model registry row and re-anchors the new business snapshot.
@@ -22,6 +23,16 @@ export class UpdateAiModelUseCase {
   async execute(id: string, dto: UpdateAiModelDto, actorId?: string) {
     const existing = await this.repo.findById(id);
     if (!existing || existing.isDeleted || existing.status === 'DELETE') throw new NotFoundException('Không tìm thấy mô hình AI.');
+    const hasUsage = Number(existing._count?.diagnoses || 0) + Number(existing._count?.aiQualities || 0) > 0;
+    if (hasUsage) {
+      const identityChanged =
+        (dto.modelName !== undefined && dto.modelName.trim() !== existing.modelName) ||
+        (dto.modelVersion !== undefined && dto.modelVersion.trim() !== existing.modelVersion) ||
+        (dto.type !== undefined && dto.type !== existing.type) ||
+        (dto.provider !== undefined && dto.provider !== existing.provider) ||
+        (dto.recommendedSpecialty !== undefined && (dto.recommendedSpecialty.trim() || null) !== existing.recommendedSpecialty);
+      if (identityChanged) throw new BadRequestException('Mô hình đã được sử dụng; chỉ được cập nhật điểm cuối API, khóa truy cập, mô tả hoặc trạng thái.');
+    }
 
     const type = dto.type ?? existing.type ?? 'API';
     if (type === 'API' && !(dto.provider ?? existing.provider)) {
@@ -60,6 +71,6 @@ export class UpdateAiModelUseCase {
     const before = buildAiModelSnapshot(existing);
     const updated = await this.repo.update(id, data);
     await this.integrity.anchorChange(updated, 'UPDATE', actorId, before);
-    return updated;
+    return presentAiModel(updated);
   }
 }
