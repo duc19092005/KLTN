@@ -183,18 +183,73 @@ export class AuditController {
       this.prisma.auditBatch.count(),
     ]);
 
-    const contentByBatch = await this.buildBatchContentSummaries(items.map((item) => item.batchId));
+    const batchIds = items.map((item) => item.batchId);
+    const contentByBatch = await this.buildBatchContentSummaries(batchIds);
+    const integrityByBatch = await this.buildBatchIntegritySummaries(batchIds);
 
     return {
       items: items.map(({ artifactUri, ...item }) => ({
         ...item,
         artifactAvailable: Boolean(artifactUri && item.artifactHash),
         contentSummary: contentByBatch.get(item.batchId) ?? [],
+        integrity: integrityByBatch.get(item.batchId) ?? {
+          status: 'PENDING',
+          verified: 0,
+          tampered: 0,
+          pending: 0,
+          total: 0,
+        },
       })),
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  @Get('batches/:batchId')
+  @ApiOperation({ summary: 'Batch detail with all audit seq leaves and integrity summary' })
+  async batchDetail(
+    @Param('batchId', ParseIntPipe) batchId: number,
+    @CurrentUser() user?: AuthUser,
+  ) {
+    const batch = await this.prisma.auditBatch.findUnique({ where: { batchId } });
+    if (!batch) throw new NotFoundException('Không tìm thấy lô audit.');
+
+    const rows = await this.prisma.blockchainLogger.findMany({
+      where: { batchId },
+      orderBy: { seq: 'asc' },
+    });
+
+    const actorIds = [...new Set(rows.map((r) => r.actorId).filter((id): id is string => Boolean(id)))];
+    const actors = actorIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: actorIds } },
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            role: true,
+            staffProfile: { select: { fullName: true } },
+            adminProfile: { select: { adminUserName: true } },
+          },
+        })
+      : [];
+    const actorMap = new Map(actors.map((a) => [a.id, a]));
+    const subjectMap = await this.resolveSubjectContextMap(rows);
+    const logs = rows.map((row) =>
+      this.presentAuditRow(row, row.actorId ? actorMap.get(row.actorId) : null, user, false, false, subjectMap.get(this.subjectKey(row)) ?? null),
+    );
+    const integrity = this.summarizeIntegrityFromPresented(logs);
+    const contentSummary = (await this.buildBatchContentSummaries([batchId])).get(batchId) ?? [];
+
+    const { artifactUri, ...safeBatch } = batch as typeof batch & { artifactUri?: string | null };
+    return {
+      ...safeBatch,
+      artifactAvailable: Boolean(artifactUri && batch.artifactHash),
+      contentSummary,
+      integrity,
+      logs,
     };
   }
 
@@ -305,6 +360,63 @@ export class AuditController {
 
   }
 
+
+  private async buildBatchIntegritySummaries(batchIds: number[]) {
+    const map = new Map<
+      number,
+      { status: 'VERIFIED' | 'TAMPERED' | 'PENDING'; verified: number; tampered: number; pending: number; total: number }
+    >();
+    if (!batchIds.length) return map;
+
+    const rows = await this.prisma.blockchainLogger.findMany({
+      where: { batchId: { in: batchIds } },
+      orderBy: { seq: 'asc' },
+    });
+
+    const byBatch = new Map<number, typeof rows>();
+    for (const row of rows) {
+      if (row.batchId == null) continue;
+      const list = byBatch.get(row.batchId) ?? [];
+      list.push(row);
+      byBatch.set(row.batchId, list);
+    }
+
+    for (const [batchId, batchRows] of byBatch.entries()) {
+      let verified = 0;
+      let tampered = 0;
+      let pending = 0;
+      for (const row of batchRows) {
+        const result = verifyAuditRowLight(row);
+        if (result.status === 'VERIFIED') verified += 1;
+        else if (result.status === 'TAMPERED') tampered += 1;
+        else pending += 1;
+      }
+      const total = batchRows.length;
+      const status: 'VERIFIED' | 'TAMPERED' | 'PENDING' =
+        tampered > 0 ? 'TAMPERED' : pending > 0 ? 'PENDING' : total > 0 ? 'VERIFIED' : 'PENDING';
+      map.set(batchId, { status, verified, tampered, pending, total });
+    }
+
+    return map;
+  }
+
+  private summarizeIntegrityFromPresented(
+    logs: Array<{ blockchainStatus?: string; verification?: { status?: string } }>,
+  ) {
+    let verified = 0;
+    let tampered = 0;
+    let pending = 0;
+    for (const log of logs) {
+      const status = log.blockchainStatus || log.verification?.status || 'PENDING';
+      if (status === 'VERIFIED') verified += 1;
+      else if (status === 'TAMPERED') tampered += 1;
+      else pending += 1;
+    }
+    const total = logs.length;
+    const status: 'VERIFIED' | 'TAMPERED' | 'PENDING' =
+      tampered > 0 ? 'TAMPERED' : pending > 0 ? 'PENDING' : total > 0 ? 'VERIFIED' : 'PENDING';
+    return { status, verified, tampered, pending, total };
+  }
 
   /**
    * Map free-text search (department code/name, staff name/code, AI model name)

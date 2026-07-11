@@ -147,52 +147,26 @@ export default function AuditLogsPage() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const [tab, setTab] = useState('logs');
   const [loading, setLoading] = useState(true);
-  const [logs, setLogs] = useState([]);
   const [batches, setBatches] = useState([]);
   const [chain, setChain] = useState(null);
-  const [entity, setEntity] = useState('');
   const [searchQ, setSearchQ] = useState('');
   const [appliedQ, setAppliedQ] = useState('');
-  const [sortOrder, setSortOrder] = useState('desc');
-  const [batchFilter, setBatchFilter] = useState('');
   const [anchoring, setAnchoring] = useState(false);
   const [proof, setProof] = useState(null);
   const [recoveryTarget, setRecoveryTarget] = useState(null);
   const [recoveryReason, setRecoveryReason] = useState('');
   const [recoveryFaceOpen, setRecoveryFaceOpen] = useState(false);
   const [recoveringBatchId, setRecoveringBatchId] = useState(null);
-
-  const [logsPage, setLogsPage] = useState(1);
-  const [logsTotalPages, setLogsTotalPages] = useState(1);
-  const [logsTotal, setLogsTotal] = useState(0);
+  const [selectedBatchId, setSelectedBatchId] = useState(null);
+  const [batchDetail, setBatchDetail] = useState(null);
+  const [batchDetailLoading, setBatchDetailLoading] = useState(false);
+  const [seqDetail, setSeqDetail] = useState(null);
+  const [pendingQueue, setPendingQueue] = useState({ total: 0, items: [] });
 
   const [batchesPage, setBatchesPage] = useState(1);
   const [batchesTotalPages, setBatchesTotalPages] = useState(1);
   const [batchesTotal, setBatchesTotal] = useState(0);
-
-  const loadLogs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await auditService.logs({
-        page: logsPage,
-        limit: 10,
-        sort: sortOrder,
-        ...(entity ? { entity } : {}),
-        ...(appliedQ ? { q: appliedQ } : {}),
-        ...(batchFilter !== '' ? { batch: batchFilter } : {}),
-      });
-      const data = res.data || {};
-      setLogs(data.items || []);
-      setLogsTotal(data.total || 0);
-      setLogsTotalPages(data.totalPages || 1);
-    } catch (err) {
-      toast.error(err?.response?.data?.message || err.message || 'Không tải được nhật ký');
-    } finally {
-      setLoading(false);
-    }
-  }, [logsPage, entity, appliedQ, sortOrder, batchFilter, toast]);
 
   const loadBatches = useCallback(async () => {
     setLoading(true);
@@ -212,6 +186,17 @@ export default function AuditLogsPage() {
     }
   }, [batchesPage, toast]);
 
+  const loadPendingQueue = useCallback(async () => {
+    try {
+      // Logs without batch yet (onChain not necessarily ANCHORED); filter client-side by missing batchId.
+      const res = await auditService.logs({ page: 1, limit: 20, sort: 'desc', verificationStatus: 'PENDING' });
+      const items = (res.data?.items || []).filter((item) => item.batchId == null);
+      setPendingQueue({ total: items.length, items: items.slice(0, 5) });
+    } catch {
+      setPendingQueue({ total: 0, items: [] });
+    }
+  }, []);
+
   const loadChain = useCallback(async () => {
     try {
       const res = await auditService.verifyChain();
@@ -221,40 +206,59 @@ export default function AuditLogsPage() {
     }
   }, []);
 
+  const openBatchDetail = useCallback(async (batchId) => {
+    setSelectedBatchId(batchId);
+    setBatchDetailLoading(true);
+    setBatchDetail(null);
+    try {
+      const res = await auditService.batchDetail(batchId);
+      setBatchDetail(res.data);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err.message || 'Không tải được chi tiết lô');
+      setSelectedBatchId(null);
+    } finally {
+      setBatchDetailLoading(false);
+    }
+  }, [toast]);
+
   const refreshAll = useCallback(async () => {
-    setLoading(true);
-    if (tab === 'logs') {
-      await loadLogs();
-    } else {
-      await loadBatches();
-    }
+    await loadBatches();
+    await loadPendingQueue();
     await loadChain();
-  }, [tab, loadLogs, loadBatches, loadChain]);
+    if (selectedBatchId) await openBatchDetail(selectedBatchId);
+  }, [loadBatches, loadPendingQueue, loadChain, selectedBatchId, openBatchDetail]);
 
   useEffect(() => {
-    if (tab === 'logs') {
-      loadLogs();
-    } else {
-      loadBatches();
-    }
-  }, [tab, logsPage, batchesPage, entity, appliedQ, sortOrder, batchFilter, loadLogs, loadBatches]);
+    loadBatches();
+  }, [loadBatches]);
 
   useEffect(() => {
+    loadPendingQueue();
     loadChain();
-  }, [loadChain]);
-
-  useEffect(() => {
-    setLogsPage(1);
-  }, [entity, appliedQ, sortOrder, batchFilter]);
+  }, [loadPendingQueue, loadChain]);
 
   const stats = useMemo(() => {
     return {
-      total: logsTotal,
       batches: batchesTotal,
       isChainOk: chain?.ok ?? true,
       chainLength: chain?.total ?? 0,
+      pending: pendingQueue.total,
     };
-  }, [logsTotal, batchesTotal, chain]);
+  }, [batchesTotal, chain, pendingQueue.total]);
+
+  const filteredBatches = useMemo(() => {
+    if (!appliedQ) return batches;
+    const q = appliedQ.toLowerCase();
+    return batches.filter((b) => {
+      const summaryText = (b.contentSummary || [])
+        .flatMap((item) => [item.entity, ...(item.samples || [])])
+        .join(' ')
+        .toLowerCase();
+      return String(b.batchId).includes(q)
+        || summaryText.includes(q)
+        || (b.merkleRoot || '').toLowerCase().includes(q);
+    });
+  }, [batches, appliedQ]);
 
   const handleAnchorNow = async () => {
     setAnchoring(true);
@@ -311,99 +315,146 @@ export default function AuditLogsPage() {
       onLogout={logout}
     >
       <div className="mx-auto max-w-[1600px] space-y-5">
-        <div className="flex justify-end">
-          <button
-            id="audit-anchor-now-button"
-            type="button"
-            onClick={handleAnchorNow}
-            disabled={anchoring}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-cyan-700 disabled:opacity-60"
-          >
-            <LockKeyhole className="h-4 w-4" />
-            {anchoring ? 'Đang neo dữ liệu...' : 'Neo blockchain ngay'}
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-600">Audit & blockchain</p>
+            <h1 className="mt-1 text-2xl font-black text-slate-950">Danh sách lô neo ({stats.batches})</h1>
+            <p className="mt-1 text-sm font-semibold text-slate-500">Xem theo lô → mở chi tiết để thấy các SEQ bên trong → khôi phục cả lô khi cần.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={refreshAll}
+              disabled={loading}
+              className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-700 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Đồng bộ
+            </button>
+            <button
+              id="audit-anchor-now-button"
+              type="button"
+              onClick={handleAnchorNow}
+              disabled={anchoring}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-cyan-700 disabled:opacity-60"
+            >
+              <LockKeyhole className="h-4 w-4" />
+              {anchoring ? 'Đang neo dữ liệu...' : 'Neo blockchain ngay'}
+            </button>
+          </div>
+        </div>
+
+        <ChainBanner chain={chain} loading={false} />
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <StatCard label="Lô đã neo" value={stats.batches} hint="Mỗi lô = 1 Merkle root on-chain" icon={Layers} />
+          <StatCard label="Chuỗi hash DB" value={stats.isChainOk ? 'OK' : 'Lệch'} hint={`${stats.chainLength} seq`} icon={stats.isChainOk ? ShieldCheck : ShieldAlert} color={stats.isChainOk ? 'text-emerald-700' : 'text-rose-700'} />
+          <StatCard label="Hàng đợi chưa neo" value={stats.pending} hint="Log đã ghi DB, chưa vào lô" icon={History} color="text-amber-700" />
         </div>
 
         <section className="rounded-2xl border border-cyan-100 bg-cyan-50/50 p-4 text-sm text-cyan-900 shadow-sm">
-          <p className="font-black text-cyan-800">Cách tìm lô cần khôi phục</p>
+          <p className="font-black text-cyan-800">Luồng làm việc khuyến nghị</p>
           <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs font-semibold text-cyan-800/90">
-            <li>Tab <b>Hoạt động</b>: tìm theo mã/tên phòng ban, nhân sự, mô hình AI (ô tìm kiếm).</li>
-            <li>Mở bản ghi → xem <b>Lô #N</b> (batchId). Chỉ lô đã neo mới khôi phục được.</li>
-            <li>Bấm <b>Khôi phục lô này</b> trên dòng nhật ký, hoặc sang tab <b>Lô blockchain</b> (mỗi lô hiện tóm tắt đối tượng bên trong).</li>
+            <li>Trang chủ = <b>danh sách lô</b> (có phân trang).</li>
+            <li>Bấm <b>Xem chi tiết</b> → danh sách SEQ thuộc lô đó + tóm tắt đối tượng.</li>
+            <li>Trạng thái lô = kiểm tra toàn vẹn các SEQ trong lô (Toàn vẹn / Nghi sửa / Thiếu field).</li>
+            <li><b>Khôi phục</b> luôn ở cấp lô (không khôi phục từng SEQ lẻ).</li>
           </ol>
         </section>
 
-        {/* Navigation Tabs */}
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
-          <div className="flex flex-wrap gap-2">
-            <TabButton active={tab === 'logs'} onClick={() => setTab('logs')}>
-              Hoạt động ({logsTotal})
-            </TabButton>
-            <TabButton active={tab === 'batches'} onClick={() => setTab('batches')}>
-              Lô blockchain ({batchesTotal})
-            </TabButton>
+        {pendingQueue.total > 0 && (
+          <section className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-black text-amber-900">Hàng đợi chưa neo ({pendingQueue.total}+)</p>
+                <p className="text-xs font-semibold text-amber-800/80">Các SEQ này chưa có batchId — đợi worker ~30s hoặc bấm “Neo blockchain ngay”.</p>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {pendingQueue.items.map((log) => (
+                <span key={log.id} className="rounded-lg border border-amber-200 bg-white px-2.5 py-1 text-[11px] font-bold text-amber-900">
+                  SEQ {log.seq} · {ENTITY_LABELS[log.entity] || log.entity} · {ACTION_LABEL[log.action] || log.action}
+                </span>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_120px]">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') setAppliedQ(searchQ.trim()); }}
+                placeholder="Lọc lô theo số lô, mã PB, tên phòng ban, NV, AI..."
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm font-semibold text-slate-700 outline-none focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setAppliedQ(searchQ.trim())}
+              className="rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-black text-white hover:bg-cyan-700"
+            >
+              Lọc
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={refreshAll}
-            disabled={loading}
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 transition-colors hover:bg-cyan-50 hover:text-cyan-700 disabled:opacity-50"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Đồng bộ
-          </button>
+          {appliedQ && (
+            <button type="button" onClick={() => { setSearchQ(''); setAppliedQ(''); }} className="mt-2 text-xs font-black text-cyan-700">
+              Xóa lọc “{appliedQ}”
+            </button>
+          )}
         </div>
 
         {loading ? (
           <div className="py-12 bg-white rounded-2xl border border-slate-100 shadow-sm">
-            <LoadingIndicator size="lg" label="Đang cấu trúc dữ liệu audit..." />
+            <LoadingIndicator size="lg" label="Đang tải danh sách lô..." />
           </div>
-        ) : tab === 'logs' ? (
-          <LogsTable
-            logs={logs}
-            entity={entity}
-            setEntity={setEntity}
-            searchQ={searchQ}
-            setSearchQ={setSearchQ}
-            onApplySearch={() => setAppliedQ(searchQ.trim())}
-            onClearSearch={() => { setSearchQ(''); setAppliedQ(''); }}
-            appliedQ={appliedQ}
-            sortOrder={sortOrder}
-            setSortOrder={setSortOrder}
-            batchFilter={batchFilter}
-            setBatchFilter={setBatchFilter}
-            onProof={handleProof}
-            onRecoverBatch={(batchId) => {
-              setRecoveryTarget({ batchId, status: 'ANCHORED', artifactAvailable: true });
-              setRecoveryReason('');
-            }}
-            onOpenBatch={(batchId) => {
-              setBatchFilter(String(batchId));
-              setTab('logs');
-            }}
-            page={logsPage}
-            totalPages={logsTotalPages}
-            total={logsTotal}
-            onPrev={() => setLogsPage((v) => Math.max(1, v - 1))}
-            onNext={() => setLogsPage((v) => Math.min(logsTotalPages, v + 1))}
-          />
         ) : (
-          <BatchesTable
-            batches={batches}
+          <BatchesHomeTable
+            batches={filteredBatches}
             page={batchesPage}
             totalPages={batchesTotalPages}
             total={batchesTotal}
-            onRecover={(batch) => { setRecoveryTarget(batch); setRecoveryReason(''); }}
-            onInspectBatch={(batchId) => {
-              setBatchFilter(String(batchId));
-              setTab('logs');
-            }}
             recoveringBatchId={recoveringBatchId}
+            onOpenDetail={openBatchDetail}
+            onRecover={(batch) => { setRecoveryTarget(batch); setRecoveryReason(''); }}
             onPrev={() => setBatchesPage((v) => Math.max(1, v - 1))}
             onNext={() => setBatchesPage((v) => Math.min(batchesTotalPages, v + 1))}
           />
         )}
       </div>
+
+      {(selectedBatchId || batchDetailLoading) && (
+        <BatchDetailDrawer
+          loading={batchDetailLoading}
+          detail={batchDetail}
+          recoveringBatchId={recoveringBatchId}
+          onClose={() => { setSelectedBatchId(null); setBatchDetail(null); }}
+          onRecover={(batch) => { setRecoveryTarget(batch); setRecoveryReason(''); }}
+          onProof={handleProof}
+          onOpenSeq={setSeqDetail}
+        />
+      )}
+
+      {seqDetail && (
+        <LogDetailModal
+          summaryLog={seqDetail}
+          onClose={() => setSeqDetail(null)}
+          onProof={handleProof}
+          onRecoverBatch={(batchId) => {
+            setRecoveryTarget({ batchId, status: 'ANCHORED', artifactAvailable: true });
+            setRecoveryReason('');
+            setSeqDetail(null);
+          }}
+          onOpenBatch={(batchId) => {
+            setSeqDetail(null);
+            openBatchDetail(batchId);
+          }}
+        />
+      )}
 
       {proof && <ProofModal proof={proof} onClose={() => setProof(null)} />}
       {recoveryTarget && !recoveryFaceOpen && (
@@ -1059,78 +1110,199 @@ function RecoveryReasonModal({ batch, reason, setReason, onClose, onContinue }) 
   );
 }
 
-function BatchesTable({ batches, page, totalPages, total, onPrev, onNext, onRecover, onInspectBatch, recoveringBatchId }) {
+function BatchesHomeTable({ batches, page, totalPages, total, onPrev, onNext, onRecover, onOpenDetail, recoveringBatchId }) {
   return (
     <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
       <div className="p-4 bg-slate-50/60 border-b border-slate-100 flex items-center justify-between gap-3">
         <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-          <Layers className="h-3.5 w-3.5 text-cyan-600" /> Lô neo blockchain (khôi phục theo lô)
+          <Layers className="h-3.5 w-3.5 text-cyan-600" /> Danh sách lô (mỗi lô có thể gồm nhiều SEQ / nhiều entity)
         </div>
         <div className="text-xs font-medium text-slate-400">
-          Tổng: <span className="font-bold text-slate-700">{total}</span> lô · Mỗi lô có thể chứa nhiều đối tượng
+          Tổng: <span className="font-bold text-slate-700">{total}</span> lô
         </div>
       </div>
 
       {!batches.length ? (
         <Empty
-          title="Chưa tìm thấy lô đóng gói nào"
-          desc="Khi hệ thống neo Merkle root lên chain, danh sách lô sẽ xuất hiện tại đây kèm tóm tắt đối tượng bên trong."
+          title="Chưa có lô nào"
+          desc="Khi hệ thống neo Merkle root lên chain, các lô sẽ hiện tại đây. Bấm Neo blockchain ngay nếu hàng đợi còn log."
         />
       ) : (
         <>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-slate-50/70 border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  <th className="px-6 py-3.5 text-center w-20">Mã lô</th>
-                  <th className="px-6 py-3.5 min-w-[220px]">Nội dung lô (đối tượng)</th>
-                  <th className="px-6 py-3.5">Merkle Root</th>
-                  <th className="px-6 py-3.5 text-center w-28">Số bản ghi</th>
-                  <th className="px-6 py-3.5 w-40">Thời điểm neo</th>
-                  <th className="px-6 py-3.5 text-center w-40">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {batches.map((b) => (
-                  <tr key={b.id} className="hover:bg-slate-50/50 transition-colors align-top">
-                    <td className="px-6 py-4 text-center font-mono font-bold text-slate-700">#{b.batchId}</td>
-                    <td className="px-6 py-4">
-                      <BatchContentSummary summary={b.contentSummary} fromSeq={b.fromSeq} toSeq={b.toSeq} />
-                    </td>
-                    <td className="px-6 py-4 font-mono text-[11px] text-slate-800 break-all max-w-xs">{b.merkleRoot || '—'}</td>
-                    <td className="px-6 py-4 text-center font-bold text-cyan-700">{b.leafCount ?? 0}</td>
-                    <td className="px-6 py-4 text-slate-500">{formatTime(b.anchoredAt || b.createdAt)}</td>
-                    <td className="px-6 py-4 text-center space-y-2">
-                      <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold border ${b.status === 'ANCHORED' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'
-                        }`}>
-                        {BATCH_STATUS_LABEL[b.status] || b.status}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => onInspectBatch?.(b.batchId)}
-                        className="block w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-700 hover:border-cyan-300 hover:text-cyan-700"
-                      >
-                        Xem nhật ký lô
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onRecover(b)}
-                        disabled={b.status !== 'ANCHORED' || !b.artifactAvailable || recoveringBatchId === b.batchId}
-                        className="block w-full rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
-                        title="Khôi phục từ artifact IPFS đã được blockchain xác thực"
-                      >
-                        {recoveringBatchId === b.batchId ? 'Đang chạy...' : 'Khôi phục lô'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="divide-y divide-slate-100">
+            {batches.map((b) => {
+              const integrity = b.integrity || {};
+              return (
+                <article key={b.id} className="grid gap-4 px-5 py-4 transition-colors hover:bg-slate-50/80 lg:grid-cols-[88px_1.2fr_0.9fr_120px_auto] lg:items-center">
+                  <div className="text-center">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Lô</p>
+                    <p className="text-2xl font-black text-slate-900">#{b.batchId}</p>
+                    <p className="text-[11px] font-bold text-cyan-700">{b.leafCount ?? 0} SEQ</p>
+                  </div>
+                  <div className="min-w-0">
+                    <BatchContentSummary summary={b.contentSummary} fromSeq={b.fromSeq} toSeq={b.toSeq} />
+                  </div>
+                  <div className="space-y-2">
+                    <BatchIntegrityBadge integrity={integrity} />
+                    <p className="text-[11px] font-semibold text-slate-500">
+                      Neo: {formatTime(b.anchoredAt || b.createdAt)}
+                    </p>
+                    <p className="font-mono text-[10px] text-slate-400 break-all" title={b.merkleRoot}>
+                      root {shortHash(b.merkleRoot)}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-black ${b.status === 'ANCHORED' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'}`}>
+                      {BATCH_STATUS_LABEL[b.status] || b.status}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+                    <button
+                      type="button"
+                      onClick={() => onOpenDetail(b.batchId)}
+                      className="rounded-xl bg-cyan-600 px-3 py-2 text-xs font-black text-white hover:bg-cyan-700"
+                    >
+                      Xem chi tiết
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRecover(b)}
+                      disabled={b.status !== 'ANCHORED' || !b.artifactAvailable || recoveringBatchId === b.batchId}
+                      className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {recoveringBatchId === b.batchId ? 'Đang khôi phục...' : 'Khôi phục lô'}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
-          <Pagination page={page} totalPages={totalPages} total={total} label="lô kết khối" onPrev={onPrev} onNext={onNext} />
+          <Pagination page={page} totalPages={totalPages} total={total} label="lô" onPrev={onPrev} onNext={onNext} />
         </>
       )}
     </section>
+  );
+}
+
+function BatchIntegrityBadge({ integrity }) {
+  const status = integrity?.status || 'PENDING';
+  const label = status === 'VERIFIED' ? 'Lô toàn vẹn' : status === 'TAMPERED' ? 'Lô nghi sửa đổi' : 'Lô thiếu field hash';
+  const tone = status === 'VERIFIED'
+    ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+    : status === 'TAMPERED'
+      ? 'border-rose-100 bg-rose-50 text-rose-700'
+      : 'border-amber-100 bg-amber-50 text-amber-700';
+  return (
+    <div className={`rounded-xl border px-3 py-2 ${tone}`}>
+      <p className="text-[11px] font-black">{label}</p>
+      <p className="mt-0.5 text-[10px] font-semibold opacity-90">
+        OK {integrity?.verified ?? 0} · Lệch {integrity?.tampered ?? 0} · Thiếu {integrity?.pending ?? 0}
+        {integrity?.total != null ? ` / ${integrity.total}` : ''}
+      </p>
+    </div>
+  );
+}
+
+function BatchDetailDrawer({ loading, detail, recoveringBatchId, onClose, onRecover, onProof, onOpenSeq }) {
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/45 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="flex h-full w-full max-w-3xl flex-col bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 p-5">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-600">Chi tiết lô</p>
+            <h2 className="mt-1 text-2xl font-black text-slate-950">
+              {detail ? `Lô #${detail.batchId}` : loading ? 'Đang tải…' : 'Lô'}
+            </h2>
+            {detail && (
+              <p className="mt-1 text-sm font-semibold text-slate-500">
+                {detail.leafCount ?? detail.logs?.length ?? 0} SEQ · seq {detail.fromSeq} → {detail.toSeq}
+              </p>
+            )}
+          </div>
+          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {loading && <LoadingIndicator size="lg" label="Đang tải SEQ trong lô..." />}
+          {!loading && detail && (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <BatchIntegrityBadge integrity={detail.integrity} />
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                  <p className="text-[11px] font-black uppercase text-slate-400">On-chain</p>
+                  <p className="mt-1 text-sm font-black text-slate-800">{BATCH_STATUS_LABEL[detail.status] || detail.status}</p>
+                  <p className="mt-1 font-mono text-[10px] text-slate-500 break-all">{detail.merkleRoot || '—'}</p>
+                  <p className="mt-1 text-[11px] font-semibold text-slate-500">Neo: {formatTime(detail.anchoredAt || detail.createdAt)}</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-100 bg-white p-3">
+                <p className="mb-2 text-[11px] font-black uppercase text-slate-400">Đối tượng trong lô</p>
+                <BatchContentSummary summary={detail.contentSummary} fromSeq={detail.fromSeq} toSeq={detail.toSeq} />
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => onRecover(detail)}
+                  disabled={detail.status !== 'ANCHORED' || !detail.artifactAvailable || recoveringBatchId === detail.batchId}
+                  className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-black text-amber-800 hover:bg-amber-100 disabled:opacity-40"
+                >
+                  {recoveringBatchId === detail.batchId ? 'Đang khôi phục...' : `Khôi phục lô #${detail.batchId}`}
+                </button>
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 overflow-hidden">
+                <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
+                  <h3 className="text-sm font-black text-slate-900">Các SEQ thuộc lô #{detail.batchId}</h3>
+                  <p className="text-xs font-semibold text-slate-500">Một lô gộp nhiều sự kiện / entity đã xảy ra trước khi seal.</p>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {(detail.logs || []).map((log) => (
+                    <div key={log.id} className="grid gap-3 px-4 py-3 sm:grid-cols-[72px_1fr_auto] sm:items-center">
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-slate-400">SEQ</p>
+                        <p className="text-lg font-black text-slate-900">{log.seq}</p>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black ${ACTION_TONE[log.action] || 'border-slate-200 text-slate-600'}`}>
+                            {ACTION_LABEL[log.action] || log.action}
+                          </span>
+                          <VerificationBadge status={log.blockchainStatus || log.verification?.status} title={log.verification?.reason} />
+                        </div>
+                        <p className="mt-1 truncate text-sm font-black text-slate-900">{subjectTitle(log)}</p>
+                        <p className="truncate text-xs font-semibold text-slate-500">
+                          {ENTITY_LABELS[log.entity] || log.entity} · {subjectSubtitle(log)} · {formatTime(log.createdAt)}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={() => onOpenSeq(log)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-50">
+                          Chi tiết SEQ
+                        </button>
+                        {log.onChainStatus === 'ANCHORED' && (
+                          <button type="button" onClick={() => onProof(log.seq)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50">
+                            Chứng chỉ
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {!detail.logs?.length && (
+                    <p className="px-4 py-6 text-sm font-semibold text-slate-400">Lô không có SEQ (dữ liệu lệch).</p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
