@@ -8,14 +8,17 @@ import { departmentService } from '../apis/departmentService';
 import { staffService } from '../apis/staffService';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { Search, X } from 'lucide-react';
+import { Search, Trash2, X } from 'lucide-react';
 import AuditHistoryChanges from '../components/AuditHistoryChanges';
 
 const DEPARTMENT_TYPES = [
   { value: 'EXAMINATION', label: 'Phòng khám' },
+  { value: 'CLINICAL', label: 'Khoa lâm sàng' },
   { value: 'ADMINISTRATIVE', label: 'Hành chính / Lễ tân' },
   { value: 'LABORATORY', label: 'Xét nghiệm' },
   { value: 'IMAGING', label: 'Chẩn đoán hình ảnh' },
+  { value: 'PHARMACY', label: 'Nhà thuốc' },
+  { value: 'OTHER', label: 'Khác' },
 ];
 
 const emptyForm = { departmentCode: '', name: '', floor: '', status: 'ACTIVE', type: 'EXAMINATION', canReceiveOrders: false, description: '' };
@@ -29,6 +32,16 @@ const MAX_DEPARTMENT_DESCRIPTION_LENGTH = 500;
 function getTypeLabel(type) { return DEPARTMENT_TYPES.find((item) => item.value === type)?.label || type || 'Chưa phân loại'; }
 function getStatusLabel(status) { return STATUS_LABELS[status] || status || 'Không rõ'; }
 function canDepartmentReceiveOrders(type) { return ['LABORATORY', 'IMAGING'].includes(type); }
+function departmentHasBusinessRefs(department, staffs = []) {
+  if (!department?.id) return false;
+  const staffCount = staffs.filter((s) => s.departmentId === department.id).length;
+  const count = department._count || {};
+  return staffCount > 0
+    || Number(count.staffs || 0) > 0
+    || Number(count.visits || 0) > 0
+    || Number(count.medicalOrders || 0) > 0
+    || Number(count.appointments || 0) > 0;
+}
 function getDepartmentItems(data) { return Array.isArray(data) ? data : data?.items || []; }
 function getStaffItems(data) { return Array.isArray(data) ? data : data?.items || []; }
 function getError(err, fallback) { return err?.response?.data?.message || err.message || fallback; }
@@ -116,12 +129,20 @@ export default function DepartmentsPage() {
       toast.error('Thông tin phòng ban vượt quá giới hạn ký tự cho phép.');
       return;
     }
-    const payload = {
-      ...form,
-      floor: form.floor || undefined,
-      description: form.description || undefined,
-      canReceiveOrders: canDepartmentReceiveOrders(form.type) && Boolean(form.canReceiveOrders),
-    };
+    const structuralLocked = Boolean(editingDepartment) && departmentHasBusinessRefs(editingDepartment, staffs);
+    const payload = structuralLocked
+      ? {
+          name: form.name,
+          floor: form.floor || undefined,
+          status: form.status,
+          description: form.description || undefined,
+        }
+      : {
+          ...form,
+          floor: form.floor || undefined,
+          description: form.description || undefined,
+          canReceiveOrders: canDepartmentReceiveOrders(form.type) && Boolean(form.canReceiveOrders),
+        };
     setBusy(true);
     try {
       if (editingDepartment) {
@@ -207,7 +228,17 @@ export default function DepartmentsPage() {
             onClose={() => setSelectedDepartment(null)}
           />
         )}
-        {isModalOpen && <DepartmentModal form={form} setForm={setForm} onSubmit={submitDepartment} onClose={closeModal} busy={busy} editing={Boolean(editingDepartment)} />}
+        {isModalOpen && (
+          <DepartmentModal
+            form={form}
+            setForm={setForm}
+            onSubmit={submitDepartment}
+            onClose={closeModal}
+            busy={busy}
+            editing={Boolean(editingDepartment)}
+            structuralLocked={Boolean(editingDepartment) && departmentHasBusinessRefs(editingDepartment, staffs)}
+          />
+        )}
         {pendingDeleteDepartment && (
           <DeleteDepartmentModal
             department={pendingDeleteDepartment}
@@ -546,7 +577,7 @@ function DeleteDepartmentModal({ department, busy, onCancel, onConfirm }) {
   );
 }
 
-function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing }) {
+function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing, structuralLocked = false }) {
   const canReceiveOrders = canDepartmentReceiveOrders(form.type);
   const [fieldErrors, setFieldErrors] = useState({});
 
@@ -606,6 +637,11 @@ function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing }) {
           </div>
           <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500">Đóng</button>
         </div>
+        {structuralLocked && (
+          <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
+            Phòng ban đã có dữ liệu liên quan: không thể đổi mã, loại hoặc khả năng nhận chỉ định. Vẫn sửa được tên, tầng, mô tả và trạng thái.
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
             label="Mã phòng ban"
@@ -618,6 +654,7 @@ function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing }) {
             minLength={2}
             maxLength={MAX_DEPARTMENT_CODE_LENGTH}
             pattern="[A-Z0-9-]+"
+            disabled={structuralLocked}
           />
           <Input
             label="Tên phòng ban"
@@ -642,8 +679,28 @@ function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing }) {
             pattern="[A-Z0-9]{1,3}"
             hint={`Tối đa ${MAX_DEPARTMENT_FLOOR_LENGTH} ký tự, ví dụ 2A hoặc 2B.`}
           />
-          <Select label="Loại phòng ban" value={form.type} onChange={(v) => setForm({ ...form, type: v, canReceiveOrders: canDepartmentReceiveOrders(v) ? form.canReceiveOrders : false })} options={DEPARTMENT_TYPES} />
-          {canReceiveOrders && <label className="rounded-2xl border border-cyan-100 bg-cyan-50/60 p-4 flex items-start gap-3"><input type="checkbox" checked={Boolean(form.canReceiveOrders)} onChange={(e) => setForm({ ...form, canReceiveOrders: e.target.checked })} className="mt-1 h-4 w-4" /><span><strong className="block text-sm text-cyan-800">Nhận phiếu chỉ định</strong><small className="mt-1 block text-xs font-semibold text-cyan-600">Bật cho Xét nghiệm, X-Ray, MRI, Siêu âm để hiện trong biểu mẫu bác sĩ.</small></span></label>}
+          <Select
+            label="Loại phòng ban"
+            value={form.type}
+            onChange={(v) => setForm({ ...form, type: v, canReceiveOrders: canDepartmentReceiveOrders(v) ? form.canReceiveOrders : false })}
+            options={DEPARTMENT_TYPES}
+            disabled={structuralLocked}
+          />
+          {canReceiveOrders && (
+            <label className={`rounded-2xl border border-cyan-100 bg-cyan-50/60 p-4 flex items-start gap-3 ${structuralLocked ? 'opacity-60' : ''}`}>
+              <input
+                type="checkbox"
+                checked={Boolean(form.canReceiveOrders)}
+                disabled={structuralLocked}
+                onChange={(e) => setForm({ ...form, canReceiveOrders: e.target.checked })}
+                className="mt-1 h-4 w-4"
+              />
+              <span>
+                <strong className="block text-sm text-cyan-800">Nhận phiếu chỉ định</strong>
+                <small className="mt-1 block text-xs font-semibold text-cyan-600">Bật cho Xét nghiệm / Chẩn đoán hình ảnh để hiện trong biểu mẫu bác sĩ.</small>
+              </span>
+            </label>
+          )}
         </div>
         <Textarea label="Mô tả nhiệm vụ" value={form.description} onChange={(v) => setForm({ ...form, description: v.slice(0, MAX_DEPARTMENT_DESCRIPTION_LENGTH) })} onBlur={() => validateField('description')} error={fieldErrors.description} placeholder="Mô tả chức năng phòng ban" maxLength={MAX_DEPARTMENT_DESCRIPTION_LENGTH} />
         <button disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 disabled:opacity-70">{busy && <LoadingIndicator size="sm" tone="white" />}{editing ? 'Lưu thay đổi' : 'Tạo phòng ban'}</button>
@@ -657,16 +714,25 @@ function MiniMetric({ label, value }) { return <div className="rounded-xl border
 function Alert({ children }) { return <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">{children}</div>; }
 function Empty({ title, desc }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><strong>{title}</strong><p className="mt-1 text-sm text-slate-500">{desc}</p></div>; }
 function SmallButton({ children, onClick, disabled, danger }) { return <button type="button" disabled={disabled} onClick={onClick} className={`rounded-xl border px-3 py-2 text-xs font-black disabled:opacity-50 ${danger ? 'border-rose-100 bg-rose-50 text-rose-600 hover:bg-rose-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-cyan-50 hover:text-cyan-600'}`}>{children}</button>; }
-function Input({ label, value, onChange, onBlur, error, required, placeholder, type = 'text', min, max, minLength, maxLength, pattern, hint }) {
+function Input({ label, value, onChange, onBlur, error, required, placeholder, type = 'text', min, max, minLength, maxLength, pattern, hint, disabled = false }) {
   return (
     <label className="block space-y-1.5">
       <span className="text-[13px] font-bold text-slate-700">{label}</span>
-      <input type={type} required={required} value={value || ''} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder} min={min} max={max} minLength={minLength} maxLength={maxLength} pattern={pattern} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} />
+      <input type={type} required={required} disabled={disabled} value={value || ''} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder} min={min} max={max} minLength={minLength} maxLength={maxLength} pattern={pattern} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none disabled:cursor-not-allowed disabled:opacity-60 ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} />
       <p className={`min-h-[16px] text-xs font-semibold leading-4 ${error ? 'text-rose-600' : 'text-transparent'}`}>{error || hint || 'Không có lỗi'}</p>
     </label>
   );
 }
-function Select({ label, value, onChange, options }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><select value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none">{options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>; }
+function Select({ label, value, onChange, options, disabled = false }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-[13px] font-bold text-slate-700">{label}</span>
+      <select disabled={disabled} value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none disabled:cursor-not-allowed disabled:opacity-60">
+        {options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+      </select>
+    </label>
+  );
+}
 function Textarea({ label, value, onChange, onBlur, error, placeholder, maxLength, hint }) {
   return (
     <label className="block space-y-1.5">

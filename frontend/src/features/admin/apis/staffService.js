@@ -16,7 +16,7 @@ export const staffService = {
   uploadAvatar: (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/doctors/upload-avatar', formData, {
+    return api.post('/staff/upload-avatar', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

@@ -570,7 +570,7 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {manualEndpoint && <div className="md:col-span-2"><Field label="Điểm cuối API" value={form.apiEndpoint} onChange={(v) => changeField('apiEndpoint', limitText(v.trim(), MAX_ENDPOINT_LENGTH))} onBlur={() => validateField('apiEndpoint')} error={fieldErrors.apiEndpoint} required placeholder="http://localhost:11434/v1/chat/completions" maxLength={MAX_ENDPOINT_LENGTH} /></div>}
           <TextAreaField
-            label={editingModel ? 'Khóa API / Token (để trống nếu giữ secret hiện tại)' : 'Khóa API / Token'}
+            label={editing ? 'Khóa API / Token (để trống nếu giữ secret hiện tại)' : 'Khóa API / Token'}
             value={form.secretOrIpHash}
             onChange={(v) => changeField('secretOrIpHash', limitText(v, MAX_SECRET_LENGTH))}
             onBlur={() => validateField('secretOrIpHash')}
@@ -580,6 +580,7 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
             rows={2}
             maxLength={MAX_SECRET_LENGTH}
             className="md:col-span-2"
+            inputType="password"
           />
           <TextAreaField label="Mô tả" value={form.description} onChange={(v) => changeField('description', limitText(v, MAX_DESCRIPTION_LENGTH))} onBlur={() => validateField('description')} error={fieldErrors.description} rows={2} maxLength={MAX_DESCRIPTION_LENGTH} className="md:col-span-2" />
         </div>
@@ -616,8 +617,42 @@ function Field({ label, value, onChange, onBlur, error, required = false, placeh
 function SelectField({ label, value, onChange, onBlur, options, empty, required, error }) {
   return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}{required && <span className="text-rose-500"> *</span>}</span><select required={required} value={value || ''} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`}>{empty && <option value="">{empty}</option>}{options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select><FieldError message={error} /></label>;
 }
-function TextAreaField({ label, value, onChange, onBlur, error, required = false, optional = false, rows = 2, maxLength, className = '' }) {
-  return <label className={`block space-y-1.5 ${className}`}><span className="text-[13px] font-bold text-slate-700">{label}{required && <span className="text-rose-500"> *</span>}{optional && <span className="font-semibold text-slate-400"> (tùy chọn)</span>}</span><textarea required={required} value={value || ''} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} rows={rows} maxLength={maxLength} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} /><FieldError message={error} /></label>;
+function TextAreaField({ label, value, onChange, onBlur, error, required = false, optional = false, rows = 2, maxLength, className = '', inputType }) {
+  const fieldClass = `w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`;
+  return (
+    <label className={`block space-y-1.5 ${className}`}>
+      <span className="text-[13px] font-bold text-slate-700">
+        {label}
+        {required && <span className="text-rose-500"> *</span>}
+        {optional && <span className="font-semibold text-slate-400"> (tùy chọn)</span>}
+      </span>
+      {inputType === 'password' ? (
+        <input
+          type="password"
+          autoComplete="new-password"
+          required={required}
+          value={value || ''}
+          onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
+          maxLength={maxLength}
+          aria-invalid={Boolean(error)}
+          className={fieldClass}
+        />
+      ) : (
+        <textarea
+          required={required}
+          value={value || ''}
+          onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
+          rows={rows}
+          maxLength={maxLength}
+          aria-invalid={Boolean(error)}
+          className={fieldClass}
+        />
+      )}
+      <FieldError message={error} />
+    </label>
+  );
 }
 function FieldError({ message }) { return <p className={`min-h-[1rem] text-xs font-bold leading-4 transition-colors ${message ? 'text-rose-600' : 'text-transparent'}`}>{message || 'Không có lỗi'}</p>; }
 function ModelCard({ model, onViewDetails, onEdit, onToggleStatus, onDelete, busy }) {

@@ -710,17 +710,24 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
   const actor = log.actor;
 
   const loadDetail = async () => {
+    if (summaryLog?.seq == null) return;
     setDetailLoading(true);
     setDetailError('');
     try {
       const res = await auditService.detail(summaryLog.seq);
       setLog(res.data || summaryLog);
     } catch (err) {
-      setDetailError(err?.response?.data?.message || err.message || 'Không tải được chi tiết audit đã giải mã.');
+      setDetailError(err?.response?.data?.message || err.message || 'Không tải được chi tiết audit.');
     } finally {
       setDetailLoading(false);
     }
   };
+
+  useEffect(() => {
+    setLog(summaryLog);
+    loadDetail();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summaryLog?.seq]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm" onClick={onClose}>
