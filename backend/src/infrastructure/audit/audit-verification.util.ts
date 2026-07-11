@@ -99,9 +99,9 @@ export function verifyAuditRowLight(row: AuditRowLike): AuditRowVerificationResu
     if (suspiciousFields.length > 0) {
       return {
         ok: false,
-        status: 'TAMPERED',
+        status: 'PENDING',
         version: 'V2',
-        reason: 'Thiếu hash bắt buộc trên bản ghi audit V2.',
+        reason: `Thiếu field bắt buộc để kiểm tra hash: ${suspiciousFields.join(', ')}. Thường gặp ở log cũ, ghi dở, hoặc event không đủ schema V2.`,
         suspiciousFields,
       };
     }

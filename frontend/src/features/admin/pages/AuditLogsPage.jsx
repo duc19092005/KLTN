@@ -100,7 +100,7 @@ const VERIFICATION_TONE = {
 
 const VERIFICATION_LABEL = {
   VERIFIED: 'Toàn vẹn',
-  PENDING: 'Chưa đủ dữ liệu kiểm tra',
+  PENDING: 'Thiếu field hash',
   TAMPERED: 'Nghi sửa đổi',
 };
 
