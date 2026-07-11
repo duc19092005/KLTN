@@ -41,6 +41,8 @@ export class AuditController {
   @ApiOperation({ summary: 'List audit log entries (hash-chained) with pagination, sort & batch filter' })
   async logs(
     @Query('entity') entity?: string,
+    @Query('entityId') entityId?: string,
+    @Query('q') qRaw?: string,
     @Query('action') action?: string,
     @Query('actorId') actorId?: string,
     @Query('from') fromRaw?: string,
@@ -60,6 +62,7 @@ export class AuditController {
 
     const where: any = {};
     if (entity) where.entity = entity;
+    if (entityId?.trim()) where.entityId = entityId.trim();
     if (action) where.action = action;
     if (actorId) where.actorId = actorId;
     if (verificationStatus) where.onChainStatus = verificationStatus;
@@ -73,6 +76,23 @@ export class AuditController {
     }
     if (batchRaw !== undefined && batchRaw !== '' && Number.isFinite(Number(batchRaw))) {
       where.batchId = Number(batchRaw);
+    }
+
+    const q = qRaw?.trim();
+    if (q) {
+      const subjectFilters = await this.buildSubjectSearchFilters(q);
+      where.AND = [
+        ...(where.AND || []),
+        {
+          OR: [
+            { entityId: q },
+            { entityId: { contains: q, mode: 'insensitive' } },
+            { action: { contains: q, mode: 'insensitive' } },
+            { entity: { contains: q, mode: 'insensitive' } },
+            ...subjectFilters,
+          ],
+        },
+      ];
     }
 
     const [items, total] = await Promise.all([
@@ -163,10 +183,13 @@ export class AuditController {
       this.prisma.auditBatch.count(),
     ]);
 
+    const contentByBatch = await this.buildBatchContentSummaries(items.map((item) => item.batchId));
+
     return {
       items: items.map(({ artifactUri, ...item }) => ({
         ...item,
         artifactAvailable: Boolean(artifactUri && item.artifactHash),
+        contentSummary: contentByBatch.get(item.batchId) ?? [],
       })),
       total,
       page,
@@ -289,6 +312,134 @@ export class AuditController {
 
   }
 
+
+  /**
+   * Map free-text search (department code/name, staff name/code, AI model name)
+   * to entityId filters so admins can find "which batch touches room ABC".
+   */
+  private async buildSubjectSearchFilters(q: string): Promise<Array<Record<string, unknown>>> {
+    const filters: Array<Record<string, unknown>> = [];
+    const [departments, staffs, aiModels] = await Promise.all([
+      this.prisma.department.findMany({
+        where: {
+          OR: [
+            { departmentCode: { contains: q, mode: 'insensitive' } },
+            { name: { contains: q, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+        take: 40,
+      }),
+      this.prisma.staffProfile.findMany({
+        where: {
+          OR: [
+            { fullName: { contains: q, mode: 'insensitive' } },
+            { employeeCode: { contains: q, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+        take: 40,
+      }),
+      this.prisma.aiModelRegistry.findMany({
+        where: {
+          OR: [
+            { modelName: { contains: q, mode: 'insensitive' } },
+            { modelId: { contains: q, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+        take: 40,
+      }),
+    ]);
+
+    if (departments.length) {
+      filters.push({ entity: 'Department', entityId: { in: departments.map((d) => d.id) } });
+    }
+    if (staffs.length) {
+      filters.push({ entity: 'StaffProfile', entityId: { in: staffs.map((s) => s.id) } });
+    }
+    if (aiModels.length) {
+      filters.push({ entity: 'AiModelRegistry', entityId: { in: aiModels.map((m) => m.id) } });
+    }
+    return filters;
+  }
+
+  /** Compact "what's inside this batch" for the admin recovery UI. */
+  private async buildBatchContentSummaries(batchIds: number[]) {
+    const map = new Map<number, Array<{ entity: string; count: number; samples: string[] }>>();
+    if (!batchIds.length) return map;
+
+    const rows = await this.prisma.blockchainLogger.findMany({
+      where: { batchId: { in: batchIds } },
+      select: { batchId: true, entity: true, entityId: true, action: true, seq: true },
+      orderBy: { seq: 'asc' },
+      take: 2000,
+    });
+
+    const byBatch = new Map<number, typeof rows>();
+    for (const row of rows) {
+      if (row.batchId == null) continue;
+      const list = byBatch.get(row.batchId) ?? [];
+      list.push(row);
+      byBatch.set(row.batchId, list);
+    }
+
+    await Promise.all(
+      [...byBatch.entries()].map(async ([batchId, batchRows]) => {
+        const entityCounts = new Map<string, { count: number; ids: string[] }>();
+        for (const row of batchRows) {
+          const bucket = entityCounts.get(row.entity) ?? { count: 0, ids: [] };
+          bucket.count += 1;
+          if (row.entityId && bucket.ids.length < 4 && !bucket.ids.includes(row.entityId)) {
+            bucket.ids.push(row.entityId);
+          }
+          entityCounts.set(row.entity, bucket);
+        }
+
+        const summary = await Promise.all(
+          [...entityCounts.entries()]
+            .sort((a, b) => b[1].count - a[1].count)
+            .slice(0, 6)
+            .map(async ([entity, info]) => {
+              const samples = await this.resolveSampleLabels(entity, info.ids);
+              return { entity, count: info.count, samples };
+            }),
+        );
+        map.set(batchId, summary);
+      }),
+    );
+
+    return map;
+  }
+
+  private async resolveSampleLabels(entity: string, ids: string[]): Promise<string[]> {
+    if (!ids.length) return [];
+    if (entity === 'Department') {
+      const rows = await this.prisma.department.findMany({
+        where: { id: { in: ids } },
+        select: { departmentCode: true, name: true },
+      });
+      return rows.map((r) => `${r.departmentCode} · ${r.name}`);
+    }
+    if (entity === 'StaffProfile') {
+      const rows = await this.prisma.staffProfile.findMany({
+        where: { id: { in: ids } },
+        select: { employeeCode: true, fullName: true },
+      });
+      return rows.map((r) => `${r.employeeCode || 'NV'} · ${r.fullName}`);
+    }
+    if (entity === 'AiModelRegistry') {
+      const rows = await this.prisma.aiModelRegistry.findMany({
+        where: { id: { in: ids } },
+        select: { modelName: true, modelVersion: true },
+      });
+      return rows.map((r) => `${r.modelName} v${r.modelVersion}`);
+    }
+    if (entity === 'Visit' || entity === 'Patient' || entity === 'MedicalConclusion' || entity === 'MedicalResult' || entity === 'MedicalOrder') {
+      return ids.map((id) => `${entity} ${id.slice(0, 8)}…`);
+    }
+    return ids.map((id) => id.slice(0, 10));
+  }
 
   private subjectKey(row: { entity: string; entityId?: string | null }) {
     return `${row.entity}:${row.entityId ?? ''}`;

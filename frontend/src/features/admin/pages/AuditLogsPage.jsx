@@ -153,6 +153,8 @@ export default function AuditLogsPage() {
   const [batches, setBatches] = useState([]);
   const [chain, setChain] = useState(null);
   const [entity, setEntity] = useState('');
+  const [searchQ, setSearchQ] = useState('');
+  const [appliedQ, setAppliedQ] = useState('');
   const [sortOrder, setSortOrder] = useState('desc');
   const [batchFilter, setBatchFilter] = useState('');
   const [anchoring, setAnchoring] = useState(false);
@@ -178,6 +180,7 @@ export default function AuditLogsPage() {
         limit: 10,
         sort: sortOrder,
         ...(entity ? { entity } : {}),
+        ...(appliedQ ? { q: appliedQ } : {}),
         ...(batchFilter !== '' ? { batch: batchFilter } : {}),
       });
       const data = res.data || {};
@@ -189,7 +192,7 @@ export default function AuditLogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [logsPage, entity, sortOrder, batchFilter, toast]);
+  }, [logsPage, entity, appliedQ, sortOrder, batchFilter, toast]);
 
   const loadBatches = useCallback(async () => {
     setLoading(true);
@@ -234,7 +237,7 @@ export default function AuditLogsPage() {
     } else {
       loadBatches();
     }
-  }, [tab, logsPage, batchesPage, entity, sortOrder, batchFilter, loadLogs, loadBatches]);
+  }, [tab, logsPage, batchesPage, entity, appliedQ, sortOrder, batchFilter, loadLogs, loadBatches]);
 
   useEffect(() => {
     loadChain();
@@ -242,7 +245,7 @@ export default function AuditLogsPage() {
 
   useEffect(() => {
     setLogsPage(1);
-  }, [entity, sortOrder, batchFilter]);
+  }, [entity, appliedQ, sortOrder, batchFilter]);
 
   const stats = useMemo(() => {
     return {
@@ -321,6 +324,15 @@ export default function AuditLogsPage() {
           </button>
         </div>
 
+        <section className="rounded-2xl border border-cyan-100 bg-cyan-50/50 p-4 text-sm text-cyan-900 shadow-sm">
+          <p className="font-black text-cyan-800">Cách tìm lô cần khôi phục</p>
+          <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs font-semibold text-cyan-800/90">
+            <li>Tab <b>Hoạt động</b>: tìm theo mã/tên phòng ban, nhân sự, mô hình AI (ô tìm kiếm).</li>
+            <li>Mở bản ghi → xem <b>Lô #N</b> (batchId). Chỉ lô đã neo mới khôi phục được.</li>
+            <li>Bấm <b>Khôi phục lô này</b> trên dòng nhật ký, hoặc sang tab <b>Lô blockchain</b> (mỗi lô hiện tóm tắt đối tượng bên trong).</li>
+          </ol>
+        </section>
+
         {/* Navigation Tabs */}
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
           <div className="flex flex-wrap gap-2">
@@ -351,11 +363,24 @@ export default function AuditLogsPage() {
             logs={logs}
             entity={entity}
             setEntity={setEntity}
+            searchQ={searchQ}
+            setSearchQ={setSearchQ}
+            onApplySearch={() => setAppliedQ(searchQ.trim())}
+            onClearSearch={() => { setSearchQ(''); setAppliedQ(''); }}
+            appliedQ={appliedQ}
             sortOrder={sortOrder}
             setSortOrder={setSortOrder}
             batchFilter={batchFilter}
             setBatchFilter={setBatchFilter}
             onProof={handleProof}
+            onRecoverBatch={(batchId) => {
+              setRecoveryTarget({ batchId, status: 'ANCHORED', artifactAvailable: true });
+              setRecoveryReason('');
+            }}
+            onOpenBatch={(batchId) => {
+              setBatchFilter(String(batchId));
+              setTab('logs');
+            }}
             page={logsPage}
             totalPages={logsTotalPages}
             total={logsTotal}
@@ -369,6 +394,10 @@ export default function AuditLogsPage() {
             totalPages={batchesTotalPages}
             total={batchesTotal}
             onRecover={(batch) => { setRecoveryTarget(batch); setRecoveryReason(''); }}
+            onInspectBatch={(batchId) => {
+              setBatchFilter(String(batchId));
+              setTab('logs');
+            }}
             recoveringBatchId={recoveringBatchId}
             onPrev={() => setBatchesPage((v) => Math.max(1, v - 1))}
             onNext={() => setBatchesPage((v) => Math.min(batchesTotalPages, v + 1))}
@@ -514,11 +543,18 @@ function LogsTable({
   logs,
   entity,
   setEntity,
+  searchQ,
+  setSearchQ,
+  onApplySearch,
+  onClearSearch,
+  appliedQ,
   sortOrder,
   setSortOrder,
   batchFilter,
   setBatchFilter,
   onProof,
+  onRecoverBatch,
+  onOpenBatch,
   page,
   totalPages,
   total,
@@ -548,14 +584,25 @@ function LogsTable({
             ))}
           </div>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_160px_96px]">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.4fr)_140px_160px_96px]">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') onApplySearch(); }}
+                placeholder="Tìm phòng ban / mã PB / tên NV / mô hình AI..."
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none transition-colors focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100"
+              />
+            </div>
             <button
               type="button"
               onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-black text-slate-600 transition-colors hover:bg-cyan-50 hover:text-cyan-700"
             >
               {sortOrder === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />}
-              {sortOrder === 'desc' ? 'Mới nhất trước' : 'Cũ nhất trước'}
+              {sortOrder === 'desc' ? 'Mới nhất' : 'Cũ nhất'}
             </button>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">#</span>
@@ -568,11 +615,20 @@ function LogsTable({
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-7 pr-2 text-xs font-semibold text-slate-700 outline-none transition-colors focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100"
               />
             </div>
-            <button type="button" onClick={applyBatch} className="rounded-xl bg-cyan-600 px-3 py-2.5 text-xs font-black text-white hover:bg-cyan-700">Tìm</button>
+            <button type="button" onClick={() => { onApplySearch(); applyBatch(); }} className="rounded-xl bg-cyan-600 px-3 py-2.5 text-xs font-black text-white hover:bg-cyan-700">Tìm</button>
           </div>
-          {batchFilter !== '' && (
-            <button type="button" onClick={() => { setBatchInput(''); setBatchFilter(''); }} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-500 hover:bg-slate-50">Xóa lọc lô #{batchFilter}</button>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {appliedQ && (
+              <button type="button" onClick={onClearSearch} className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-100">
+                Xóa tìm: “{appliedQ}”
+              </button>
+            )}
+            {batchFilter !== '' && (
+              <button type="button" onClick={() => { setBatchInput(''); setBatchFilter(''); }} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-500 hover:bg-slate-50">
+                Xóa lọc lô #{batchFilter}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -588,7 +644,7 @@ function LogsTable({
         {!logs.length ? (
           <Empty
             title="Không tìm thấy nhật ký"
-            desc={entity || batchFilter !== '' ? 'Không có bản ghi nào khớp với bộ lọc hiện tại.' : 'Hệ thống chưa ghi nhận hoạt động thay đổi dữ liệu.'}
+            desc={entity || batchFilter !== '' || appliedQ ? 'Không có bản ghi nào khớp với bộ lọc hiện tại.' : 'Hệ thống chưa ghi nhận hoạt động thay đổi dữ liệu.'}
           />
         ) : (
           <>
@@ -622,16 +678,39 @@ function LogsTable({
                       <p className="text-xs font-bold text-slate-600">{formatTime(log.createdAt)}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-black ${log.onChainStatus === 'ANCHORED' ? 'bg-slate-50 text-slate-600 border-slate-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                        {log.onChainStatus === 'ANCHORED' ? `Lô #${log.batchId}` : 'Hàng đợi'}
-                      </span>
+                      {log.onChainStatus === 'ANCHORED' && log.batchId != null ? (
+                        <button
+                          type="button"
+                          onClick={() => onOpenBatch?.(log.batchId)}
+                          className="inline-flex rounded-full border border-cyan-200 bg-cyan-50 px-2 py-1 text-[10px] font-black text-cyan-700 hover:bg-cyan-100"
+                          title="Lọc các bản ghi cùng lô neo blockchain"
+                        >
+                          Lô #{log.batchId}
+                        </button>
+                      ) : (
+                        <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-black text-slate-500">
+                          Hàng đợi
+                        </span>
+                      )}
                       <VerificationBadge status={log.blockchainStatus} />
                     </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2 xl:justify-end">
                     <button type="button" onClick={() => setDetail(log)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-cyan-600 hover:bg-cyan-50">Chi tiết</button>
-                    {log.onChainStatus === 'ANCHORED' && <button type="button" onClick={() => onProof(log.seq)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600">Chứng chỉ</button>}
+                    {log.onChainStatus === 'ANCHORED' && log.batchId != null && (
+                      <>
+                        <button type="button" onClick={() => onProof(log.seq)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600">Chứng chỉ</button>
+                        <button
+                          type="button"
+                          onClick={() => onRecoverBatch?.(log.batchId)}
+                          className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800 hover:bg-amber-100"
+                          title="Khôi phục toàn bộ lô chứa bản ghi này (không chỉ 1 dòng)"
+                        >
+                          Khôi phục lô #{log.batchId}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </article>
               ))}
@@ -640,7 +719,15 @@ function LogsTable({
           </>
         )}
 
-        {detail && <LogDetailModal summaryLog={detail} onClose={() => setDetail(null)} onProof={onProof} />}
+        {detail && (
+          <LogDetailModal
+            summaryLog={detail}
+            onClose={() => setDetail(null)}
+            onProof={onProof}
+            onRecoverBatch={onRecoverBatch}
+            onOpenBatch={onOpenBatch}
+          />
+        )}
       </section>
     </section>
   );
@@ -703,7 +790,7 @@ function ActorCell({ log }) {
 
 // ---- LogDetailModal Component -----------------------------------------------
 
-function LogDetailModal({ summaryLog, onClose, onProof }) {
+function LogDetailModal({ summaryLog, onClose, onProof, onRecoverBatch, onOpenBatch }) {
   const [log, setLog] = useState(summaryLog);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
@@ -744,14 +831,40 @@ function LogDetailModal({ summaryLog, onClose, onProof }) {
                 {ACTION_LABEL[log.action] || log.action}
               </span>
               <VerificationBadge status={log.blockchainStatus} />
+              {log.onChainStatus === 'ANCHORED' && log.batchId != null && (
+                <span className="inline-flex rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-[10px] font-black text-cyan-700">
+                  Thuộc lô #{log.batchId}
+                </span>
+              )}
             </div>
+            <p className="mt-2 text-sm font-semibold text-slate-500">{subjectTitle(log)} · {ENTITY_LABELS[log.entity] || log.entity}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500 transition-colors hover:bg-slate-50"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {log.onChainStatus === 'ANCHORED' && log.batchId != null && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => { onOpenBatch?.(log.batchId); onClose(); }}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50"
+                >
+                  Lọc lô #{log.batchId}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { onRecoverBatch?.(log.batchId); onClose(); }}
+                  className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800 hover:bg-amber-100"
+                >
+                  Khôi phục lô #{log.batchId}
+                </button>
+              </>
+            )}
+            <button
+              onClick={onClose}
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500 transition-colors hover:bg-slate-50"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Main Content Container */}
@@ -933,22 +1046,22 @@ function RecoveryReasonModal({ batch, reason, setReason, onClose, onContinue }) 
   );
 }
 
-function BatchesTable({ batches, page, totalPages, total, onPrev, onNext, onRecover, recoveringBatchId }) {
+function BatchesTable({ batches, page, totalPages, total, onPrev, onNext, onRecover, onInspectBatch, recoveringBatchId }) {
   return (
     <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-      <div className="p-4 bg-slate-50/60 border-b border-slate-100 flex items-center justify-between">
+      <div className="p-4 bg-slate-50/60 border-b border-slate-100 flex items-center justify-between gap-3">
         <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-          <Layers className="h-3.5 w-3.5 text-cyan-600" /> Sổ cái phân phối khối mã hóa Merkle
+          <Layers className="h-3.5 w-3.5 text-cyan-600" /> Lô neo blockchain (khôi phục theo lô)
         </div>
         <div className="text-xs font-medium text-slate-400">
-          Tổng số lô định danh: <span className="font-bold text-slate-700">{total}</span> lô
+          Tổng: <span className="font-bold text-slate-700">{total}</span> lô · Mỗi lô có thể chứa nhiều đối tượng
         </div>
       </div>
 
       {!batches.length ? (
         <Empty
           title="Chưa tìm thấy lô đóng gói nào"
-          desc="Khi hệ thống thực hiện thao tác đóng chuỗi và neo lên mạng lưới, danh sách lịch sử đóng khối khối sẽ xuất hiện tại đây."
+          desc="Khi hệ thống neo Merkle root lên chain, danh sách lô sẽ xuất hiện tại đây kèm tóm tắt đối tượng bên trong."
         />
       ) : (
         <>
@@ -957,42 +1070,43 @@ function BatchesTable({ batches, page, totalPages, total, onPrev, onNext, onReco
               <thead>
                 <tr className="bg-slate-50/70 border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   <th className="px-6 py-3.5 text-center w-20">Mã lô</th>
-                  <th className="px-6 py-3.5">Merkle Root Hash</th>
-                  <th className="px-6 py-3.5 text-center w-36">Số lá cây (Records)</th>
-                  <th className="px-6 py-3.5 w-44">Thời điểm đóng cấu trúc</th>
-                  <th className="px-6 py-3.5 w-40">Mã giao dịch sổ cái (TxHash)</th>
-                  <th className="px-6 py-3.5 text-center w-32">Cơ chế xác thực</th>
+                  <th className="px-6 py-3.5 min-w-[220px]">Nội dung lô (đối tượng)</th>
+                  <th className="px-6 py-3.5">Merkle Root</th>
+                  <th className="px-6 py-3.5 text-center w-28">Số bản ghi</th>
+                  <th className="px-6 py-3.5 w-40">Thời điểm neo</th>
+                  <th className="px-6 py-3.5 text-center w-40">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                 {batches.map((b) => (
-                  <tr key={b.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 text-center font-mono font-bold text-slate-400">#{b.batchId}</td>
-                    <td className="px-6 py-4 font-mono text-[11px] text-slate-800 break-all max-w-sm">{b.merkleRoot || '—'}</td>
-                    <td className="px-6 py-4 text-center font-bold text-cyan-700">{b.leafCount ?? 0} bản ghi</td>
-                    <td className="px-6 py-4 text-slate-500">{formatTime(b.createdAt)}</td>
-                    <td className="px-6 py-4 font-mono text-[11px] text-slate-400" title={b.txHash}>
-                      {b.txHash ? (
-                        <span className="text-slate-600 font-semibold bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded">
-                          {shortHash(b.txHash)}
-                        </span>
-                      ) : (
-                        <span className="italic text-slate-300">N/A (Cục bộ)</span>
-                      )}
+                  <tr key={b.id} className="hover:bg-slate-50/50 transition-colors align-top">
+                    <td className="px-6 py-4 text-center font-mono font-bold text-slate-700">#{b.batchId}</td>
+                    <td className="px-6 py-4">
+                      <BatchContentSummary summary={b.contentSummary} fromSeq={b.fromSeq} toSeq={b.toSeq} />
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-6 py-4 font-mono text-[11px] text-slate-800 break-all max-w-xs">{b.merkleRoot || '—'}</td>
+                    <td className="px-6 py-4 text-center font-bold text-cyan-700">{b.leafCount ?? 0}</td>
+                    <td className="px-6 py-4 text-slate-500">{formatTime(b.anchoredAt || b.createdAt)}</td>
+                    <td className="px-6 py-4 text-center space-y-2">
                       <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold border ${b.status === 'ANCHORED' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'
                         }`}>
                         {BATCH_STATUS_LABEL[b.status] || b.status}
                       </span>
                       <button
                         type="button"
+                        onClick={() => onInspectBatch?.(b.batchId)}
+                        className="block w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-700 hover:border-cyan-300 hover:text-cyan-700"
+                      >
+                        Xem nhật ký lô
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => onRecover(b)}
                         disabled={b.status !== 'ANCHORED' || !b.artifactAvailable || recoveringBatchId === b.batchId}
-                        className="mt-2 block w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-700 hover:border-cyan-300 hover:text-cyan-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="block w-full rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
                         title="Khôi phục từ artifact IPFS đã được blockchain xác thực"
                       >
-                        {recoveringBatchId === b.batchId ? 'Đang chạy...' : 'Khôi phục'}
+                        {recoveringBatchId === b.batchId ? 'Đang chạy...' : 'Khôi phục lô'}
                       </button>
                     </td>
                   </tr>
@@ -1004,6 +1118,35 @@ function BatchesTable({ batches, page, totalPages, total, onPrev, onNext, onReco
         </>
       )}
     </section>
+  );
+}
+
+function BatchContentSummary({ summary, fromSeq, toSeq }) {
+  if (!summary?.length) {
+    return (
+      <div className="text-xs text-slate-400">
+        <p>Chưa có tóm tắt đối tượng.</p>
+        <p className="mt-1 font-mono text-[10px]">seq {fromSeq ?? '—'} → {toSeq ?? '—'}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2 max-w-sm">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">seq {fromSeq ?? '—'} → {toSeq ?? '—'}</p>
+      {summary.map((item) => (
+        <div key={item.entity} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-black text-slate-700">{ENTITY_LABELS[item.entity] || item.entity}</span>
+            <span className="text-[10px] font-bold text-cyan-700">{item.count} bản ghi</span>
+          </div>
+          {item.samples?.length > 0 && (
+            <p className="mt-0.5 text-[10px] font-semibold text-slate-500 truncate" title={item.samples.join(', ')}>
+              {item.samples.join(' · ')}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 
