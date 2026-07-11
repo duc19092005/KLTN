@@ -18,7 +18,9 @@ services:
       retries: 20
 
   kafka:
-    image: bitnami/kafka:3.7
+    # bitnami/* free tags were removed from Docker Hub (Aug 2025).
+    # Use bitnamilegacy for local/dev (no further updates; same image layout).
+    image: bitnamilegacy/kafka:3.7
     container_name: kltn-audit-kafka
     restart: unless-stopped
     ports:

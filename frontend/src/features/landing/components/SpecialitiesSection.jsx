@@ -1,45 +1,102 @@
 import React from 'react';
 import { SPECIALITIES } from '../data/homeContent';
+import Reveal from './Reveal';
 
 export default function SpecialitiesSection() {
   return (
-    <section id="chuyen-khoa" className="border-y border-slate-200 bg-white" aria-labelledby="specialities-heading">
-      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="max-w-2xl">
-            <p className="text-xs font-bold uppercase tracking-wider text-blue-800">Chuyên khoa mũi nhọn</p>
-            <h2 id="specialities-heading" className="mt-2 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
-              Thế mạnh điều trị của chúng tôi
-            </h2>
-            <p className="mt-3 text-base font-semibold leading-relaxed text-slate-700">
-              Các chuyên khoa được đầu tư đội ngũ và quy trình chăm sóc chuẩn hóa.
-            </p>
-          </div>
-          <a
-            href="#dat-lich"
-            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-50 px-4 text-sm font-bold text-blue-900 ring-1 ring-blue-100 transition duration-150 hover:bg-blue-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
-          >
-            Đặt lịch theo chuyên khoa
-          </a>
-        </div>
+    <section id="chuyen-khoa" className="bg-[#f7f9fb] py-20" aria-labelledby="specialities-heading">
+      <div className="mx-auto max-w-[1280px] px-4 sm:px-6">
+        <Reveal variant="up" className="mb-16 text-center">
+          <span className="mb-4 block text-xs font-medium uppercase tracking-normal text-[#00a4b9]">
+            Dịch vụ lâm sàng
+          </span>
+          <h2 id="specialities-heading" className="le-display text-4xl text-[#001836] sm:text-5xl">
+            Chuyên khoa mũi nhọn
+          </h2>
+        </Reveal>
 
-        <ul className="mt-8 grid gap-4 sm:grid-cols-2">
-          {SPECIALITIES.map((item) => (
-            <li key={item.id}>
-              <article className="flex h-full min-h-[160px] flex-col rounded-2xl bg-slate-50 p-6 shadow-sm ring-1 ring-slate-200 transition duration-150 ease-out hover:scale-[1.01] hover:bg-white hover:shadow-md hover:ring-blue-200">
-                <p className="text-xs font-bold uppercase tracking-wide text-blue-800">{item.focus}</p>
-                <h3 className="mt-3 text-xl font-bold text-slate-950">{item.title}</h3>
-                <p className="mt-3 flex-1 text-base font-semibold leading-relaxed text-slate-700">{item.description}</p>
-                <a
-                  href="#dat-lich"
-                  className="mt-5 inline-flex min-h-11 w-fit items-center rounded-xl px-1 text-sm font-bold text-blue-800 underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
+          {SPECIALITIES.map((item, index) => {
+            if (item.featured) {
+              return (
+                <Reveal
+                  key={item.id}
+                  variant="up"
+                  delay={index * 90}
+                  className="md:col-span-2 md:row-span-2"
                 >
-                  Đặt lịch chuyên khoa này
-                </a>
-              </article>
-            </li>
-          ))}
-        </ul>
+                  <div className="group flex h-full flex-col justify-between border border-[#c3c6d0] bg-white p-10 transition-colors hover:border-[#001836]">
+                    <div>
+                      <span
+                        className="material-symbols-outlined mb-8 text-4xl text-[#001836]"
+                        style={{ fontVariationSettings: "'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24" }}
+                        aria-hidden="true"
+                      >
+                        {item.icon}
+                      </span>
+                      <h3 className="le-display mb-4 text-3xl text-[#001836]">{item.title}</h3>
+                      <p className="mb-8 max-w-sm text-base leading-[1.6] text-[#43474f]">
+                        {item.description}
+                      </p>
+                    </div>
+                    <a
+                      href="#dat-lich"
+                      className="flex items-center gap-2 text-sm font-semibold tracking-normal text-[#001836] transition-all group-hover:gap-4"
+                    >
+                      Xem chi tiết
+                      <span className="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+                    </a>
+                  </div>
+                </Reveal>
+              );
+            }
+
+            if (item.wide) {
+              return (
+                <Reveal
+                  key={item.id}
+                  variant="up"
+                  delay={index * 90}
+                  className="md:col-span-2"
+                >
+                  <div className="flex h-full items-center justify-between gap-8 border border-[#c3c6d0] bg-white p-8 transition-colors hover:border-[#001836]">
+                    <div className="max-w-xs">
+                      <span className="material-symbols-outlined mb-4 text-3xl text-[#001836]" aria-hidden="true">
+                        {item.icon}
+                      </span>
+                      <h3 className="le-display mb-2 text-2xl text-[#001836]">{item.title}</h3>
+                      <p className="text-sm text-[#43474f]">{item.description}</p>
+                    </div>
+                    {item.image && (
+                      <div className="h-32 w-32 shrink-0 overflow-hidden rounded-full">
+                        <img
+                          src={item.image}
+                          alt=""
+                          className="h-full w-full object-cover"
+                          width={128}
+                          height={128}
+                          loading="lazy"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </Reveal>
+              );
+            }
+
+            return (
+              <Reveal key={item.id} variant="up" delay={index * 90}>
+                <div className="h-full border border-[#c3c6d0] bg-white p-8 transition-colors hover:border-[#001836]">
+                  <span className="material-symbols-outlined mb-4 text-3xl text-[#001836]" aria-hidden="true">
+                    {item.icon}
+                  </span>
+                  <h3 className="le-display mb-2 text-2xl text-[#001836]">{item.title}</h3>
+                  <p className="text-sm text-[#43474f]">{item.description}</p>
+                </div>
+              </Reveal>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

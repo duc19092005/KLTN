@@ -3,30 +3,19 @@ import { useSearchParams } from 'react-router-dom';
 import { LoginPage } from '../../auth';
 import SiteHeader from '../components/SiteHeader';
 import HeroSection from '../components/HeroSection';
-import QuickActions from '../components/QuickActions';
+import VisionSection from '../components/VisionSection';
 import SpecialitiesSection from '../components/SpecialitiesSection';
-import DoctorsPricingSection from '../components/DoctorsPricingSection';
+import DoctorsSection from '../components/DoctorsSection';
+import FacilitiesSection from '../components/FacilitiesSection';
+import NewsSection from '../components/NewsSection';
 import BookingCtaSection from '../components/BookingCtaSection';
 import SiteFooter from '../components/SiteFooter';
+import '../landing.css';
 
 /**
- * Home — BVĐK Quốc tế
- *
- * Stack: Vite + React + Tailwind + shared UI (shadcn-style). Project is not Next.js;
- * sections are split like App Router segments for maintainability.
- *
- * taste-skill dials:
- * - TYPOGRAPHY_ELEVATION: High — bold hierarchy, 16px+ body, strong trust
- * - MOTION_INTENSITY: Low — duration-150, scale ≤ 1.015 on cards only
- * - VISUAL_DENSITY: Medium — spacing scale 4–64, airy but not sparse art-gallery
- *
- * web a11y (healthcare):
- * - WCAG-minded contrast (slate-900 on white / blue-900 CTAs)
- * - Touch targets ≥ 44px
- * - Mobile-first responsive
- * - Medical blue + clean neutrals
+ * Home — full editorial mock rewrite (Libre Caslon + hospital MD tokens).
+ * Stack remains Vite + React (not Next.js). Staff login preserved.
  */
-
 export default function HospitalLandingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const showLogin = searchParams.get('login') === 'true';
@@ -47,11 +36,18 @@ export default function HospitalLandingPage() {
       document.getElementById('doi-ngu')?.scrollIntoView({ behavior: 'smooth' });
       return;
     }
-    if (q.includes('giá') || q.includes('gia') || q.includes('bảng')) {
-      document.getElementById('bang-gia')?.scrollIntoView({ behavior: 'smooth' });
+    if (q.includes('cơ sở') || q.includes('co so') || q.includes('mri')) {
+      document.getElementById('co-so')?.scrollIntoView({ behavior: 'smooth' });
       return;
     }
-    if (q.includes('sản') || q.includes('nhi') || q.includes('tim') || q.includes('khớp') || q.includes('ung') || q.includes('khoa')) {
+    if (
+      q.includes('sản')
+      || q.includes('nhi')
+      || q.includes('tim')
+      || q.includes('khớp')
+      || q.includes('ung')
+      || q.includes('khoa')
+    ) {
       document.getElementById('chuyen-khoa')?.scrollIntoView({ behavior: 'smooth' });
       return;
     }
@@ -59,21 +55,23 @@ export default function HospitalLandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 antialiased">
+    <div className="landing-editorial min-h-screen">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-bold focus:text-slate-900 focus:shadow-lg"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:border focus:border-[#001836] focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-medium focus:text-[#001836]"
       >
         Bỏ qua đến nội dung chính
       </a>
 
       <SiteHeader onOpenStaffLogin={openStaffLogin} onSearch={onSearch} />
 
-      <main id="main-content">
+      <main id="main-content" className="pt-20">
         <HeroSection />
-        <QuickActions />
+        <VisionSection />
         <SpecialitiesSection />
-        <DoctorsPricingSection />
+        <DoctorsSection />
+        <FacilitiesSection />
+        <NewsSection />
         <BookingCtaSection />
       </main>
 
