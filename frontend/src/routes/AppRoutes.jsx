@@ -15,7 +15,7 @@ import DoctorQueuePage from '../features/doctor/pages/DoctorQueuePage';
 import LabManagerDashboardPage from '../features/lab-manager/pages/LabManagerDashboard';
 import LoadingIndicator from '../shared/components/LoadingIndicator';
 import { getDashboardRoute } from '../shared/constants/roleRoutes';
-import { PatientVerificationPage } from '../features/verification';
+import HospitalLandingPage from '../features/landing/pages/HospitalLandingPage';
 import PatientHomePage from '../features/patient/pages/PatientHomePage';
 import { ProfilePage } from '../features/profile';
 
@@ -44,7 +44,7 @@ export default function App() {
   return (
     <div className="app">
       <Routes>
-        <Route path="/" element={<PatientVerificationPage />} />
+        <Route path="/" element={<HospitalLandingPage />} />
         <Route path="/patient-home" element={<PatientHomePage />} />
         <Route path="/login" element={!isAuthenticated || loading ? <Navigate to="/?login=true" replace /> : <Navigate to={user?.firstLogin ? firstLoginRoute(user) : dashboardRoute} replace />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
