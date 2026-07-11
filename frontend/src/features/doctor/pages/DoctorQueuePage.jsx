@@ -271,7 +271,22 @@ export default function DoctorQueuePage() {
       }
     })();
   }, []);
-  useEffect(() => { aiModelService.list({ type: 'API' }).then((res) => { const items = getItems(res.data); setAiModels(items); setSelectedAiModelId((current) => current || items[0]?.id || ''); }).catch(() => { }); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    aiModelService.availableForDiagnosis()
+      .then((res) => {
+        if (cancelled) return;
+        const items = getItems(res.data);
+        setAiModels(items);
+        setSelectedAiModelId((current) => current || items[0]?.id || '');
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        toast.error(err?.response?.data?.message || 'Không tải được danh sách mô hình AI cho chẩn đoán.');
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filteredVisits = useMemo(() => {
     const text = query.trim().toLowerCase();
@@ -350,7 +365,7 @@ export default function DoctorQueuePage() {
       const activeDiag = decision?.aiDiagnoses?.find((d) => d.id === selectedAiId);
       if (activeDiag?.aiModel) {
         setRatingModelId(activeDiag.aiModel.id);
-        setRatingModelName(activeDiag.aiModel.modelName);
+        setRatingModelName(activeDiag.aiModel.modelName || activeDiag.aiModel.name || 'Mô hình AI');
         setShowRatingPopup(true);
         setCountdown(10);
         setRatingSelected(null);
@@ -387,6 +402,7 @@ export default function DoctorQueuePage() {
     try {
       setBusy(true);
       await aiModelService.rate(ratingModelId, {
+        aiDiagnosisId: selectedAiId,
         satisfied,
         feedback: satisfied ? undefined : ratingFeedback,
       });
@@ -1063,7 +1079,7 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
         <div className="flex flex-col sm:flex-row gap-2 xl:min-w-[520px]">
           <select value={selectedAiModelId} onChange={(e) => setSelectedAiModelId(e.target.value)} disabled={busy} className="flex-1 rounded-xl border border-cyan-100 bg-cyan-50/50 p-3 text-xs font-bold text-slate-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100 disabled:opacity-50 transition-colors">
             <option value="">-- Chọn mô hình AI --</option>
-            {aiModels.map((model) => <option key={model.id} value={model.id}>{model.modelName || model.name || 'Mô hình AI'} {model.modelVersion ? `(${model.modelVersion})` : ''} - {model.provider || 'khác'}</option>)}
+            {aiModels.map((model) => <option key={model.id} value={model.id}>{model.modelName || model.name || 'Mô hình AI'} {model.modelVersion || model.version ? `(${model.modelVersion || model.version})` : ''} - {model.recommendedSpecialty || 'Tổng quát'}</option>)}
           </select>
           <button type="button" onClick={onGenerate} disabled={busy || !selectedAiModelId} className="rounded-xl bg-cyan-600 px-5 py-3 text-xs font-black uppercase tracking-wider text-white shadow-sm hover:bg-cyan-700 disabled:opacity-50 disabled:shadow-none whitespace-nowrap transition-colors flex items-center justify-center gap-2">
             {busy ? (<><LoadingIndicator size="sm" /><span>Đang phân tích...</span></>) : 'Chạy mô hình'}
@@ -1088,7 +1104,10 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
                       <span className="rounded-lg bg-cyan-50 px-2 py-1 text-[10px] font-black uppercase text-cyan-700 border border-cyan-100">#{index + 1} · {parsed.provider || diagnosis.aiModel?.provider || 'AI'}</span>
                       <span className="text-[10px] font-bold text-slate-400">{formatTime(diagnosis.createdAt)}</span>
                     </div>
-                    <strong className="mt-2 block text-xs font-black text-slate-900">{parsed.modelName || diagnosis.aiModel?.modelName || 'Mô hình AI'}</strong>
+                    <strong className="mt-2 block text-xs font-black text-slate-900">
+                      {parsed.modelName || diagnosis.aiModel?.modelName || diagnosis.aiModel?.name || 'Mô hình AI'}
+                      {(diagnosis.aiModel?.modelVersion || diagnosis.aiModel?.version) ? ` · v${diagnosis.aiModel.modelVersion || diagnosis.aiModel.version}` : ''}
+                    </strong>
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <span className="text-[10px] font-black text-slate-400">Confidence</span>
                       <span className="text-[10px] font-black text-cyan-700">{formatConfidence(diagnosis.confidence)}</span>
@@ -1111,8 +1130,16 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
                   <span className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-[10px] font-black text-emerald-700">Confidence {formatConfidence(currentDiagnosis?.confidence)}</span>
                   <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black text-slate-600">{currentDiagnosis?.status === 'DOCTOR_REVIEWED' ? 'Bác sĩ đã review' : 'AI gợi ý'}</span>
                 </div>
-                <h4 className="mt-3 text-lg font-black text-slate-950">{parsedResult.modelName || currentDiagnosis?.aiModel?.modelName || 'Mô hình AI'}</h4>
-                <p className="mt-1 text-[11px] font-semibold text-slate-500">Nền tảng: {parsedResult.provider || currentDiagnosis?.aiModel?.provider || 'khác'} · {currentDiagnosis?.createdAt ? new Date(currentDiagnosis.createdAt).toLocaleString('vi-VN') : 'N/A'}</p>
+                <h4 className="mt-3 text-lg font-black text-slate-950">
+                  {parsedResult.modelName || currentDiagnosis?.aiModel?.modelName || currentDiagnosis?.aiModel?.name || 'Mô hình AI'}
+                  {(currentDiagnosis?.aiModel?.modelVersion || currentDiagnosis?.aiModel?.version) ? ` · v${currentDiagnosis.aiModel.modelVersion || currentDiagnosis.aiModel.version}` : ''}
+                </h4>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                  Nền tảng: {parsedResult.provider || currentDiagnosis?.aiModel?.provider || 'khác'}
+                  {selectedModel?.recommendedSpecialty || currentDiagnosis?.aiModel?.recommendedSpecialty ? ` · ${selectedModel?.recommendedSpecialty || currentDiagnosis?.aiModel?.recommendedSpecialty}` : ''}
+                  {' · '}
+                  {currentDiagnosis?.createdAt ? new Date(currentDiagnosis.createdAt).toLocaleString('vi-VN') : 'N/A'}
+                </p>
               </div>
               <span className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-[10px] font-black text-emerald-700">Đã lưu DB</span>
             </div>

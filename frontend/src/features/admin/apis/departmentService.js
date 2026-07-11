@@ -5,6 +5,8 @@ export const departmentService = {
   create: (payload) => api.post('/departments', payload),
   update: (id, payload) => api.patch(`/departments/${id}`, payload),
   remove: (id) => api.delete(`/departments/${id}`),
+  restore: (id) => api.patch(`/departments/${id}/restore`),
+  permanentDelete: (id) => api.delete(`/departments/${id}/permanent`),
   assignManager: (id, managerId) => api.patch(`/departments/${id}/manager`, { managerId }),
 
   // Blockchain audit: tamper-evidence verification + change history

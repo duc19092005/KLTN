@@ -11,10 +11,12 @@ export const staffService = {
   lock: (id) => api.patch(`/staff/${id}/lock`),
   unlock: (id) => api.patch(`/staff/${id}/unlock`),
   remove: (id) => api.delete(`/staff/${id}`),
+  restore: (id) => api.patch(`/staff/${id}/restore`),
+  permanentDelete: (id) => api.delete(`/staff/${id}/permanent`),
   uploadAvatar: (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/doctors/upload-avatar', formData, {
+    return api.post('/staff/upload-avatar', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

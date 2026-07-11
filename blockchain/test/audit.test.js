@@ -30,7 +30,7 @@ describe('IdentityRegistry', function () {
     expect(await identity.owner()).to.equal(owner.address);
   });
 
-  it('authorizes and revokes admin wallets by owner only', async function () {
+  it('authorizes admin wallets by relayer/owner and revokes by owner', async function () {
     await expect(identity.authorizeAdmin(other.address)).to.emit(identity, 'AdminAuthorized');
     expect(await identity.isAuthorized(other.address)).to.equal(true);
 
@@ -38,7 +38,7 @@ describe('IdentityRegistry', function () {
     expect(await identity.isAuthorized(other.address)).to.equal(false);
 
     await expect(identity.connect(other).authorizeAdmin(relayer.address)).to.be.revertedWith(
-      'IdentityRegistry: caller is not owner',
+      'IdentityRegistry: caller is not relayer',
     );
   });
 
@@ -142,6 +142,8 @@ describe('AuditAnchor', function () {
   const entryA = `0x${'a'.repeat(64)}`;
   const entryB = `0x${'b'.repeat(64)}`;
   const entryC = `0x${'c'.repeat(64)}`;
+  const artifactHash = `0x${'d'.repeat(64)}`;
+  const artifactUri = 'ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3';
 
   function hashLeafV2(entryHash) {
     return ethers.sha256(ethers.concat([ethers.toUtf8Bytes('KLTN_AUDIT_LEAF_V2'), ethers.getBytes(entryHash)]));
@@ -167,13 +169,15 @@ describe('AuditAnchor', function () {
 
   it('commits and reads a root as owner', async function () {
     const root = rootForThreeLeaves();
-    await expect(anchor.commitRoot(1, root, 3)).to.emit(anchor, 'RootCommitted');
+    await expect(anchor.commitCheckpoint(1, root, 3, artifactHash, artifactUri)).to.emit(anchor, 'CheckpointCommitted');
     expect(await anchor.getRoot(1)).to.equal(root);
     expect(await anchor.latestBatchId()).to.equal(1);
     expect(await anchor.totalBatches()).to.equal(1);
 
-    const [cpRoot, leafCount, , committed] = await anchor.getCheckpoint(1);
+    const [cpRoot, cpArtifactHash, cpArtifactUri, leafCount, , committed] = await anchor.getCheckpoint(1);
     expect(cpRoot).to.equal(root);
+    expect(cpArtifactHash).to.equal(artifactHash);
+    expect(cpArtifactUri).to.equal(artifactUri);
     expect(leafCount).to.equal(3);
     expect(committed).to.equal(true);
   });
@@ -181,30 +185,32 @@ describe('AuditAnchor', function () {
   it('commits a root as authorized relayer', async function () {
     await identity.addRelayer(relayer.address);
     const root = rootForThreeLeaves();
-    await expect(anchor.connect(relayer).commitRoot(1, root, 3)).to.emit(anchor, 'RootCommitted');
+    await expect(anchor.connect(relayer).commitCheckpoint(1, root, 3, artifactHash, artifactUri)).to.emit(anchor, 'CheckpointCommitted');
     expect(await anchor.getRoot(1)).to.equal(root);
   });
 
   it('rejects duplicate batch commit', async function () {
     const root = rootForThreeLeaves();
-    await anchor.commitRoot(1, root, 3);
-    await expect(anchor.commitRoot(1, root, 3)).to.be.revertedWith('AuditAnchor: batch already committed');
+    await anchor.commitCheckpoint(1, root, 3, artifactHash, artifactUri);
+    await expect(anchor.commitCheckpoint(1, root, 3, artifactHash, artifactUri)).to.be.revertedWith('AuditAnchor: batch already committed');
   });
 
   it('rejects empty root / empty batch', async function () {
     const root = rootForThreeLeaves();
-    await expect(anchor.commitRoot(1, ethers.ZeroHash, 4)).to.be.revertedWith('AuditAnchor: empty root');
-    await expect(anchor.commitRoot(1, root, 0)).to.be.revertedWith('AuditAnchor: empty batch');
+    await expect(anchor.commitCheckpoint(1, ethers.ZeroHash, 4, artifactHash, artifactUri)).to.be.revertedWith('AuditAnchor: empty root');
+    await expect(anchor.commitCheckpoint(1, root, 4, ethers.ZeroHash, artifactUri)).to.be.revertedWith('AuditAnchor: empty artifact hash');
+    await expect(anchor.commitCheckpoint(1, root, 4, artifactHash, '')).to.be.revertedWith('AuditAnchor: empty artifact uri');
+    await expect(anchor.commitCheckpoint(1, root, 0, artifactHash, artifactUri)).to.be.revertedWith('AuditAnchor: empty batch');
   });
 
   it('rejects non-sequential batch ids', async function () {
-    await expect(anchor.commitRoot(2, rootForThreeLeaves(), 3)).to.be.revertedWith(
+    await expect(anchor.commitCheckpoint(2, rootForThreeLeaves(), 3, artifactHash, artifactUri)).to.be.revertedWith(
       'AuditAnchor: non-sequential batch',
     );
   });
 
   it('rejects non-writer commit', async function () {
-    await expect(anchor.connect(other).commitRoot(1, rootForThreeLeaves(), 3)).to.be.revertedWith(
+    await expect(anchor.connect(other).commitCheckpoint(1, rootForThreeLeaves(), 3, artifactHash, artifactUri)).to.be.revertedWith(
       'AuditAnchor: caller is not writer',
     );
   });
@@ -223,7 +229,7 @@ describe('AuditAnchor', function () {
     expect(await anchor.hashPair(leafA, leafB)).to.equal(pairAB);
     expect(await anchor.hashPair(leafC, leafC)).to.equal(pairCC);
 
-    await anchor.commitRoot(1, root, 3);
+    await anchor.commitCheckpoint(1, root, 3, artifactHash, artifactUri);
 
     expect(await anchor.verifyProof(1, entryA, [leafB, pairCC])).to.equal(true);
     expect(await anchor.verifyProof(1, entryB, [leafA, pairCC])).to.equal(true);
@@ -236,7 +242,7 @@ describe('AuditAnchor', function () {
     const pairAB = '0xd364921803de82bee9d8be064cab3febadddd3be6cfb01f76c295d78772f2cbf';
     const root = '0x5f591b089c3b297deae0b31b1aeff9527c3c576102d1c7806044a4bd8bf46816';
 
-    await anchor.commitRoot(1, root, 3);
+    await anchor.commitCheckpoint(1, root, 3, artifactHash, artifactUri);
 
     expect(await anchor.verifyProof(1, entryC, [entryC, pairAB])).to.equal(false);
     expect(await anchor.verifyProof(1, entryA, [entryC, pairAB])).to.equal(false);

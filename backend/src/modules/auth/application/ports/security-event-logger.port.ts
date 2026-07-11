@@ -2,10 +2,10 @@
 export const SECURITY_EVENT_LOGGER = Symbol('SECURITY_EVENT_LOGGER');
 
 /**
- * Boundary for the dual-write auth/security audit, extracted verbatim from the
- * former AuthService.writeAudit(): writes to BOTH the queryable AuditLog and the
- * tamper-evident BlockchainLogger (via AuditLoggerService). Both writes are
- * non-fatal so a logging failure never blocks authentication.
+ * Boundary for the dual-write auth/security audit: writes to BOTH the queryable
+ * AuditLog and the tamper-evident audit V2 stream. At least one durable channel
+ * must succeed; dual-failure throws so security mutations cannot complete without
+ * an audit trail.
  */
 export interface SecurityEventLoggerPort {
   write(

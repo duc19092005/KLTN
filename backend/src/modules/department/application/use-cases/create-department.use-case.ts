@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { OperationalStatus } from '@prisma/client';
 import { CreateDepartmentDto } from '../../dto/department.dto';
 import { DEPARTMENT_REPOSITORY, DepartmentRepositoryPort } from '../ports/department.repository.port';
@@ -19,24 +19,28 @@ export class CreateDepartmentUseCase {
   async execute(dto: CreateDepartmentDto, actorId?: string) {
     await this.validator.assertNameUnique(dto.name);
     await this.validator.assertDepartmentCodeUnique(dto.departmentCode);
+    if (dto.canReceiveOrders && !['LABORATORY', 'IMAGING'].includes(dto.type)) {
+      throw new BadRequestException('Chỉ phòng xét nghiệm hoặc chẩn đoán hình ảnh được phép nhận chỉ định cận lâm sàng.');
+    }
     if (dto.managerId) {
       const manager = await this.validator.assertStaffExists(dto.managerId);
       await this.validator.assertManagerAvailable(dto.managerId);
       this.validator.assertManagerUnassignedForCreate(manager);
     }
 
-    const department = await this.repo.createWithManager({
-      departmentCode: dto.departmentCode,
-      name: dto.name,
-      floor: dto.floor,
-      status: dto.status || OperationalStatus.ACTIVE,
-      type: dto.type,
-      canReceiveOrders: dto.canReceiveOrders ?? false,
-      description: dto.description,
-      managerId: dto.managerId || null,
-    });
-
-    await this.integrity.anchorChange(department, 'CREATE', actorId, null);
+    const department = await this.repo.createWithManager(
+      {
+        departmentCode: dto.departmentCode,
+        name: dto.name,
+        floor: dto.floor,
+        status: dto.status || OperationalStatus.ACTIVE,
+        type: dto.type,
+        canReceiveOrders: dto.canReceiveOrders,
+        description: dto.description,
+        managerId: dto.managerId || null,
+      },
+      (created, tx) => this.integrity.anchorChange(created, 'CREATE', actorId, null, tx),
+    );
     return this.repo.findByIdOrThrow(department.id);
   }
 }

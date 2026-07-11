@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { MedicalOrderStatus } from '@prisma/client';
 import { AuthUser } from '../../../../common/types/auth-user.type';
 import { MedicalOrderAccessPolicy } from '../policies/medical-order-access.policy';
@@ -21,6 +21,15 @@ export class UpdateMedicalOrderStatusUseCase {
 
     await this.accessPolicy.assertCanManageOrder(order, user, () => this.resolveStaff(user.sub));
     await this.assertDepartmentMatch(order.targetDepartmentId, user);
+    const allowed: Record<MedicalOrderStatus, MedicalOrderStatus[]> = {
+      [MedicalOrderStatus.ORDERED]: [MedicalOrderStatus.IN_PROGRESS, MedicalOrderStatus.CANCELLED],
+      [MedicalOrderStatus.IN_PROGRESS]: [MedicalOrderStatus.CANCELLED],
+      [MedicalOrderStatus.RESULT_READY]: [],
+      [MedicalOrderStatus.CANCELLED]: [],
+    };
+    if (!allowed[order.status].includes(status)) {
+      throw new BadRequestException('Chuyển trạng thái chỉ định không hợp lệ. Kết quả chỉ được hoàn tất qua chức năng trả kết quả xét nghiệm.');
+    }
 
     const completedAt =
       status === MedicalOrderStatus.RESULT_READY || status === MedicalOrderStatus.CANCELLED ? new Date() : undefined;

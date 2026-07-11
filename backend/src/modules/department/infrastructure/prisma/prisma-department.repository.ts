@@ -5,6 +5,7 @@ import {
   CreateDepartmentData,
   DepartmentListFilter,
   DepartmentRepositoryPort,
+  DepartmentWriteHook,
   StaffProfileInfo,
   UpdateDepartmentData,
 } from '../../application/ports/department.repository.port';
@@ -51,7 +52,20 @@ export class PrismaDepartmentRepository implements DepartmentRepositoryPort {
     return this.prisma.staffProfile.count({ where: { departmentId } });
   }
 
-  async createWithManager(data: CreateDepartmentData): Promise<any> {
+  async countBusinessReferences(departmentId: string): Promise<number> {
+    const department = await this.prisma.department.findUnique({
+      where: { id: departmentId },
+      select: {
+        _count: {
+          select: { staffs: true, visits: true, medicalOrders: true, appointments: true },
+        },
+      },
+    });
+    if (!department) return 0;
+    const count = department._count;
+    return count.staffs + count.visits + count.medicalOrders + count.appointments;
+  }
+  async createWithManager(data: CreateDepartmentData, afterWrite?: DepartmentWriteHook): Promise<any> {
     return this.prisma.$transaction(async (tx) => {
       const dept = await tx.department.create({
         data: {
@@ -71,7 +85,9 @@ export class PrismaDepartmentRepository implements DepartmentRepositoryPort {
         await tx.staffProfile.update({ where: { id: data.managerId }, data: { departmentId: dept.id } });
       }
 
-      return tx.department.findUniqueOrThrow({ where: { id: dept.id }, include: this.includeRelations() });
+      const created = await tx.department.findUniqueOrThrow({ where: { id: dept.id }, include: this.includeRelations() });
+      await afterWrite?.(created, tx);
+      return created;
     });
   }
 
@@ -99,27 +115,43 @@ export class PrismaDepartmentRepository implements DepartmentRepositoryPort {
     return { items, total };
   }
 
-  async update(id: string, data: UpdateDepartmentData): Promise<any> {
-    return this.prisma.department.update({
-      where: { id },
-      data: {
-        ...(data.departmentCode !== undefined ? { departmentCode: data.departmentCode.trim() } : {}),
-        ...(data.name !== undefined ? { name: data.name.trim() } : {}),
-        ...(data.floor !== undefined ? { floor: data.floor?.trim() } : {}),
-        ...(data.status !== undefined ? { status: data.status } : {}),
-        ...(data.type !== undefined ? { type: data.type } : {}),
-        ...(data.canReceiveOrders !== undefined ? { canReceiveOrders: data.canReceiveOrders } : {}),
-        ...(data.description !== undefined ? { description: data.description?.trim() } : {}),
-      },
-      include: this.includeRelations(),
+  async update(id: string, data: UpdateDepartmentData, afterWrite?: DepartmentWriteHook): Promise<any> {
+    return this.prisma.$transaction(async (tx) => {
+      const department = await tx.department.update({
+        where: { id },
+        data: {
+          ...(data.departmentCode !== undefined ? { departmentCode: data.departmentCode.trim() } : {}),
+          ...(data.name !== undefined ? { name: data.name.trim() } : {}),
+          ...(data.floor !== undefined ? { floor: data.floor?.trim() } : {}),
+          ...(data.status !== undefined ? { status: data.status } : {}),
+          ...(data.type !== undefined ? { type: data.type } : {}),
+          ...(data.canReceiveOrders !== undefined ? { canReceiveOrders: data.canReceiveOrders } : {}),
+          ...(data.description !== undefined ? { description: data.description?.trim() } : {}),
+        },
+        include: this.includeRelations(),
+      });
+      await afterWrite?.(department, tx);
+      return department;
     });
   }
 
-  async assignManager(id: string, managerId: string | null): Promise<any> {
-    return this.prisma.department.update({
-      where: { id },
-      data: { managerId: managerId || null },
-      include: this.includeRelations(),
+  async assignManager(
+    id: string,
+    managerId: string | null,
+    staffIdToAssign?: string,
+    afterWrite?: DepartmentWriteHook,
+  ): Promise<any> {
+    return this.prisma.$transaction(async (tx) => {
+      if (staffIdToAssign) {
+        await tx.staffProfile.update({ where: { id: staffIdToAssign }, data: { departmentId: id } });
+      }
+      const department = await tx.department.update({
+        where: { id },
+        data: { managerId: managerId || null },
+        include: this.includeRelations(),
+      });
+      await afterWrite?.(department, tx);
+      return department;
     });
   }
 

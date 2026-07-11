@@ -1,6 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { AI_MODEL_REPOSITORY, AiModelRepositoryPort } from '../ports/ai-model.repository.port';
 import { AI_MODEL_INTEGRITY_ANCHOR, AiModelIntegrityAnchorPort } from '../ports/ai-model-integrity-anchor.port';
+import { presentAiModel } from '../../domain/ai-model.presenter';
 
 /**
  * Fetches one AI model and attaches its integrity audit summary. Behavior
@@ -22,7 +23,7 @@ export class FindAiModelUseCase {
     const positiveRatings = model.aiQualities?.filter((q: any) => q.trustablePercent === 100).length || 0;
     const averageAccuracy = totalRatings > 0 ? Math.round((positiveRatings / totalRatings) * 100) : null;
 
-    return {
+    return presentAiModel({
       ...model,
       averageAccuracy,
       totalRatings,
@@ -34,6 +35,6 @@ export class FindAiModelUseCase {
         storedHash: integrity.storedHash,
         recomputedHash: integrity.recomputedHash,
       },
-    };
+    });
   }
 }

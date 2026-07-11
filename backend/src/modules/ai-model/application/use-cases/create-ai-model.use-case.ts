@@ -4,6 +4,7 @@ import { AI_MODEL_REPOSITORY, AiModelRepositoryPort } from '../ports/ai-model.re
 import { AI_MODEL_CRYPTO, AiModelCryptoPort } from '../ports/ai-model-crypto.port';
 import { AI_MODEL_CONNECTIVITY, AiModelConnectivityPort } from '../ports/ai-model-connectivity.port';
 import { AI_MODEL_INTEGRITY_ANCHOR, AiModelIntegrityAnchorPort } from '../ports/ai-model-integrity-anchor.port';
+import { presentAiModel } from '../../domain/ai-model.presenter';
 
 /**
  * Registers a new AI model. Behavior copied verbatim from the former
@@ -32,20 +33,21 @@ export class CreateAiModelUseCase {
     const encrypted = this.crypto.encrypt(secretMaterial);
     const plainFingerprint = this.crypto.fingerprint(secretMaterial);
 
-    const model = await this.repo.create({
-      modelName: dto.modelName.trim(),
-      modelVersion: dto.modelVersion.trim(),
-      recommendedSpecialty: dto.recommendedSpecialty?.trim() || null,
-      type: dto.type,
-      provider: dto.type === 'API' ? dto.provider || 'other' : 'ip',
-      apiEndpoint,
-      ipHashEncrypted: encrypted,
-      ipHashPlain: plainFingerprint,
-      description: dto.description?.trim() || null,
-      createdBy: adminUserId,
-    });
-
-    await this.integrity.anchorChange(model, 'CREATE', adminUserId, null);
-    return model;
+    const model = await this.repo.create(
+      {
+        modelName: dto.modelName.trim(),
+        modelVersion: dto.modelVersion.trim(),
+        recommendedSpecialty: dto.recommendedSpecialty?.trim() || null,
+        type: dto.type,
+        provider: dto.type === 'API' ? dto.provider || 'other' : 'ip',
+        apiEndpoint,
+        ipHashEncrypted: encrypted,
+        ipHashPlain: plainFingerprint,
+        description: dto.description?.trim() || null,
+        createdBy: adminUserId,
+      },
+      (created, tx) => this.integrity.anchorChange(created, 'CREATE', adminUserId, null, tx),
+    );
+    return presentAiModel(model);
   }
 }

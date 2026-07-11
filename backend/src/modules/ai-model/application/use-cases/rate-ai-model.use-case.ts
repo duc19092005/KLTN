@@ -9,7 +9,7 @@ export class RateAiModelUseCase {
     private readonly audit: AuditLoggerService,
   ) {}
 
-  async execute(aiModelId: string, userId: string, satisfied: boolean, feedback?: string) {
+  async execute(aiModelId: string, userId: string, aiDiagnosisId: string, satisfied: boolean, feedback?: string) {
     // 1. Verify model exists
     const model = await this.prisma.aiModelRegistry.findUnique({
       where: { id: aiModelId },
@@ -28,6 +28,13 @@ export class RateAiModelUseCase {
     }
     const doctorId = staff.doctorProfile.id;
 
+    const diagnosis = await this.prisma.aiDiagnosis.findUnique({ where: { id: aiDiagnosisId } });
+    if (!diagnosis || diagnosis.aiModelId !== aiModelId || diagnosis.reviewedByDoctorId !== doctorId || !diagnosis.visitId) {
+      throw new BadRequestException('Chỉ được đánh giá kết quả AI mà bác sĩ đã sử dụng và xác nhận trong lượt khám của mình.');
+    }
+    const existingRating = await this.prisma.aiQuality.findUnique({ where: { aiDiagnosisId } });
+    if (existingRating) throw new BadRequestException('Kết quả AI này đã được đánh giá.');
+
     const trustablePercent = satisfied ? 100 : 0;
     const conclusion = feedback?.trim() || (satisfied ? 'Hài lòng với kết quả gợi ý chẩn đoán' : 'Chưa hài lòng với kết quả chẩn đoán');
 
@@ -36,6 +43,7 @@ export class RateAiModelUseCase {
       data: {
         doctorId,
         aiModelId,
+        aiDiagnosisId,
         doctorConclusionAboutModel: conclusion,
         trustablePercent,
       },

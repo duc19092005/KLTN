@@ -52,15 +52,21 @@ export class AssignManagerUseCase {
         throw new BadRequestException(human[department.type] || 'Vai trò không phù hợp với loại phòng ban.');
       }
 
-      if (!staff.departmentId) await this.repo.setStaffDepartment(staff.id, id);
+      // The repository assigns an unassigned manager inside the same transaction
+      // as the department update and audit write.
     }
 
     // Capture the before-snapshot using the canonical fields (name/code/type/managerId/etc),
     // then apply the change and anchor the new state.
     const fullBefore = await this.repo.findByIdOrThrow(id);
     const before = buildDepartmentSnapshot(fullBefore);
-    const updated = await this.repo.assignManager(id, dto.managerId || null);
-    await this.integrity.anchorChange(updated, 'UPDATE', actorId, before);
+    const manager = dto.managerId ? await this.validator.assertStaffExists(dto.managerId) : null;
+    const updated = await this.repo.assignManager(
+      id,
+      dto.managerId || null,
+      manager && !manager.departmentId ? manager.id : undefined,
+      (departmentAfter, tx) => this.integrity.anchorChange(departmentAfter, 'UPDATE', actorId, before, tx),
+    );
     return updated;
   }
 }

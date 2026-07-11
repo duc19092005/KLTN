@@ -7,6 +7,7 @@ import { AuthUser } from '../../../common/types/auth-user.type';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { DepartmentService } from '../services/department.service';
 import { AssignManagerDto, CreateDepartmentDto, DepartmentQueryDto, UpdateDepartmentDto } from '../dto/department.dto';
+import { AdministrativeLifecycleService } from '../../../common/lifecycle/administrative-lifecycle.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
@@ -14,7 +15,7 @@ import { AssignManagerDto, CreateDepartmentDto, DepartmentQueryDto, UpdateDepart
 @ApiBearerAuth()
 @Controller('departments')
 export class DepartmentController {
-  constructor(private readonly service: DepartmentService) {}
+  constructor(private readonly service: DepartmentService, private readonly lifecycle: AdministrativeLifecycleService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a department' })
@@ -68,6 +69,16 @@ export class DepartmentController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete an empty department' })
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.service.remove(id, user?.sub);
+    return this.lifecycle.softDelete('departments', id, user.sub);
+  }
+
+  @Patch(':id/restore')
+  restore(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.restore('departments', id, user.sub);
+  }
+
+  @Delete(':id/permanent')
+  permanentDelete(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.permanentDelete('departments', id, user.sub);
   }
 }

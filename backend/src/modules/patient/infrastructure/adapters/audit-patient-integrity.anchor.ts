@@ -7,6 +7,7 @@ import {
   PatientIntegrityEvaluation,
 } from '../../application/ports/patient-integrity-anchor.port';
 import { buildPatientSnapshot } from '../../domain/patient-snapshot';
+import { Prisma } from '@prisma/client';
 
 /**
  * Tamper-evidence adapter for Patient records. Uses the centralized AuditAnchor
@@ -35,19 +36,16 @@ export class AuditPatientIntegrityAnchor implements PatientIntegrityAnchorPort {
     private readonly auditAnchor: AuditAnchorService,
   ) {}
 
-  async anchorChange(patient: any, action: string, actorId?: string, before?: unknown): Promise<void> {
+  async anchorChange(patient: any, action: string, actorId?: string, before?: unknown, tx?: Prisma.TransactionClient): Promise<void> {
     const snapshot = buildPatientSnapshot(patient);
 
-    try {
-      if (action !== 'DELETE') {
-        const { salt, hash } = this.audit.hashSnapshot(snapshot);
-        await this.prisma.patient.update({
-          where: { id: patient.id },
-          data: { hash256: hash, dataSalt: salt },
-        });
-      }
-    } catch (err) {
-      console.error('Error computing patient hash:', err);
+    if (action !== 'DELETE') {
+      const { salt, hash } = this.audit.hashSnapshot(snapshot);
+      const client = tx ?? this.prisma;
+      await client.patient.update({
+        where: { id: patient.id },
+        data: { hash256: hash, dataSalt: salt },
+      });
     }
 
     await this.audit.recordV2({
@@ -58,7 +56,7 @@ export class AuditPatientIntegrityAnchor implements PatientIntegrityAnchorPort {
       before: this.toAuditSnapshot(before),
       after: action === 'DELETE' ? null : snapshot,
       onChainStatus: 'PENDING',
-    });
+    }, tx);
   }
 
   private toAuditSnapshot(value: unknown): Record<string, unknown> | null {

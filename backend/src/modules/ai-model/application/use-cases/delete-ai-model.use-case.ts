@@ -16,8 +16,10 @@ export class DeleteAiModelUseCase {
     if (!existing || existing.isDeleted || existing.status === 'DELETE') throw new NotFoundException('Không tìm thấy mô hình AI.');
 
     const before = buildAiModelSnapshot(existing);
-    const deleted = await this.repo.softDelete(id);
-    await this.integrity.anchorChange(deleted, 'DELETE', actorId, before);
+    await this.repo.softDelete(
+      id,
+      (deleted, tx) => this.integrity.anchorChange(deleted, 'DELETE', actorId, before, tx),
+    );
     return { deleted: true, id };
   }
 }

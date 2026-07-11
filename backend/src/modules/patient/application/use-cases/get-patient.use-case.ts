@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { UpdatePatientDto } from '../../dto/patient.dto';
 import { PATIENT_REPOSITORY, PatientRepositoryPort } from '../ports/patient.repository.port';
 import { PATIENT_INTEGRITY_ANCHOR, PatientIntegrityAnchorPort } from '../ports/patient-integrity-anchor.port';
@@ -23,27 +23,31 @@ export class GetPatientUseCase {
     return patient;
   }
 
-  async update(id: string, dto: UpdatePatientDto) {
+  async update(id: string, dto: UpdatePatientDto, actorId?: string) {
     const existing = await this.findOne(id);
+    if (![dto.phone, dto.citizenId, dto.insuranceNumber, dto.emergencyContact].some((value) => value?.trim())) {
+      throw new BadRequestException('Hồ sơ bệnh nhân phải có ít nhất một thông tin liên hệ hoặc định danh hợp lệ.');
+    }
+    const conflict = await this.repo.findIdentityConflict(dto, id);
+    if (conflict) {
+      throw new ConflictException(`Thông tin bệnh nhân trùng với hồ sơ ${conflict.patientCode}.`);
+    }
     const before = buildPatientSnapshot(existing);
 
-    const updated = await this.repo.update(id, {
-      fullName: dto.fullName,
-      gender: dto.gender,
-      birthDate: dto.birthDate,
-      citizenId: dto.citizenId,
-      phone: dto.phone,
-      address: dto.address,
-      insuranceNumber: dto.insuranceNumber,
-      emergencyContact: dto.emergencyContact,
-    });
-
-    // Anchor the updated patient record for tamper-evidence
-    try {
-      await this.integrity.anchorChange(updated, 'UPDATE', undefined, before);
-    } catch (err) {
-      console.error('Error anchoring patient update:', err);
-    }
+    const updated = await this.repo.update(
+      id,
+      {
+        fullName: dto.fullName,
+        gender: dto.gender,
+        birthDate: dto.birthDate,
+        citizenId: dto.citizenId,
+        phone: dto.phone,
+        address: dto.address,
+        insuranceNumber: dto.insuranceNumber,
+        emergencyContact: dto.emergencyContact,
+      },
+      (patient, tx) => this.integrity.anchorChange(patient, 'UPDATE', actorId, before, tx),
+    );
 
     return updated;
   }

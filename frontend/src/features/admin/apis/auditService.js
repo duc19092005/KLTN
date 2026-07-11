@@ -12,7 +12,13 @@ export const auditService = {
   logs: (params = {}) => api.get('/audit/logs', { params }),
   verifyChain: () => api.get('/audit/verify-chain'),
   batches: (params = {}) => api.get('/audit/batches', { params }),
+  batchDetail: (batchId) => api.get(`/audit/batches/${batchId}`),
   detail: (seq) => api.get(`/audit/logs/${seq}`),
   proof: (seq) => api.get(`/audit/logs/${seq}/proof`),
   anchorNow: () => api.post('/audit/anchor-now', {}),
+  recoverBatch: (batchId, reason, stepUpTicket) => api.post(
+    `/audit/recovery/${batchId}`,
+    { reason },
+    { headers: { 'x-stepup-ticket': stepUpTicket } },
+  ),
 };

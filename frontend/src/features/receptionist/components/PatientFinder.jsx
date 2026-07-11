@@ -175,6 +175,15 @@ export default function PatientFinder({ onPatientSelected }) {
       if (error) errors[field] = error;
       return errors;
     }, {});
+    const hasContactMethod = [form.phone, form.citizenId, form.insuranceNumber, form.emergencyContact]
+      .some((value) => typeof value === 'string' && value.trim().length > 0);
+    if (!hasContactMethod) {
+      const contactMessage = 'Hồ sơ bệnh nhân phải có ít nhất một thông tin liên hệ hoặc định danh hợp lệ (SĐT, CCCD, BHYT hoặc liên hệ khẩn cấp).';
+      nextErrors.phone = nextErrors.phone || contactMessage;
+      nextErrors.citizenId = nextErrors.citizenId || contactMessage;
+      nextErrors.insuranceNumber = nextErrors.insuranceNumber || contactMessage;
+      nextErrors.emergencyContact = nextErrors.emergencyContact || contactMessage;
+    }
     setFieldErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };

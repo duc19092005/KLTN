@@ -10,6 +10,7 @@ import { AuditAction } from '../../../../infrastructure/audit/audit-logger.servi
 import { computeAfterHashV2 } from '../../../../infrastructure/audit/audit-hash.util';
 import { buildStaffSnapshot } from '../../domain/staff-snapshot';
 import { buildUnifiedDoctorSnapshot } from '../../../doctor/domain/doctor-snapshot';
+import { Prisma } from '@prisma/client';
 
 /**
  * Tamper-evidence adapter for staff profiles. Uses the centralized AuditAnchor
@@ -27,15 +28,17 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
     private readonly auditAnchor: AuditAnchorService,
   ) {}
 
-  async anchorChange(staff: any, action: AuditAction, actorId?: string, before?: unknown): Promise<void> {
+  async anchorChange(
+    staff: any,
+    action: AuditAction,
+    actorId?: string,
+    before?: unknown,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     const snapshot = buildStaffSnapshot(staff);
-
-    try {
-      const { salt, hash } = this.audit.hashSnapshot(snapshot);
-      await this.prisma.staffProfile.update({ where: { id: staff.id }, data: { hash256: hash, dataSalt: salt } });
-    } catch {
-      // Hash computation failed; log entry will still be created below with null hashes.
-    }
+    const { salt, hash } = this.audit.hashSnapshot(snapshot);
+    const client = tx ?? this.prisma;
+    await client.staffProfile.update({ where: { id: staff.id }, data: { hash256: hash, dataSalt: salt } });
 
     await this.audit.recordV2({
       entity: 'StaffProfile',
@@ -45,7 +48,7 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
       before: this.toAuditSnapshot(before),
       after: snapshot,
       onChainStatus: 'PENDING',
-    });
+    }, tx);
   }
 
   private toAuditSnapshot(value: unknown): Record<string, unknown> | null {

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Query, UseGuards, NotFoundException } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, UseGuards, NotFoundException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
@@ -8,9 +8,12 @@ import { AuditAnchorService } from '../../../infrastructure/audit/audit-anchor.s
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
-import { toDisplayAuditDiff } from '../../../infrastructure/audit/audit-diff.util';
-import { verifyAuditRow } from '../../../infrastructure/audit/audit-verification.util';
-import { buildAuditEncryptionAad, decryptAuditSnapshot } from '../../../infrastructure/audit/audit-encryption.util';
+import { toDisplayAuditDiff, toDisplayAuditFields } from '../../../infrastructure/audit/audit-diff.util';
+import { verifyAuditRow, verifyAuditRowLight } from '../../../infrastructure/audit/audit-verification.util';
+import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
+import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
+import { AuditRecoveryService } from '../../../infrastructure/audit/audit-recovery.service';
+import { RecoverAuditBatchDto } from '../dto/recover-audit-batch.dto';
 
 /**
  * Admin-only audit + integrity API. Surfaces the tamper-evidence machinery so it can be
@@ -21,7 +24,7 @@ import { buildAuditEncryptionAad, decryptAuditSnapshot } from '../../../infrastr
  *  - proof:      Merkle inclusion proof for a single log, independently verifiable.
  *  - anchorNow:  force-seal+commit the current batch (Tier-A / on-demand).
  */
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
 @Roles('ADMIN')
 @ApiTags('Audit & Integrity')
 @ApiBearerAuth()
@@ -31,12 +34,20 @@ export class AuditController {
     private readonly audit: AuditLoggerService,
     private readonly anchor: AuditAnchorService,
     private readonly prisma: PrismaService,
+    private readonly recovery: AuditRecoveryService,
   ) {}
 
   @Get('logs')
   @ApiOperation({ summary: 'List audit log entries (hash-chained) with pagination, sort & batch filter' })
   async logs(
     @Query('entity') entity?: string,
+    @Query('entityId') entityId?: string,
+    @Query('q') qRaw?: string,
+    @Query('action') action?: string,
+    @Query('actorId') actorId?: string,
+    @Query('from') fromRaw?: string,
+    @Query('to') toRaw?: string,
+    @Query('verificationStatus') verificationStatus?: string,
     @Query('batch') batchRaw?: string,
     @Query('sort') sortRaw?: string,
     @Query('page') pageRaw?: string,
@@ -49,10 +60,39 @@ export class AuditController {
     // Display order only — the tamper-evident chain itself is always keyed by the monotonic seq.
     const sort: 'asc' | 'desc' = sortRaw === 'asc' ? 'asc' : 'desc';
 
-    const where: { entity?: string; batchId?: number } = {};
+    const where: any = {};
     if (entity) where.entity = entity;
+    if (entityId?.trim()) where.entityId = entityId.trim();
+    if (action) where.action = action;
+    if (actorId) where.actorId = actorId;
+    if (verificationStatus) where.onChainStatus = verificationStatus;
+    const from = fromRaw ? new Date(fromRaw) : null;
+    const to = toRaw ? new Date(toRaw) : null;
+    if ((from && !Number.isNaN(from.getTime())) || (to && !Number.isNaN(to.getTime()))) {
+      where.createdAt = {
+        ...(from && !Number.isNaN(from.getTime()) ? { gte: from } : {}),
+        ...(to && !Number.isNaN(to.getTime()) ? { lte: to } : {}),
+      };
+    }
     if (batchRaw !== undefined && batchRaw !== '' && Number.isFinite(Number(batchRaw))) {
       where.batchId = Number(batchRaw);
+    }
+
+    const q = qRaw?.trim();
+    if (q) {
+      const subjectFilters = await this.buildSubjectSearchFilters(q);
+      where.AND = [
+        ...(where.AND || []),
+        {
+          OR: [
+            { entityId: q },
+            { entityId: { contains: q, mode: 'insensitive' } },
+            { action: { contains: q, mode: 'insensitive' } },
+            { entity: { contains: q, mode: 'insensitive' } },
+            ...subjectFilters,
+          ],
+        },
+      ];
     }
 
     const [items, total] = await Promise.all([
@@ -110,26 +150,114 @@ export class AuditController {
   async batches(
     @Query('page') pageRaw?: string,
     @Query('limit') limitRaw?: string,
+    @Query('sortBy') sortByRaw?: string,
+    @Query('sort') sortRaw?: string,
   ) {
     const page = Math.max(Number(pageRaw) || 1, 1);
     const limit = Math.min(Math.max(Number(limitRaw) || 10, 1), 100);
     const skip = (page - 1) * limit;
+    const sortDir: 'asc' | 'desc' = sortRaw === 'asc' ? 'asc' : 'desc';
+    const sortBy = (sortByRaw || 'batchId').toLowerCase();
+    const orderBy =
+      sortBy === 'time' || sortBy === 'anchoredat' || sortBy === 'createdat'
+        ? [{ anchoredAt: sortDir }, { createdAt: sortDir }, { batchId: sortDir }]
+        : [{ batchId: sortDir }];
 
     const [items, total] = await Promise.all([
       this.prisma.auditBatch.findMany({
-        orderBy: { batchId: 'desc' },
+        orderBy,
         skip,
         take: limit,
+        select: {
+          id: true,
+          batchId: true,
+          merkleRoot: true,
+          leafCount: true,
+          fromSeq: true,
+          toSeq: true,
+          status: true,
+          algorithmVersion: true,
+          contractVersion: true,
+          artifactHash: true,
+          artifactUri: true,
+          txHash: true,
+          blockNumber: true,
+          error: true,
+          createdAt: true,
+          anchoredAt: true,
+          recoveredAt: true,
+        },
       }),
       this.prisma.auditBatch.count(),
     ]);
 
+    const batchIds = items.map((item) => item.batchId);
+    const contentByBatch = await this.buildBatchContentSummaries(batchIds);
+    const integrityByBatch = await this.buildBatchIntegritySummaries(batchIds);
+
     return {
-      items,
+      items: items.map(({ artifactUri, ...item }) => ({
+        ...item,
+        artifactAvailable: Boolean(artifactUri && item.artifactHash),
+        contentSummary: contentByBatch.get(item.batchId) ?? [],
+        integrity: integrityByBatch.get(item.batchId) ?? {
+          status: 'PENDING',
+          verified: 0,
+          tampered: 0,
+          pending: 0,
+          total: 0,
+        },
+      })),
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  @Get('batches/:batchId')
+  @ApiOperation({ summary: 'Batch detail with all audit seq leaves and integrity summary' })
+  async batchDetail(
+    @Param('batchId', ParseIntPipe) batchId: number,
+    @CurrentUser() user?: AuthUser,
+  ) {
+    const batch = await this.prisma.auditBatch.findUnique({ where: { batchId } });
+    if (!batch) throw new NotFoundException('Không tìm thấy lô audit.');
+
+    const rows = await this.prisma.blockchainLogger.findMany({
+      where: { batchId },
+      orderBy: { seq: 'asc' },
+    });
+
+    const actorIds = [...new Set(rows.map((r) => r.actorId).filter((id): id is string => Boolean(id)))];
+    const actors = actorIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: actorIds } },
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            role: true,
+            staffProfile: { select: { fullName: true } },
+            adminProfile: { select: { adminUserName: true } },
+          },
+        })
+      : [];
+    const actorMap = new Map(actors.map((a) => [a.id, a]));
+    const subjectMap = await this.resolveSubjectContextMap(rows);
+    const logs = rows.map((row) =>
+      this.presentAuditRow(row, row.actorId ? actorMap.get(row.actorId) : null, user, false, false, subjectMap.get(this.subjectKey(row)) ?? null),
+    );
+    const integrity = this.summarizeIntegrityFromPresented(logs);
+    const contentSummary = (await this.buildBatchContentSummaries([batchId])).get(batchId) ?? [];
+
+    const { artifactUri, ...safeBatch } = batch as typeof batch & { artifactUri?: string | null };
+    return {
+      ...safeBatch,
+      artifactAvailable: Boolean(artifactUri && batch.artifactHash),
+      contentSummary,
+      integrity,
+      logs,
     };
   }
 
@@ -154,7 +282,7 @@ export class AuditController {
       : null;
 
     const subject = await this.resolveSubjectContext(row);
-    return this.presentAuditRow(row, actor, user, true, true, subject);
+    return this.presentAuditRow(row, actor, user, true, false, subject);
   }
 
   @Get('logs/:seq/proof')
@@ -169,16 +297,20 @@ export class AuditController {
     return this.anchor.anchorNow();
   }
 
+  @Post('recovery/:batchId')
+  @RequireFaceStepUp('RECOVER_AUDIT_BATCH')
+  @ApiOperation({ summary: 'Recover one tampered audit batch from its verified IPFS artifact' })
+  recoverBatch(
+    @Param('batchId', ParseIntPipe) batchId: number,
+    @Body() body: RecoverAuditBatchDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.recovery.recover(batchId, user.sub, body.reason);
+  }
+
   private presentAuditRow(row: any, actor: any, user: AuthUser | undefined, includeDetail: boolean, faceVerified = false, subject: any = null) {
-    const verification = includeDetail
-      ? verifyAuditRow(row)
-      : {
-          ok: true,
-          status: 'PENDING' as const,
-          version: row.hashVersion ? 'V2' as const : 'V1' as const,
-          reason: 'Danh sách chỉ hiển thị kiểm tra nhanh và không giải mã dữ liệu audit đã mã hóa. Mở chi tiết bản ghi hoặc chạy kiểm tra toàn chuỗi để xem trạng thái toàn vẹn đầy đủ.',
-          suspiciousFields: [],
-        };
+    // List: cheap hash recompute (no decrypt). Detail: full V2 decrypt + recompute.
+    const verification = includeDetail ? verifyAuditRow(row) : verifyAuditRowLight(row);
     const diff = row.diffJson?.schema === 'KLTN_AUDIT_DIFF_V1'
       ? toDisplayAuditDiff(row.diffJson, {
           role: user?.role,
@@ -218,7 +350,7 @@ export class AuditController {
           }
         : null,
       diff,
-      fieldsChanged: row.fieldsChanged ?? row.diffJson?.fieldsChanged ?? [],
+      fieldsChanged: toDisplayAuditFields(row.fieldsChanged ?? row.diffJson?.fieldsChanged),
       subject,
       hashes: {
         dataHash: row.dataHash,
@@ -230,42 +362,197 @@ export class AuditController {
       },
     };
 
-    if (!includeDetail) return base;
+    // Audit endpoints never expose encrypted or decrypted snapshots. Recovery decryption is
+    // isolated in the server-side recovery service and is not a viewer capability.
+    return base;
 
-    return {
-      ...base,
-      encryptedSnapshots: {
-        before: this.describeEncryptedSnapshot(row.beforeEncrypted),
-        after: this.describeEncryptedSnapshot(row.afterEncrypted),
-      },
-      decryptedSnapshots: faceVerified
-        ? {
-            before: this.decryptAndParse(row.beforeEncrypted, row),
-            after: this.decryptAndParse(row.afterEncrypted, row),
-          }
-        : null,
-      sensitiveDetailUnlocked: faceVerified,
-    };
   }
 
-  private decryptAndParse(encrypted: any, row: any): any {
-    if (!encrypted) return null;
-    try {
-      const aad = buildAuditEncryptionAad({
-        seq: row.seq,
-        entity: row.entity,
-        entityId: row.entityId,
-        action: row.action,
-        createdAtIso: row.createdAt instanceof Date ? row.createdAt.toISOString() : new Date(row.createdAt).toISOString(),
-      });
-      const decrypted = decryptAuditSnapshot(encrypted, aad);
-      return JSON.parse(decrypted);
-    } catch (err) {
-      console.warn(`[AuditController] Decryption failed for seq=${row.seq}:`, err);
-      return null;
+
+  private async buildBatchIntegritySummaries(batchIds: number[]) {
+    const map = new Map<
+      number,
+      { status: 'VERIFIED' | 'TAMPERED' | 'PENDING'; verified: number; tampered: number; pending: number; total: number }
+    >();
+    if (!batchIds.length) return map;
+
+    const rows = await this.prisma.blockchainLogger.findMany({
+      where: { batchId: { in: batchIds } },
+      orderBy: { seq: 'asc' },
+    });
+
+    const byBatch = new Map<number, typeof rows>();
+    for (const row of rows) {
+      if (row.batchId == null) continue;
+      const list = byBatch.get(row.batchId) ?? [];
+      list.push(row);
+      byBatch.set(row.batchId, list);
     }
+
+    for (const [batchId, batchRows] of byBatch.entries()) {
+      let verified = 0;
+      let tampered = 0;
+      let pending = 0;
+      for (const row of batchRows) {
+        const result = verifyAuditRowLight(row);
+        if (result.status === 'VERIFIED') verified += 1;
+        else if (result.status === 'TAMPERED') tampered += 1;
+        else pending += 1;
+      }
+      const total = batchRows.length;
+      const status: 'VERIFIED' | 'TAMPERED' | 'PENDING' =
+        tampered > 0 ? 'TAMPERED' : pending > 0 ? 'PENDING' : total > 0 ? 'VERIFIED' : 'PENDING';
+      map.set(batchId, { status, verified, tampered, pending, total });
+    }
+
+    return map;
   }
 
+  private summarizeIntegrityFromPresented(
+    logs: Array<{ blockchainStatus?: string; verification?: { status?: string } }>,
+  ) {
+    let verified = 0;
+    let tampered = 0;
+    let pending = 0;
+    for (const log of logs) {
+      const status = log.blockchainStatus || log.verification?.status || 'PENDING';
+      if (status === 'VERIFIED') verified += 1;
+      else if (status === 'TAMPERED') tampered += 1;
+      else pending += 1;
+    }
+    const total = logs.length;
+    const status: 'VERIFIED' | 'TAMPERED' | 'PENDING' =
+      tampered > 0 ? 'TAMPERED' : pending > 0 ? 'PENDING' : total > 0 ? 'VERIFIED' : 'PENDING';
+    return { status, verified, tampered, pending, total };
+  }
+
+  /**
+   * Map free-text search (department code/name, staff name/code, AI model name)
+   * to entityId filters so admins can find "which batch touches room ABC".
+   */
+  private async buildSubjectSearchFilters(q: string): Promise<Array<Record<string, unknown>>> {
+    const filters: Array<Record<string, unknown>> = [];
+    const [departments, staffs, aiModels] = await Promise.all([
+      this.prisma.department.findMany({
+        where: {
+          OR: [
+            { departmentCode: { contains: q, mode: 'insensitive' } },
+            { name: { contains: q, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+        take: 40,
+      }),
+      this.prisma.staffProfile.findMany({
+        where: {
+          OR: [
+            { fullName: { contains: q, mode: 'insensitive' } },
+            { employeeCode: { contains: q, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+        take: 40,
+      }),
+      this.prisma.aiModelRegistry.findMany({
+        where: {
+          OR: [
+            { modelName: { contains: q, mode: 'insensitive' } },
+            { modelId: { contains: q, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+        take: 40,
+      }),
+    ]);
+
+    if (departments.length) {
+      filters.push({ entity: 'Department', entityId: { in: departments.map((d) => d.id) } });
+    }
+    if (staffs.length) {
+      filters.push({ entity: 'StaffProfile', entityId: { in: staffs.map((s) => s.id) } });
+    }
+    if (aiModels.length) {
+      filters.push({ entity: 'AiModelRegistry', entityId: { in: aiModels.map((m) => m.id) } });
+    }
+    return filters;
+  }
+
+  /** Compact "what's inside this batch" for the admin recovery UI. */
+  private async buildBatchContentSummaries(batchIds: number[]) {
+    const map = new Map<number, Array<{ entity: string; count: number; samples: string[] }>>();
+    if (!batchIds.length) return map;
+
+    const rows = await this.prisma.blockchainLogger.findMany({
+      where: { batchId: { in: batchIds } },
+      select: { batchId: true, entity: true, entityId: true, action: true, seq: true },
+      orderBy: { seq: 'asc' },
+      take: 2000,
+    });
+
+    const byBatch = new Map<number, typeof rows>();
+    for (const row of rows) {
+      if (row.batchId == null) continue;
+      const list = byBatch.get(row.batchId) ?? [];
+      list.push(row);
+      byBatch.set(row.batchId, list);
+    }
+
+    await Promise.all(
+      [...byBatch.entries()].map(async ([batchId, batchRows]) => {
+        const entityCounts = new Map<string, { count: number; ids: string[] }>();
+        for (const row of batchRows) {
+          const bucket = entityCounts.get(row.entity) ?? { count: 0, ids: [] };
+          bucket.count += 1;
+          if (row.entityId && bucket.ids.length < 4 && !bucket.ids.includes(row.entityId)) {
+            bucket.ids.push(row.entityId);
+          }
+          entityCounts.set(row.entity, bucket);
+        }
+
+        const summary = await Promise.all(
+          [...entityCounts.entries()]
+            .sort((a, b) => b[1].count - a[1].count)
+            .slice(0, 6)
+            .map(async ([entity, info]) => {
+              const samples = await this.resolveSampleLabels(entity, info.ids);
+              return { entity, count: info.count, samples };
+            }),
+        );
+        map.set(batchId, summary);
+      }),
+    );
+
+    return map;
+  }
+
+  private async resolveSampleLabels(entity: string, ids: string[]): Promise<string[]> {
+    if (!ids.length) return [];
+    if (entity === 'Department') {
+      const rows = await this.prisma.department.findMany({
+        where: { id: { in: ids } },
+        select: { departmentCode: true, name: true },
+      });
+      return rows.map((r) => `${r.departmentCode} · ${r.name}`);
+    }
+    if (entity === 'StaffProfile') {
+      const rows = await this.prisma.staffProfile.findMany({
+        where: { id: { in: ids } },
+        select: { employeeCode: true, fullName: true },
+      });
+      return rows.map((r) => `${r.employeeCode || 'NV'} · ${r.fullName}`);
+    }
+    if (entity === 'AiModelRegistry') {
+      const rows = await this.prisma.aiModelRegistry.findMany({
+        where: { id: { in: ids } },
+        select: { modelName: true, modelVersion: true },
+      });
+      return rows.map((r) => `${r.modelName} v${r.modelVersion}`);
+    }
+    if (entity === 'Visit' || entity === 'Patient' || entity === 'MedicalConclusion' || entity === 'MedicalResult' || entity === 'MedicalOrder') {
+      return ids.map((id) => `${entity} ${id.slice(0, 8)}…`);
+    }
+    return ids.map((id) => id.slice(0, 10));
+  }
 
   private subjectKey(row: { entity: string; entityId?: string | null }) {
     return `${row.entity}:${row.entityId ?? ''}`;
@@ -297,6 +584,16 @@ export class AuditController {
       visitId: null as string | null,
     };
 
+    if (row.entity === 'Patient') {
+      return { ...base, label: 'Patient record', displayName: 'Protected medical subject', patientId: row.entityId };
+    }
+    if (row.entity === 'Visit') {
+      return { ...base, label: 'Visit', displayName: 'Protected medical visit', visitId: row.entityId };
+    }
+    if (row.entity === 'MedicalConclusion' || row.entity === 'MedicalResult' || row.entity === 'MedicalOrder') {
+      return { ...base, label: row.entity, displayName: 'Protected clinical record' };
+    }
+
     if (row.entity === 'StaffProfile') {
       const staff = await this.prisma.staffProfile.findUnique({
         where: { id: row.entityId },
@@ -304,33 +601,6 @@ export class AuditController {
       });
       if (!staff) return base;
       return { ...base, label: 'Nhân sự', code: staff.employeeCode, displayName: staff.fullName, linkedUserId: staff.userId, departmentId: staff.departmentId, departmentName: staff.department?.name ?? null };
-    }
-
-    if (row.entity === 'Patient') {
-      const patient = await this.prisma.patient.findUnique({
-        where: { id: row.entityId },
-        select: { id: true, patientCode: true, fullName: true },
-      });
-      if (!patient) return base;
-      return { ...base, label: 'Bệnh nhân', code: patient.patientCode, displayName: patient.fullName, patientId: patient.id };
-    }
-
-    if (row.entity === 'Visit') {
-      const visit = await this.prisma.visit.findUnique({
-        where: { id: row.entityId },
-        select: { id: true, visitCode: true, patientId: true, departmentId: true, patient: { select: { fullName: true, patientCode: true } }, department: { select: { name: true } } },
-      });
-      if (!visit) return base;
-      return { ...base, label: 'Lượt khám', code: visit.visitCode, displayName: `${visit.patient?.fullName ?? 'Bệnh nhân'} · ${visit.visitCode}`, departmentId: visit.departmentId, departmentName: visit.department?.name ?? null, patientId: visit.patientId, visitId: visit.id };
-    }
-
-    if (row.entity === 'MedicalConclusion') {
-      const conclusion = await this.prisma.medicalConclusion.findUnique({
-        where: { id: row.entityId },
-        select: { id: true, visitId: true, visit: { select: { visitCode: true, patientId: true, patient: { select: { fullName: true } }, departmentId: true, department: { select: { name: true } } } } },
-      });
-      if (!conclusion) return base;
-      return { ...base, label: 'Kết luận khám', code: conclusion.visit?.visitCode ?? null, displayName: `${conclusion.visit?.patient?.fullName ?? 'Bệnh nhân'} · Kết luận`, departmentId: conclusion.visit?.departmentId ?? null, departmentName: conclusion.visit?.department?.name ?? null, patientId: conclusion.visit?.patientId ?? null, visitId: conclusion.visitId };
     }
 
     if (row.entity === 'Department') {

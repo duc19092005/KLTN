@@ -45,17 +45,23 @@ export class UpdateVisitStatusUseCase {
     const previousStatus = visit.status;
     const completedAt =
       status === VisitStatus.COMPLETED || status === VisitStatus.CANCELLED ? new Date() : undefined;
-    const result = await this.repo.updateStatus(id, status, completedAt, assignedStaffId);
-
-    await this.auditLogger.recordV2({
-      entity: 'Visit',
-      entityId: id,
-      action: 'UPDATE',
-      actorId: user?.sub ?? null,
-      before: { status: previousStatus },
-      after: { status, completedAt: completedAt ?? null, staffId: assignedStaffId ?? visit.staffId },
-      metadata: { schema: 'KLTN_VISIT_STATUS_AUDIT_V2', field: 'status', from: previousStatus, to: status },
-    });
+    const result = await this.repo.updateStatus(
+      id,
+      status,
+      completedAt,
+      assignedStaffId,
+      async (updatedVisit, tx) => {
+        await this.auditLogger.recordV2({
+          entity: 'Visit',
+          entityId: id,
+          action: 'UPDATE',
+          actorId: user?.sub ?? null,
+          before: { status: previousStatus },
+          after: { status, completedAt: completedAt ?? null, staffId: updatedVisit.staffId },
+          metadata: { schema: 'KLTN_VISIT_STATUS_AUDIT_V2', field: 'status', from: previousStatus, to: status },
+        }, tx);
+      },
+    );
 
     return result;
   }

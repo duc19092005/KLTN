@@ -1,4 +1,4 @@
-import { MedicalSpecialty, UserStatus } from '@prisma/client';
+import { MedicalSpecialty, Prisma, UserStatus } from '@prisma/client';
 import { CreateDoctorDto, CreateDoctorWithStaffDto, UpdateDoctorDto } from '../../dto/doctor.dto';
 
 /** DI token for the Doctor repository port. */
@@ -18,6 +18,8 @@ export type StaffForDoctorCreate = {
   departmentId: string | null;
 };
 
+export type DoctorWriteHook = (doctor: any, tx: Prisma.TransactionClient) => Promise<void>;
+
 /**
  * Persistence boundary for the DoctorProfile aggregate. The Prisma
  * implementation keeps the include shapes, code generation, and the multi-step
@@ -36,15 +38,20 @@ export interface DoctorRepositoryPort {
   generateEmployeeCode(): Promise<string>;
 
   /** Create a DoctorProfile for an existing DOCTOR staff. */
-  createForExistingStaff(dto: CreateDoctorDto): Promise<any>;
+  createForExistingStaff(dto: CreateDoctorDto, afterWrite?: DoctorWriteHook): Promise<any>;
 
   /** Atomic: create user + staff + doctor profile. */
-  createWithStaff(dto: CreateDoctorWithStaffDto, employeeCode: string, passwordHash: string): Promise<any>;
+  createWithStaff(
+    dto: CreateDoctorWithStaffDto,
+    employeeCode: string,
+    passwordHash: string,
+    afterWrite?: DoctorWriteHook,
+  ): Promise<any>;
 
   findManyPaginated(filter: DoctorListFilter, skip: number, take: number): Promise<{ items: unknown[]; total: number }>;
 
   /** Atomic: update doctor (+ nested staff). */
-  updateWithRoom(id: string, dto: UpdateDoctorDto): Promise<any>;
+  updateWithRoom(id: string, dto: UpdateDoctorDto, afterWrite?: DoctorWriteHook): Promise<any>;
 
   findByStaffProfileId(staffProfileId: string): Promise<any | null>;
   findAllWithRelations(): Promise<any[]>;

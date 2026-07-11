@@ -6,6 +6,7 @@ import {
   CreateResultCommand,
   CreateResultTransactionPayload,
   MedicalOrderRepositoryPort,
+  OrderCreatedHook,
   OrderListFilter,
   OrderVisitInfo,
   ResultFileWithOrder,
@@ -63,7 +64,7 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
     return Boolean(department);
   }
 
-  async createOrderWithVisitTransition(command: CreateOrderCommand): Promise<unknown> {
+  async createOrderWithVisitTransition(command: CreateOrderCommand, onCreated?: OrderCreatedHook): Promise<unknown> {
     const maxAttempts = 5;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
@@ -91,6 +92,8 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
               ...(command.staffId ? { staffId: command.staffId } : {}),
             },
           });
+
+          if (onCreated) await onCreated(order, tx);
 
           return order;
         });

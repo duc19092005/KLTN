@@ -16,8 +16,8 @@ export class PatientService {
     private readonly getPatientUseCase: GetPatientUseCase,
   ) {}
 
-  create(dto: CreatePatientDto) {
-    return this.createPatientUseCase.execute(dto);
+  create(dto: CreatePatientDto, actorId?: string) {
+    return this.createPatientUseCase.execute(dto, actorId);
   }
 
   findAll(query: PatientQueryDto) {
@@ -28,7 +28,7 @@ export class PatientService {
     return this.getPatientUseCase.findOne(id);
   }
 
-  update(id: string, dto: UpdatePatientDto) {
-    return this.getPatientUseCase.update(id, dto);
+  update(id: string, dto: UpdatePatientDto, actorId?: string) {
+    return this.getPatientUseCase.update(id, dto, actorId);
   }
 }

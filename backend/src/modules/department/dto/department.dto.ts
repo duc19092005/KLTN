@@ -4,6 +4,9 @@ import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, M
 import { Transform } from 'class-transformer';
 import { PaginationQueryDto } from '../../shared/pagination.dto';
 
+const parseOptionalBoolean = (value: unknown) =>
+  value === undefined || value === null || value === '' ? undefined : value === true || value === 'true';
+
 function normalizeDepartmentName(value: unknown): unknown {
   if (typeof value !== 'string') return value;
 
@@ -45,18 +48,16 @@ export class CreateDepartmentDto {
   @IsEnum(OperationalStatus)
   status?: OperationalStatus;
 
-  @ApiPropertyOptional({ enum: DepartmentType, example: DepartmentType.CLINICAL })
-  @IsOptional()
+  @ApiProperty({ enum: DepartmentType, example: DepartmentType.CLINICAL })
   @IsEnum(DepartmentType)
-  type?: DepartmentType;
+  type!: DepartmentType;
 
 
 
-  @ApiPropertyOptional({ example: false })
-  @IsOptional()
-  @Transform(({ value }) => value === true || value === 'true')
+  @ApiProperty({ example: false })
+  @Transform(({ value }) => parseOptionalBoolean(value))
   @IsBoolean()
-  canReceiveOrders?: boolean;
+  canReceiveOrders!: boolean;
 
   @ApiPropertyOptional({ example: 'Heart and vascular disease department', maxLength: 500 })
   @IsOptional()
@@ -113,7 +114,7 @@ export class UpdateDepartmentDto {
 
   @ApiPropertyOptional({ example: false })
   @IsOptional()
-  @Transform(({ value }) => value === true || value === 'true')
+  @Transform(({ value }) => parseOptionalBoolean(value))
   @IsBoolean()
   canReceiveOrders?: boolean;
 
@@ -156,7 +157,7 @@ export class DepartmentQueryDto extends PaginationQueryDto {
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ value }) => value === true || value === 'true')
+  @Transform(({ value }) => parseOptionalBoolean(value))
   @IsBoolean()
   canReceiveOrders?: boolean;
 }

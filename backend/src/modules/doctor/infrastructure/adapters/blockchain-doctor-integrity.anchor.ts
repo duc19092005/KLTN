@@ -9,6 +9,7 @@ import {
 } from '../../application/ports/doctor-integrity-anchor.port';
 import { buildUnifiedDoctorSnapshot } from '../../domain/doctor-snapshot';
 import { computeAfterHashV2 } from '../../../../infrastructure/audit/audit-hash.util';
+import { Prisma } from '@prisma/client';
 
 /**
  * Tamper-evidence adapter for doctors. Uses the centralized AuditAnchor
@@ -24,15 +25,17 @@ export class BlockchainDoctorIntegrityAnchor implements DoctorIntegrityAnchorPor
     private readonly auditAnchor: AuditAnchorService,
   ) {}
 
-  async anchorChange(doctor: any, action: DoctorAnchorAction, actorId?: string, before?: unknown): Promise<void> {
+  async anchorChange(
+    doctor: any,
+    action: DoctorAnchorAction,
+    actorId?: string,
+    before?: unknown,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     const snapshot = buildUnifiedDoctorSnapshot(doctor);
-
-    try {
-      const { salt, hash } = this.audit.hashSnapshot(snapshot);
-      await this.prisma.doctorProfile.update({ where: { id: doctor.id }, data: { hash256: hash, dataSalt: salt } });
-    } catch (err) {
-      console.error('Error computing doctor hash:', err);
-    }
+    const { salt, hash } = this.audit.hashSnapshot(snapshot);
+    const client = tx ?? this.prisma;
+    await client.doctorProfile.update({ where: { id: doctor.id }, data: { hash256: hash, dataSalt: salt } });
 
     await this.audit.recordV2({
       entity: 'DoctorProfile',
@@ -42,7 +45,7 @@ export class BlockchainDoctorIntegrityAnchor implements DoctorIntegrityAnchorPor
       before: this.toAuditSnapshot(before),
       after: snapshot,
       onChainStatus: 'PENDING',
-    });
+    }, tx);
   }
 
   private toAuditSnapshot(value: unknown): Record<string, unknown> | null {

@@ -24,7 +24,7 @@ export class FaceStepUpGuard implements CanActivate {
     const req = context.switchToHttp().getRequest();
     const userId = req.user?.sub;
     const token = req.headers?.['x-stepup-ticket'] as string | undefined;
-    const resourceId = req.params?.id ?? req.params?.seq ?? null;
+    const resourceId = req.params?.id ?? req.params?.seq ?? req.params?.batchId ?? null;
     const ip = String(req.headers?.['x-forwarded-for'] || '').split(',')[0].trim() || req.ip;
     await this.stepUp.consume({ userId, action, token, resourceId, ip });
     req.stepUp = { verified: true, mode: 'TICKET', action, resourceId };

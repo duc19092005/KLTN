@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { BlockchainLogger, Prisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   computeRecordHash,
@@ -124,7 +125,9 @@ export class AuditLoggerService {
       metadata: params.metadata,
     };
     if (tx) return this.appendRecordV2(v2Params, tx);
-    return this.enqueue(() => this.prisma.$transaction((transaction) => this.appendRecordV2(v2Params, transaction)));
+    const row = await this.enqueue(() => this.prisma.$transaction((transaction) => this.appendRecordV2(v2Params, transaction)));
+    await this.anchorTierA(row);
+    return row;
   }
 
   async recordV2(
@@ -143,7 +146,9 @@ export class AuditLoggerService {
     tx?: Prisma.TransactionClient,
   ) {
     if (tx) return this.appendRecordV2(params, tx);
-    return this.enqueue(() => this.prisma.$transaction((transaction) => this.appendRecordV2(params, transaction)));
+    const row = await this.enqueue(() => this.prisma.$transaction((transaction) => this.appendRecordV2(params, transaction)));
+    await this.anchorTierA(row);
+    return row;
   }
 
   private toAuditSnapshot(value: unknown): Record<string, unknown> | null {
@@ -179,6 +184,7 @@ export class AuditLoggerService {
       select: { seq: true, entryHash: true },
     });
     const seq = (tail?.seq ?? 0) + 1;
+    const eventId = randomUUID();
     const prevHash = tail?.entryHash ?? GENESIS_PREV_HASH;
     const createdAt = new Date();
 
@@ -200,6 +206,7 @@ export class AuditLoggerService {
     const fkField = FK_FIELD[params.entity];
     const data: Record<string, any> = {
       entity: params.entity,
+      eventId,
       entityId: params.entityId,
       action: params.action,
       actorId: params.actorId ?? null,
@@ -218,9 +225,11 @@ export class AuditLoggerService {
     };
     if (fkField) data[fkField] = params.entityId;
 
-    return client.blockchainLogger.create({
+    const row = await client.blockchainLogger.create({
       data: data as Prisma.BlockchainLoggerUncheckedCreateInput,
     });
+    await this.enqueueKafkaOutbox(client, row);
+    return row;
   }
 
   private async appendRecordV2(
@@ -246,6 +255,7 @@ export class AuditLoggerService {
       select: { seq: true, entryHash: true },
     });
     const seq = (tail?.seq ?? 0) + 1;
+    const eventId = randomUUID();
     const prevHash = tail?.entryHash ?? GENESIS_PREV_HASH;
     const createdAt = new Date();
     const createdAtIso = createdAt.toISOString();
@@ -292,6 +302,7 @@ export class AuditLoggerService {
     const fkField = FK_FIELD[params.entity];
     const data: Record<string, any> = {
       entity: params.entity,
+      eventId,
       entityId: params.entityId,
       action: params.action,
       actorId: params.actorId ?? null,
@@ -320,9 +331,51 @@ export class AuditLoggerService {
     };
     if (fkField) data[fkField] = params.entityId;
 
-    return client.blockchainLogger.create({
+    const row = await client.blockchainLogger.create({
       data: data as Prisma.BlockchainLoggerUncheckedCreateInput,
     });
+    await this.enqueueKafkaOutbox(client, row);
+    return row;
+  }
+
+  private async enqueueKafkaOutbox(
+    client: Prisma.TransactionClient,
+    row: BlockchainLogger,
+  ): Promise<void> {
+    if (!row.eventId) throw new Error('New audit rows must have an eventId.');
+    const tier = this.auditTier(row.entity, row.action);
+    const topic = tier === 'A'
+      ? (process.env.KAFKA_AUDIT_TIER_A_TOPIC ?? 'audit.events.tier-a')
+      : (process.env.KAFKA_AUDIT_TIER_B_TOPIC ?? 'audit.events.tier-b');
+    const payload = {
+      ...row,
+      createdAt: row.createdAt.toISOString(),
+      tier,
+    };
+    await client.auditOutbox.create({
+      data: {
+        eventId: row.eventId,
+        auditLogId: row.id,
+        topic,
+        payload: payload as unknown as Prisma.InputJsonValue,
+      },
+    });
+  }
+
+  private auditTier(entity: string, action: string): 'A' | 'B' {
+    if (entity === 'MedicalConclusion' || action === 'AUDIT_RECOVERY_EXECUTED' || action.includes('SECURITY')) {
+      return 'A';
+    }
+    return 'B';
+  }
+
+  private async anchorTierA(row: BlockchainLogger): Promise<void> {
+    if (this.auditTier(row.entity, row.action) !== 'A') return;
+    try {
+      await this.anchor.anchorNow();
+    } catch {
+      // The durable DB/outbox record remains pending and the 30-second batch worker retries it.
+    }
   }
 
   /** List change history for an entity (optionally a specific record), newest first. */

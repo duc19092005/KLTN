@@ -8,6 +8,7 @@ import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { aiModelService } from '../apis/aiModelService';
 import { useToast } from '../../../providers/ToastProvider';
 import AiModelDetailModal from '../components/AiModelDetailModal';
+import { Trash2 } from 'lucide-react';
 
 // A provider is either a managed cloud API (endpoint auto-filled, key required) or a
 // self-hosted / custom endpoint (admin types the URL, key optional). "local" covers
@@ -343,7 +344,8 @@ export default function AiModelsPage() {
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="aiModels" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
       <div className="mx-auto max-w-[1600px] space-y-5">
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <button type="button" title="Mô hình AI đã xóa" onClick={() => navigate('/admin/ai-models/trash')} className="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"><Trash2 size={18} /></button>
           <button type="button" onClick={openCreateModal} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 transition-colors">+ Thêm mô hình AI</button>
         </div>
 
@@ -567,7 +569,19 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
         <SectionTitle title="Kết nối và bảo mật" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {manualEndpoint && <div className="md:col-span-2"><Field label="Điểm cuối API" value={form.apiEndpoint} onChange={(v) => changeField('apiEndpoint', limitText(v.trim(), MAX_ENDPOINT_LENGTH))} onBlur={() => validateField('apiEndpoint')} error={fieldErrors.apiEndpoint} required placeholder="http://localhost:11434/v1/chat/completions" maxLength={MAX_ENDPOINT_LENGTH} /></div>}
-          <TextAreaField label="Khóa API / Token" value={form.secretOrIpHash} onChange={(v) => changeField('secretOrIpHash', limitText(v, MAX_SECRET_LENGTH))} onBlur={() => validateField('secretOrIpHash')} error={fieldErrors.secretOrIpHash} required={keyRequiredForSubmit} optional={!keyRequiredForSubmit} rows={2} maxLength={MAX_SECRET_LENGTH} className="md:col-span-2" />
+          <TextAreaField
+            label={editing ? 'Khóa API / Token (để trống nếu giữ secret hiện tại)' : 'Khóa API / Token'}
+            value={form.secretOrIpHash}
+            onChange={(v) => changeField('secretOrIpHash', limitText(v, MAX_SECRET_LENGTH))}
+            onBlur={() => validateField('secretOrIpHash')}
+            error={fieldErrors.secretOrIpHash}
+            required={keyRequiredForSubmit}
+            optional={!keyRequiredForSubmit}
+            rows={2}
+            maxLength={MAX_SECRET_LENGTH}
+            className="md:col-span-2"
+            inputType="password"
+          />
           <TextAreaField label="Mô tả" value={form.description} onChange={(v) => changeField('description', limitText(v, MAX_DESCRIPTION_LENGTH))} onBlur={() => validateField('description')} error={fieldErrors.description} rows={2} maxLength={MAX_DESCRIPTION_LENGTH} className="md:col-span-2" />
         </div>
 
@@ -603,8 +617,42 @@ function Field({ label, value, onChange, onBlur, error, required = false, placeh
 function SelectField({ label, value, onChange, onBlur, options, empty, required, error }) {
   return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}{required && <span className="text-rose-500"> *</span>}</span><select required={required} value={value || ''} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`}>{empty && <option value="">{empty}</option>}{options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select><FieldError message={error} /></label>;
 }
-function TextAreaField({ label, value, onChange, onBlur, error, required = false, optional = false, rows = 2, maxLength, className = '' }) {
-  return <label className={`block space-y-1.5 ${className}`}><span className="text-[13px] font-bold text-slate-700">{label}{required && <span className="text-rose-500"> *</span>}{optional && <span className="font-semibold text-slate-400"> (tùy chọn)</span>}</span><textarea required={required} value={value || ''} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} rows={rows} maxLength={maxLength} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} /><FieldError message={error} /></label>;
+function TextAreaField({ label, value, onChange, onBlur, error, required = false, optional = false, rows = 2, maxLength, className = '', inputType }) {
+  const fieldClass = `w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`;
+  return (
+    <label className={`block space-y-1.5 ${className}`}>
+      <span className="text-[13px] font-bold text-slate-700">
+        {label}
+        {required && <span className="text-rose-500"> *</span>}
+        {optional && <span className="font-semibold text-slate-400"> (tùy chọn)</span>}
+      </span>
+      {inputType === 'password' ? (
+        <input
+          type="password"
+          autoComplete="new-password"
+          required={required}
+          value={value || ''}
+          onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
+          maxLength={maxLength}
+          aria-invalid={Boolean(error)}
+          className={fieldClass}
+        />
+      ) : (
+        <textarea
+          required={required}
+          value={value || ''}
+          onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
+          rows={rows}
+          maxLength={maxLength}
+          aria-invalid={Boolean(error)}
+          className={fieldClass}
+        />
+      )}
+      <FieldError message={error} />
+    </label>
+  );
 }
 function FieldError({ message }) { return <p className={`min-h-[1rem] text-xs font-bold leading-4 transition-colors ${message ? 'text-rose-600' : 'text-transparent'}`}>{message || 'Không có lỗi'}</p>; }
 function ModelCard({ model, onViewDetails, onEdit, onToggleStatus, onDelete, busy }) {
@@ -645,8 +693,16 @@ function ModelCard({ model, onViewDetails, onEdit, onToggleStatus, onDelete, bus
         </div>
       )}
       <div className="mt-3 rounded-xl bg-white border border-slate-100 p-3">
-        <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">Dấu vân tay SHA-256</p>
-        <p className="mt-1 break-all text-xs font-mono text-slate-600">{model.ipHashPlain || 'Không hiển thị'}</p>
+        <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">Cấu hình secret</p>
+        <p className="mt-1 text-xs font-semibold text-slate-600">
+          {model.secretConfigured ? 'Đã cấu hình secret (không hiển thị plaintext)' : 'Chưa cấu hình secret'}
+        </p>
+        {(model.secretFingerprint || model.ipHashPlain) && (
+          <>
+            <p className="mt-2 text-[10px] uppercase tracking-wider font-black text-slate-400">Dấu vân tay SHA-256</p>
+            <p className="mt-1 break-all text-xs font-mono text-slate-600">{model.secretFingerprint || model.ipHashPlain}</p>
+          </>
+        )}
       </div>
       <div className="mt-3 flex flex-wrap justify-end gap-2">
         <button type="button" onClick={() => onViewDetails(model.id)} className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-100">Chi tiết</button>

@@ -191,7 +191,14 @@ export default function AiModelDetailModal({ modelId, onClose }) {
                   <div className="grid grid-cols-2 gap-4">
                     <Field label="Mã mô hình" value={model.id} colSpan={2} mono />
                     <Field label="Điểm cuối API" value={model.apiEndpoint || 'Không hiển thị'} colSpan={2} mono />
-                    <Field label="Dấu vân tay SHA-256" value={model.ipHashPlain || 'Không hiển thị'} colSpan={2} mono />
+                    <Field
+                      label="Cấu hình secret"
+                      value={model.secretConfigured || model.ipHashPlain || model.secretFingerprint
+                        ? 'Đã cấu hình (không hiển thị plaintext)'
+                        : 'Chưa cấu hình secret'}
+                      colSpan={2}
+                    />
+                    <Field label="Dấu vân tay SHA-256" value={model.secretFingerprint || model.ipHashPlain || 'Không hiển thị'} colSpan={2} mono />
                     <Field label="Mã hóa khóa" value="AES-256" />
                     <Field label="Blockchain" value={model.isActiveOnChain ? 'Đã kích hoạt' : 'Theo audit log'} />
                     <Field label="Ngày tạo" value={formatTime(model.createdAt)} colSpan={2} />

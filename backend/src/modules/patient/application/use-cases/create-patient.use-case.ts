@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
 import { CreatePatientDto } from '../../dto/patient.dto';
 import { PATIENT_REPOSITORY, PatientRepositoryPort } from '../ports/patient.repository.port';
 import { PATIENT_INTEGRITY_ANCHOR, PatientIntegrityAnchorPort } from '../ports/patient-integrity-anchor.port';
@@ -15,7 +15,14 @@ export class CreatePatientUseCase {
     @Inject(PATIENT_INTEGRITY_ANCHOR) private readonly integrity: PatientIntegrityAnchorPort,
   ) {}
 
-  async execute(dto: CreatePatientDto) {
+  async execute(dto: CreatePatientDto, actorId?: string) {
+    if (![dto.phone, dto.citizenId, dto.insuranceNumber, dto.emergencyContact].some((value) => value?.trim())) {
+      throw new BadRequestException('Hồ sơ bệnh nhân phải có ít nhất một thông tin liên hệ hoặc định danh hợp lệ.');
+    }
+    const conflict = await this.repo.findIdentityConflict(dto);
+    if (conflict) {
+      throw new ConflictException(`Thông tin bệnh nhân trùng với hồ sơ ${conflict.patientCode}.`);
+    }
     const patientCode = dto.patientCode || (await this.repo.generatePatientCode());
     const created = await this.repo.create(
       {
@@ -29,14 +36,8 @@ export class CreatePatientUseCase {
         emergencyContact: dto.emergencyContact,
       },
       patientCode,
+      (patient, tx) => this.integrity.anchorChange(patient, 'CREATE', actorId, null, tx),
     );
-
-    // Anchor the newly created patient record for tamper-evidence
-    try {
-      await this.integrity.anchorChange(created, 'CREATE');
-    } catch (err) {
-      console.error('Error anchoring patient creation:', err);
-    }
 
     return created;
   }

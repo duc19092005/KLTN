@@ -49,6 +49,20 @@ export type CreateResultFileData = {
   etag?: string | null;
 };
 
+export type CreatedOrderRecord = {
+  id: string;
+  orderCode: string;
+  visitId: string;
+  patientId: string;
+  doctorId: string;
+  targetDepartmentId: string | null;
+  orderType: string;
+  priority: string;
+  status: MedicalOrderStatus;
+};
+
+export type OrderCreatedHook = (order: CreatedOrderRecord, tx: Prisma.TransactionClient) => Promise<void>;
+
 export type CreateResultCommand = {
   orderId: string;
   performedById: string;
@@ -104,7 +118,7 @@ export interface MedicalOrderRepositoryPort {
   departmentExists(id: string): Promise<boolean>;
 
   /** Atomic: generate unique order code, create order, transition visit to WAITING_TEST_RESULT (with retry). */
-  createOrderWithVisitTransition(command: CreateOrderCommand): Promise<unknown>;
+  createOrderWithVisitTransition(command: CreateOrderCommand, onCreated?: OrderCreatedHook): Promise<unknown>;
 
   findAll(filter: OrderListFilter): Promise<unknown[]>;
 

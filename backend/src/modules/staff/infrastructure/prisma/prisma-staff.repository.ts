@@ -62,9 +62,12 @@ export class PrismaStaffRepository implements StaffRepositoryPort {
     return `${prefix}-${String(lastNumber + 1).padStart(4, '0')}`;
   }
 
-  async createStaffUser(data: CreateStaffData): Promise<any> {
+  async createStaffUser(
+    data: CreateStaffData,
+    afterCreate?: (created: any, tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<any> {
     const user = await this.prisma.$transaction(async (tx) => {
-      return tx.user.create({
+      const created = await tx.user.create({
         data: {
           username: data.username.trim(),
           email: data.email.trim().toLowerCase(),
@@ -89,6 +92,8 @@ export class PrismaStaffRepository implements StaffRepositoryPort {
         },
         include: this.includeUserStaff(),
       });
+      await afterCreate?.(created, tx);
+      return created;
     });
     return this.sanitizeUser(user);
   }
@@ -162,8 +167,20 @@ export class PrismaStaffRepository implements StaffRepositoryPort {
     return this.sanitizeUser(updated);
   }
 
-  async setUserStatus(userId: string, status: UserStatus): Promise<any> {
-    const updated = await this.prisma.user.update({ where: { id: userId }, data: { status, tokenVersion: { increment: 1 } }, include: this.includeUserStaff() });
+  async setUserStatus(
+    userId: string,
+    status: UserStatus,
+    afterUpdate?: (updated: any, tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<any> {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: { status, tokenVersion: { increment: 1 } },
+        include: this.includeUserStaff(),
+      });
+      await afterUpdate?.(user, tx);
+      return user;
+    });
     return this.sanitizeUser(updated);
   }
 

@@ -57,8 +57,6 @@ enum OperationalStatus {
   DELETE
 }
 
-
-
 enum LabSpecialty {
   LABORATORY
   IMAGING
@@ -115,9 +113,9 @@ model User {
   faceHash          String?
 
   // Biometric metadata
-  faceModelVersion  String?
-  faceEnrolledAt    DateTime?
-  faceSampleCount   Int?
+  faceModelVersion String?
+  faceEnrolledAt   DateTime?
+  faceSampleCount  Int?
 
   // Biometric anti-replay challenge (single-use nonce)
   faceChallenge          String?
@@ -127,18 +125,29 @@ model User {
   failedFaceAttempts Int       @default(0)
   faceLockedUntil    DateTime?
 
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+  deletedBy  String?
+  restoredAt DateTime?
 
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
-
-  staffProfile      StaffProfile?
-  adminProfile      AdminProfile?
-  patientAccesses   PatientAccess[]
-  refreshTokens     RefreshToken[]
-  performedResults  MedicalResult[]
-  stepUpTickets     StepUpTicket[]
-
-  notifications     Notification[]
+  staffProfile             StaffProfile?
+  adminProfile             AdminProfile?
+  patientAccesses          PatientAccess[]
+  refreshTokens            RefreshToken[]
+  performedResults         MedicalResult[]
+  stepUpTickets            StepUpTicket[]
+  notifications            Notification[]
+  auditLogs                AuditLog[]         @relation("AuditLogActor")
+  blockchainLogs           BlockchainLogger[] @relation("BlockchainLoggerActor")
+  createdAppointments      Appointment[]      @relation("AppointmentCreator")
+  verifiedPatientAccesses  PatientAccess[]    @relation("PatientAccessVerifier")
+  createdAiModels          AiModelRegistry[]  @relation("AiModelCreator")
+  requestedAuditRecoveries AuditRecovery[]    @relation("AuditRecoveryRequester")
+  deletedUsers             User[]             @relation("UserDeletedBy")
+  deletedDepartments       Department[]       @relation("DepartmentDeletedBy")
+  deletedAiModels          AiModelRegistry[]  @relation("AiModelDeletedBy")
+  deletedByUser            User?              @relation("UserDeletedBy", fields: [deletedBy], references: [id], onDelete: SetNull)
 
   @@index([role])
   @@index([status])
@@ -146,69 +155,73 @@ model User {
 }
 
 model Department {
-  id             String   @id @default(uuid())
-  departmentCode String   @unique
-  name           String   @unique
+  id               String            @id @default(uuid())
+  departmentCode   String            @unique
+  name             String            @unique
   floor            String?
   status           OperationalStatus @default(ACTIVE)
-  type             DepartmentType @default(CLINICAL)
-  canReceiveOrders Boolean        @default(false)
+  type             DepartmentType    @default(CLINICAL)
+  canReceiveOrders Boolean           @default(false)
   description      String?
-  managerId        String?        @unique
+  managerId        String?           @unique
 
-  manager        StaffProfile?  @relation("DepartmentManager", fields: [managerId], references: [id])
-  staffs         StaffProfile[] @relation("DepartmentStaffs")
-  visits         Visit[]
-  medicalOrders  MedicalOrder[]
-  appointments   Appointment[]
+  manager       StaffProfile?  @relation("DepartmentManager", fields: [managerId], references: [id])
+  staffs        StaffProfile[] @relation("DepartmentStaffs")
+  visits        Visit[]
+  medicalOrders MedicalOrder[]
+  appointments  Appointment[]
 
   blockchainLogs BlockchainLogger[]
 
   // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)).
   // Changes are recorded in BlockchainLogger and anchored through AuditAnchor
   // Merkle batches. dataSalt is a per-record random salt.
-  hash256        String?
-  dataSalt       String?
+  hash256  String?
+  dataSalt String?
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+  deletedBy     String?
+  restoredAt    DateTime?
+  deletedByUser User?     @relation("DepartmentDeletedBy", fields: [deletedBy], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([type])
   @@index([canReceiveOrders])
+  @@index([deletedAt])
 }
 
 model StaffProfile {
-  id             String  @id @default(uuid())
-  userId         String  @unique
-  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  departmentId   String?
-  department     Department? @relation("DepartmentStaffs", fields: [departmentId], references: [id])
+  departmentId String?
+  department   Department? @relation("DepartmentStaffs", fields: [departmentId], references: [id])
 
-  fullName       String
-  phone          String
-  gender         String
-  citizenId      String  @unique
-  birthDate      DateTime
-  address        String?
-  avatarUrl      String
-  employeeCode   String  @unique
-  position       String?
-  labSpecialty   LabSpecialty?
+  fullName     String
+  phone        String
+  gender       String
+  citizenId    String        @unique
+  birthDate    DateTime
+  address      String?
+  avatarUrl    String
+  employeeCode String        @unique
+  position     String?
+  labSpecialty LabSpecialty?
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  managedDepartment Department? @relation("DepartmentManager")
+  managedDepartment Department?        @relation("DepartmentManager")
   doctorProfile     DoctorProfile?
-  assignedVisits    Visit[] @relation("VisitAssignedStaff")
+  assignedVisits    Visit[]            @relation("VisitAssignedStaff")
   blockchainLogs    BlockchainLogger[]
 
-
   // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
-  hash256        String?
-  dataSalt       String?
+  hash256  String?
+  dataSalt String?
 
   @@index([departmentId])
   @@index([fullName])
@@ -216,29 +229,29 @@ model StaffProfile {
 }
 
 model DoctorProfile {
-  id              String       @id @default(uuid())
+  id String @id @default(uuid())
 
-  staffProfileId  String       @unique
-  staffProfile    StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+  staffProfileId String       @unique
+  staffProfile   StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
 
   specialty       MedicalSpecialty
-  licenseNumber   String       @unique
+  licenseNumber   String           @unique
   qualification   String
   yearsExperience Int?
 
-  aiQualities     AiQuality[]
-  medicalOrders   MedicalOrder[]
-  appointments    Appointment[]
+  aiQualities         AiQuality[]
+  medicalOrders       MedicalOrder[]
+  appointments        Appointment[]
   reviewedAiDiagnoses AiDiagnosis[]
   medicalConclusions  MedicalConclusion[]
   blockchainLogs      BlockchainLogger[]
 
   // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
-  hash256        String?
-  dataSalt       String?
+  hash256  String?
+  dataSalt String?
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([specialty])
 }
@@ -266,16 +279,16 @@ model Patient {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  linkedAccounts   PatientAccess[]
-  visits           Visit[]
-  appointments     Appointment[]
-  aiDiagnoses      AiDiagnosis[]
-  medicalOrders    MedicalOrder[]
-  blockchainLogs   BlockchainLogger[]
+  linkedAccounts PatientAccess[]
+  visits         Visit[]
+  appointments   Appointment[]
+  aiDiagnoses    AiDiagnosis[]
+  medicalOrders  MedicalOrder[]
+  blockchainLogs BlockchainLogger[]
 
   // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
-  hash256          String?
-  dataSalt         String?
+  hash256  String?
+  dataSalt String?
 
   @@index([fullName])
   @@index([citizenId])
@@ -283,27 +296,28 @@ model Patient {
 }
 
 model PatientAccess {
-  id              String              @id @default(uuid())
+  id String @id @default(uuid())
 
-  userId          String
-  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  patientId       String
-  patient         Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
-  relationship    PatientRelationship @default(SELF)
-  status          PatientAccessStatus @default(ACTIVE)
+  relationship PatientRelationship @default(SELF)
+  status       PatientAccessStatus @default(ACTIVE)
 
-  canViewProfile  Boolean             @default(true)
-  canViewVisits   Boolean             @default(true)
-  canViewResults  Boolean             @default(true)
-  canBookVisit    Boolean             @default(false)
+  canViewProfile Boolean @default(true)
+  canViewVisits  Boolean @default(true)
+  canViewResults Boolean @default(true)
+  canBookVisit   Boolean @default(false)
 
-  verifiedAt      DateTime?
-  verifiedById    String?
-  revokedAt       DateTime?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  verifiedAt   DateTime?
+  verifiedById String?
+  verifiedBy   User?     @relation("PatientAccessVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@unique([userId, patientId])
   @@index([userId])
@@ -312,17 +326,17 @@ model PatientAccess {
 }
 
 model AdminProfile {
-  id             String   @id @default(uuid())
-  userId         String   @unique
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  adminUserName  String   @unique
-  walletAddress  String?  @unique
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adminUserName  String    @unique
+  walletAddress  String?   @unique
   nonce          String?
   nonceExpiresAt DateTime?
   noncePurpose   String?
   mfaSecret      String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([walletAddress])
   @@index([noncePurpose, nonceExpiresAt])
@@ -331,6 +345,7 @@ model AdminProfile {
 model AuditLog {
   id        String   @id @default(uuid())
   actorId   String?
+  actor     User?    @relation("AuditLogActor", fields: [actorId], references: [id], onDelete: SetNull)
   action    String
   entity    String
   entityId  String?
@@ -343,28 +358,28 @@ model AuditLog {
 }
 
 model Visit {
-  id             String       @id @default(uuid())
-  visitCode      String       @unique
+  id        String @id @default(uuid())
+  visitCode String @unique
 
-  patientId      String
-  patient        Patient      @relation(fields: [patientId], references: [id])
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
 
-  departmentId   String
-  department     Department   @relation(fields: [departmentId], references: [id])
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
 
-  staffId        String?
-  staff          StaffProfile? @relation("VisitAssignedStaff", fields: [staffId], references: [id])
+  staffId String?
+  staff   StaffProfile? @relation("VisitAssignedStaff", fields: [staffId], references: [id])
 
-  status         VisitStatus  @default(WAITING)
-  source         VisitSource  @default(WALK_IN)
-  checkInAt      DateTime     @default(now())
-  completedAt    DateTime?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  status      VisitStatus @default(WAITING)
+  source      VisitSource @default(WALK_IN)
+  checkInAt   DateTime    @default(now())
+  completedAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
-  appointment    Appointment?
-  medicalOrders  MedicalOrder[]
-  aiDiagnoses    AiDiagnosis[]
+  appointment     Appointment?
+  medicalOrders   MedicalOrder[]
+  aiDiagnoses     AiDiagnosis[]
   finalConclusion MedicalConclusion?
 
   @@index([patientId])
@@ -375,33 +390,34 @@ model Visit {
 }
 
 model Appointment {
-  id              String            @id @default(uuid())
-  appointmentCode String            @unique
+  id              String @id @default(uuid())
+  appointmentCode String @unique
 
-  patientId       String
-  patient         Patient           @relation(fields: [patientId], references: [id])
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
 
-  departmentId    String
-  department      Department        @relation(fields: [departmentId], references: [id])
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
 
-  doctorId        String?
-  doctor          DoctorProfile?    @relation(fields: [doctorId], references: [id])
+  doctorId String?
+  doctor   DoctorProfile? @relation(fields: [doctorId], references: [id])
 
-  scheduledAt     DateTime
-  status          AppointmentStatus @default(CONFIRMED)
+  scheduledAt DateTime
+  status      AppointmentStatus @default(CONFIRMED)
 
-  qrTokenHash     String            @unique
-  qrExpiresAt     DateTime
-  checkedInAt     DateTime?
+  qrTokenHash String    @unique
+  qrExpiresAt DateTime
+  checkedInAt DateTime?
 
-  visitId         String?           @unique
-  visit           Visit?            @relation(fields: [visitId], references: [id])
+  visitId String? @unique
+  visit   Visit?  @relation(fields: [visitId], references: [id])
 
   cancelledAt     DateTime?
   cancelReason    String?
   createdByUserId String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdByUser   User?     @relation("AppointmentCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([patientId])
   @@index([departmentId])
@@ -411,31 +427,31 @@ model Appointment {
 }
 
 model MedicalOrder {
-  id                String             @id @default(uuid())
-  orderCode         String             @unique
+  id        String @id @default(uuid())
+  orderCode String @unique
 
-  visitId           String
-  visit             Visit              @relation(fields: [visitId], references: [id])
+  visitId String
+  visit   Visit  @relation(fields: [visitId], references: [id])
 
-  patientId         String
-  patient           Patient            @relation(fields: [patientId], references: [id])
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
 
-  doctorId          String
-  doctor            DoctorProfile      @relation(fields: [doctorId], references: [id])
+  doctorId String
+  doctor   DoctorProfile @relation(fields: [doctorId], references: [id])
 
   targetDepartmentId String?
-  targetDepartment   Department?       @relation(fields: [targetDepartmentId], references: [id])
+  targetDepartment   Department? @relation(fields: [targetDepartmentId], references: [id])
 
-  orderType         String
-  priority          String             @default("NORMAL")
-  clinicalNote      String?
-  status            MedicalOrderStatus @default(ORDERED)
-  orderedAt         DateTime           @default(now())
-  completedAt       DateTime?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  orderType    String
+  priority     String             @default("NORMAL")
+  clinicalNote String?
+  status       MedicalOrderStatus @default(ORDERED)
+  orderedAt    DateTime           @default(now())
+  completedAt  DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
-  results           MedicalResult[]
+  results MedicalResult[]
 
   @@index([visitId])
   @@index([patientId])
@@ -445,43 +461,43 @@ model MedicalOrder {
 }
 
 model MedicalResult {
-  id              String       @id @default(uuid())
-  resultCode      String       @unique
+  id         String @id @default(uuid())
+  resultCode String @unique
 
-  orderId         String
-  order           MedicalOrder @relation(fields: [orderId], references: [id])
+  orderId String
+  order   MedicalOrder @relation(fields: [orderId], references: [id])
 
-  performedById   String?
-  performedBy     User?        @relation(fields: [performedById], references: [id])
+  performedById String?
+  performedBy   User?   @relation(fields: [performedById], references: [id])
 
-  note            String?
-  returnedAt      DateTime     @default(now())
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  note       String?
+  returnedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  files           MedicalResultFile[]
+  files MedicalResultFile[]
 
   @@index([orderId])
   @@index([performedById])
 }
 
 model MedicalResultFile {
-  id             String        @id @default(uuid())
-  resultId       String
-  result         MedicalResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  id       String        @id @default(uuid())
+  resultId String
+  result   MedicalResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
 
-  fileName       String
-  originalName   String
-  mimeType       String
-  size           Int
-  url            String?
-  storageProvider String      @default("CLOUDINARY")
-  bucket         String?
-  objectKey      String?
-  sha256         String?
-  etag           String?
+  fileName        String
+  originalName    String
+  mimeType        String
+  size            Int
+  url             String?
+  storageProvider String  @default("CLOUDINARY")
+  bucket          String?
+  objectKey       String?
+  sha256          String?
+  etag            String?
 
-  createdAt      DateTime      @default(now())
+  createdAt DateTime @default(now())
 
   @@index([resultId])
   @@index([storageProvider])
@@ -495,34 +511,39 @@ enum MedicalOrderStatus {
 }
 
 model AiModelRegistry {
-  id                   String   @id @default(uuid())
-  modelId              String   @unique @default(uuid())
+  id                   String  @id @default(uuid())
+  modelId              String  @unique @default(uuid())
   modelName            String
   modelVersion         String
   recommendedSpecialty String?
 
-  ipHashEncrypted      String
-  ipHashPlain          String?
-  apiEndpoint          String?
-  provider             String?
-  isActiveOnChain      Boolean  @default(false)
+  ipHashEncrypted String
+  ipHashPlain     String?
+  apiEndpoint     String?
+  provider        String?
+  isActiveOnChain Boolean @default(false)
 
-  description          String?
-  createdBy            String
-  type                 String?
-  status               OperationalStatus @default(ACTIVE)
-  isDeleted            Boolean  @default(false)
+  description   String?
+  createdBy     String
+  createdByUser User              @relation("AiModelCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  type          String?
+  status        OperationalStatus @default(ACTIVE)
+  isDeleted     Boolean           @default(false)
 
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+  deletedBy     String?
+  restoredAt    DateTime?
+  deletedByUser User?     @relation("AiModelDeletedBy", fields: [deletedBy], references: [id], onDelete: SetNull)
 
-  diagnoses            AiDiagnosis[]
-  aiQualities          AiQuality[]
-  blockchainLogs       BlockchainLogger[]
+  diagnoses      AiDiagnosis[]
+  aiQualities    AiQuality[]
+  blockchainLogs BlockchainLogger[]
 
   // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
-  hash256              String?
-  dataSalt             String?
+  hash256  String?
+  dataSalt String?
 
   @@index([modelId])
   @@index([isActiveOnChain])
@@ -530,29 +551,31 @@ model AiModelRegistry {
   @@index([isDeleted])
   @@index([type])
   @@index([provider])
+  @@index([deletedAt])
 }
 
 model AiDiagnosis {
-  id           String          @id @default(uuid())
-  aiModelId    String
-  aiModel      AiModelRegistry @relation(fields: [aiModelId], references: [id])
+  id        String          @id @default(uuid())
+  aiModelId String
+  aiModel   AiModelRegistry @relation(fields: [aiModelId], references: [id])
 
-  patientId    String?
-  patient      Patient?        @relation(fields: [patientId], references: [id])
-  visitId      String?
-  visit        Visit?          @relation(fields: [visitId], references: [id])
+  patientId String?
+  patient   Patient? @relation(fields: [patientId], references: [id])
+  visitId   String?
+  visit     Visit?   @relation(fields: [visitId], references: [id])
 
-  prompt       String?
-  result       String?
-  confidence   Float?
-  status       String          @default("AI_SUGGESTED")
+  prompt             String?
+  result             String?
+  confidence         Float?
+  status             String              @default("AI_SUGGESTED")
   reviewedByDoctorId String?
-  reviewedByDoctor   DoctorProfile? @relation(fields: [reviewedByDoctorId], references: [id])
-  doctorFeedback String?
-  conclusions    MedicalConclusion[]
+  reviewedByDoctor   DoctorProfile?      @relation(fields: [reviewedByDoctorId], references: [id])
+  doctorFeedback     String?
+  conclusions        MedicalConclusion[]
+  quality            AiQuality?
 
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([aiModelId])
   @@index([patientId])
@@ -561,54 +584,57 @@ model AiDiagnosis {
 }
 
 model MedicalConclusion {
-  id              String        @id @default(uuid())
-  visitId         String        @unique
-  visit           Visit         @relation(fields: [visitId], references: [id])
+  id      String @id @default(uuid())
+  visitId String @unique
+  visit   Visit  @relation(fields: [visitId], references: [id])
 
-  doctorId        String
-  doctor          DoctorProfile @relation(fields: [doctorId], references: [id])
+  doctorId String
+  doctor   DoctorProfile @relation(fields: [doctorId], references: [id])
 
-  aiDiagnosisId   String?
-  aiDiagnosis     AiDiagnosis?  @relation(fields: [aiDiagnosisId], references: [id])
+  aiDiagnosisId String?
+  aiDiagnosis   AiDiagnosis? @relation(fields: [aiDiagnosisId], references: [id])
 
-  finalDiagnosis  String
-  treatmentPlan   String?
-  prescription    String?
-  followUpNote    String?
-  doctorNote      String?
-  concludedAt     DateTime      @default(now())
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  finalDiagnosis String
+  treatmentPlan  String?
+  prescription   String?
+  followUpNote   String?
+  doctorNote     String?
+  concludedAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  blockchainLogs  BlockchainLogger[]
+  blockchainLogs BlockchainLogger[]
 
   // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
-  hash256         String?
-  dataSalt        String?
+  hash256  String?
+  dataSalt String?
 
   @@index([doctorId])
   @@index([aiDiagnosisId])
 }
 
 model AiQuality {
-  id                         String          @id @default(uuid())
-  doctorId                   String
-  doctor                     DoctorProfile   @relation(fields: [doctorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id       String        @id @default(uuid())
+  doctorId String
+  doctor   DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  aiModelId                  String
-  aiModel                    AiModelRegistry @relation(fields: [aiModelId], references: [id])
+  aiModelId String
+  aiModel   AiModelRegistry @relation(fields: [aiModelId], references: [id])
+
+  aiDiagnosisId String?      @unique
+  aiDiagnosis   AiDiagnosis? @relation(fields: [aiDiagnosisId], references: [id])
 
   doctorConclusionAboutModel String
   trustablePercent           Float
 
-  createdAt                  DateTime        @default(now())
-  updatedAt                  DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  blockchainLogs             BlockchainLogger[]
+  blockchainLogs BlockchainLogger[]
 
   // Tamper-evidence: hash256 = SHA256(pepper + dataSalt + canonical(data)), mirrored on-chain.
-  hash256                    String?
-  dataSalt                   String?
+  hash256  String?
+  dataSalt String?
 
   @@index([doctorId])
   @@index([aiModelId])
@@ -619,20 +645,22 @@ model AiQuality {
 /// hash is mirrored on-chain; foreign keys point to the specific entity the log refers to
 /// (exactly one FK is set per row, the rest are null).
 model BlockchainLogger {
-  id        String   @id @default(uuid())
+  id      String  @id @default(uuid())
+  eventId String? @unique // idempotency key shared with the Kafka audit journal
 
   // Who performed the change, what action, and on which logical entity
-  actorId   String?
-  action    String   // CREATE | UPDATE | DELETE
-  entity    String   // denormalized label: "Department", "Patient", ...
-  entityId  String?  // affected record id (string form) for display + verification
-  metadata  Json?
+  actorId  String?
+  actor    User?   @relation("BlockchainLoggerActor", fields: [actorId], references: [id], onDelete: Restrict)
+  action   String // CREATE | UPDATE | DELETE
+  entity   String // denormalized label: "Department", "Patient", ...
+  entityId String? // affected record id (string form) for display + verification
+  metadata Json?
 
   // Tamper-evidence integrity fields
-  dataHash      String?  // V1: SHA256/HMAC over sanitized payload; V2: HMAC over before/after/diff hashes
-  dataSalt      String?  // V1 per-entry salt; null for V2 HMAC rows
-  beforeJson    Json?    // V1/safe display snapshot before the change (null on CREATE)
-  afterJson     Json?    // V1/safe display snapshot after the change (null on DELETE)
+  dataHash   String? // V1: SHA256/HMAC over sanitized payload; V2: HMAC over before/after/diff hashes
+  dataSalt   String? // V1 per-entry salt; null for V2 HMAC rows
+  beforeJson Json? // V1/safe display snapshot before the change (null on CREATE)
+  afterJson  Json? // V1/safe display snapshot after the change (null on DELETE)
 
   // Blockchain Audit V2 encrypted-diff fields. Raw before/after snapshots are encrypted;
   // hashes are computed from canonical plaintext, never from ciphertext.
@@ -648,7 +676,7 @@ model BlockchainLogger {
   fieldsChanged     Json?
 
   // On-chain anchoring
-  onChainStatus String?  @default("PENDING") // PENDING | ANCHORED | UNANCHORED
+  onChainStatus String? @default("PENDING") // PENDING | ANCHORED | UNANCHORED
   txHash        String?
   blockNumber   Int?
 
@@ -658,34 +686,35 @@ model BlockchainLogger {
   // is provable. batchId records which Merkle checkpoint anchored this row on-chain (null =
   // not yet anchored). These columns are the only ones the anchoring job may mutate; all
   // content columns are immutable via a DB trigger (see migration).
-  seq        Int?    @unique // monotonic sequence number (1, 2, 3, ...)
-  prevHash   String?         // entryHash of seq-1; genesis (seq 1) uses 64 zeros
-  entryHash  String?         // SHA256(pepper | seq | prevHash | core fields) -- the chain leaf
-  batchId    Int?            // Merkle batch that anchored this row; null until anchored
+  seq        Int?        @unique // monotonic sequence number (1, 2, 3, ...)
+  prevHash   String? // entryHash of seq-1; genesis (seq 1) uses 64 zeros
+  entryHash  String? // SHA256(pepper | seq | prevHash | core fields) -- the chain leaf
+  batchId    Int? // Merkle batch that anchored this row; null until anchored
+  auditBatch AuditBatch? @relation("AuditBatchLogs", fields: [batchId], references: [batchId], onDelete: Restrict)
 
   // Foreign keys to the audited entities (nullable; exactly one set per row)
-  departmentId        String?
-  department          Department?        @relation(fields: [departmentId], references: [id])
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
-  staffProfileId      String?
-  staffProfile        StaffProfile?      @relation(fields: [staffProfileId], references: [id])
+  staffProfileId String?
+  staffProfile   StaffProfile? @relation(fields: [staffProfileId], references: [id], onDelete: SetNull)
 
-  doctorProfileId     String?
-  doctorProfile       DoctorProfile?     @relation(fields: [doctorProfileId], references: [id])
+  doctorProfileId String?
+  doctorProfile   DoctorProfile? @relation(fields: [doctorProfileId], references: [id], onDelete: SetNull)
 
-  patientId           String?
-  patient             Patient?           @relation(fields: [patientId], references: [id])
+  patientId String?
+  patient   Patient? @relation(fields: [patientId], references: [id])
 
-  aiModelRegistryId   String?
-  aiModelRegistry     AiModelRegistry?   @relation(fields: [aiModelRegistryId], references: [id])
+  aiModelRegistryId String?
+  aiModelRegistry   AiModelRegistry? @relation(fields: [aiModelRegistryId], references: [id], onDelete: SetNull)
 
   medicalConclusionId String?
   medicalConclusion   MedicalConclusion? @relation(fields: [medicalConclusionId], references: [id])
 
-  aiQualityId         String?
-  aiQuality           AiQuality?         @relation(fields: [aiQualityId], references: [id])
-
-
+  aiQualityId   String?
+  aiQuality     AiQuality?          @relation(fields: [aiQualityId], references: [id])
+  outbox        AuditOutbox?        @relation("AuditOutboxAuditLog")
+  kafkaReceipts AuditKafkaReceipt[] @relation("AuditKafkaReceiptAuditLog")
 
   createdAt DateTime @default(now())
 
@@ -699,7 +728,6 @@ model BlockchainLogger {
   @@index([aiModelRegistryId])
   @@index([medicalConclusionId])
   @@index([aiQualityId])
-
   @@index([batchId])
   @@index([onChainStatus])
   @@index([hashVersion])
@@ -712,25 +740,99 @@ model BlockchainLogger {
 /// created PENDING, flipped to ANCHORED once the on-chain tx confirms, or deleted/marked FAILED
 /// if the commit fails (the logs then stay unanchored and are retried next cycle).
 model AuditBatch {
-  id          String    @id @default(uuid())
-  batchId     Int       @unique // monotonic, mirrors the on-chain batchId
-  merkleRoot  String            // hex SHA256 Merkle root over the batch's entryHashes
-  leafCount   Int               // number of logs in the batch
-  fromSeq     Int?              // smallest BlockchainLogger.seq in the batch
-  toSeq       Int?              // largest BlockchainLogger.seq in the batch
-  status      String    @default("PENDING") // PENDING | ANCHORED | FAILED
-  algorithmVersion String @default("MERKLE_SHA256_STRING_V1")
+  id               String             @id @default(uuid())
+  batchId          Int                @unique // monotonic, mirrors the on-chain batchId
+  merkleRoot       String // hex SHA256 Merkle root over the batch's entryHashes
+  leafCount        Int // number of logs in the batch
+  fromSeq          Int? // smallest BlockchainLogger.seq in the batch
+  toSeq            Int? // largest BlockchainLogger.seq in the batch
+  status           String             @default("PREPARING") // PREPARING | ARTIFACT_READY | ON_CHAIN_CONFIRMED | ANCHORED | FAILED
+  algorithmVersion String             @default("MERKLE_SHA256_STRING_V1")
   contractVersion  String?
-  txHash      String?
-  blockNumber Int?
-  error       String?
-  createdAt   DateTime  @default(now())
-  anchoredAt  DateTime?
-  recoveredAt DateTime?
+  artifactHash     String?
+  artifactUri      String?
+  artifactCid      String?
+  artifactKeyId    String?
+  txHash           String?
+  blockNumber      Int?
+  error            String?
+  createdAt        DateTime           @default(now())
+  anchoredAt       DateTime?
+  recoveredAt      DateTime?
+  logs             BlockchainLogger[] @relation("AuditBatchLogs")
+  recoveries       AuditRecovery[]    @relation("AuditRecoveryBatch")
 
   @@index([status])
   @@index([algorithmVersion])
   @@index([createdAt])
+}
+
+/// Transactional hand-off from PostgreSQL to Kafka. The audit row and this record are created
+/// atomically, so a process crash cannot create a business change without a durable audit event.
+model AuditOutbox {
+  id          String           @id @default(uuid())
+  eventId     String           @unique
+  auditLogId  String           @unique
+  auditLog    BlockchainLogger @relation("AuditOutboxAuditLog", fields: [auditLogId], references: [id], onDelete: NoAction)
+  topic       String
+  payload     Json
+  status      String           @default("PENDING") // PENDING | PUBLISHED | FAILED
+  attempts    Int              @default(0)
+  lastError   String?
+  publishedAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([status, createdAt])
+}
+
+/// Idempotency receipt maintained by the Kafka consumer. Replaying a retained topic is safe.
+model AuditKafkaReceipt {
+  id          String           @id @default(uuid())
+  eventId     String           @unique
+  auditLogId  String
+  auditLog    BlockchainLogger @relation("AuditKafkaReceiptAuditLog", fields: [auditLogId], references: [id], onDelete: NoAction)
+  topic       String
+  partition   Int
+  offset      String
+  processedAt DateTime         @default(now())
+
+  @@index([auditLogId])
+}
+
+/// Operational evidence for face-gated recovery. No artifact plaintext is stored here.
+model AuditRecovery {
+  id            String                  @id @default(uuid())
+  batchId       Int
+  batch         AuditBatch              @relation("AuditRecoveryBatch", fields: [batchId], references: [batchId], onDelete: Restrict)
+  requestedById String
+  requestedBy   User                    @relation("AuditRecoveryRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  reason        String
+  status        String                  @default("STARTED") // STARTED | COMPLETED | FAILED | REJECTED
+  restoredCount Int                     @default(0)
+  artifactHash  String?
+  merkleRoot    String?
+  failureReason String?
+  createdAt     DateTime                @default(now())
+  completedAt   DateTime?
+  stageRows     AuditRecoveryStageRow[]
+
+  @@index([batchId, createdAt])
+  @@index([requestedById, createdAt])
+}
+
+/// Ephemeral validated rows used inside the same recovery transaction before replacement.
+model AuditRecoveryStageRow {
+  id         String        @id @default(uuid())
+  recoveryId String
+  recovery   AuditRecovery @relation(fields: [recoveryId], references: [id], onDelete: Cascade)
+  seq        Int
+  entryHash  String
+  payload    Json
+  createdAt  DateTime      @default(now())
+
+  @@unique([recoveryId, seq])
+  @@index([recoveryId])
 }
 
 /// Short-lived, single-use proof that a user re-authenticated with their face immediately
@@ -745,38 +847,36 @@ model AuditBatch {
 /// consumes it atomically (usedAt) so it can never be replayed. We store only the SHA256 of the raw
 /// token, never the token itself.
 model StepUpTicket {
-  id         String   @id @default(uuid())
-  tokenHash  String   @unique // SHA256(raw ticket token); raw token is returned to client once
+  id         String    @id @default(uuid())
+  tokenHash  String    @unique // SHA256(raw ticket token); raw token is returned to client once
   userId     String
-  user       User     @relation(fields: [userId], references: [id])
-  action     String            // scope, e.g. "DELETE_DOCTOR" | "ANCHOR_BLOCKCHAIN"
-  resourceId String?           // optional: binds the ticket to one specific target record
+  user       User      @relation(fields: [userId], references: [id])
+  action     String // scope, e.g. "DELETE_DOCTOR" | "ANCHOR_BLOCKCHAIN"
+  resourceId String? // optional: binds the ticket to one specific target record
   ip         String?
-  expiresAt  DateTime          // typically now + a few minutes
-  usedAt     DateTime?         // set on first (and only) consumption
-  createdAt  DateTime @default(now())
+  expiresAt  DateTime // typically now + a few minutes
+  usedAt     DateTime? // set on first (and only) consumption
+  createdAt  DateTime  @default(now())
 
   @@index([userId])
   @@index([action])
   @@index([expiresAt])
 }
 
-
-
 model RefreshToken {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  tokenHash   String   @unique
-  deviceId    String?
-  deviceName  String?
-  ipAddress   String?
-  userAgent   String?
+  tokenHash  String  @unique
+  deviceId   String?
+  deviceName String?
+  ipAddress  String?
+  userAgent  String?
 
-  expiresAt   DateTime
-  revokedAt   DateTime?
-  createdAt   DateTime @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
 
   @@index([userId])
   @@index([expiresAt])
@@ -805,7 +905,6 @@ model OtpVerification {
   @@index([usedAt])
 }
 
-
 model Notification {
   id        String   @id @default(uuid())
   userId    String
@@ -820,4 +919,3 @@ model Notification {
   @@index([userId, isRead])
   @@index([userId, createdAt])
 }
-

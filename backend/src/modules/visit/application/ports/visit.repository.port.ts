@@ -45,6 +45,32 @@ export type VisitDoctorStaff = {
   departmentId: string | null;
 };
 
+export type VisitCreatedRecord = {
+  id: string;
+  visitCode: string;
+  patientId: string;
+  departmentId: string;
+  staffId: string | null;
+  status: VisitStatus;
+};
+
+export type PatientCreatedRecord = {
+  id: string;
+  patientCode: string;
+  fullName: string;
+  gender: string;
+  birthDate: Date;
+  citizenId: string | null;
+  phone: string | null;
+  address: string | null;
+  insuranceNumber: string | null;
+  emergencyContact: string | null;
+};
+
+export type VisitCreatedHook = (visit: VisitCreatedRecord, tx: Prisma.TransactionClient) => Promise<void>;
+export type VisitUpdatedHook = (visit: VisitCreatedRecord, tx: Prisma.TransactionClient) => Promise<void>;
+export type PatientCreatedHook = (patient: PatientCreatedRecord, tx: Prisma.TransactionClient) => Promise<void>;
+
 /**
  * Persistence boundary for the Visit aggregate. The Prisma implementation keeps
  * include shapes, code generation and the create transaction; the application
@@ -57,11 +83,15 @@ export interface VisitRepositoryPort {
   findDoctorStaffByUserId(userId: string): Promise<VisitDoctorStaff | null>;
 
   /** Atomic intake: optional patient creation + unique code generation + visit creation, with retry. */
-  createVisitWithOptionalPatient(command: CreateVisitCommand): Promise<unknown>;
+  createVisitWithOptionalPatient(
+    command: CreateVisitCommand,
+    onCreated?: VisitCreatedHook,
+    onPatientCreated?: PatientCreatedHook,
+  ): Promise<unknown>;
 
   findManyPaginated(filter: VisitListFilter, skip: number, take: number): Promise<{ items: unknown[]; total: number }>;
 
-  updateStatus(id: string, status: VisitStatus, completedAt?: Date, staffId?: string): Promise<unknown>;
+  updateStatus(id: string, status: VisitStatus, completedAt?: Date, staffId?: string, afterWrite?: VisitUpdatedHook): Promise<unknown>;
 
   suggestDepartments(specialty: string): Promise<unknown[]>;
 }

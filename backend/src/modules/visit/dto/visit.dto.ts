@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { VisitStatus } from '@prisma/client';
-import { IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { IsEnum, IsOptional, IsUUID, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { PaginationQueryDto } from '../../shared/pagination.dto';
 import { CreatePatientDto } from '../../patient/dto/patient.dto';
 
@@ -12,6 +13,8 @@ export class CreateVisitDto {
 
   @ApiPropertyOptional({ description: 'Thông tin bệnh nhân mới nếu chưa có hồ sơ' })
   @IsOptional()
+  @ValidateNested()
+  @Type(() => CreatePatientDto)
   patient?: CreatePatientDto;
 
   @ApiProperty({ example: 'department-id' })

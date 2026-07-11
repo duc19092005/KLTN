@@ -16,9 +16,10 @@ const ROLE_LABEL = {
 };
 
 const DEPARTMENT_TYPE_LABEL = {
-  EXAMINATION: 'Chuyên khoa',
+  EXAMINATION: 'Phòng khám',
+  CLINICAL: 'Khoa lâm sàng',
   ADMINISTRATIVE: 'Hành chính',
-  LABORATORY: 'Cận lâm sàng',
+  LABORATORY: 'Xét nghiệm',
   IMAGING: 'Chẩn đoán hình ảnh',
   PHARMACY: 'Nhà thuốc',
   OTHER: 'Khác',

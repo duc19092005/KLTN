@@ -1,4 +1,5 @@
 import { AuditAction } from '../../../../infrastructure/audit/audit-logger.service';
+import { Prisma } from '@prisma/client';
 
 /** DI token for the Staff integrity anchor port. */
 export const STAFF_INTEGRITY_ANCHOR = Symbol('STAFF_INTEGRITY_ANCHOR');
@@ -25,7 +26,13 @@ export type StaffIntegrityEvaluation = {
  * preserved exactly.
  */
 export interface StaffIntegrityAnchorPort {
-  anchorChange(staffProfile: any, action: AuditAction, actorId?: string, before?: unknown): Promise<void>;
+  anchorChange(
+    staffProfile: any,
+    action: AuditAction,
+    actorId?: string,
+    before?: unknown,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void>;
   evaluate(staff: any, skipChainCheck?: boolean): Promise<StaffIntegrityEvaluation>;
   history(id?: string): Promise<unknown>;
 }

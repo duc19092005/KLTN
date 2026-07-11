@@ -24,6 +24,7 @@ import { StepUpModule } from './common/stepup/stepup.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { PatientAuthModule } from './modules/patient-auth/patient-auth.module';
 import { PatientPortalModule } from './modules/patient-portal/patient-portal.module';
+import { AdministrativeLifecycleModule } from './common/lifecycle/administrative-lifecycle.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { PatientPortalModule } from './modules/patient-portal/patient-portal.mod
     BlockchainModule,
     AuditModule,
     StepUpModule,
+    AdministrativeLifecycleModule,
     EncryptionModule,
     AuthModule,
     DepartmentModule,

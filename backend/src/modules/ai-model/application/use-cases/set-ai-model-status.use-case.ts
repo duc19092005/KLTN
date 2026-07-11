@@ -22,8 +22,11 @@ export class SetAiModelStatusUseCase {
     }
 
     const before = buildAiModelSnapshot(existing);
-    const updated = await this.repo.update(id, { status, isDeleted: status === 'ACTIVE' ? false : existing.isDeleted });
-    await this.integrity.anchorChange(updated, 'UPDATE', actorId, before);
+    const updated = await this.repo.update(
+      id,
+      { status, isDeleted: status === 'ACTIVE' ? false : existing.isDeleted },
+      (model, tx) => this.integrity.anchorChange(model, 'UPDATE', actorId, before, tx),
+    );
     return updated;
   }
 }
