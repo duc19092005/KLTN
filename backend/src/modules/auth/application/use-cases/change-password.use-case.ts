@@ -28,9 +28,17 @@ export class ChangePasswordUseCase {
     const user = await this.repo.findUserWithProfile(userId);
     if (!user) throw new UnauthorizedException('Không tìm thấy tài khoản.');
     if (!['RECEPTIONIST', 'DOCTOR', 'LAB_MANAGER'].includes(user.role)) {
+      await this.audit.write(userId, 'PASSWORD_CHANGE_DENIED', 'User', userId, {
+        reason: 'ROLE_NOT_ALLOWED',
+        role: user.role,
+      });
       throw new BadRequestException('Chức năng đổi mật khẩu chỉ áp dụng cho tài khoản nhân sự.');
     }
     if (!user.passwordHash || !verifyPassword(currentPassword, user.passwordHash)) {
+      await this.audit.write(userId, 'PASSWORD_CHANGE_FAILED', 'User', userId, {
+        reason: 'INVALID_CURRENT_PASSWORD',
+        role: user.role,
+      });
       throw new UnauthorizedException('Mật khẩu hiện tại không đúng.');
     }
     const updated = await this.repo.updatePasswordChange(

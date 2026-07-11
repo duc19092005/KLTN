@@ -144,4 +144,15 @@ describe('CreateMedicalResultUseCase audit integrity', () => {
     await expect(useCase.execute('order-1', dto, baseUser)).rejects.toThrow(BadRequestException);
     expect(repo.createResultWithTransitions).not.toHaveBeenCalled();
   });
+
+  it('rejects a public URL for a new medical result file', async () => {
+    const { useCase, repo } = makeUseCase();
+    const dto = {
+      ...baseDto,
+      files: [{ ...baseDto.files[0], url: 'https://cdn.example.com/result.pdf' }],
+    };
+
+    await expect(useCase.execute('order-1', dto, baseUser)).rejects.toThrow(BadRequestException);
+    expect(repo.createResultWithTransitions).not.toHaveBeenCalled();
+  });
 });

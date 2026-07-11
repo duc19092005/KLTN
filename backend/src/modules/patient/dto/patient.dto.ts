@@ -55,6 +55,33 @@ function IsValidBirthDateRange(validationOptions?: ValidationOptions) {
   };
 }
 
+function HasAtLeastOneContactMethod(validationOptions?: ValidationOptions) {
+  return function (object: object, propertyName: string) {
+    registerDecorator({
+      name: 'hasAtLeastOneContactMethod',
+      target: object.constructor,
+      propertyName,
+      options: validationOptions,
+      validator: {
+        validate(_value: unknown, args: ValidationArguments) {
+          const dto = args.object as {
+            phone?: string;
+            citizenId?: string;
+            insuranceNumber?: string;
+            emergencyContact?: string;
+          };
+          return [dto.phone, dto.citizenId, dto.insuranceNumber, dto.emergencyContact].some(
+            (value) => typeof value === 'string' && value.trim().length > 0,
+          );
+        },
+        defaultMessage() {
+          return 'Hồ sơ bệnh nhân phải có ít nhất một thông tin liên hệ hoặc định danh hợp lệ (SĐT, CCCD, BHYT hoặc liên hệ khẩn cấp).';
+        },
+      },
+    });
+  };
+}
+
 export class CreatePatientDto {
   @ApiPropertyOptional({ example: 'BN-0001' })
   @IsOptional()
@@ -67,6 +94,10 @@ export class CreatePatientDto {
   @IsNotEmpty({ message: 'Vui lòng nhập họ tên.' })
   @MaxLength(80, { message: 'Họ tên không được vượt quá 80 ký tự.' })
   @Matches(VIETNAMESE_NAME_REGEX, { message: 'Họ tên chỉ được chứa chữ cái tiếng Việt và khoảng trắng.' })
+  @HasAtLeastOneContactMethod({
+    message:
+      'Hồ sơ bệnh nhân phải có ít nhất một thông tin liên hệ hoặc định danh hợp lệ (SĐT, CCCD, BHYT hoặc liên hệ khẩn cấp).',
+  })
   fullName!: string;
 
   @ApiProperty({ example: 'MALE', enum: PATIENT_GENDER_VALUES })

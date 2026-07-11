@@ -569,7 +569,18 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
         <SectionTitle title="Kết nối và bảo mật" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {manualEndpoint && <div className="md:col-span-2"><Field label="Điểm cuối API" value={form.apiEndpoint} onChange={(v) => changeField('apiEndpoint', limitText(v.trim(), MAX_ENDPOINT_LENGTH))} onBlur={() => validateField('apiEndpoint')} error={fieldErrors.apiEndpoint} required placeholder="http://localhost:11434/v1/chat/completions" maxLength={MAX_ENDPOINT_LENGTH} /></div>}
-          <TextAreaField label="Khóa API / Token" value={form.secretOrIpHash} onChange={(v) => changeField('secretOrIpHash', limitText(v, MAX_SECRET_LENGTH))} onBlur={() => validateField('secretOrIpHash')} error={fieldErrors.secretOrIpHash} required={keyRequiredForSubmit} optional={!keyRequiredForSubmit} rows={2} maxLength={MAX_SECRET_LENGTH} className="md:col-span-2" />
+          <TextAreaField
+            label={editingModel ? 'Khóa API / Token (để trống nếu giữ secret hiện tại)' : 'Khóa API / Token'}
+            value={form.secretOrIpHash}
+            onChange={(v) => changeField('secretOrIpHash', limitText(v, MAX_SECRET_LENGTH))}
+            onBlur={() => validateField('secretOrIpHash')}
+            error={fieldErrors.secretOrIpHash}
+            required={keyRequiredForSubmit}
+            optional={!keyRequiredForSubmit}
+            rows={2}
+            maxLength={MAX_SECRET_LENGTH}
+            className="md:col-span-2"
+          />
           <TextAreaField label="Mô tả" value={form.description} onChange={(v) => changeField('description', limitText(v, MAX_DESCRIPTION_LENGTH))} onBlur={() => validateField('description')} error={fieldErrors.description} rows={2} maxLength={MAX_DESCRIPTION_LENGTH} className="md:col-span-2" />
         </div>
 
@@ -647,8 +658,16 @@ function ModelCard({ model, onViewDetails, onEdit, onToggleStatus, onDelete, bus
         </div>
       )}
       <div className="mt-3 rounded-xl bg-white border border-slate-100 p-3">
-        <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">Dấu vân tay SHA-256</p>
-        <p className="mt-1 break-all text-xs font-mono text-slate-600">{model.ipHashPlain || 'Không hiển thị'}</p>
+        <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">Cấu hình secret</p>
+        <p className="mt-1 text-xs font-semibold text-slate-600">
+          {model.secretConfigured ? 'Đã cấu hình secret (không hiển thị plaintext)' : 'Chưa cấu hình secret'}
+        </p>
+        {(model.secretFingerprint || model.ipHashPlain) && (
+          <>
+            <p className="mt-2 text-[10px] uppercase tracking-wider font-black text-slate-400">Dấu vân tay SHA-256</p>
+            <p className="mt-1 break-all text-xs font-mono text-slate-600">{model.secretFingerprint || model.ipHashPlain}</p>
+          </>
+        )}
       </div>
       <div className="mt-3 flex flex-wrap justify-end gap-2">
         <button type="button" onClick={() => onViewDetails(model.id)} className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-100">Chi tiết</button>

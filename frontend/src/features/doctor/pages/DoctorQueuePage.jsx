@@ -350,7 +350,7 @@ export default function DoctorQueuePage() {
       const activeDiag = decision?.aiDiagnoses?.find((d) => d.id === selectedAiId);
       if (activeDiag?.aiModel) {
         setRatingModelId(activeDiag.aiModel.id);
-        setRatingModelName(activeDiag.aiModel.modelName);
+        setRatingModelName(activeDiag.aiModel.modelName || activeDiag.aiModel.name || 'Mô hình AI');
         setShowRatingPopup(true);
         setCountdown(10);
         setRatingSelected(null);

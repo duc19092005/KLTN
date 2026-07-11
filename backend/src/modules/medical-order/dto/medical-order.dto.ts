@@ -1,6 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MedicalOrderStatus } from '@prisma/client';
-import { IsArray, IsEnum, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, ValidateNested, ArrayMinSize } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsIn,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+  ArrayMinSize,
+  ValidateIf,
+  IsEmpty,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateMedicalOrderDto {
@@ -72,9 +85,11 @@ export class MedicalResultFileDto {
   @IsNumber()
   size!: number;
 
-  @ApiPropertyOptional({ description: 'Legacy public/provider URL for pre-S3 files only.' })
-  @IsOptional()
-  @IsString()
+  @ApiPropertyOptional({
+    description: 'Không dùng cho file y tế mới. Public URL bị từ chối; chỉ S3 private metadata được chấp nhận.',
+  })
+  @ValidateIf((_, value) => value !== undefined && value !== null && value !== '')
+  @IsEmpty({ message: 'Không được gửi URL công khai cho file kết quả y tế mới.' })
   url?: string;
 
   @ApiProperty({ example: 'S3' })

@@ -90,20 +90,23 @@ export class PatientPortalService {
         },
       });
 
-      return createdPatient;
-    });
+      await this.recordAudit(
+        {
+          entity: 'Patient',
+          entityId: createdPatient.id,
+          action: 'CREATE',
+          actorId: userId,
+          after: {
+            patientCode: createdPatient.patientCode,
+            phonePresent: Boolean(createdPatient.phone),
+            citizenIdPresent: Boolean(createdPatient.citizenId),
+          },
+          metadata: { schema: 'KLTN_PATIENT_PORTAL_PROFILE_CREATE_V1' },
+        },
+        tx,
+      );
 
-    await this.safeAudit({
-      entity: 'Patient',
-      entityId: patient.id,
-      action: 'CREATE',
-      actorId: userId,
-      after: {
-        patientCode: patient.patientCode,
-        phonePresent: Boolean(patient.phone),
-        citizenIdPresent: Boolean(patient.citizenId),
-      },
-      metadata: { schema: 'KLTN_PATIENT_PORTAL_PROFILE_CREATE_V1' },
+      return createdPatient;
     });
 
     return this.toPatientSummary(patient);
@@ -389,7 +392,7 @@ export class PatientPortalService {
     const qrTokenHash = this.hashQrToken(rawQrToken);
     const appointment = await this.prisma.$transaction(async (tx) => {
       const appointmentCode = await this.generateAppointmentCode(tx);
-      return tx.appointment.create({
+      const created = await tx.appointment.create({
         data: {
           appointmentCode,
           patientId: dto.patientId,
@@ -403,23 +406,28 @@ export class PatientPortalService {
         },
         include: this.appointmentInclude(),
       });
-    });
 
-    await this.safeAudit({
-      entity: 'Appointment',
-      entityId: appointment.id,
-      action: 'CREATE',
-      actorId: userId,
-      after: {
-        appointmentCode: appointment.appointmentCode,
-        patientId: appointment.patientId,
-        departmentId: appointment.departmentId,
-        doctorId: appointment.doctorId,
-        scheduledAt: appointment.scheduledAt,
-        status: appointment.status,
-        doctorStaffId,
-      },
-      metadata: { schema: 'KLTN_APPOINTMENT_CREATE_AUDIT_V1' },
+      await this.recordAudit(
+        {
+          entity: 'Appointment',
+          entityId: created.id,
+          action: 'CREATE',
+          actorId: userId,
+          after: {
+            appointmentCode: created.appointmentCode,
+            patientId: created.patientId,
+            departmentId: created.departmentId,
+            doctorId: created.doctorId,
+            scheduledAt: created.scheduledAt,
+            status: created.status,
+            doctorStaffId,
+          },
+          metadata: { schema: 'KLTN_APPOINTMENT_CREATE_AUDIT_V1' },
+        },
+        tx,
+      );
+
+      return created;
     });
 
     return { ...this.toAppointmentSummary(appointment), qrPayload: this.buildQrPayload(rawQrToken) };
@@ -470,19 +478,26 @@ export class PatientPortalService {
       throw new BadRequestException('Chỉ có thể hủy lịch hẹn chưa check-in.');
     }
 
-    const updated = await this.prisma.appointment.update({
-      where: { id: appointmentId },
-      data: { status: 'CANCELLED', cancelledAt: new Date(), cancelReason: 'PATIENT_CANCELLED' },
-      include: this.appointmentInclude(),
-    });
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const cancelled = await tx.appointment.update({
+        where: { id: appointmentId },
+        data: { status: 'CANCELLED', cancelledAt: new Date(), cancelReason: 'PATIENT_CANCELLED' },
+        include: this.appointmentInclude(),
+      });
 
-    await this.safeAudit({
-      entity: 'Appointment',
-      entityId: updated.id,
-      action: 'UPDATE',
-      actorId: userId,
-      after: { appointmentCode: updated.appointmentCode, status: updated.status },
-      metadata: { schema: 'KLTN_APPOINTMENT_CANCEL_AUDIT_V1' },
+      await this.recordAudit(
+        {
+          entity: 'Appointment',
+          entityId: cancelled.id,
+          action: 'UPDATE',
+          actorId: userId,
+          after: { appointmentCode: cancelled.appointmentCode, status: cancelled.status },
+          metadata: { schema: 'KLTN_APPOINTMENT_CANCEL_AUDIT_V1' },
+        },
+        tx,
+      );
+
+      return cancelled;
     });
 
     return this.toAppointmentSummary(updated);
@@ -503,6 +518,9 @@ export class PatientPortalService {
       });
       if (!appointment) throw new NotFoundException('Không tìm thấy lịch hẹn từ mã QR.');
       this.assertAppointmentCanCheckIn(appointment);
+      if (!appointment.department || appointment.department.status !== 'ACTIVE') {
+        throw new BadRequestException('Phòng ban của lịch hẹn đang ngừng hoạt động, không thể check-in.');
+      }
 
       const visitCode = await this.generateVisitCode(tx);
       const visit = await tx.visit.create({
@@ -527,36 +545,42 @@ export class PatientPortalService {
         include: this.appointmentInclude(),
       });
 
+      await this.recordAudit(
+        {
+          entity: 'Appointment',
+          entityId: checkedInAppointment.id,
+          action: 'UPDATE',
+          actorId: user.sub,
+          after: {
+            appointmentCode: checkedInAppointment.appointmentCode,
+            status: checkedInAppointment.status,
+            visitId: visit.id,
+          },
+          metadata: { schema: 'KLTN_APPOINTMENT_CHECKIN_AUDIT_V1' },
+        },
+        tx,
+      );
+
+      await this.recordAudit(
+        {
+          entity: 'Visit',
+          entityId: visit.id,
+          action: 'CREATE',
+          actorId: user.sub,
+          after: {
+            visitCode: visit.visitCode,
+            patientId: visit.patientId,
+            departmentId: visit.departmentId,
+            staffId: visit.staffId,
+            status: visit.status,
+            source: visit.source,
+          },
+          metadata: { schema: 'KLTN_VISIT_FROM_APPOINTMENT_AUDIT_V1' },
+        },
+        tx,
+      );
+
       return { appointment: checkedInAppointment, visit };
-    });
-
-    await this.safeAudit({
-      entity: 'Appointment',
-      entityId: result.appointment.id,
-      action: 'UPDATE',
-      actorId: user.sub,
-      after: {
-        appointmentCode: result.appointment.appointmentCode,
-        status: result.appointment.status,
-        visitId: result.visit.id,
-      },
-      metadata: { schema: 'KLTN_APPOINTMENT_CHECKIN_AUDIT_V1' },
-    });
-
-    await this.safeAudit({
-      entity: 'Visit',
-      entityId: result.visit.id,
-      action: 'CREATE',
-      actorId: user.sub,
-      after: {
-        visitCode: result.visit.visitCode,
-        patientId: result.visit.patientId,
-        departmentId: result.visit.departmentId,
-        staffId: result.visit.staffId,
-        status: result.visit.status,
-        source: result.visit.source,
-      },
-      metadata: { schema: 'KLTN_VISIT_FROM_APPOINTMENT_AUDIT_V1' },
     });
 
     return {
@@ -753,16 +777,24 @@ export class PatientPortalService {
     return phoneNormalized.startsWith('84') ? `0${phoneNormalized.slice(2)}` : phoneNormalized;
   }
 
-  private async safeAudit(input: {
-    entity: string;
-    entityId: string;
-    action: 'CREATE' | 'UPDATE' | 'DELETE';
-    actorId: string | null;
-    after: Record<string, unknown> | null;
-    metadata: Record<string, unknown>;
-  }) {
-    try {
-      await this.auditLogger.recordV2({
+  /**
+   * Mandatory audit write for patient-portal storage events.
+   * Must run inside the same DB transaction as the domain mutation so audit
+   * failure rolls back appointment/visit/patient writes.
+   */
+  private async recordAudit(
+    input: {
+      entity: string;
+      entityId: string;
+      action: 'CREATE' | 'UPDATE' | 'DELETE';
+      actorId: string | null;
+      after: Record<string, unknown> | null;
+      metadata: Record<string, unknown>;
+    },
+    tx: Prisma.TransactionClient,
+  ) {
+    await this.auditLogger.recordV2(
+      {
         entity: input.entity,
         entityId: input.entityId,
         action: input.action,
@@ -770,9 +802,8 @@ export class PatientPortalService {
         before: null,
         after: input.after,
         metadata: input.metadata,
-      });
-    } catch (error) {
-      console.error(`Failed to write audit log for ${input.entity}:`, error);
-    }
+      },
+      tx,
+    );
   }
 }
