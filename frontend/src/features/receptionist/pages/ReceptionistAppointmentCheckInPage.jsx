@@ -13,8 +13,6 @@ export default function ReceptionistAppointmentCheckInPage() {
   const toast = useToast();
   const [qrPayload, setQrPayload] = useState('');
   const [verification, setVerification] = useState(null);
-  const [reason, setReason] = useState('');
-  const [symptoms, setSymptoms] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [scannerActive, setScannerActive] = useState(false);
@@ -109,8 +107,6 @@ export default function ReceptionistAppointmentCheckInPage() {
     try {
       const data = await appointmentService.verifyQr(payload);
       setVerification(data);
-      setReason(data?.appointment?.reason || 'Khám theo lịch hẹn');
-      setSymptoms(data?.appointment?.symptoms || '');
       toast.success('Mã QR hợp lệ. Vui lòng xác minh thông tin bệnh nhân.');
     } catch (err) {
       const message = err.response?.data?.message || err.message || 'Không xác minh được mã QR.';
@@ -129,7 +125,7 @@ export default function ReceptionistAppointmentCheckInPage() {
     setBusy(true);
     setError('');
     try {
-      const data = await appointmentService.checkIn(qrPayload.trim(), { reason, symptoms });
+      const data = await appointmentService.checkIn(qrPayload.trim());
       toast.success(`Check-in thành công. Đã tạo lượt khám ${data?.visit?.visitCode || ''}`);
       navigate('/receptionist/queue');
     } catch (err) {
@@ -177,11 +173,7 @@ export default function ReceptionistAppointmentCheckInPage() {
             <PatientCard patient={verification.patient} />
             <AppointmentCard
               verification={verification}
-              reason={reason}
-              symptoms={symptoms}
               busy={busy}
-              onReasonChange={setReason}
-              onSymptomsChange={setSymptoms}
               onCheckIn={checkIn}
             />
           </section>
@@ -308,7 +300,7 @@ function PatientCard({ patient }) {
   );
 }
 
-function AppointmentCard({ verification, reason, symptoms, busy, onReasonChange, onSymptomsChange, onCheckIn }) {
+function AppointmentCard({ verification, busy, onCheckIn }) {
   return (
     <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -324,13 +316,6 @@ function AppointmentCard({ verification, reason, symptoms, busy, onReasonChange,
         <InfoCard label="Bác sĩ" value={verification.doctor?.fullName || 'Bác sĩ bất kỳ'} />
         <InfoCard label="Ngày khám" value={verification.appointment?.scheduledAt ? new Date(verification.appointment.scheduledAt).toLocaleDateString('vi-VN') : 'N/A'} />
         <InfoCard label="Giờ khám" value={verification.appointment?.scheduledAt ? new Date(verification.appointment.scheduledAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'N/A'} />
-      </div>
-
-      <div className="mt-5 grid gap-3">
-        <label htmlFor="appointment-reason" className="text-xs font-black uppercase tracking-wider text-slate-500">Lý do khám</label>
-        <input id="appointment-reason" value={reason} onChange={(event) => onReasonChange(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-cyan-500 focus:bg-white focus:ring-4 focus:ring-cyan-50" />
-        <label htmlFor="appointment-symptoms" className="text-xs font-black uppercase tracking-wider text-slate-500">Triệu chứng ghi nhận</label>
-        <textarea id="appointment-symptoms" value={symptoms} onChange={(event) => onSymptomsChange(event.target.value)} rows={3} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-cyan-500 focus:bg-white focus:ring-4 focus:ring-cyan-50" />
       </div>
 
       <button type="button" disabled={busy} onClick={onCheckIn} className="mt-5 w-full rounded-xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50">

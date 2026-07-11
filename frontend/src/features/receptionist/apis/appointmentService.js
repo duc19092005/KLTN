@@ -6,12 +6,8 @@ export const appointmentService = {
     return response.data;
   },
 
-  async checkIn(qrPayload, payload = {}) {
-    const response = await api.post('/appointments/check-in', {
-      qrPayload,
-      reason: payload.reason || undefined,
-      symptoms: payload.symptoms || undefined,
-    });
+  async checkIn(qrPayload) {
+    const response = await api.post('/appointments/check-in', { qrPayload });
     return response.data;
   },
 };

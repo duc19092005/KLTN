@@ -22,16 +22,34 @@ const emptyForm = { departmentCode: '', name: '', floor: '', status: 'ACTIVE', t
 const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100', INACTIVE: 'bg-rose-50 text-rose-700 border-rose-100' };
 const orderTone = { true: 'bg-cyan-50 text-cyan-700 border-cyan-100', false: 'bg-slate-50 text-slate-600 border-slate-100' };
 const STATUS_LABELS = { ACTIVE: 'Đang hoạt động', INACTIVE: 'Ngưng hoạt động', PENDING: 'Chờ kích hoạt' };
+const BLOCKCHAIN_TONE = {
+  VERIFIED: { label: 'Xác thực khớp với blockchain', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
+  TAMPERED: { label: 'CẢNH BÁO: Dữ liệu đã bị sửa đổi!', cls: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500' },
+  PENDING_ANCHOR: { label: 'Đang chờ neo on-chain', cls: 'bg-cyan-50 text-cyan-700 border-cyan-200', dot: 'bg-cyan-500' },
+  UNANCHORED: { label: 'Chưa được neo trên blockchain', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
+};
 const MAX_DEPARTMENT_CODE_LENGTH = 10;
 const MAX_DEPARTMENT_NAME_LENGTH = 50;
 const MAX_DEPARTMENT_FLOOR_LENGTH = 3;
 const MAX_DEPARTMENT_DESCRIPTION_LENGTH = 500;
+function normalizeDepartmentNameInput(value) {
+  return value
+    .replace(/[^\p{L}\p{N}\s-]+/gu, ' ')
+    .replace(/(?<![\p{L}\p{N}])-|-(?![\p{L}\p{N}])/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .slice(0, MAX_DEPARTMENT_NAME_LENGTH);
+}
 function getTypeLabel(type) { return DEPARTMENT_TYPES.find((item) => item.value === type)?.label || type || 'Chưa phân loại'; }
 function getStatusLabel(status) { return STATUS_LABELS[status] || status || 'Không rõ'; }
 function canDepartmentReceiveOrders(type) { return ['LABORATORY', 'IMAGING'].includes(type); }
 function getDepartmentItems(data) { return Array.isArray(data) ? data : data?.items || []; }
 function getStaffItems(data) { return Array.isArray(data) ? data : data?.items || []; }
 function getError(err, fallback) { return err?.response?.data?.message || err.message || fallback; }
+function shortHash(hash) {
+  if (!hash) return '—';
+  const clean = hash.startsWith('0x') ? hash.slice(2) : hash;
+  return `${clean.slice(0, 10)}…${clean.slice(-8)}`;
+}
 
 export default function DepartmentsPage() {
   const { user, logout } = useAuth();
@@ -379,15 +397,7 @@ function DepartmentDetail({ department, staffs, onGoStaff, onClose }) {
         <div className="flex-1 overflow-y-auto bg-slate-50/60 p-6">
           {activeTab === 'info' ? (
             <div className="space-y-6">
-              <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-5 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded-full border px-3 py-1 text-xs font-black ${statusTone[department.status] || statusTone.ACTIVE}`}>{getStatusLabel(department.status)}</span>
-                    <BlockchainStatusBadge status={department.blockchainStatus} prefix="Blockchain: " />
-                  </div>
-                  <span className="text-[11px] font-black uppercase text-cyan-700 tracking-wider">Xác thực bằng hợp đồng thông minh Solidity</span>
-                </div>
-              </div>
+              <DepartmentIntegrityCard department={department} />
 
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
@@ -429,6 +439,49 @@ function DepartmentDetail({ department, staffs, onGoStaff, onClose }) {
           <button onClick={onGoStaff} className="w-full rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-3 text-sm font-black text-cyan-700 hover:bg-cyan-100">Đi tới quản lý nhân sự</button>
         </div>
       </aside>
+    </div>
+  );
+}
+
+function DepartmentIntegrityCard({ department }) {
+  const audit = department.audit || {};
+  const status = audit.status || department.blockchainStatus;
+  const tone = BLOCKCHAIN_TONE[status] || BLOCKCHAIN_TONE.UNANCHORED;
+
+  return (
+    <div className={`rounded-2xl border p-5 shadow-sm space-y-4 ${status === 'VERIFIED' ? 'bg-emerald-50/60 border-emerald-100' : status === 'TAMPERED' ? 'bg-rose-50/60 border-rose-100 animate-pulse' : 'bg-amber-50/60 border-amber-100'}`}>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`rounded-full border px-3 py-1 text-xs font-black ${statusTone[department.status] || statusTone.ACTIVE}`}>{getStatusLabel(department.status)}</span>
+          <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black ${tone.cls}`}>
+            <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
+            Trạng thái: {tone.label}
+          </span>
+        </div>
+        <span className="text-[11px] font-black uppercase text-cyan-700 tracking-wider">
+          Xác thực bằng hợp đồng thông minh Solidity
+        </span>
+      </div>
+      <div className="bg-white p-4 rounded-xl border border-slate-100 space-y-2 mt-3">
+        <strong className="block text-slate-900 font-bold border-b pb-1 text-sm">Xác thực toàn vẹn dữ liệu phòng ban</strong>
+        <div className="space-y-1.5 text-xs">
+          <HashRow label="Trạng thái" value={audit.chainMatches ? 'Khớp với blockchain' : audit.onChainHash ? 'Mâu thuẫn' : 'Chưa neo'} match={audit.chainMatches} />
+          <HashRow label="Hash trong CSDL" value={audit.storedHash} match={audit.dbMatches} />
+          <HashRow label="Hash trên chuỗi" value={audit.onChainHash} match={audit.chainMatches} />
+          <HashRow label="Hash tính lại" value={audit.recomputedHash} match={audit.dbMatches && audit.chainMatches} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HashRow({ label, value, match }) {
+  return (
+    <div className="flex justify-between items-center gap-2 py-0.5">
+      <span className="text-slate-500 font-semibold">{label}:</span>
+      <span className={`font-mono text-right ${match === true ? 'text-emerald-600 font-bold' : match === false ? 'text-rose-600 font-bold' : 'text-slate-700'}`}>
+        {label === 'Trạng thái' ? value : shortHash(value)}
+      </span>
     </div>
   );
 }
@@ -559,7 +612,7 @@ function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing }) {
       if (!value.trim()) return 'Vui lòng nhập tên phòng ban.';
       if (value.trim().length < 2) return 'Tên phòng ban phải có ít nhất 2 ký tự.';
       if (value.length > MAX_DEPARTMENT_NAME_LENGTH) return `Tên phòng ban không được vượt quá ${MAX_DEPARTMENT_NAME_LENGTH} ký tự.`;
-      if (!/^[\p{L}]+(?:\s+[\p{L}]+)*(?:\s+\d+)?$/u.test(value.trim())) return 'Tên phòng ban phải bắt đầu bằng chữ; số chỉ được đặt ở cuối, ví dụ: Tổng quát 1.';
+      if (!/^[\p{L}]+(?:[\s-]+[\p{L}]+)*(?:[\s-]+\d+)?$/u.test(value.trim())) return 'Tên phòng ban phải bắt đầu bằng chữ; cho phép khoảng trắng/dấu gạch ngang, số chỉ được đặt ở cuối. VD: X-Ray, Tổng quát 1.';
     }
     if (field === 'floor') {
       if (!value.trim()) return 'Vui lòng nhập tầng.';
@@ -619,7 +672,7 @@ function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing }) {
           <Input
             label="Tên phòng ban"
             value={form.name}
-            onChange={(v) => setForm({ ...form, name: v.replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').slice(0, MAX_DEPARTMENT_NAME_LENGTH) })}
+            onChange={(v) => setForm({ ...form, name: normalizeDepartmentNameInput(v) })}
             onBlur={() => validateField('name')}
             error={fieldErrors.name}
             placeholder="X Ray, MRI, Lễ tân..."

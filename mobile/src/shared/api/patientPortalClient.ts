@@ -33,8 +33,6 @@ export type PatientVisitSummary = {
   source?: string;
   checkInAt: string;
   completedAt?: string | null;
-  reason?: string | null;
-  symptoms?: string | null;
   department?: { id: string; name: string; type: string } | null;
   doctor?: { id: string; fullName: string } | null;
   finalDiagnosis?: string | null;
@@ -117,8 +115,6 @@ export type PatientAppointment = {
   id: string;
   appointmentCode: string;
   scheduledAt: string;
-  reason?: string | null;
-  symptoms?: string | null;
   status: string;
   qrExpiresAt: string;
   checkedInAt?: string | null;
@@ -134,8 +130,6 @@ export type CreateAppointmentPayload = {
   specialty: string;
   doctorId: string;
   scheduledAt: string;
-  reason?: string;
-  symptoms?: string;
 };
 
 type ApiEnvelope<T> = {

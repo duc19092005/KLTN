@@ -4,6 +4,17 @@ import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, M
 import { Transform } from 'class-transformer';
 import { PaginationQueryDto } from '../../shared/pagination.dto';
 
+function normalizeDepartmentName(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+
+  return value
+    .trim()
+    .replace(/[^\p{L}\p{N}\s-]+/gu, ' ')
+    .replace(/(?<![\p{L}\p{N}])-|-(?![\p{L}\p{N}])/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export class CreateDepartmentDto {
   @ApiProperty({ example: 'PB-XRAY', minLength: 2, maxLength: 10, description: 'Mã phòng ban chỉ gồm chữ in hoa, số và dấu gạch ngang' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim().toUpperCase() : value))
@@ -14,11 +25,11 @@ export class CreateDepartmentDto {
   departmentCode!: string;
 
   @ApiProperty({ example: 'Phòng khám tổng quát', minLength: 2, maxLength: 50 })
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @Transform(({ value }) => normalizeDepartmentName(value))
   @IsString()
   @MinLength(2)
   @MaxLength(50)
-  @Matches(/^[\p{L}]+(?:\s+[\p{L}]+)*(?:\s+\d+)?$/u, { message: 'Tên phòng ban phải bắt đầu bằng chữ; số chỉ được đặt ở cuối, ví dụ: Tổng quát 1.' })
+  @Matches(/^[\p{L}]+(?:[\s-]+[\p{L}]+)*(?:[\s-]+\d+)?$/u, { message: 'Tên phòng ban phải bắt đầu bằng chữ; cho phép khoảng trắng/dấu gạch ngang, số chỉ được đặt ở cuối, ví dụ: X-Ray hoặc Tổng quát 1.' })
   name!: string;
 
   @ApiProperty({ example: '2A', maxLength: 3, description: 'Tầng là mã chữ-số ngắn, ví dụ 2A, 2B, B1' })
@@ -73,11 +84,11 @@ export class UpdateDepartmentDto {
 
   @ApiPropertyOptional({ example: 'Phòng khám tổng quát', minLength: 2, maxLength: 50 })
   @IsOptional()
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @Transform(({ value }) => normalizeDepartmentName(value))
   @IsString()
   @MinLength(2)
   @MaxLength(50)
-  @Matches(/^[\p{L}]+(?:\s+[\p{L}]+)*(?:\s+\d+)?$/u, { message: 'Tên phòng ban phải bắt đầu bằng chữ; số chỉ được đặt ở cuối, ví dụ: Tổng quát 1.' })
+  @Matches(/^[\p{L}]+(?:[\s-]+[\p{L}]+)*(?:[\s-]+\d+)?$/u, { message: 'Tên phòng ban phải bắt đầu bằng chữ; cho phép khoảng trắng/dấu gạch ngang, số chỉ được đặt ở cuối, ví dụ: X-Ray hoặc Tổng quát 1.' })
   name?: string;
 
   @ApiPropertyOptional({ example: '2A', maxLength: 3, description: 'Tầng là mã chữ-số ngắn, ví dụ 2A, 2B, B1' })

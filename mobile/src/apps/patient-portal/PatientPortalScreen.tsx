@@ -134,8 +134,6 @@ export function PatientPortalScreen() {
   const [bookingDoctorId, setBookingDoctorId] = useState('');
   const [bookingDate, setBookingDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
   const [bookingSlot, setBookingSlot] = useState('');
-  const [bookingReason, setBookingReason] = useState('');
-  const [bookingSymptoms, setBookingSymptoms] = useState('');
   const [bookingStage, setBookingStage] = useState<BookingStage>('profiles');
   const [profileForm, setProfileForm] = useState<ProfileForm>({ fullName: '', gender: 'MALE', birthDate: '', citizenId: '', address: '', insuranceNumber: '', emergencyContact: '' });
   const [profileFormErrors, setProfileFormErrors] = useState<ProfileFormErrors>({});
@@ -575,8 +573,6 @@ export function PatientPortalScreen() {
         specialty: bookingSpecialty,
         doctorId: bookingDoctorId,
         scheduledAt: bookingSlot,
-        reason: bookingReason,
-        symptoms: bookingSymptoms,
       });
       setAppointments((current) => [appointment, ...current]);
       setBookingStage('qr');
@@ -830,8 +826,6 @@ export function PatientPortalScreen() {
           doctorId={bookingDoctorId}
           selectedSlot={bookingSlot}
           date={bookingDate}
-          reason={bookingReason}
-          symptoms={bookingSymptoms}
           busy={busy}
           busyStage={bookingBusyStage}
           onCreateProfile={() => { setCreatingProfileFromBooking(true); setStep('createProfile'); }}
@@ -841,8 +835,6 @@ export function PatientPortalScreen() {
           onDoctor={selectBookingDoctor}
           onDate={changeBookingDate}
           onSlot={setBookingSlot}
-          onReason={setBookingReason}
-          onSymptoms={setBookingSymptoms}
           onSubmit={submitAppointment}
           onQr={refreshAppointmentQr}
           expandedQrIds={expandedQrIds}
@@ -1510,8 +1502,6 @@ type BookingScreenProps = {
   doctorId: string;
   selectedSlot: string;
   date: string;
-  reason: string;
-  symptoms: string;
   busy: boolean;
   busyStage: BookingBusyStage;
   onCreateProfile: () => void;
@@ -1521,8 +1511,6 @@ type BookingScreenProps = {
   onDoctor: (doctorId: string) => void;
   onDate: (date: string) => void;
   onSlot: (slot: string) => void;
-  onReason: (reason: string) => void;
-  onSymptoms: (symptoms: string) => void;
   onSubmit: () => void;
   onQr: (appointmentId: string) => void;
   expandedQrIds: Record<string, boolean>;
@@ -1532,7 +1520,7 @@ type BookingScreenProps = {
   onDownloadQr: (appointment: PatientAppointment) => void;
 };
 
-function BookingScreen({ patient, patients, selectedPatientId, stage, specialties, doctors, slots, appointments, specialty, doctorId, selectedSlot, date, reason, symptoms, busy, busyStage, onCreateProfile, onPatient, onStage, onSpecialty, onDoctor, onDate, onSlot, onReason, onSymptoms, onSubmit, onQr, expandedQrIds, qrRefs, onOpenQr, onCloseQr, onDownloadQr }: BookingScreenProps) {
+function BookingScreen({ patient, patients, selectedPatientId, stage, specialties, doctors, slots, appointments, specialty, doctorId, selectedSlot, date, busy, busyStage, onCreateProfile, onPatient, onStage, onSpecialty, onDoctor, onDate, onSlot, onSubmit, onQr, expandedQrIds, qrRefs, onOpenQr, onCloseQr, onDownloadQr }: BookingScreenProps) {
   const selectedSpecialty = specialties.find((item) => item.value === specialty);
   const selectedDoctor = doctors.find((doctor) => doctor.id === doctorId);
   return (
@@ -1556,7 +1544,7 @@ function BookingScreen({ patient, patients, selectedPatientId, stage, specialtie
       ) : null}
 
       {stage === 'confirm' ? (
-        <BookingConfirmPage patient={patient} specialty={selectedSpecialty} doctor={selectedDoctor} slot={selectedSlot} reason={reason} symptoms={symptoms} busy={busyStage === 'submit' || busy} onReason={onReason} onSymptoms={onSymptoms} onSubmit={onSubmit} />
+        <BookingConfirmPage patient={patient} specialty={selectedSpecialty} doctor={selectedDoctor} slot={selectedSlot} busy={busyStage === 'submit' || busy} onSubmit={onSubmit} />
       ) : null}
 
       {stage === 'qr' ? (
@@ -1652,7 +1640,7 @@ function BookingSlotPage({ date, slots, onDate, onSlot }: any) {
   );
 }
 
-function BookingConfirmPage({ patient, specialty, doctor, slot, reason, symptoms, busy, onReason, onSymptoms, onSubmit }: any) {
+function BookingConfirmPage({ patient, specialty, doctor, slot, busy, onSubmit }: any) {
   return (
     <BookingStepPage title="Xác nhận thông tin" subtitle="Kiểm tra lại trước khi tạo mã QR check-in">
       <View style={styles.bookingSummaryBox}>
@@ -1662,8 +1650,6 @@ function BookingConfirmPage({ patient, specialty, doctor, slot, reason, symptoms
         <Text style={styles.bookingSummaryText}>Phòng ban: {doctor?.department?.name || 'N/A'}</Text>
         <Text style={styles.bookingSummaryText}>Ngày: {slot || 'N/A'}</Text>
       </View>
-      <FormInput label="Lý do khám" value={reason} onChangeText={onReason} icon="document-text-outline" placeholder="Ví dụ: Đau ngực" />
-      <FormInput label="Triệu chứng" value={symptoms} onChangeText={onSymptoms} icon="pulse-outline" placeholder="Mô tả ngắn triệu chứng" />
       <ActionButton label="Xác nhận đặt lịch" loading={busy} onPress={onSubmit} icon={<Ionicons name="qr-code-outline" size={20} color="#ffffff" />} />
     </BookingStepPage>
   );
@@ -1833,8 +1819,6 @@ function VisitDetailScreen({ visitDetail, previewUrls, fileBusyId, onBack, onOpe
 
       <DetailSection title="Tổng quan lượt khám" icon="clipboard-outline">
         <Info label="Mã bệnh nhân" value={visitDetail.patient.patientCode} />
-        {visitDetail.reason ? <Info label="Lý do khám" value={visitDetail.reason} /> : null}
-        {visitDetail.symptoms ? <Info label="Triệu chứng" value={visitDetail.symptoms} /> : null}
       </DetailSection>
 
       {visitDetail.conclusion ? (
