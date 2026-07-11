@@ -83,6 +83,24 @@ function shortHash(hash) {
   return `${clean.slice(0, 8)}…${clean.slice(-6)}`;
 }
 
+/** Recover only when integrity check is not OK (hash lệch / nghi sửa đổi). */
+function canRecoverBatch(batch) {
+  if (!batch) return false;
+  if (batch.status !== 'ANCHORED' || !batch.artifactAvailable) return false;
+  const integrity = batch.integrity || {};
+  return integrity.status === 'TAMPERED' || Number(integrity.tampered) > 0;
+}
+
+function recoverBatchDisabledReason(batch) {
+  if (!batch) return 'Không có lô.';
+  if (batch.status !== 'ANCHORED') return 'Chỉ khôi phục lô đã neo on-chain.';
+  if (!batch.artifactAvailable) return 'Lô không có artifact IPFS để khôi phục.';
+  const integrity = batch.integrity || {};
+  if (integrity.status === 'TAMPERED' || Number(integrity.tampered) > 0) return '';
+  if (integrity.status === 'PENDING') return 'Lô thiếu field hash — không mở khôi phục (chưa kết luận bị sửa).';
+  return 'Lô đang toàn vẹn — không cần khôi phục.';
+}
+
 function formatTime(value) {
   return value ? new Date(value).toLocaleString('vi-VN', { hour12: false }) : 'N/A';
 }
@@ -793,18 +811,8 @@ function LogsTable({
 
                   <div className="flex flex-wrap gap-2 xl:justify-end">
                     <button type="button" onClick={() => setDetail(log)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-cyan-600 hover:bg-cyan-50">Chi tiết</button>
-                    {log.onChainStatus === 'ANCHORED' && log.batchId != null && (
-                      <>
-                        <button type="button" onClick={() => onProof(log.seq)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600">Chứng chỉ</button>
-                        <button
-                          type="button"
-                          onClick={() => onRecoverBatch?.(log.batchId)}
-                          className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800 hover:bg-amber-100"
-                          title="Khôi phục toàn bộ lô chứa bản ghi này (không chỉ 1 dòng)"
-                        >
-                          Khôi phục lô #{log.batchId}
-                        </button>
-                      </>
+                    {log.onChainStatus === 'ANCHORED' && (
+                      <button type="button" onClick={() => onProof(log.seq)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600">Chứng chỉ</button>
                     )}
                   </div>
                 </article>
@@ -943,22 +951,13 @@ function LogDetailModal({ summaryLog, onClose, onProof, onRecoverBatch, onOpenBa
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {log.onChainStatus === 'ANCHORED' && log.batchId != null && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => { onOpenBatch?.(log.batchId); onClose(); }}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50"
-                >
-                  Lọc lô #{log.batchId}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { onRecoverBatch?.(log.batchId); onClose(); }}
-                  className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800 hover:bg-amber-100"
-                >
-                  Khôi phục lô #{log.batchId}
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => { onOpenBatch?.(log.batchId); onClose(); }}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50"
+              >
+                Xem lô #{log.batchId}
+              </button>
             )}
             <button
               onClick={onClose}
@@ -1208,7 +1207,8 @@ function BatchesHomeTable({ batches, page, totalPages, total, sortBy, sortOrder,
                     <button
                       type="button"
                       onClick={() => onRecover(b)}
-                      disabled={b.status !== 'ANCHORED' || !b.artifactAvailable || recoveringBatchId === b.batchId}
+                      disabled={!canRecoverBatch(b) || recoveringBatchId === b.batchId}
+                      title={recoverBatchDisabledReason(b) || 'Khôi phục lô khi kiểm tra toàn vẹn không ổn'}
                       className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {recoveringBatchId === b.batchId ? 'Đang khôi phục...' : 'Khôi phục lô'}
@@ -1287,15 +1287,21 @@ function BatchDetailDrawer({ loading, detail, recoveringBatchId, onClose, onReco
                 <BatchContentSummary summary={detail.contentSummary} fromSeq={detail.fromSeq} toSeq={detail.toSeq} />
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 items-center">
                 <button
                   type="button"
                   onClick={() => onRecover(detail)}
-                  disabled={detail.status !== 'ANCHORED' || !detail.artifactAvailable || recoveringBatchId === detail.batchId}
+                  disabled={!canRecoverBatch(detail) || recoveringBatchId === detail.batchId}
+                  title={recoverBatchDisabledReason(detail) || 'Khôi phục lô khi kiểm tra toàn vẹn không ổn'}
                   className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-black text-amber-800 hover:bg-amber-100 disabled:opacity-40"
                 >
                   {recoveringBatchId === detail.batchId ? 'Đang khôi phục...' : `Khôi phục lô #${detail.batchId}`}
                 </button>
+                {!canRecoverBatch(detail) && (
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    {recoverBatchDisabledReason(detail)}
+                  </span>
+                )}
               </div>
 
               <div className="rounded-2xl border border-slate-100 overflow-hidden">
