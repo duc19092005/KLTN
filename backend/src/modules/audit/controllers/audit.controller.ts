@@ -9,7 +9,7 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
 import { toDisplayAuditDiff, toDisplayAuditFields } from '../../../infrastructure/audit/audit-diff.util';
-import { verifyAuditRow } from '../../../infrastructure/audit/audit-verification.util';
+import { verifyAuditRow, verifyAuditRowLight } from '../../../infrastructure/audit/audit-verification.util';
 import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
 import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
 import { AuditRecoveryService } from '../../../infrastructure/audit/audit-recovery.service';
@@ -246,15 +246,8 @@ export class AuditController {
   }
 
   private presentAuditRow(row: any, actor: any, user: AuthUser | undefined, includeDetail: boolean, faceVerified = false, subject: any = null) {
-    const verification = includeDetail
-      ? verifyAuditRow(row)
-      : {
-          ok: true,
-          status: 'PENDING' as const,
-          version: row.hashVersion ? 'V2' as const : 'V1' as const,
-          reason: 'Danh sách chỉ hiển thị kiểm tra nhanh và không giải mã dữ liệu audit đã mã hóa. Mở chi tiết bản ghi hoặc chạy kiểm tra toàn chuỗi để xem trạng thái toàn vẹn đầy đủ.',
-          suspiciousFields: [],
-        };
+    // List: cheap hash recompute (no decrypt). Detail: full V2 decrypt + recompute.
+    const verification = includeDetail ? verifyAuditRow(row) : verifyAuditRowLight(row);
     const diff = row.diffJson?.schema === 'KLTN_AUDIT_DIFF_V1'
       ? toDisplayAuditDiff(row.diffJson, {
           role: user?.role,

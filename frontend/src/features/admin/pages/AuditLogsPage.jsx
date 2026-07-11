@@ -93,14 +93,14 @@ function formatHashVersion(version) {
 }
 
 const VERIFICATION_TONE = {
-  VERIFIED: 'border-slate-200 bg-slate-50 text-slate-600',
-  PENDING: 'border-slate-200 bg-slate-50 text-slate-600',
+  VERIFIED: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+  PENDING: 'border-amber-100 bg-amber-50 text-amber-700',
   TAMPERED: 'border-rose-100 bg-rose-50 text-rose-600',
 };
 
 const VERIFICATION_LABEL = {
   VERIFIED: 'Toàn vẹn',
-  PENDING: 'Chờ kiểm tra',
+  PENDING: 'Chưa đủ dữ liệu kiểm tra',
   TAMPERED: 'Nghi sửa đổi',
 };
 
@@ -685,14 +685,20 @@ function LogsTable({
                           className="inline-flex rounded-full border border-cyan-200 bg-cyan-50 px-2 py-1 text-[10px] font-black text-cyan-700 hover:bg-cyan-100"
                           title="Lọc các bản ghi cùng lô neo blockchain"
                         >
-                          Lô #{log.batchId}
+                          Lô #{log.batchId} · Đã neo
                         </button>
                       ) : (
-                        <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-black text-slate-500">
-                          Hàng đợi
+                        <span
+                          className="inline-flex rounded-full border border-amber-100 bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-700"
+                          title="Đã ghi audit DB, chưa (hoặc đang chờ) neo Merkle root lên blockchain"
+                        >
+                          Chờ neo chain
                         </span>
                       )}
-                      <VerificationBadge status={log.blockchainStatus} />
+                      <VerificationBadge
+                        status={log.blockchainStatus || log.verification?.status}
+                        title={log.verification?.reason || undefined}
+                      />
                     </div>
                   </div>
 
@@ -757,10 +763,17 @@ function DiffPreview({ log }) {
   );
 }
 
-function VerificationBadge({ status }) {
+function VerificationBadge({ status, title }) {
   const Icon = status === 'VERIFIED' ? ShieldCheck : ShieldAlert;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-bold shadow-sm ${VERIFICATION_TONE[status] || VERIFICATION_TONE.TAMPERED}`}>
+    <span
+      title={title || (status === 'VERIFIED'
+        ? 'Hash nội bộ khớp (kiểm tra nhanh). Mở chi tiết để xác thực đầy đủ / giải mã.'
+        : status === 'TAMPERED'
+          ? 'Hash không khớp — nghi log bị sửa.'
+          : 'Chưa đủ field để kiểm tra hash.')}
+      className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-bold shadow-sm ${VERIFICATION_TONE[status] || VERIFICATION_TONE.PENDING}`}
+    >
       <Icon className="h-3 w-3 shrink-0" />
       {VERIFICATION_LABEL[status] || status || 'Không rõ'}
     </span>

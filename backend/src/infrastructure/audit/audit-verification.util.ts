@@ -82,6 +82,85 @@ export function verifyAuditRow(row: AuditRowLike): AuditRowVerificationResult {
   return verifyAuditRowV1(row);
 }
 
+/**
+ * Fast list-view check: recomputes entryHash / dataHash from fields already stored
+ * on the row. Does NOT decrypt encrypted snapshots (cheap, safe for paginated lists).
+ * Open detail still uses full verifyAuditRow (decrypt + recompute).
+ */
+export function verifyAuditRowLight(row: AuditRowLike): AuditRowVerificationResult {
+  if (row.hashVersion === AUDIT_ENTRY_V2) {
+    const suspiciousFields: string[] = [];
+    if (row.seq == null) suspiciousFields.push('seq');
+    if (!row.entryHash) suspiciousFields.push('entryHash');
+    if (!row.beforeHash) suspiciousFields.push('beforeHash');
+    if (!row.afterHash) suspiciousFields.push('afterHash');
+    if (!row.diffHash) suspiciousFields.push('diffHash');
+    if (!row.dataHash) suspiciousFields.push('dataHash');
+    if (suspiciousFields.length > 0) {
+      return {
+        ok: false,
+        status: 'TAMPERED',
+        version: 'V2',
+        reason: 'Thiếu hash bắt buộc trên bản ghi audit V2.',
+        suspiciousFields,
+      };
+    }
+
+    const fieldsChanged = normalizeFieldsChanged(row.fieldsChanged);
+    const recomputedDataHash = computeDataHashV2({
+      entity: row.entity,
+      entityId: row.entityId ?? null,
+      action: row.action,
+      beforeHash: row.beforeHash!,
+      afterHash: row.afterHash!,
+      diffHash: row.diffHash!,
+      fieldsChanged,
+    });
+    if (recomputedDataHash !== row.dataHash) {
+      return {
+        ok: false,
+        status: 'TAMPERED',
+        version: 'V2',
+        reason: 'dataHash không khớp (kiểm tra nhanh danh sách).',
+        suspiciousFields: ['dataHash'],
+      };
+    }
+
+    const recomputedEntryHash = computeEntryHashV2({
+      seq: row.seq!,
+      prevHash: row.prevHash ?? GENESIS_PREV_HASH,
+      entity: row.entity,
+      entityId: row.entityId ?? null,
+      action: row.action,
+      actorId: row.actorId ?? null,
+      beforeHash: row.beforeHash!,
+      afterHash: row.afterHash!,
+      diffHash: row.diffHash!,
+      dataHash: row.dataHash!,
+      createdAtIso: createdAtIso(row),
+    });
+    if (recomputedEntryHash !== row.entryHash) {
+      return {
+        ok: false,
+        status: 'TAMPERED',
+        version: 'V2',
+        reason: 'entryHash không khớp (kiểm tra nhanh danh sách).',
+        suspiciousFields: ['entryHash'],
+      };
+    }
+
+    return {
+      ok: true,
+      status: 'VERIFIED',
+      version: 'V2',
+      reason: 'Kiểm tra nhanh danh sách (không giải mã snapshot). Mở chi tiết để xác thực đầy đủ.',
+      suspiciousFields: [],
+    };
+  }
+
+  return verifyAuditRowV1(row);
+}
+
 export function verifyAuditRowV1(row: AuditRowLike): AuditRowVerificationResult {
   if (row.seq == null || !row.entryHash) {
     return { ok: false, status: 'PENDING', version: 'V1', reason: 'Missing V1 seq or entryHash', suspiciousFields: ['seq', 'entryHash'] };
