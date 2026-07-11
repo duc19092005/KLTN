@@ -4,6 +4,7 @@ import { DEPARTMENT_REPOSITORY, DepartmentRepositoryPort } from '../ports/depart
 import { DEPARTMENT_INTEGRITY_ANCHOR, DepartmentIntegrityAnchorPort } from '../ports/department-integrity-anchor.port';
 import { DepartmentValidator } from '../services/department.validator';
 import { buildDepartmentSnapshot } from '../../domain/department-snapshot';
+import { EntityRecoveryService } from '../../../../infrastructure/audit/entity-recovery.service';
 
 /**
  * Updates a department then anchors the change (with before-snapshot).
@@ -15,10 +16,12 @@ export class UpdateDepartmentUseCase {
     @Inject(DEPARTMENT_REPOSITORY) private readonly repo: DepartmentRepositoryPort,
     @Inject(DEPARTMENT_INTEGRITY_ANCHOR) private readonly integrity: DepartmentIntegrityAnchorPort,
     private readonly validator: DepartmentValidator,
+    private readonly entityRecovery: EntityRecoveryService,
   ) {}
 
   async execute(id: string, dto: UpdateDepartmentDto, actorId?: string) {
     const existing = await this.repo.findByIdOrThrow(id);
+    await this.entityRecovery.assertTrusted('Department', id);
     if (dto.name) await this.validator.assertNameUnique(dto.name, id);
     if (dto.departmentCode) await this.validator.assertDepartmentCodeUnique(dto.departmentCode, id);
     const structuralChange =

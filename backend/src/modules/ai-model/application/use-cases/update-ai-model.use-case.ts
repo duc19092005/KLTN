@@ -6,6 +6,7 @@ import { AI_MODEL_INTEGRITY_ANCHOR, AiModelIntegrityAnchorPort } from '../ports/
 import { AI_MODEL_REPOSITORY, AiModelRepositoryPort, UpdateAiModelData } from '../ports/ai-model.repository.port';
 import { buildAiModelSnapshot } from '../../domain/ai-model-snapshot';
 import { presentAiModel } from '../../domain/ai-model.presenter';
+import { EntityRecoveryService } from '../../../../infrastructure/audit/entity-recovery.service';
 
 /**
  * Updates an AI model registry row and re-anchors the new business snapshot.
@@ -18,11 +19,13 @@ export class UpdateAiModelUseCase {
     @Inject(AI_MODEL_CRYPTO) private readonly crypto: AiModelCryptoPort,
     @Inject(AI_MODEL_CONNECTIVITY) private readonly connectivity: AiModelConnectivityPort,
     @Inject(AI_MODEL_INTEGRITY_ANCHOR) private readonly integrity: AiModelIntegrityAnchorPort,
+    private readonly entityRecovery: EntityRecoveryService,
   ) {}
 
   async execute(id: string, dto: UpdateAiModelDto, actorId?: string) {
     const existing = await this.repo.findById(id);
     if (!existing || existing.isDeleted || existing.status === 'DELETE') throw new NotFoundException('Không tìm thấy mô hình AI.');
+    await this.entityRecovery.assertTrusted('AiModelRegistry', id);
     const hasUsage = Number(existing._count?.diagnoses || 0) + Number(existing._count?.aiQualities || 0) > 0;
     if (hasUsage) {
       const identityChanged =

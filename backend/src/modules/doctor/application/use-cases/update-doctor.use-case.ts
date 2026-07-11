@@ -3,6 +3,7 @@ import { UpdateDoctorDto } from '../../dto/doctor.dto';
 import { DOCTOR_REPOSITORY, DoctorRepositoryPort } from '../ports/doctor.repository.port';
 import { DOCTOR_INTEGRITY_ANCHOR, DoctorIntegrityAnchorPort } from '../ports/doctor-integrity-anchor.port';
 import { buildUnifiedDoctorSnapshot } from '../../domain/doctor-snapshot';
+import { EntityRecoveryService } from '../../../../infrastructure/audit/entity-recovery.service';
 
 /**
  * Updates a doctor (+ nested staff, + clinical room) then unified-anchors with
@@ -13,11 +14,13 @@ export class UpdateDoctorUseCase {
   constructor(
     @Inject(DOCTOR_REPOSITORY) private readonly repo: DoctorRepositoryPort,
     @Inject(DOCTOR_INTEGRITY_ANCHOR) private readonly integrity: DoctorIntegrityAnchorPort,
+    private readonly entityRecovery: EntityRecoveryService,
   ) {}
 
   async execute(id: string, dto: UpdateDoctorDto, actorId?: string) {
     const existing = await this.repo.findByIdWithRelations(id);
     if (!existing) throw new NotFoundException('Không tìm thấy hồ sơ bác sĩ.');
+    await this.entityRecovery.assertTrusted('DoctorProfile', id);
 
     if (dto.licenseNumber) {
       const license = await this.repo.findDoctorByLicense(dto.licenseNumber);

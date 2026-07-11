@@ -14,6 +14,8 @@ import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
 import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
 import { AuditRecoveryService } from '../../../infrastructure/audit/audit-recovery.service';
 import { RecoverAuditBatchDto } from '../dto/recover-audit-batch.dto';
+import { EntityRecoveryService } from '../../../infrastructure/audit/entity-recovery.service';
+import { RecoverAuditEntitiesDto } from '../dto/recover-audit-entities.dto';
 
 /**
  * Admin-only audit + integrity API. Surfaces the tamper-evidence machinery so it can be
@@ -35,7 +37,21 @@ export class AuditController {
     private readonly anchor: AuditAnchorService,
     private readonly prisma: PrismaService,
     private readonly recovery: AuditRecoveryService,
+    private readonly entityRecovery: EntityRecoveryService,
   ) {}
+
+  @Get('recovery/entities/warnings')
+  @ApiOperation({ summary: 'List business entities whose live data differs from the latest anchored audit snapshot' })
+  entityWarnings(@Query('limit') limitRaw?: string) {
+    const limit = Math.min(Math.max(Number(limitRaw) || 100, 1), 200);
+    return this.entityRecovery.listWarnings(limit);
+  }
+
+  @Post('recovery/entities')
+  @ApiOperation({ summary: 'Recover selected business entities from verified encrypted audit snapshots' })
+  recoverEntities(@Body() body: RecoverAuditEntitiesDto, @CurrentUser() user: AuthUser) {
+    return this.entityRecovery.recoverMany(body.items, user.sub, body.reason.trim());
+  }
 
   @Get('logs')
   @ApiOperation({ summary: 'List audit log entries (hash-chained) with pagination, sort & batch filter' })

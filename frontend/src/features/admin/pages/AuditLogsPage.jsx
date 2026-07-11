@@ -181,6 +181,11 @@ export default function AuditLogsPage() {
   const [batchDetailLoading, setBatchDetailLoading] = useState(false);
   const [seqDetail, setSeqDetail] = useState(null);
   const [pendingQueue, setPendingQueue] = useState({ total: 0, items: [] });
+  const [entityWarnings, setEntityWarnings] = useState([]);
+  const [entityWarningsLoading, setEntityWarningsLoading] = useState(false);
+  const [selectedEntityWarnings, setSelectedEntityWarnings] = useState([]);
+  const [entityRecoveryReason, setEntityRecoveryReason] = useState('');
+  const [recoveringEntities, setRecoveringEntities] = useState(false);
 
   const [batchesPage, setBatchesPage] = useState(1);
   const [batchesTotalPages, setBatchesTotalPages] = useState(1);
@@ -233,6 +238,20 @@ export default function AuditLogsPage() {
     }
   }, []);
 
+  const loadEntityWarnings = useCallback(async () => {
+    setEntityWarningsLoading(true);
+    try {
+      const res = await auditService.entityWarnings({ limit: 100 });
+      const items = res.data?.items || [];
+      setEntityWarnings(items);
+      setSelectedEntityWarnings((selected) => selected.filter((key) => items.some((item) => `${item.entity}:${item.entityId}` === key && item.recoverable)));
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err.message || 'Không tải được cảnh báo toàn vẹn dữ liệu.');
+    } finally {
+      setEntityWarningsLoading(false);
+    }
+  }, [toast]);
+
   const openBatchDetail = useCallback(async (batchId) => {
     setSelectedBatchId(batchId);
     setBatchDetailLoading(true);
@@ -252,8 +271,9 @@ export default function AuditLogsPage() {
     await loadBatches();
     await loadPendingQueue();
     await loadChain();
+    await loadEntityWarnings();
     if (selectedBatchId) await openBatchDetail(selectedBatchId);
-  }, [loadBatches, loadPendingQueue, loadChain, selectedBatchId, openBatchDetail]);
+  }, [loadBatches, loadPendingQueue, loadChain, loadEntityWarnings, selectedBatchId, openBatchDetail]);
 
   useEffect(() => {
     loadBatches();
@@ -262,7 +282,8 @@ export default function AuditLogsPage() {
   useEffect(() => {
     loadPendingQueue();
     loadChain();
-  }, [loadPendingQueue, loadChain]);
+    loadEntityWarnings();
+  }, [loadPendingQueue, loadChain, loadEntityWarnings]);
 
   const stats = useMemo(() => {
     return {
@@ -333,6 +354,28 @@ export default function AuditLogsPage() {
     }
   };
 
+  const handleEntityRecovery = async () => {
+    const selected = entityWarnings.filter((item) => selectedEntityWarnings.includes(`${item.entity}:${item.entityId}`) && item.recoverable);
+    if (!selected.length || entityRecoveryReason.trim().length < 10) return;
+    setRecoveringEntities(true);
+    try {
+      const res = await auditService.recoverEntities(
+        selected.map(({ entity, entityId }) => ({ entity, entityId })),
+        entityRecoveryReason.trim(),
+      );
+      const data = res.data || {};
+      if (data.failed > 0) toast.error(`Khôi phục ${data.recovered || 0}/${data.requested || selected.length} bản ghi; ${data.failed} bản ghi thất bại.`);
+      else toast.success(`Đã khôi phục ${data.recovered || 0} bản ghi từ audit đã xác minh blockchain.`);
+      setSelectedEntityWarnings([]);
+      setEntityRecoveryReason('');
+      await refreshAll();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err.message || 'Khôi phục dữ liệu thất bại.');
+    } finally {
+      setRecoveringEntities(false);
+    }
+  };
+
   return (
     <DashboardLayout
       user={user}
@@ -372,6 +415,18 @@ export default function AuditLogsPage() {
         </div>
 
         <ChainBanner chain={chain} loading={false} />
+
+        <EntityRecoveryPanel
+          warnings={entityWarnings}
+          loading={entityWarningsLoading}
+          selected={selectedEntityWarnings}
+          setSelected={setSelectedEntityWarnings}
+          reason={entityRecoveryReason}
+          setReason={setEntityRecoveryReason}
+          recovering={recoveringEntities}
+          onRecover={handleEntityRecovery}
+          onRefresh={loadEntityWarnings}
+        />
 
         <div className="grid gap-3 md:grid-cols-3">
           <StatCard label="Lô đã neo" value={stats.batches} hint="Mỗi lô = 1 Merkle root on-chain" icon={Layers} />
@@ -534,6 +589,108 @@ export default function AuditLogsPage() {
       )}
 
     </DashboardLayout>
+  );
+}
+
+// ---- Entity recovery --------------------------------------------------------
+
+function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason, setReason, recovering, onRecover, onRefresh }) {
+  const recoverable = warnings.filter((item) => item.recoverable);
+  const allSelected = recoverable.length > 0 && recoverable.every((item) => selected.includes(`${item.entity}:${item.entityId}`));
+  const selectedCount = recoverable.filter((item) => selected.includes(`${item.entity}:${item.entityId}`)).length;
+  const toggleAll = () => setSelected(allSelected ? [] : recoverable.map((item) => `${item.entity}:${item.entityId}`));
+  const toggleOne = (key) => setSelected((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
+
+  if (!loading && warnings.length === 0) {
+    return (
+      <section className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+        <div className="flex items-center gap-2 text-sm font-bold text-emerald-800">
+          <ShieldCheck className="h-4 w-4" />
+          Không phát hiện entity lệch với audit đã neo
+        </div>
+        <button type="button" onClick={onRefresh} className="rounded-lg p-2 text-emerald-700 hover:bg-emerald-100" title="Quét lại dữ liệu">
+          <RefreshCw className="h-4 w-4" />
+        </button>
+      </section>
+    );
+  }
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-rose-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rose-100 bg-rose-50 px-5 py-4">
+        <div className="flex items-start gap-3">
+          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+          <div>
+            <h2 className="text-sm font-black text-rose-950">Dữ liệu cần kiểm tra ({warnings.length})</h2>
+            <p className="mt-0.5 text-xs font-semibold text-rose-700">Thao tác sửa và xóa trên các bản ghi này đang bị chặn.</p>
+          </div>
+        </div>
+        <button type="button" onClick={onRefresh} disabled={loading || recovering} className="rounded-lg p-2 text-rose-700 hover:bg-rose-100 disabled:opacity-50" title="Quét lại dữ liệu">
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-left text-xs">
+          <thead className="border-b border-slate-100 bg-slate-50 text-slate-500">
+            <tr>
+              <th className="w-12 px-4 py-3">
+                <input type="checkbox" checked={allSelected} onChange={toggleAll} disabled={!recoverable.length || recovering} aria-label="Chọn tất cả bản ghi có thể khôi phục" className="h-4 w-4 accent-cyan-600" />
+              </th>
+              <th className="px-3 py-3 font-black">Đối tượng</th>
+              <th className="px-3 py-3 font-black">Mốc tin cậy</th>
+              <th className="px-3 py-3 font-black">Phát hiện</th>
+              <th className="px-3 py-3 font-black">Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {warnings.map((item) => {
+              const key = `${item.entity}:${item.entityId}`;
+              const fields = (item.fieldsChanged || []).map((field) => field === 'SENSITIVE_FIELD_CHANGED'
+                ? 'Trường nhạy cảm đã thay đổi'
+                : fieldDisplayName({ fieldPath: `${item.entity}.${field}`, field }));
+              return (
+                <tr key={key} className="align-top hover:bg-slate-50">
+                  <td className="px-4 py-3">
+                    <input type="checkbox" checked={selected.includes(key)} onChange={() => toggleOne(key)} disabled={!item.recoverable || recovering} aria-label={`Chọn ${item.entity}`} className="h-4 w-4 accent-cyan-600 disabled:opacity-30" />
+                  </td>
+                  <td className="px-3 py-3">
+                    <p className="font-black text-slate-900">{ENTITY_LABELS[item.entity] || item.entity}</p>
+                    <p className="mt-1 font-mono text-[10px] text-slate-400">{shortHash(item.entityId)}</p>
+                  </td>
+                  <td className="px-3 py-3 text-slate-600">
+                    <p className="font-bold">SEQ {item.latestTrustedSeq ?? '—'} · Batch #{item.batchId ?? '—'}</p>
+                    <p className="mt-1 text-[10px] text-slate-400">{formatTime(item.anchoredAt)}</p>
+                  </td>
+                  <td className="max-w-sm px-3 py-3 text-slate-600">
+                    <p className="font-semibold">{fields.length ? fields.join(', ') : 'Không công khai chi tiết dữ liệu'}</p>
+                    <p className="mt-1 text-[10px] text-slate-400">{item.message}</p>
+                  </td>
+                  <td className="px-3 py-3">
+                    <span className={`inline-flex rounded-md border px-2 py-1 text-[10px] font-black ${item.recoverable ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                      {item.recoverable ? 'Có thể khôi phục' : 'Cần xử lý audit/PITR'}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {recoverable.length > 0 && (
+        <div className="grid gap-3 border-t border-slate-100 bg-slate-50 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] font-black uppercase text-slate-500">Lý do khôi phục</span>
+            <textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} rows={2} placeholder="Nhập lý do hoặc mã sự cố..." className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100" />
+          </label>
+          <button type="button" onClick={onRecover} disabled={recovering || selectedCount === 0 || reason.trim().length < 10} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-black text-white hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-40">
+            <RefreshCw className={`h-4 w-4 ${recovering ? 'animate-spin' : ''}`} />
+            {recovering ? 'Đang khôi phục...' : `Khôi phục ${selectedCount} bản ghi`}
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
 

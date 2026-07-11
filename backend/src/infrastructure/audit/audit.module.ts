@@ -7,6 +7,7 @@ import { IpfsArtifactService } from './ipfs-artifact.service';
 import { AuditArtifactService } from './audit-artifact.service';
 import { AuditRecoveryService } from './audit-recovery.service';
 import { AuditKafkaService } from './audit-kafka.service';
+import { EntityRecoveryService } from './entity-recovery.service';
 
 /**
  * Global module exposing the tamper-evident audit infrastructure to every feature module:
@@ -27,7 +28,8 @@ import { AuditKafkaService } from './audit-kafka.service';
     AuditArtifactService,
     AuditRecoveryService,
     AuditKafkaService,
+    EntityRecoveryService,
   ],
-  exports: [AuditLoggerService, AuditAnchorService, AuditArtifactService, AuditRecoveryService],
+  exports: [AuditLoggerService, AuditAnchorService, AuditArtifactService, AuditRecoveryService, EntityRecoveryService],
 })
 export class AuditModule {}

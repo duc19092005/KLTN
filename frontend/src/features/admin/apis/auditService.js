@@ -21,4 +21,6 @@ export const auditService = {
     { reason },
     { headers: { 'x-stepup-ticket': stepUpTicket } },
   ),
+  entityWarnings: (params = {}) => api.get('/audit/recovery/entities/warnings', { params }),
+  recoverEntities: (items, reason) => api.post('/audit/recovery/entities', { items, reason }),
 };

@@ -3,6 +3,7 @@ import { OperationalStatus } from '@prisma/client';
 import { AI_MODEL_INTEGRITY_ANCHOR, AiModelIntegrityAnchorPort } from '../ports/ai-model-integrity-anchor.port';
 import { AI_MODEL_REPOSITORY, AiModelRepositoryPort } from '../ports/ai-model.repository.port';
 import { buildAiModelSnapshot } from '../../domain/ai-model-snapshot';
+import { EntityRecoveryService } from '../../../../infrastructure/audit/entity-recovery.service';
 
 /** Changes AI model visibility without deleting it. INACTIVE remains list-visible. */
 @Injectable()
@@ -10,6 +11,7 @@ export class SetAiModelStatusUseCase {
   constructor(
     @Inject(AI_MODEL_REPOSITORY) private readonly repo: AiModelRepositoryPort,
     @Inject(AI_MODEL_INTEGRITY_ANCHOR) private readonly integrity: AiModelIntegrityAnchorPort,
+    private readonly entityRecovery: EntityRecoveryService,
   ) {}
 
   async execute(id: string, status: 'ACTIVE' | 'INACTIVE', actorId?: string) {
@@ -17,6 +19,7 @@ export class SetAiModelStatusUseCase {
     if (!existing) {
       throw new NotFoundException('Không tìm thấy mô hình AI.');
     }
+    await this.entityRecovery.assertTrusted('AiModelRegistry', id);
     if (status === 'INACTIVE' && (existing.isDeleted || existing.status === OperationalStatus.DELETE)) {
       throw new NotFoundException('Không tìm thấy mô hình AI.');
     }

@@ -6,6 +6,7 @@ import { StaffValidator } from '../services/staff.validator';
 import { buildStaffSnapshot } from '../../domain/staff-snapshot';
 import { DOCTOR_REANCHOR, DoctorReanchorPort } from '../../../doctor/application/ports/doctor-reanchor.port';
 import { buildUnifiedDoctorSnapshot } from '../../../doctor/domain/doctor-snapshot';
+import { EntityRecoveryService } from '../../../../infrastructure/audit/entity-recovery.service';
 
 /**
  * Sets a staff account status (lock/unlock) and re-anchors. Behavior copied
@@ -20,10 +21,12 @@ export class SetStaffStatusUseCase {
     @Inject(STAFF_INTEGRITY_ANCHOR) private readonly integrity: StaffIntegrityAnchorPort,
     @Inject(DOCTOR_REANCHOR) private readonly doctorReanchor: DoctorReanchorPort,
     private readonly validator: StaffValidator,
+    private readonly entityRecovery: EntityRecoveryService,
   ) {}
 
   async execute(id: string, status: UserStatus, actorId?: string) {
     const staff = await this.validator.ensureStaff(id);
+    await this.entityRecovery.assertTrusted(staff.doctorProfile ? 'DoctorProfile' : 'StaffProfile', staff.doctorProfile?.id ?? id);
     const before = buildStaffSnapshot(staff);
     const isDoctor = Boolean(staff.doctorProfile);
     const doctorBefore = isDoctor ? buildUnifiedDoctorSnapshot({ ...staff.doctorProfile, staffProfile: staff }) : null;

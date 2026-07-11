@@ -2,6 +2,11 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { OperationalStatus, UserStatus } from '@prisma/client';
 import { AuditLoggerService } from '../../infrastructure/audit/audit-logger.service';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import { EntityRecoveryService } from '../../infrastructure/audit/entity-recovery.service';
+import { buildAiModelSnapshot } from '../../modules/ai-model/domain/ai-model-snapshot';
+import { buildDepartmentSnapshot } from '../../modules/department/domain/department-snapshot';
+import { buildStaffSnapshot } from '../../modules/staff/domain/staff-snapshot';
+import { buildUnifiedDoctorSnapshot } from '../../modules/doctor/domain/doctor-snapshot';
 
 type LifecycleEntity = 'ai-models' | 'staff' | 'doctors' | 'departments';
 
@@ -9,11 +14,16 @@ const RESTORE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class AdministrativeLifecycleService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditLoggerService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditLoggerService,
+    private readonly entityRecovery: EntityRecoveryService,
+  ) {}
 
   async softDelete(entity: LifecycleEntity, id: string, actorId: string) {
     const current = await this.find(entity, id);
     if (!current) throw new NotFoundException('Không tìm thấy bản ghi.');
+    await this.entityRecovery.assertTrusted(this.auditEntity(entity), id);
     if (this.statusOf(entity, current) === 'DELETE') throw new ConflictException('Bản ghi đã được xóa trước đó.');
     if (entity === 'departments') {
       const department: any = current;
@@ -36,6 +46,7 @@ export class AdministrativeLifecycleService {
   async restore(entity: LifecycleEntity, id: string, actorId: string) {
     const current = await this.find(entity, id);
     if (!current || this.statusOf(entity, current) !== 'DELETE') throw new NotFoundException('Không tìm thấy bản ghi đã xóa.');
+    await this.entityRecovery.assertTrusted(this.auditEntity(entity), id);
     const deletedAt = this.deletedAtOf(entity, current);
     if (!deletedAt || Date.now() - deletedAt.getTime() > RESTORE_WINDOW_MS) {
       throw new ConflictException('Bản ghi đã quá thời hạn khôi phục 30 ngày hoặc thiếu thời điểm xóa hợp lệ.');
@@ -53,6 +64,7 @@ export class AdministrativeLifecycleService {
   async permanentDelete(entity: LifecycleEntity, id: string, actorId: string) {
     const current = await this.find(entity, id);
     if (!current || this.statusOf(entity, current) !== 'DELETE') throw new NotFoundException('Không tìm thấy bản ghi đã xóa.');
+    await this.entityRecovery.assertTrusted(this.auditEntity(entity), id);
     const references = await this.referenceCount(entity, current);
     if (references > 0) throw new ConflictException(`Không thể xóa vĩnh viễn vì bản ghi còn ${references} dữ liệu nghiệp vụ liên quan.`);
     const row: any = current;
@@ -93,7 +105,12 @@ export class AdministrativeLifecycleService {
   private statusOf(entity: LifecycleEntity, row: any) { return entity === 'staff' ? row.user.status : entity === 'doctors' ? row.staffProfile.user.status : row.status; }
   private deletedAtOf(entity: LifecycleEntity, row: any): Date | null { return entity === 'staff' ? row.user.deletedAt : entity === 'doctors' ? row.staffProfile.user.deletedAt : row.deletedAt; }
   private auditEntity(entity: LifecycleEntity) { return ({ 'ai-models': 'AiModelRegistry', staff: 'StaffProfile', doctors: 'DoctorProfile', departments: 'Department' } as const)[entity]; }
-  private snapshot(entity: LifecycleEntity, row: any) { return { id: row.id, status: this.statusOf(entity, row), deletedAt: this.deletedAtOf(entity, row), code: row.modelId ?? row.employeeCode ?? row.departmentCode ?? row.licenseNumber ?? null }; }
+  private snapshot(entity: LifecycleEntity, row: any) {
+    if (entity === 'ai-models') return buildAiModelSnapshot(row);
+    if (entity === 'departments') return buildDepartmentSnapshot(row);
+    if (entity === 'staff') return buildStaffSnapshot(row);
+    return buildUnifiedDoctorSnapshot(row);
+  }
   private async referenceCount(entity: LifecycleEntity, row: any) {
     if (entity === 'ai-models') return row._count.diagnoses + row._count.aiQualities;
     if (entity === 'departments') return row._count.staffs + row._count.visits + row._count.medicalOrders + row._count.appointments;

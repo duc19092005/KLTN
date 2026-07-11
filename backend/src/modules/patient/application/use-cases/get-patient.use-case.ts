@@ -3,6 +3,7 @@ import { UpdatePatientDto } from '../../dto/patient.dto';
 import { PATIENT_REPOSITORY, PatientRepositoryPort } from '../ports/patient.repository.port';
 import { PATIENT_INTEGRITY_ANCHOR, PatientIntegrityAnchorPort } from '../ports/patient-integrity-anchor.port';
 import { buildPatientSnapshot } from '../../domain/patient-snapshot';
+import { EntityRecoveryService } from '../../../../infrastructure/audit/entity-recovery.service';
 
 /**
  * Fetch one patient and update a patient. Behavior copied verbatim from the
@@ -15,6 +16,7 @@ export class GetPatientUseCase {
   constructor(
     @Inject(PATIENT_REPOSITORY) private readonly repo: PatientRepositoryPort,
     @Inject(PATIENT_INTEGRITY_ANCHOR) private readonly integrity: PatientIntegrityAnchorPort,
+    private readonly entityRecovery: EntityRecoveryService,
   ) {}
 
   async findOne(id: string) {
@@ -25,6 +27,7 @@ export class GetPatientUseCase {
 
   async update(id: string, dto: UpdatePatientDto, actorId?: string) {
     const existing = await this.findOne(id);
+    await this.entityRecovery.assertTrusted('Patient', id);
     if (![dto.phone, dto.citizenId, dto.insuranceNumber, dto.emergencyContact].some((value) => value?.trim())) {
       throw new BadRequestException('Hồ sơ bệnh nhân phải có ít nhất một thông tin liên hệ hoặc định danh hợp lệ.');
     }

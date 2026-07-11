@@ -132,6 +132,7 @@ describe('AuditController readable V2 diff', () => {
       { getInclusionProof: jest.fn(), anchorNow: jest.fn() } as any,
       prisma as any,
       { recover: jest.fn() } as any,
+      { listWarnings: jest.fn(), recoverMany: jest.fn() } as any,
     );
     return { controller, row };
   }
@@ -142,7 +143,7 @@ describe('AuditController readable V2 diff', () => {
     const result = await controller.logs(undefined, undefined, undefined, undefined, undefined, { sub: 'admin-1', role: 'ADMIN' } as any);
 
     expect(result.total).toBe(1);
-    expect(result.items[0]).toMatchObject({ blockchainStatus: 'PENDING', fieldsChanged: ['SENSITIVE_FIELD_CHANGED'] });
+    expect(result.items[0]).toMatchObject({ blockchainStatus: 'VERIFIED', fieldsChanged: ['SENSITIVE_FIELD_CHANGED'] });
     expect(result.items[0].diff).toEqual([
       expect.objectContaining({ field: 'avatarUrl', before: '[REDACTED]', after: '[REDACTED]', redacted: true }),
       expect.objectContaining({ field: 'fullName', before: '[REDACTED]', after: '[REDACTED]', redacted: true }),

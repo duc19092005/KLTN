@@ -7,6 +7,7 @@ import { StaffValidator } from '../services/staff.validator';
 import { buildStaffSnapshot } from '../../domain/staff-snapshot';
 import { DOCTOR_REANCHOR, DoctorReanchorPort } from '../../../doctor/application/ports/doctor-reanchor.port';
 import { buildUnifiedDoctorSnapshot } from '../../../doctor/domain/doctor-snapshot';
+import { EntityRecoveryService } from '../../../../infrastructure/audit/entity-recovery.service';
 
 /**
  * Updates a staff profile + linked user account. Behavior copied verbatim from
@@ -21,6 +22,7 @@ export class UpdateStaffUseCase {
     @Inject(STAFF_INTEGRITY_ANCHOR) private readonly integrity: StaffIntegrityAnchorPort,
     @Inject(DOCTOR_REANCHOR) private readonly doctorReanchor: DoctorReanchorPort,
     private readonly validator: StaffValidator,
+    private readonly entityRecovery: EntityRecoveryService,
   ) {}
 
   async execute(id: string, dto: UpdateStaffDto, actorId?: string) {
@@ -29,6 +31,7 @@ export class UpdateStaffUseCase {
       throw new BadRequestException('Không được sửa tên đăng nhập, vai trò hoặc trạng thái trong chức năng cập nhật hồ sơ nhân sự.');
     }
     const staff = await this.validator.ensureStaff(id);
+    await this.entityRecovery.assertTrusted(staff.doctorProfile ? 'DoctorProfile' : 'StaffProfile', staff.doctorProfile?.id ?? id);
     if (dto.departmentId) {
       const dept = await this.repo.findDepartment(dto.departmentId);
       if (!dept) throw new NotFoundException('Không tìm thấy phòng ban.');

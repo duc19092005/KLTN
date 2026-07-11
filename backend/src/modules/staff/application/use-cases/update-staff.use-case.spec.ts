@@ -51,11 +51,13 @@ describe('UpdateStaffUseCase audit V2', () => {
       assertUserUnique: jest.fn(),
       assertCitizenIdUnique: jest.fn(),
     };
+    const entityRecovery = { assertTrusted: jest.fn().mockResolvedValue(undefined) };
     const useCase = new UpdateStaffUseCase(
       repo as any,
       integrity as any,
       doctorReanchor as any,
       validator as any,
+      entityRecovery as any,
     );
     return { useCase, repo, integrity, doctorReanchor, validator };
   }

@@ -4,6 +4,7 @@ import { DEPARTMENT_REPOSITORY, DepartmentRepositoryPort } from '../ports/depart
 import { DEPARTMENT_INTEGRITY_ANCHOR, DepartmentIntegrityAnchorPort } from '../ports/department-integrity-anchor.port';
 import { DepartmentValidator } from '../services/department.validator';
 import { buildDepartmentSnapshot } from '../../domain/department-snapshot';
+import { EntityRecoveryService } from '../../../../infrastructure/audit/entity-recovery.service';
 
 /**
  * Soft-deletes a department by marking it DELETE, then anchors the change.
@@ -16,10 +17,12 @@ export class RemoveDepartmentUseCase {
     @Inject(DEPARTMENT_REPOSITORY) private readonly repo: DepartmentRepositoryPort,
     @Inject(DEPARTMENT_INTEGRITY_ANCHOR) private readonly integrity: DepartmentIntegrityAnchorPort,
     private readonly validator: DepartmentValidator,
+    private readonly entityRecovery: EntityRecoveryService,
   ) {}
 
   async execute(id: string, actorId?: string) {
     const existing = await this.validator.ensureDepartment(id);
+    await this.entityRecovery.assertTrusted('Department', id);
     const before = buildDepartmentSnapshot(existing);
 
     const department = await this.repo.update(id, { status: OperationalStatus.DELETE });

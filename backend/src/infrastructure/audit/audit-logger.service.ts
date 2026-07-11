@@ -363,7 +363,7 @@ export class AuditLoggerService {
   }
 
   private auditTier(entity: string, action: string): 'A' | 'B' {
-    if (entity === 'MedicalConclusion' || action === 'AUDIT_RECOVERY_EXECUTED' || action.includes('SECURITY')) {
+    if (entity === 'MedicalConclusion' || action === 'AUDIT_RECOVERY_EXECUTED' || action === 'AUDIT_ENTITY_RECOVERED' || action.includes('SECURITY')) {
       return 'A';
     }
     return 'B';

@@ -22,7 +22,8 @@ describe('UpdateDepartmentUseCase structural rules', () => {
       assertNameUnique: jest.fn(),
       assertDepartmentCodeUnique: jest.fn(),
     };
-    return { useCase: new UpdateDepartmentUseCase(repo as never, integrity as never, validator as never), repo };
+    const entityRecovery = { assertTrusted: jest.fn().mockResolvedValue(undefined) };
+    return { useCase: new UpdateDepartmentUseCase(repo as never, integrity as never, validator as never, entityRecovery as never), repo };
   }
 
   it('blocks changing structural fields after business data exists', async () => {
