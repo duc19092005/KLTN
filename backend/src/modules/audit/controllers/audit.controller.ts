@@ -150,14 +150,22 @@ export class AuditController {
   async batches(
     @Query('page') pageRaw?: string,
     @Query('limit') limitRaw?: string,
+    @Query('sortBy') sortByRaw?: string,
+    @Query('sort') sortRaw?: string,
   ) {
     const page = Math.max(Number(pageRaw) || 1, 1);
     const limit = Math.min(Math.max(Number(limitRaw) || 10, 1), 100);
     const skip = (page - 1) * limit;
+    const sortDir: 'asc' | 'desc' = sortRaw === 'asc' ? 'asc' : 'desc';
+    const sortBy = (sortByRaw || 'batchId').toLowerCase();
+    const orderBy =
+      sortBy === 'time' || sortBy === 'anchoredat' || sortBy === 'createdat'
+        ? [{ anchoredAt: sortDir }, { createdAt: sortDir }, { batchId: sortDir }]
+        : [{ batchId: sortDir }];
 
     const [items, total] = await Promise.all([
       this.prisma.auditBatch.findMany({
-        orderBy: { batchId: 'desc' },
+        orderBy,
         skip,
         take: limit,
         select: {

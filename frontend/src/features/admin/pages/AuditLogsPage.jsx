@@ -167,6 +167,9 @@ export default function AuditLogsPage() {
   const [batchesPage, setBatchesPage] = useState(1);
   const [batchesTotalPages, setBatchesTotalPages] = useState(1);
   const [batchesTotal, setBatchesTotal] = useState(0);
+  /** sortBy: batchId | time ; sortOrder: asc | desc */
+  const [batchSortBy, setBatchSortBy] = useState('batchId');
+  const [batchSortOrder, setBatchSortOrder] = useState('desc');
 
   const loadBatches = useCallback(async () => {
     setLoading(true);
@@ -174,6 +177,8 @@ export default function AuditLogsPage() {
       const res = await auditService.batches({
         page: batchesPage,
         limit: 10,
+        sortBy: batchSortBy,
+        sort: batchSortOrder,
       });
       const data = res.data || {};
       setBatches(data.items || []);
@@ -184,7 +189,11 @@ export default function AuditLogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [batchesPage, toast]);
+  }, [batchesPage, batchSortBy, batchSortOrder, toast]);
+
+  useEffect(() => {
+    setBatchesPage(1);
+  }, [batchSortBy, batchSortOrder]);
 
   const loadPendingQueue = useCallback(async () => {
     try {
@@ -380,7 +389,7 @@ export default function AuditLogsPage() {
           </section>
         )}
 
-        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm space-y-3">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_120px]">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -401,8 +410,35 @@ export default function AuditLogsPage() {
               Lọc
             </button>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">Sắp xếp</span>
+            <button
+              type="button"
+              onClick={() => setBatchSortBy('batchId')}
+              className={`rounded-xl border px-3 py-2 text-xs font-black ${batchSortBy === 'batchId' ? 'border-cyan-200 bg-cyan-50 text-cyan-700' : 'border-slate-200 bg-white text-slate-600'}`}
+            >
+              Theo số lô
+            </button>
+            <button
+              type="button"
+              onClick={() => setBatchSortBy('time')}
+              className={`rounded-xl border px-3 py-2 text-xs font-black ${batchSortBy === 'time' ? 'border-cyan-200 bg-cyan-50 text-cyan-700' : 'border-slate-200 bg-white text-slate-600'}`}
+            >
+              Theo thời gian
+            </button>
+            <button
+              type="button"
+              onClick={() => setBatchSortOrder((v) => (v === 'desc' ? 'asc' : 'desc'))}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700 hover:bg-cyan-50 hover:text-cyan-700"
+            >
+              {batchSortOrder === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />}
+              {batchSortBy === 'batchId'
+                ? (batchSortOrder === 'desc' ? 'Số lô giảm dần' : 'Số lô tăng dần')
+                : (batchSortOrder === 'desc' ? 'Mới nhất trước' : 'Cũ nhất trước')}
+            </button>
+          </div>
           {appliedQ && (
-            <button type="button" onClick={() => { setSearchQ(''); setAppliedQ(''); }} className="mt-2 text-xs font-black text-cyan-700">
+            <button type="button" onClick={() => { setSearchQ(''); setAppliedQ(''); }} className="text-xs font-black text-cyan-700">
               Xóa lọc “{appliedQ}”
             </button>
           )}
@@ -418,6 +454,8 @@ export default function AuditLogsPage() {
             page={batchesPage}
             totalPages={batchesTotalPages}
             total={batchesTotal}
+            sortBy={batchSortBy}
+            sortOrder={batchSortOrder}
             recoveringBatchId={recoveringBatchId}
             onOpenDetail={openBatchDetail}
             onRecover={(batch) => { setRecoveryTarget(batch); setRecoveryReason(''); }}
@@ -1110,7 +1148,10 @@ function RecoveryReasonModal({ batch, reason, setReason, onClose, onContinue }) 
   );
 }
 
-function BatchesHomeTable({ batches, page, totalPages, total, onPrev, onNext, onRecover, onOpenDetail, recoveringBatchId }) {
+function BatchesHomeTable({ batches, page, totalPages, total, sortBy, sortOrder, onPrev, onNext, onRecover, onOpenDetail, recoveringBatchId }) {
+  const sortHint = sortBy === 'time'
+    ? (sortOrder === 'desc' ? 'Thời gian: mới → cũ' : 'Thời gian: cũ → mới')
+    : (sortOrder === 'desc' ? 'Số lô: lớn → nhỏ' : 'Số lô: nhỏ → lớn');
   return (
     <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
       <div className="p-4 bg-slate-50/60 border-b border-slate-100 flex items-center justify-between gap-3">
@@ -1118,7 +1159,7 @@ function BatchesHomeTable({ batches, page, totalPages, total, onPrev, onNext, on
           <Layers className="h-3.5 w-3.5 text-cyan-600" /> Danh sách lô (mỗi lô có thể gồm nhiều SEQ / nhiều entity)
         </div>
         <div className="text-xs font-medium text-slate-400">
-          Tổng: <span className="font-bold text-slate-700">{total}</span> lô
+          {sortHint} · Tổng: <span className="font-bold text-slate-700">{total}</span> lô
         </div>
       </div>
 
