@@ -70,13 +70,19 @@ export class AiModelController {
     return this.service.verifyAll();
   }
 
-  @Roles('ADMIN', 'DOCTOR')
+  @Roles('ADMIN')
   @Get('stats/overview')
   getStats() {
     return this.service.getStats();
   }
 
-  @Roles('ADMIN', 'DOCTOR')
+  @Roles('DOCTOR')
+  @Get('available-for-diagnosis')
+  findAvailableForDiagnosis() {
+    return this.service.findAvailableForDiagnosis();
+  }
+
+  @Roles('ADMIN')
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
@@ -94,7 +100,7 @@ export class AiModelController {
     return this.service.verifyAiModel(id);
   }
 
-  @Roles('ADMIN', 'DOCTOR')
+  @Roles('ADMIN')
   @Get()
   findAll(@Query() query: AiModelQueryDto) {
     return this.service.findAll(query);

@@ -271,7 +271,7 @@ export default function DoctorQueuePage() {
       }
     })();
   }, []);
-  useEffect(() => { aiModelService.list({ type: 'API' }).then((res) => { const items = getItems(res.data); setAiModels(items); setSelectedAiModelId((current) => current || items[0]?.id || ''); }).catch(() => { }); }, []);
+  useEffect(() => { aiModelService.availableForDiagnosis().then((res) => { const items = getItems(res.data); setAiModels(items); setSelectedAiModelId((current) => current || items[0]?.id || ''); }).catch(() => { }); }, []);
 
   const filteredVisits = useMemo(() => {
     const text = query.trim().toLowerCase();
@@ -1064,7 +1064,7 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
         <div className="flex flex-col sm:flex-row gap-2 xl:min-w-[520px]">
           <select value={selectedAiModelId} onChange={(e) => setSelectedAiModelId(e.target.value)} disabled={busy} className="flex-1 rounded-xl border border-cyan-100 bg-cyan-50/50 p-3 text-xs font-bold text-slate-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100 disabled:opacity-50 transition-colors">
             <option value="">-- Chọn mô hình AI --</option>
-            {aiModels.map((model) => <option key={model.id} value={model.id}>{model.modelName || model.name || 'Mô hình AI'} {model.modelVersion ? `(${model.modelVersion})` : ''} - {model.provider || 'khác'}</option>)}
+            {aiModels.map((model) => <option key={model.id} value={model.id}>{model.modelName || model.name || 'Mô hình AI'} {model.modelVersion || model.version ? `(${model.modelVersion || model.version})` : ''} - {model.recommendedSpecialty || 'Tổng quát'}</option>)}
           </select>
           <button type="button" onClick={onGenerate} disabled={busy || !selectedAiModelId} className="rounded-xl bg-cyan-600 px-5 py-3 text-xs font-black uppercase tracking-wider text-white shadow-sm hover:bg-cyan-700 disabled:opacity-50 disabled:shadow-none whitespace-nowrap transition-colors flex items-center justify-center gap-2">
             {busy ? (<><LoadingIndicator size="sm" /><span>Đang phân tích...</span></>) : 'Chạy mô hình'}

@@ -9,6 +9,7 @@ import {
   IntegrityEvaluation,
 } from '../../application/ports/ai-model-integrity-anchor.port';
 import { buildAiModelSnapshot } from '../../domain/ai-model-snapshot';
+import { Prisma } from '@prisma/client';
 
 /**
  * Tamper-evidence adapter for AI models. Uses the centralized AuditAnchor
@@ -22,21 +23,19 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
     private readonly auditAnchor: AuditAnchorService,
   ) {}
 
-  async anchorChange(model: any, action: AiModelAnchorAction, actorId?: string, before?: unknown): Promise<void> {
+  async anchorChange(
+    model: any,
+    action: AiModelAnchorAction,
+    actorId?: string,
+    before?: unknown,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     const snapshot = buildAiModelSnapshot(model);
-    let dataHash: string | null = null;
-    let dataSalt: string | null = null;
+    const { salt: dataSalt, hash: dataHash } = this.audit.hashSnapshot(snapshot);
+    const client = tx ?? this.prisma;
+    await client.aiModelRegistry.update({ where: { id: model.id }, data: { hash256: dataHash, dataSalt } });
 
-    try {
-      const { salt, hash } = this.audit.hashSnapshot(snapshot);
-      dataHash = hash;
-      dataSalt = salt;
-      await this.prisma.aiModelRegistry.update({ where: { id: model.id }, data: { hash256: hash, dataSalt: salt } });
-    } catch {
-      // Hash computation failed; log entry will still be created below with null hashes.
-    }
-
-    await this.audit.record({
+    const auditRecord = {
       entity: 'AiModelRegistry',
       entityId: model.id,
       action,
@@ -46,7 +45,9 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
       before: before ?? null,
       after: snapshot,
       onChainStatus: 'PENDING',
-    });
+    };
+    if (tx) await this.audit.record(auditRecord, tx);
+    else await this.audit.record(auditRecord);
   }
 
   async evaluate(model: any, skipChainCheck = false): Promise<IntegrityEvaluation> {

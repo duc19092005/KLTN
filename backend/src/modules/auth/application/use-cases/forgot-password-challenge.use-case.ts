@@ -16,6 +16,10 @@ export class ForgotPasswordChallengeUseCase {
       throw new NotFoundException('Không tìm thấy tài khoản nhân sự này.');
     }
 
+    if (!['RECEPTIONIST', 'DOCTOR', 'LAB_MANAGER'].includes(user.role)) {
+      throw new BadRequestException('Chức năng quên mật khẩu chỉ áp dụng cho tài khoản nhân sự.');
+    }
+
     if (!user.faceEmbedding) {
       throw new BadRequestException('Tài khoản này chưa đăng ký sinh trắc học khuôn mặt.');
     }

@@ -42,8 +42,11 @@ export class UpdateDoctorUseCase {
     }
 
     const before = buildUnifiedDoctorSnapshot(existing);
-    const doctor = await this.repo.updateWithRoom(id, dto);
-    await this.integrity.anchorChange(doctor, 'UPDATE', actorId, before);
+    const doctor = await this.repo.updateWithRoom(
+      id,
+      dto,
+      (updated, tx) => this.integrity.anchorChange(updated, 'UPDATE', actorId, before, tx),
+    );
     return doctor;
   }
 }

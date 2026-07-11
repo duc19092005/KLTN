@@ -33,20 +33,21 @@ export class CreateAiModelUseCase {
     const encrypted = this.crypto.encrypt(secretMaterial);
     const plainFingerprint = this.crypto.fingerprint(secretMaterial);
 
-    const model = await this.repo.create({
-      modelName: dto.modelName.trim(),
-      modelVersion: dto.modelVersion.trim(),
-      recommendedSpecialty: dto.recommendedSpecialty?.trim() || null,
-      type: dto.type,
-      provider: dto.type === 'API' ? dto.provider || 'other' : 'ip',
-      apiEndpoint,
-      ipHashEncrypted: encrypted,
-      ipHashPlain: plainFingerprint,
-      description: dto.description?.trim() || null,
-      createdBy: adminUserId,
-    });
-
-    await this.integrity.anchorChange(model, 'CREATE', adminUserId, null);
+    const model = await this.repo.create(
+      {
+        modelName: dto.modelName.trim(),
+        modelVersion: dto.modelVersion.trim(),
+        recommendedSpecialty: dto.recommendedSpecialty?.trim() || null,
+        type: dto.type,
+        provider: dto.type === 'API' ? dto.provider || 'other' : 'ip',
+        apiEndpoint,
+        ipHashEncrypted: encrypted,
+        ipHashPlain: plainFingerprint,
+        description: dto.description?.trim() || null,
+        createdBy: adminUserId,
+      },
+      (created, tx) => this.integrity.anchorChange(created, 'CREATE', adminUserId, null, tx),
+    );
     return presentAiModel(model);
   }
 }

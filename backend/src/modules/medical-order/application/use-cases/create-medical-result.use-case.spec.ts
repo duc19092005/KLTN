@@ -7,11 +7,14 @@ const baseDto = {
   note: 'Sensitive result note must never be audited raw',
   files: [
     {
-      fileName: 'cloudinary-internal-name.pdf',
+      fileName: 'result-internal-name.pdf',
       originalName: 'patient-xray.pdf',
       mimeType: 'application/pdf',
       size: 2048,
-      url: 'https://res.cloudinary.com/demo/patient-xray.pdf',
+      storageProvider: 'S3',
+      bucket: 'hospital-medical-private',
+      objectKey: 'medical-results/order-1/result-internal-name.pdf',
+      sha256: 'a'.repeat(64),
     },
   ],
 } as any;
@@ -91,6 +94,7 @@ describe('CreateMedicalResultUseCase audit integrity', () => {
     expect(serialized).not.toContain('cloudinary');
     expect(serialized).not.toContain('patient-xray.pdf');
     expect(serialized).not.toContain('cloudinary-internal-name.pdf');
+    expect(serialized).not.toContain('result-internal-name.pdf');
   });
 
   it('propagates audit failure so the repository transaction can rollback domain writes', async () => {
@@ -117,5 +121,27 @@ describe('CreateMedicalResultUseCase audit integrity', () => {
     await expect(useCase.execute('order-1', baseDto, baseUser)).rejects.toThrow(BadRequestException);
     expect(repo.createResultWithTransitions).not.toHaveBeenCalled();
     expect(audit.recordV2).not.toHaveBeenCalled();
+  });
+
+  it('rejects Cloudinary metadata for a new medical result', async () => {
+    const { useCase, repo } = makeUseCase();
+    const dto = {
+      ...baseDto,
+      files: [{ ...baseDto.files[0], storageProvider: 'CLOUDINARY' }],
+    };
+
+    await expect(useCase.execute('order-1', dto, baseUser)).rejects.toThrow(BadRequestException);
+    expect(repo.createResultWithTransitions).not.toHaveBeenCalled();
+  });
+
+  it('rejects an S3 file without an object key', async () => {
+    const { useCase, repo } = makeUseCase();
+    const dto = {
+      ...baseDto,
+      files: [{ ...baseDto.files[0], objectKey: undefined }],
+    };
+
+    await expect(useCase.execute('order-1', dto, baseUser)).rejects.toThrow(BadRequestException);
+    expect(repo.createResultWithTransitions).not.toHaveBeenCalled();
   });
 });

@@ -2,6 +2,7 @@ import api from '../../../shared/apis/api';
 
 export const aiModelService = {
   list: (params = {}) => api.get('/ai-models', { params }),
+  availableForDiagnosis: () => api.get('/ai-models/available-for-diagnosis'),
   create: (payload) => api.post('/ai-models', payload),
   update: (id, payload) => api.patch(`/ai-models/${id}`, payload),
   hide: (id) => api.patch(`/ai-models/${id}/hide`),

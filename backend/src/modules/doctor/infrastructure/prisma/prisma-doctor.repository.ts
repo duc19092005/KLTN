@@ -5,6 +5,7 @@ import { CreateDoctorDto, CreateDoctorWithStaffDto, UpdateDoctorDto } from '../.
 import {
   DoctorListFilter,
   DoctorRepositoryPort,
+  DoctorWriteHook,
   StaffForDoctorCreate,
 } from '../../application/ports/doctor.repository.port';
 
@@ -66,11 +67,20 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
     return `${prefix}-${String(lastNumber + 1).padStart(4, '0')}`;
   }
 
-  async createForExistingStaff(dto: CreateDoctorDto): Promise<any> {
-    return this.prisma.doctorProfile.create({ data: this.toCreateData(dto), include: this.includeRelations() });
+  async createForExistingStaff(dto: CreateDoctorDto, afterWrite?: DoctorWriteHook): Promise<any> {
+    return this.prisma.$transaction(async (tx) => {
+      const doctor = await tx.doctorProfile.create({ data: this.toCreateData(dto), include: this.includeRelations() });
+      await afterWrite?.(doctor, tx);
+      return doctor;
+    });
   }
 
-  async createWithStaff(dto: CreateDoctorWithStaffDto, employeeCode: string, passwordHash: string): Promise<any> {
+  async createWithStaff(
+    dto: CreateDoctorWithStaffDto,
+    employeeCode: string,
+    passwordHash: string,
+    afterWrite?: DoctorWriteHook,
+  ): Promise<any> {
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -104,7 +114,9 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
       const doctorId = user.staffProfile?.doctorProfile?.id;
       if (!doctorId) throw new BadRequestException('Chưa tạo được hồ sơ bác sĩ.');
 
-      return tx.doctorProfile.findUniqueOrThrow({ where: { id: doctorId }, include: this.includeRelations() });
+      const doctor = await tx.doctorProfile.findUniqueOrThrow({ where: { id: doctorId }, include: this.includeRelations() });
+      await afterWrite?.(doctor, tx);
+      return doctor;
     });
   }
 
@@ -122,7 +134,7 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
     return { items, total };
   }
 
-  async updateWithRoom(id: string, dto: UpdateDoctorDto): Promise<any> {
+  async updateWithRoom(id: string, dto: UpdateDoctorDto, afterWrite?: DoctorWriteHook): Promise<any> {
     return this.prisma.$transaction(async (tx) => {
       const staffData: any = {};
       if (dto.fullName !== undefined) staffData.fullName = dto.fullName.trim();
@@ -137,7 +149,7 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
 
       const hasStaffUpdates = Object.keys(staffData).length > 0;
 
-      return tx.doctorProfile.update({
+      const doctor = await tx.doctorProfile.update({
         where: { id },
         data: {
           ...(dto.specialty !== undefined ? { specialty: dto.specialty } : {}),
@@ -148,6 +160,8 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
         },
         include: this.includeRelations(),
       });
+      await afterWrite?.(doctor, tx);
+      return doctor;
     });
   }
 

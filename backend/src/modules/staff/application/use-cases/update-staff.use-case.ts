@@ -6,7 +6,6 @@ import { STAFF_INTEGRITY_ANCHOR, StaffIntegrityAnchorPort } from '../ports/staff
 import { StaffValidator } from '../services/staff.validator';
 import { buildStaffSnapshot } from '../../domain/staff-snapshot';
 import { DOCTOR_REANCHOR, DoctorReanchorPort } from '../../../doctor/application/ports/doctor-reanchor.port';
-import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
 import { buildUnifiedDoctorSnapshot } from '../../../doctor/domain/doctor-snapshot';
 
 /**
@@ -22,7 +21,6 @@ export class UpdateStaffUseCase {
     @Inject(STAFF_INTEGRITY_ANCHOR) private readonly integrity: StaffIntegrityAnchorPort,
     @Inject(DOCTOR_REANCHOR) private readonly doctorReanchor: DoctorReanchorPort,
     private readonly validator: StaffValidator,
-    private readonly audit: AuditLoggerService,
   ) {}
 
   async execute(id: string, dto: UpdateStaffDto, actorId?: string) {
@@ -66,30 +64,19 @@ export class UpdateStaffUseCase {
           position: dto.position,
         },
         async (updatedUser, tx) => {
-          if (!isDoctor && updatedUser.staffProfile) {
-            await this.audit.recordV2(
-              {
-                entity: 'StaffProfile',
-                entityId: updatedUser.staffProfile.id,
-                action: 'UPDATE',
-                actorId: actorId ?? null,
-                before,
-                after: buildStaffSnapshot(updatedUser.staffProfile),
-                metadata: { source: 'staff.update' },
-              },
+          if (isDoctor && updatedUser.staffProfile?.doctorProfile) {
+            await this.doctorReanchor.reanchorSnapshot(
+              { ...updatedUser.staffProfile.doctorProfile, staffProfile: updatedUser.staffProfile },
+              actorId,
+              doctorBefore,
+              'UPDATE',
               tx,
             );
+          } else if (updatedUser.staffProfile) {
+            await this.integrity.anchorChange(updatedUser.staffProfile, 'UPDATE', actorId, before, tx);
           }
         },
       );
-
-      if (isDoctor) {
-        // Staff is a doctor → re-anchor the unified doctor hash (staff + doctor)
-        await this.doctorReanchor.reanchorForStaffUpdate(id, actorId, doctorBefore);
-      } else if (updated.staffProfile) {
-        // Regular staff → anchor just the staff profile
-        await this.integrity.anchorChange(updated.staffProfile, 'UPDATE', actorId, before);
-      }
 
       return updated;
     } catch (error) {

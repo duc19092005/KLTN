@@ -6,6 +6,9 @@ import {
   isUniqueVisitCodeConflict,
   VisitEntity,
   VisitListFilter,
+  VisitCreatedHook,
+  PatientCreatedHook,
+  VisitUpdatedHook,
   VisitRepositoryPort,
 } from '../../application/ports/visit.repository.port';
 
@@ -45,18 +48,29 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
     };
   }
 
-  async createVisitWithOptionalPatient(command: CreateVisitCommand): Promise<unknown> {
-    // Pre-check citizenId uniqueness so we can return a friendly message instead of
-    // letting the transaction hit a P2002 that retries uselessly (citizenId is a real
-    // duplicate, not a race condition).
-    if (!command.patientId && command.patient?.citizenId) {
-      const existingCitizen = await this.prisma.patient.findUnique({
-        where: { citizenId: command.patient.citizenId.trim() },
+  async createVisitWithOptionalPatient(
+    command: CreateVisitCommand,
+    onCreated?: VisitCreatedHook,
+    onPatientCreated?: PatientCreatedHook,
+  ): Promise<unknown> {
+    if (!command.patientId && command.patient) {
+      const identityChecks: Prisma.PatientWhereInput[] = [];
+      if (command.patient.citizenId?.trim()) identityChecks.push({ citizenId: command.patient.citizenId.trim() });
+      if (command.patient.insuranceNumber?.trim()) identityChecks.push({ insuranceNumber: command.patient.insuranceNumber.trim() });
+      if (command.patient.phone?.trim()) {
+        identityChecks.push({
+          phone: command.patient.phone.trim(),
+          birthDate: new Date(command.patient.birthDate),
+          fullName: { equals: command.patient.fullName.trim(), mode: 'insensitive' },
+        });
+      }
+      const existingCitizen = identityChecks.length ? await this.prisma.patient.findFirst({
+        where: { OR: identityChecks },
         select: { id: true, fullName: true, patientCode: true },
-      });
+      }) : null;
       if (existingCitizen) {
         throw new BadRequestException(
-          `CCCD/CMND "${command.patient.citizenId}" đã tồn tại trong hệ thống (mã BN: ${existingCitizen.patientCode}, tên: ${existingCitizen.fullName}). Vui lòng chọn bệnh nhân có sẵn.`,
+          `Thông tin định danh đã tồn tại trong hệ thống (mã BN: ${existingCitizen.patientCode}, tên: ${existingCitizen.fullName}). Vui lòng chọn bệnh nhân có sẵn.`,
         );
       }
     }
@@ -84,11 +98,12 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
                 emergencyContact: command.patient.emergencyContact?.trim() || null,
               },
             });
+            if (onPatientCreated) await onPatientCreated(patient, tx);
             patientId = patient.id;
           }
           if (!patientId) throw new BadRequestException('Vui lòng chọn bệnh nhân.');
           const visitCode = await this.generateVisitCode(tx);
-          return tx.visit.create({
+          const visit = await tx.visit.create({
             data: {
               visitCode,
               patientId,
@@ -98,6 +113,8 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
             },
             include: this.includeRelations(),
           });
+          if (onCreated) await onCreated(visit, tx);
+          return visit;
         });
       } catch (error) {
         if (!isUniqueVisitCodeConflict(error) || attempt === maxAttempts) throw error;
@@ -121,11 +138,15 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
     return { items, total };
   }
 
-  async updateStatus(id: string, status: VisitStatus, completedAt?: Date, staffId?: string) {
-    return this.prisma.visit.update({
-      where: { id },
-      data: { status, completedAt, ...(staffId ? { staffId } : {}) },
-      include: this.includeRelations(),
+  async updateStatus(id: string, status: VisitStatus, completedAt?: Date, staffId?: string, afterWrite?: VisitUpdatedHook) {
+    return this.prisma.$transaction(async (tx) => {
+      const visit = await tx.visit.update({
+        where: { id },
+        data: { status, completedAt, ...(staffId ? { staffId } : {}) },
+        include: this.includeRelations(),
+      });
+      await afterWrite?.(visit, tx);
+      return visit;
     });
   }
 

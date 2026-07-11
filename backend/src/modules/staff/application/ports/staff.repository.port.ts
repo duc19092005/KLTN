@@ -72,7 +72,10 @@ export interface StaffRepositoryPort {
   generateEmployeeCode(role: UserRole): Promise<string>;
 
   /** Atomic: create User + nested StaffProfile. Returns sanitized user incl. staffProfile. */
-  createStaffUser(data: CreateStaffData): Promise<any>;
+  createStaffUser(
+    data: CreateStaffData,
+    afterCreate?: (created: any, tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<any>;
 
   findManyPaginated(filter: StaffListFilter, skip: number, take: number): Promise<{ items: unknown[]; total: number }>;
 
@@ -84,7 +87,11 @@ export interface StaffRepositoryPort {
   ): Promise<any>;
 
   /** Update only the User status (+ bump tokenVersion). Returns sanitized user incl. staffProfile. */
-  setUserStatus(userId: string, status: UserStatus): Promise<any>;
+  setUserStatus(
+    userId: string,
+    status: UserStatus,
+    afterUpdate?: (updated: any, tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<any>;
 
   findAllOrdered(): Promise<any[]>;
 }

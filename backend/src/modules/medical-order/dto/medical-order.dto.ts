@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MedicalOrderStatus } from '@prisma/client';
-import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, ValidateNested, ArrayMinSize } from 'class-validator';
+import { IsArray, IsEnum, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, ValidateNested, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateMedicalOrderDto {
@@ -77,25 +77,25 @@ export class MedicalResultFileDto {
   @IsString()
   url?: string;
 
-  @ApiPropertyOptional({ example: 'S3' })
-  @IsOptional()
+  @ApiProperty({ example: 'S3' })
   @IsString()
-  storageProvider?: string;
+  @IsIn(['S3'], { message: 'File y tế mới chỉ được lưu bằng AWS S3 private.' })
+  storageProvider!: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty()
   @IsString()
-  bucket?: string;
+  @IsNotEmpty()
+  bucket!: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty()
   @IsString()
-  objectKey?: string;
+  @IsNotEmpty()
+  objectKey!: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty()
   @IsString()
-  sha256?: string;
+  @IsNotEmpty()
+  sha256!: string;
 
   @ApiPropertyOptional()
   @IsOptional()

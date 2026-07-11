@@ -69,8 +69,11 @@ export class UpdateAiModelUseCase {
     }
 
     const before = buildAiModelSnapshot(existing);
-    const updated = await this.repo.update(id, data);
-    await this.integrity.anchorChange(updated, 'UPDATE', actorId, before);
+    const updated = await this.repo.update(
+      id,
+      data,
+      (model, tx) => this.integrity.anchorChange(model, 'UPDATE', actorId, before, tx),
+    );
     return presentAiModel(updated);
   }
 }

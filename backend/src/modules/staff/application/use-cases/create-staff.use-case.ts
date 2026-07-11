@@ -42,27 +42,29 @@ export class CreateStaffUseCase {
     const passwordHash = await this.passwordHasher.hash(DEFAULT_STAFF_PASSWORD);
 
     try {
-      const user = await this.repo.createStaffUser({
-        username: dto.username,
-        email: dto.email,
-        passwordHash,
-        role: dto.role,
-        employeeCode,
-        fullName: dto.fullName,
-        phone: dto.phone,
-        gender: dto.gender,
-        citizenId: dto.citizenId,
-        birthDate: dto.birthDate,
-        address: dto.address,
-        avatarUrl: dto.avatarUrl,
-        departmentId: dto.departmentId || null,
-        position: dto.position,
-      });
-
-      // Anchor the staff profile on-chain (non-doctor staff only)
-      if (user.staffProfile) {
-        await this.integrity.anchorChange(user.staffProfile, 'CREATE', actorId, null);
-      }
+      const user = await this.repo.createStaffUser(
+        {
+          username: dto.username,
+          email: dto.email,
+          passwordHash,
+          role: dto.role,
+          employeeCode,
+          fullName: dto.fullName,
+          phone: dto.phone,
+          gender: dto.gender,
+          citizenId: dto.citizenId,
+          birthDate: dto.birthDate,
+          address: dto.address,
+          avatarUrl: dto.avatarUrl,
+          departmentId: dto.departmentId || null,
+          position: dto.position,
+        },
+        async (created, tx) => {
+          if (created.staffProfile) {
+            await this.integrity.anchorChange(created.staffProfile, 'CREATE', actorId, null, tx);
+          }
+        },
+      );
 
       return user;
     } catch (error) {

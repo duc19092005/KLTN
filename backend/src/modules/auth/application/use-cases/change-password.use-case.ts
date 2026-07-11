@@ -1,4 +1,4 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { AUTH_REPOSITORY, AuthRepositoryPort } from '../ports/auth.repository.port';
 import { ACCESS_TOKEN_SIGNER, AccessTokenSignerPort } from '../ports/access-token-signer.port';
 import { SECURITY_EVENT_LOGGER, SecurityEventLoggerPort } from '../ports/security-event-logger.port';
@@ -27,6 +27,9 @@ export class ChangePasswordUseCase {
   async execute(userId: string, currentPassword: string, newPassword: string) {
     const user = await this.repo.findUserWithProfile(userId);
     if (!user) throw new UnauthorizedException('Không tìm thấy tài khoản.');
+    if (!['RECEPTIONIST', 'DOCTOR', 'LAB_MANAGER'].includes(user.role)) {
+      throw new BadRequestException('Chức năng đổi mật khẩu chỉ áp dụng cho tài khoản nhân sự.');
+    }
     if (!user.passwordHash || !verifyPassword(currentPassword, user.passwordHash)) {
       throw new UnauthorizedException('Mật khẩu hiện tại không đúng.');
     }
@@ -35,6 +38,7 @@ export class ChangePasswordUseCase {
       hashPassword(newPassword),
       Math.max(user.registrationStep ?? 1, 2),
     );
+    await this.audit.write(userId, 'PASSWORD_CHANGE_SUCCESS', 'User', userId, { role: user.role });
 
     // Activation path: firstLogin user just enrolled their face moments ago and
     // is now setting a permanent password. Skip the redundant face-verify scan

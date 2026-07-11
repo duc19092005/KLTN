@@ -4,6 +4,7 @@ import { CreateMedicalOrderDto } from '../../dto/medical-order.dto';
 import { MEDICAL_ORDER_REPOSITORY, MedicalOrderRepositoryPort } from '../ports/medical-order.repository.port';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { NotificationService } from '../../../notification/services/notification.service';
+import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
 
 /**
  * Doctor creates a lab/imaging order for a visit in their examination
@@ -16,6 +17,7 @@ export class CreateMedicalOrderUseCase {
     @Inject(MEDICAL_ORDER_REPOSITORY) private readonly repo: MedicalOrderRepositoryPort,
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
+    private readonly audit: AuditLoggerService,
   ) {}
 
   async execute(dto: CreateMedicalOrderDto, doctorUserId: string): Promise<unknown> {
@@ -44,16 +46,39 @@ export class CreateMedicalOrderUseCase {
       }
     }
 
-    const result = await this.repo.createOrderWithVisitTransition({
-      visitId: visit.id,
-      patientId: visit.patientId,
-      doctorId: currentDoctor.doctorId,
-      staffId: currentDoctor.staffId,
-      targetDepartmentId: dto.targetDepartmentId || null,
-      orderType: dto.orderType.trim(),
-      priority: dto.priority?.trim() || 'NORMAL',
-      clinicalNote: dto.clinicalNote?.trim() || undefined,
-    });
+    const result = await this.repo.createOrderWithVisitTransition(
+      {
+        visitId: visit.id,
+        patientId: visit.patientId,
+        doctorId: currentDoctor.doctorId,
+        staffId: currentDoctor.staffId,
+        targetDepartmentId: dto.targetDepartmentId || null,
+        orderType: dto.orderType.trim(),
+        priority: dto.priority?.trim() || 'NORMAL',
+        clinicalNote: dto.clinicalNote?.trim() || undefined,
+      },
+      async (order, tx) => {
+        await this.audit.recordV2({
+          entity: 'MedicalOrder',
+          entityId: order.id,
+          action: 'CREATE',
+          actorId: doctorUserId,
+          before: null,
+          after: {
+            orderId: order.id,
+            orderCode: order.orderCode,
+            visitId: order.visitId,
+            doctorId: order.doctorId,
+            targetDepartmentId: order.targetDepartmentId,
+            orderType: order.orderType,
+            priority: order.priority,
+            status: order.status,
+          },
+          metadata: { schema: 'KLTN_MEDICAL_ORDER_CREATE_AUDIT_V2' },
+          onChainStatus: 'PENDING',
+        }, tx);
+      },
+    );
 
     try {
       const order = result as any;

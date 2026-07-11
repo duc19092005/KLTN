@@ -46,8 +46,12 @@ export class CreateDoctorWithStaffUseCase {
     const passwordHash = await bcrypt.hash(DEFAULT_STAFF_PASSWORD, 12);
 
     try {
-      const doctor = await this.repo.createWithStaff(dto, employeeCode, passwordHash);
-      await this.integrity.anchorChange(doctor, 'CREATE', actorId, null);
+      const doctor = await this.repo.createWithStaff(
+        dto,
+        employeeCode,
+        passwordHash,
+        (created, tx) => this.integrity.anchorChange(created, 'CREATE', actorId, null, tx),
+      );
       return doctor;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {

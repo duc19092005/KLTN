@@ -1,4 +1,5 @@
 import { DoctorAnchorAction } from './doctor-integrity-anchor.port';
+import { Prisma } from '@prisma/client';
 
 /** DI token for the doctor re-anchor port (used by StaffModule to avoid forwardRef). */
 export const DOCTOR_REANCHOR = Symbol('DOCTOR_REANCHOR');
@@ -10,6 +11,13 @@ export const DOCTOR_REANCHOR = Symbol('DOCTOR_REANCHOR');
  * DoctorService.reanchorForStaffUpdate().
  */
 export interface DoctorReanchorPort {
+  reanchorSnapshot(
+    doctor: any,
+    actorId?: string,
+    beforeSnapshot?: Record<string, unknown> | null,
+    action?: DoctorAnchorAction,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void>;
   reanchorForStaffUpdate(
     staffProfileId: string,
     actorId?: string,

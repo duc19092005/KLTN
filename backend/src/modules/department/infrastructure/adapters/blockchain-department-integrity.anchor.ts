@@ -9,6 +9,7 @@ import {
   DepartmentIntegrityEvaluation,
 } from '../../application/ports/department-integrity-anchor.port';
 import { buildDepartmentSnapshot } from '../../domain/department-snapshot';
+import { Prisma } from '@prisma/client';
 
 /**
  * Tamper-evidence adapter for departments. Each change is recorded in
@@ -23,19 +24,17 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
     private readonly auditAnchor: AuditAnchorService,
   ) {}
 
-  async anchorChange(department: any, action: DepartmentAnchorAction, actorId?: string, before?: unknown): Promise<void> {
+  async anchorChange(
+    department: any,
+    action: DepartmentAnchorAction,
+    actorId?: string,
+    before?: unknown,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     const snapshot = buildDepartmentSnapshot(department);
-    let dataHash: string | null = null;
-    let dataSalt: string | null = null;
-
-    try {
-      const { salt, hash } = this.audit.hashSnapshot(snapshot);
-      dataHash = hash;
-      dataSalt = salt;
-      await this.prisma.department.update({ where: { id: department.id }, data: { hash256: hash, dataSalt: salt } });
-    } catch {
-      // Hash computation failed; log entry will still be created below with null hashes.
-    }
+    const { salt: dataSalt, hash: dataHash } = this.audit.hashSnapshot(snapshot);
+    const client = tx ?? this.prisma;
+    await client.department.update({ where: { id: department.id }, data: { hash256: dataHash, dataSalt } });
 
     await this.audit.record({
       entity: 'Department',
@@ -47,7 +46,7 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
       before: before ?? null,
       after: snapshot,
       onChainStatus: 'PENDING',
-    });
+    }, tx);
   }
 
   async evaluate(dept: any, skipChainCheck = false): Promise<DepartmentIntegrityEvaluation> {

@@ -26,9 +26,16 @@ export type IntegrityEvaluation = {
  */
 export interface AiModelIntegrityAnchorPort {
   /** Anchor a create/update/delete change and write the audit log. */
-  anchorChange(model: any, action: AiModelAnchorAction, actorId?: string, before?: unknown): Promise<void>;
+  anchorChange(
+    model: any,
+    action: AiModelAnchorAction,
+    actorId?: string,
+    before?: unknown,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void>;
   /** Recompute the integrity hash and compare against DB + on-chain values. */
   evaluate(model: any, skipChainCheck?: boolean): Promise<IntegrityEvaluation>;
   /** Append-only change history for an AI model (or all). */
   history(id?: string): Promise<unknown>;
 }
+import { Prisma } from '@prisma/client';

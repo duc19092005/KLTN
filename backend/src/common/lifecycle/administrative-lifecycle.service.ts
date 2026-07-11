@@ -54,7 +54,7 @@ export class AdministrativeLifecycleService {
     const current = await this.find(entity, id);
     if (!current || this.statusOf(entity, current) !== 'DELETE') throw new NotFoundException('Không tìm thấy bản ghi đã xóa.');
     const references = await this.referenceCount(entity, current);
-    if (references > 0) throw new ConflictException(`Không thể xóa vĩnh viễn vì bản ghi còn ${references} dữ liệu liên quan hoặc nhật ký tham chiếu.`);
+    if (references > 0) throw new ConflictException(`Không thể xóa vĩnh viễn vì bản ghi còn ${references} dữ liệu nghiệp vụ liên quan.`);
     const row: any = current;
     await this.prisma.$transaction(async (tx) => {
       await this.audit.recordV2({

@@ -4,6 +4,7 @@ import { PrismaService } from '../../../../infrastructure/prisma/prisma.service'
 import {
   PatientListFilter,
   PatientRepositoryPort,
+  PatientWriteHook,
   PatientWriteData,
 } from '../../application/ports/patient.repository.port';
 
@@ -45,16 +46,41 @@ export class PrismaPatientRepository implements PatientRepositoryPort {
     });
   }
 
+  async findIdentityConflict(data: PatientWriteData, excludeId?: string) {
+    const identityChecks: Prisma.PatientWhereInput[] = [];
+    if (data.citizenId?.trim()) identityChecks.push({ citizenId: data.citizenId.trim() });
+    if (data.insuranceNumber?.trim()) identityChecks.push({ insuranceNumber: data.insuranceNumber.trim() });
+    if (data.phone?.trim() && data.birthDate && data.fullName?.trim()) {
+      identityChecks.push({
+        phone: data.phone.trim(),
+        birthDate: new Date(data.birthDate),
+        fullName: { equals: data.fullName.trim(), mode: 'insensitive' },
+      });
+    }
+    if (identityChecks.length === 0) return null;
+    return this.prisma.patient.findFirst({
+      where: {
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+        OR: identityChecks,
+      },
+      select: { id: true, patientCode: true },
+    });
+  }
+
   async generatePatientCode(): Promise<string> {
     const latest = await this.prisma.patient.findFirst({ where: { patientCode: { startsWith: 'BN-' } }, orderBy: { patientCode: 'desc' }, select: { patientCode: true } });
     const lastNumber = Number(latest?.patientCode?.replace('BN-', '') || '0');
     return `BN-${String(lastNumber + 1).padStart(4, '0')}`;
   }
 
-  async create(data: PatientWriteData, patientCode: string): Promise<any> {
-    return this.prisma.patient.create({
-      data: this.toData(data, patientCode) as Prisma.PatientUncheckedCreateInput,
-      include: this.includeRelations(),
+  async create(data: PatientWriteData, patientCode: string, afterWrite?: PatientWriteHook): Promise<any> {
+    return this.prisma.$transaction(async (tx) => {
+      const patient = await tx.patient.create({
+        data: this.toData(data, patientCode) as Prisma.PatientUncheckedCreateInput,
+        include: this.includeRelations(),
+      });
+      await afterWrite?.(patient, tx);
+      return patient;
     });
   }
 
@@ -76,11 +102,15 @@ export class PrismaPatientRepository implements PatientRepositoryPort {
     return { items, total };
   }
 
-  async update(id: string, data: PatientWriteData): Promise<any> {
-    return this.prisma.patient.update({
-      where: { id },
-      data: this.toData(data) as Prisma.PatientUncheckedUpdateInput,
-      include: this.includeRelations(),
+  async update(id: string, data: PatientWriteData, afterWrite?: PatientWriteHook): Promise<any> {
+    return this.prisma.$transaction(async (tx) => {
+      const patient = await tx.patient.update({
+        where: { id },
+        data: this.toData(data) as Prisma.PatientUncheckedUpdateInput,
+        include: this.includeRelations(),
+      });
+      await afterWrite?.(patient, tx);
+      return patient;
     });
   }
 

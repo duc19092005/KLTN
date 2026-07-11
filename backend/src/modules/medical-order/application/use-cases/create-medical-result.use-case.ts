@@ -38,6 +38,19 @@ export class CreateMedicalResultUseCase {
     if (!dto.files?.length) {
       throw new BadRequestException('Vui lòng cung cấp ít nhất một file kết quả PDF hoặc hình ảnh.');
     }
+    for (const file of dto.files) {
+      if (
+        file.storageProvider?.toUpperCase() !== 'S3' ||
+        !file.bucket?.trim() ||
+        !file.objectKey?.trim() ||
+        !file.sha256?.trim()
+      ) {
+        throw new BadRequestException('File kết quả y tế phải có đầy đủ bucket, objectKey và SHA-256 của AWS S3 private.');
+      }
+      if (file.url) {
+        throw new BadRequestException('Không được lưu URL công khai cho file kết quả y tế mới.');
+      }
+    }
 
     const resultPayload = await this.repo.createResultWithTransitions(
       {
@@ -49,11 +62,11 @@ export class CreateMedicalResultUseCase {
           originalName: file.originalName,
           mimeType: file.mimeType,
           size: file.size,
-          url: file.url ?? null,
-          storageProvider: file.storageProvider || (file.objectKey ? 'S3' : 'CLOUDINARY'),
-          bucket: file.bucket ?? null,
-          objectKey: file.objectKey ?? null,
-          sha256: file.sha256 ?? null,
+          url: null,
+          storageProvider: 'S3',
+          bucket: file.bucket.trim(),
+          objectKey: file.objectKey.trim(),
+          sha256: file.sha256.trim(),
           etag: file.etag ?? null,
         })),
       },

@@ -4,6 +4,7 @@ import { VISIT_REPOSITORY, VisitRepositoryPort } from '../ports/visit.repository
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { NotificationService } from '../../../notification/services/notification.service';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { buildPatientSnapshot } from '../../../patient/domain/patient-snapshot';
 import { AuthUser } from '../../../../common/types/auth-user.type';
 
 /**
@@ -22,6 +23,16 @@ export class CreateVisitUseCase {
   async execute(dto: CreateVisitDto, user?: AuthUser): Promise<unknown> {
     if (!dto.patientId && !dto.patient) {
       throw new BadRequestException('Vui lòng chọn bệnh nhân hoặc nhập thông tin bệnh nhân mới.');
+    }
+    if (dto.patientId && dto.patient) {
+      throw new BadRequestException('Chỉ được chọn bệnh nhân có sẵn hoặc nhập bệnh nhân mới, không được gửi đồng thời cả hai.');
+    }
+    if (
+      dto.patient &&
+      ![dto.patient.phone, dto.patient.citizenId, dto.patient.insuranceNumber, dto.patient.emergencyContact]
+        .some((value) => value?.trim())
+    ) {
+      throw new BadRequestException('Hồ sơ bệnh nhân mới phải có ít nhất một thông tin liên hệ hoặc định danh hợp lệ.');
     }
 
     const department = await this.repo.findDepartmentForVisit(dto.departmentId);
@@ -46,27 +57,25 @@ export class CreateVisitUseCase {
       }
     }
 
-    const result = await this.repo.createVisitWithOptionalPatient({
-      patientId: dto.patientId,
-      patient: dto.patient
-        ? {
-            fullName: dto.patient.fullName,
-            gender: dto.patient.gender,
-            birthDate: dto.patient.birthDate,
-            citizenId: dto.patient.citizenId,
-            phone: dto.patient.phone,
-            address: dto.patient.address,
-            insuranceNumber: dto.patient.insuranceNumber,
-            emergencyContact: dto.patient.emergencyContact,
-          }
-        : undefined,
-      departmentId: dto.departmentId,
-      staffId: assignedStaffId ?? null,
-    });
-
-    try {
-      const visit = result as any;
-      if (visit && visit.id) {
+    const result = await this.repo.createVisitWithOptionalPatient(
+      {
+        patientId: dto.patientId,
+        patient: dto.patient
+          ? {
+              fullName: dto.patient.fullName,
+              gender: dto.patient.gender,
+              birthDate: dto.patient.birthDate,
+              citizenId: dto.patient.citizenId,
+              phone: dto.patient.phone,
+              address: dto.patient.address,
+              insuranceNumber: dto.patient.insuranceNumber,
+              emergencyContact: dto.patient.emergencyContact,
+            }
+          : undefined,
+        departmentId: dto.departmentId,
+        staffId: assignedStaffId ?? null,
+      },
+      async (visit, tx) => {
         await this.auditLogger.recordV2({
           entity: 'Visit',
           entityId: visit.id,
@@ -81,11 +90,27 @@ export class CreateVisitUseCase {
             status: visit.status,
           },
           metadata: { schema: 'KLTN_VISIT_CREATE_AUDIT_V2' },
+        }, tx);
+      },
+      async (patient, tx) => {
+        const snapshot = buildPatientSnapshot(patient);
+        const { salt, hash } = this.auditLogger.hashSnapshot(snapshot);
+        await tx.patient.update({
+          where: { id: patient.id },
+          data: { hash256: hash, dataSalt: salt },
         });
-      }
-    } catch (err) {
-      console.error('Failed to write audit log for visit registration:', err);
-    }
+        await this.auditLogger.recordV2({
+          entity: 'Patient',
+          entityId: patient.id,
+          action: 'CREATE',
+          actorId: user?.sub ?? null,
+          before: null,
+          after: snapshot,
+          metadata: { schema: 'KLTN_PATIENT_CREATE_AUDIT_V2', source: 'VISIT_INTAKE' },
+          onChainStatus: 'PENDING',
+        }, tx);
+      },
+    );
 
     try {
       const visit = result as any;

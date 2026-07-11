@@ -23,7 +23,14 @@ export type DoctorIntegrityEvaluation = {
  * salted hash goes on-chain.
  */
 export interface DoctorIntegrityAnchorPort {
-  anchorChange(doctor: any, action: DoctorAnchorAction, actorId?: string, before?: unknown): Promise<void>;
+  anchorChange(
+    doctor: any,
+    action: DoctorAnchorAction,
+    actorId?: string,
+    before?: unknown,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void>;
   evaluate(doctor: any, skipChainCheck?: boolean): Promise<DoctorIntegrityEvaluation>;
   history(id?: string): Promise<unknown>;
 }
+import { Prisma } from '@prisma/client';

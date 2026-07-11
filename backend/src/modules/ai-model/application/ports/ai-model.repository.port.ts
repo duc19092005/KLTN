@@ -39,19 +39,30 @@ export type AiModelListFilter = {
   status?: OperationalStatus;
 };
 
+export type AvailableAiModel = {
+  id: string;
+  modelName: string;
+  modelVersion: string;
+  recommendedSpecialty: string | null;
+  status: OperationalStatus;
+  aiQualities: Array<{ trustablePercent: number }>;
+};
+export type AiModelWriteHook = (model: any, tx: Prisma.TransactionClient) => Promise<void>;
+
 /**
  * Persistence boundary for the AiModelRegistry aggregate. The Prisma
  * implementation keeps the include shapes and query filters unchanged.
  */
 export interface AiModelRepositoryPort {
-  create(data: CreateAiModelData): Promise<any>;
-  update(id: string, data: UpdateAiModelData): Promise<any>;
-  softDelete(id: string): Promise<any>;
+  create(data: CreateAiModelData, afterWrite?: AiModelWriteHook): Promise<any>;
+  update(id: string, data: UpdateAiModelData, afterWrite?: AiModelWriteHook): Promise<any>;
+  softDelete(id: string, afterWrite?: AiModelWriteHook): Promise<any>;
   findAll(filter: AiModelListFilter): Promise<any[]>;
   findManyPaginated(filter: AiModelListFilter, skip: number, take: number): Promise<{ items: any[]; total: number }>;
   findByIdOrThrow(id: string): Promise<any>;
   findById(id: string): Promise<any | null>;
   findAllOrdered(): Promise<any[]>;
+  findAvailableForDiagnosis(): Promise<AvailableAiModel[]>;
 }
 
 /** Builds the where clause for AI model listing, shared by repo internals. */

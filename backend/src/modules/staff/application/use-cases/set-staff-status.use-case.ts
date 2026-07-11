@@ -27,18 +27,30 @@ export class SetStaffStatusUseCase {
     const before = buildStaffSnapshot(staff);
     const isDoctor = Boolean(staff.doctorProfile);
     const doctorBefore = isDoctor ? buildUnifiedDoctorSnapshot({ ...staff.doctorProfile, staffProfile: staff }) : null;
-    const updated = await this.repo.setUserStatus(staff.userId, status);
-
-    if (isDoctor) {
-      // Staff is a doctor → re-anchor the unified doctor hash
-      const action = status === UserStatus.DELETE ? 'DELETE' : 'UPDATE';
-      await this.doctorReanchor.reanchorForStaffUpdate(id, actorId, doctorBefore, action);
-    } else if (updated.staffProfile) {
-      // Ẩn/hiện tài khoản là thay đổi trạng thái mềm, không phải xóa hồ sơ.
-      // Truyền kèm user mới để snapshot after có `status` thay vì null.
-      const action = status === UserStatus.DELETE ? 'DELETE' : 'UPDATE';
-      await this.integrity.anchorChange({ ...updated.staffProfile, user: updated }, action, actorId, before);
-    }
+    const action = status === UserStatus.DELETE ? 'DELETE' : 'UPDATE';
+    const updated = await this.repo.setUserStatus(
+      staff.userId,
+      status,
+      async (updatedUser, tx) => {
+        if (isDoctor && updatedUser.staffProfile?.doctorProfile) {
+          await this.doctorReanchor.reanchorSnapshot(
+            { ...updatedUser.staffProfile.doctorProfile, staffProfile: { ...updatedUser.staffProfile, user: updatedUser } },
+            actorId,
+            doctorBefore,
+            action,
+            tx,
+          );
+        } else if (updatedUser.staffProfile) {
+          await this.integrity.anchorChange(
+            { ...updatedUser.staffProfile, user: updatedUser },
+            action,
+            actorId,
+            before,
+            tx,
+          );
+        }
+      },
+    );
 
     return updated;
   }

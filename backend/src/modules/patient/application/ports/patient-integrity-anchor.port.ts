@@ -16,7 +16,8 @@ export type PatientIntegrityEvaluation = {
  * Interface representing the boundary for Patient integrity auditing.
  */
 export interface PatientIntegrityAnchorPort {
-  anchorChange(patient: any, action: string, actorId?: string, before?: unknown): Promise<void>;
+  anchorChange(patient: any, action: string, actorId?: string, before?: unknown, tx?: Prisma.TransactionClient): Promise<void>;
   evaluate(patient: any, skipChainCheck?: boolean): Promise<PatientIntegrityEvaluation>;
   history(id?: string): Promise<any[]>;
 }
+import { Prisma } from '@prisma/client';

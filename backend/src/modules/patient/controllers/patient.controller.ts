@@ -3,21 +3,22 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
-import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
 import { CreatePatientDto, PatientQueryDto, UpdatePatientDto } from '../dto/patient.dto';
 import { PatientService } from '../services/patient.service';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { AuthUser } from '../../../common/types/auth-user.type';
 
 @ApiTags('Patients')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, FaceStepUpGuard)
-@Roles('ADMIN', 'RECEPTIONIST', 'DOCTOR')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ADMIN', 'RECEPTIONIST')
 @Controller('patients')
 export class PatientController {
   constructor(private readonly patientService: PatientService) {}
 
   @Post()
-  create(@Body() dto: CreatePatientDto) {
-    return this.patientService.create(dto);
+  create(@Body() dto: CreatePatientDto, @CurrentUser() user: AuthUser) {
+    return this.patientService.create(dto, user.sub);
   }
 
   @Get()
@@ -31,7 +32,7 @@ export class PatientController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdatePatientDto) {
-    return this.patientService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdatePatientDto, @CurrentUser() user: AuthUser) {
+    return this.patientService.update(id, dto, user.sub);
   }
 }

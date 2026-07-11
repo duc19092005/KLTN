@@ -24,7 +24,7 @@ export class ListVisitsUseCase {
     if (user?.role === UserRole.DOCTOR) {
       const doctor = await this.repo.findDoctorStaffByUserId(user.sub);
       departmentId = doctor?.departmentId ?? '__no-doctor-department__';
-      staffId = undefined;
+      staffId = doctor?.staffId ?? '__no-doctor-staff__';
     }
 
     const { items, total } = await this.repo.findManyPaginated(

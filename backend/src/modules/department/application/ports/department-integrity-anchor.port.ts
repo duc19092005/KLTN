@@ -21,7 +21,14 @@ export type DepartmentIntegrityEvaluation = {
  * integrity evaluation. Only hashes/Merkle roots go on-chain.
  */
 export interface DepartmentIntegrityAnchorPort {
-  anchorChange(department: any, action: DepartmentAnchorAction, actorId?: string, before?: unknown): Promise<void>;
+  anchorChange(
+    department: any,
+    action: DepartmentAnchorAction,
+    actorId?: string,
+    before?: unknown,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void>;
   evaluate(department: any, skipChainCheck?: boolean): Promise<DepartmentIntegrityEvaluation>;
   history(id?: string): Promise<unknown>;
 }
+import { Prisma } from '@prisma/client';

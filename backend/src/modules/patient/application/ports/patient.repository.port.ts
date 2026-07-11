@@ -19,6 +19,8 @@ export type PatientWriteData = {
   emergencyContact?: string;
 };
 
+export type PatientWriteHook = (patient: any, tx: Prisma.TransactionClient) => Promise<void>;
+
 /**
  * Persistence boundary for the Patient aggregate. The Prisma implementation
  * keeps the include shapes (recent visits), the field-mapping/normalization, and
@@ -27,8 +29,10 @@ export type PatientWriteData = {
 export interface PatientRepositoryPort {
   findByIdWithRelations(id: string): Promise<any | null>;
   findByPatientCode(patientCode: string): Promise<any | null>;
+  findIdentityConflict(data: PatientWriteData, excludeId?: string): Promise<{ id: string; patientCode: string } | null>;
   generatePatientCode(): Promise<string>;
-  create(data: PatientWriteData, patientCode: string): Promise<any>;
+  create(data: PatientWriteData, patientCode: string, afterWrite?: PatientWriteHook): Promise<any>;
   findManyPaginated(filter: PatientListFilter, skip: number, take: number): Promise<{ items: unknown[]; total: number }>;
-  update(id: string, data: PatientWriteData): Promise<any>;
+  update(id: string, data: PatientWriteData, afterWrite?: PatientWriteHook): Promise<any>;
 }
+import { Prisma } from '@prisma/client';
