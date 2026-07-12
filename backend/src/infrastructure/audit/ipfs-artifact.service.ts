@@ -121,9 +121,10 @@ export class IpfsArtifactService {
   }
 
   private pinataGatewayUrl(): string {
-    return (process.env.PINATA_GATEWAY_URL || process.env.IPFS_GATEWAY_URL || 'https://gateway.pinata.cloud')
+    const url = (process.env.PINATA_GATEWAY_URL || process.env.IPFS_GATEWAY_URL || 'https://gateway.pinata.cloud')
       .trim()
       .replace(/\/$/, '');
+    return url.includes('://') ? url : `https://${url}`;
   }
 
   private isPinataUrl(value?: string | null): boolean {
