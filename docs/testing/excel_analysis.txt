@@ -1,0 +1,172 @@
+=== EXCEL STRUCTURE ANALYSIS ===
+Total Sheets: 13
+Sheet Names: FunctionList, Test scenario, Xác thực nhân viên, Cổng thông tin bệnh nhân, Quy trình khám bệnh, Phòng Ban, Nhân sự, Bác sĩ, Mô hình AI, Dữ liệu đã xóa, Audit và Blockchain, Thông báo, Thông tin cá nhân
+
+--- Sheet: FunctionList ---
+Total Rows: 22
+Non-empty Rows: 22
+Sample Rows:
+  Row 0: ["Feature #","Feature Name","Function ID","Function","Priority","Description","Link Test scenario","Actual Result","Pass/Failed","Notes"]
+  Row 1: [1,"Xác thực nhân viên","F1.1","Đăng nhập và bảo vệ phiên","Critical","Cho phép nhân viên đăng nhập, đăng xuất và bảo vệ phiên làm việc để người khác không sử dụng lại phiên cũ.","#'Test scenario'!A2"]
+  Row 2: [null,"Xác thực nhân viên","F1.2","Xác thực khuôn mặt và lần đăng nhập đầu","Critical","Xác minh đúng người sử dụng bằng khuôn mặt và hướng dẫn nhân viên mới hoàn tất thiết lập tài khoản.","#'Test scenario'!A3"]
+  Row 3: [null,"Xác thực nhân viên","F1.3","Đổi và khôi phục mật khẩu","High","Cho phép đổi hoặc đặt lại mật khẩu trong khi vẫn bảo vệ tài khoản khỏi yêu cầu không hợp lệ.","#'Test scenario'!A6"]
+  Row 4: [2,"Cổng thông tin bệnh nhân","F2.1","Đăng nhập bệnh nhân bằng OTP hoặc mật khẩu","Critical","Cho phép bệnh nhân đăng nhập an toàn bằng mã OTP có thời hạn hoặc bằng mật khẩu.","#'Test scenario'!A9"]
+  Row 5: [null,"Cổng thông tin bệnh nhân","F2.2","Quản lý hồ sơ bệnh nhân liên kết","Critical","Cho phép xem và tạo hồ sơ được liên kết với số điện thoại, đồng thời ngăn xem hồ sơ của người khác.","#'Test scenario'!A13"]
+  Row 6: [null,"Cổng thông tin bệnh nhân","F2.3","Xem lịch sử khám và file kết quả","Critical","Cho phép bệnh nhân xem lịch sử, chi tiết lượt khám và file kết quả thuộc hồ sơ mình được phép xem.","#'Test scenario'!A12"]
+  Row 7: [3,"Đặt lịch và tiếp nhận","F3.1","Đặt, xem và hủy lịch khám","Critical","Cho phép bệnh nhân chọn chuyên khoa, bác sĩ, thời gian, xác nhận và quản lý lịch hẹn.","#'Test scenario'!A14"]
+
+--- Sheet: Test scenario ---
+Total Rows: 139
+Non-empty Rows: 139
+Sample Rows:
+  Row 0: ["Feature #","Function #","Function name","Functions description","Test scenario #","Test Scenario description","Priority","Category","Link Testcases","Actual Result","Pass/Failed","Notes"]
+  Row 1: ["F1","F1.1","Đăng nhập và bảo vệ phiên","Cho phép nhân viên đăng nhập, đăng xuất và bảo vệ phiên làm việc để người khác không sử dụng lại phiên cũ.","S-AUTH-1","Đăng nhập nhân viên","Critical","Normal flow","#'Xác thực nhân viên'!A2"]
+  Row 2: ["F1","F1.2","Xác thực khuôn mặt và lần đăng nhập đầu","Xác minh đúng người sử dụng bằng khuôn mặt và hướng dẫn nhân viên mới hoàn tất thiết lập tài khoản.","S-AUTH-2","Lần đăng nhập đầu tiên","Critical","Normal flow","#'Xác thực nhân viên'!A8"]
+  Row 3: ["F1","F1.1","Đăng nhập và bảo vệ phiên","Cho phép nhân viên đăng nhập, đăng xuất và bảo vệ phiên làm việc để người khác không sử dụng lại phiên cũ.","S-AUTH-3","Đăng xuất và bảo vệ phiên","Critical","Negative case","#'Xác thực nhân viên'!A10"]
+  Row 4: ["F1","F1.2","Xác thực khuôn mặt và lần đăng nhập đầu","Xác minh đúng người sử dụng bằng khuôn mặt và hướng dẫn nhân viên mới hoàn tất thiết lập tài khoản.","S-AUTH-4","Xác thực khuôn mặt","Critical","Normal flow","#'Xác thực nhân viên'!A13"]
+  Row 5: ["F1","F1.3","Đổi và khôi phục mật khẩu","Cho phép đổi hoặc đặt lại mật khẩu trong khi vẫn bảo vệ tài khoản khỏi yêu cầu không hợp lệ.","S-AUTH-5","Đổi mật khẩu","High","Normal flow","#'Xác thực nhân viên'!A15"]
+  Row 6: ["F1","F1.3","Đổi và khôi phục mật khẩu","Cho phép đổi hoặc đặt lại mật khẩu trong khi vẫn bảo vệ tài khoản khỏi yêu cầu không hợp lệ.","S-AUTH-6","Quên mật khẩu","High","Normal flow","#'Xác thực nhân viên'!A19"]
+  Row 7: ["F1","F1.2","Xác thực khuôn mặt và lần đăng nhập đầu","Xác minh đúng người sử dụng bằng khuôn mặt và hướng dẫn nhân viên mới hoàn tất thiết lập tài khoản.","S-AUTH-7","Phân quyền màn hình","Critical","Negative case","#'Xác thực nhân viên'!A22"]
+
+--- Sheet: Xác thực nhân viên ---
+Total Rows: 23
+Non-empty Rows: 23
+Sample Rows:
+  Row 0: ["Test Scenario #","Scenario Description","Test Case #","Test Case Description","Pre-condition","Steps","Data Test Example","Expected Result","Actual Result","Pass/Failed","Notes"]
+  Row 1: ["S-AUTH-1","Đăng nhập nhân viên","TC-AUTH-001","Đăng nhập thành công bằng tài khoản nhân viên đang hoạt động","Tài khoản nhân viên đã được tạo, chưa bị khóa và có mật khẩu hợp lệ","1. Mở màn hình đăng nhập nhân viên","Tên đăng nhập: admin01; Mật khẩu: mật khẩu kiểm thử hợp lệ","Hệ thống xác nhận đúng tài khoản. Nếu đây không phải lần đăng nhập đầu tiên, người dùng được chuyển đến màn hình làm việc đúng với vai trò của mình. Không hiển thị mật khẩu trên giao diện."]
+  Row 2: [null,null,null,null,null,"2. Nhập tên đăng nhập và mật khẩu hợp lệ"]
+  Row 3: [null,null,null,null,null,"3. Nhấn nút đăng nhập"]
+  Row 4: ["S-AUTH-1","Đăng nhập nhân viên","TC-AUTH-002","Không đăng nhập khi mật khẩu không đúng","Tài khoản nhân viên đang hoạt động","1. Mở màn hình đăng nhập","admin01 / SaiMatKhau123!","Hệ thống không cho vào trang làm việc, không cấp phiên đăng nhập và hiển thị thông báo cho biết thông tin đăng nhập không đúng mà không tiết lộ tên tài khoản có tồn tại hay không."]
+  Row 5: [null,null,null,null,null,"2. Nhập đúng tên đăng nhập nhưng sai mật khẩu"]
+  Row 6: [null,null,null,null,null,"3. Nhấn đăng nhập"]
+  Row 7: ["S-AUTH-2","Lần đăng nhập đầu tiên","TC-AUTH-003","Yêu cầu đăng ký khuôn mặt trước khi đổi mật khẩu lần đầu","Tài khoản mới được cấp, thuộc trạng thái lần đăng nhập đầu tiên và chưa có dữ liệu khuôn mặt","1. Đăng nhập bằng tài khoản mới","Nhân sự mới; firstLogin=true; hasFace=false","Người dùng chưa được vào trang làm việc. Hệ thống chuyển đến bước xác thực/đăng ký khuôn mặt; sau khi có khuôn mặt mới cho phép tiếp tục đổi mật khẩu."]
+
+--- Sheet: Cổng thông tin bệnh nhân ---
+Total Rows: 28
+Non-empty Rows: 28
+Sample Rows:
+  Row 0: ["Test Scenario #","Scenario Description","Test Case #","Test Case Description","Pre-condition","Steps","Data Test Example","Expected Result","Actual Result","Pass/Failed","Notes"]
+  Row 1: ["S-PAT-1","Nhận mã OTP","TC-PAT-001","Gửi OTP cho số điện thoại đúng định dạng","Số điện thoại thuộc luồng đăng nhập bệnh nhân và thiết bị có kết nối mạng","1. Mở ứng dụng bệnh nhân","0901234567","Hệ thống tiếp nhận yêu cầu, hiển thị thời gian có thể gửi lại là 60 giây và thời điểm OTP hết hạn sau 5 phút. Không hiển thị OTP trong giao diện hoặc phản hồi sản phẩm."]
+  Row 2: [null,null,null,null,null,"2. Nhập số điện thoại Việt Nam hợp lệ"]
+  Row 3: [null,null,null,null,null,"3. Nhấn nhận mã OTP"]
+  Row 4: ["S-PAT-1","Nhận mã OTP","TC-PAT-002","Từ chối số điện thoại sai định dạng","Đang ở màn hình nhập số điện thoại","1. Nhập số điện thoại không đúng định dạng Việt Nam","12345","Hệ thống hiển thị “Số điện thoại không đúng định dạng Việt Nam.” Không tạo yêu cầu OTP và không chuyển sang bước xác minh."]
+  Row 5: [null,null,null,null,null,"2. Nhấn nhận mã OTP"]
+  Row 6: ["S-PAT-2","Gửi lại OTP","TC-PAT-003","Không gửi OTP mới trước khi hết 60 giây","OTP vừa được gửi thành công","1. Nhấn gửi lại OTP ngay khi bộ đếm vẫn còn thời gian","Gửi lại sau 10 giây","Hệ thống không tạo thêm OTP mới, giữ bộ đếm đến thời điểm có thể gửi lại và không gửi nhiều tin nhắn liên tiếp."]
+  Row 7: [null,null,null,null,null,"2. Quan sát thông tin đếm ngược"]
+
+--- Sheet: Quy trình khám bệnh ---
+Total Rows: 267
+Non-empty Rows: 267
+Sample Rows:
+  Row 0: ["Flow Step","Test Scenario #","Scenario Description","Test Case #","Test Case Description","Pre-condition","Steps","Data Test Example","Expected Result","Actual Result","Pass/Failed","Notes"]
+  Row 1: ["01. Đặt khám online"]
+  Row 2: ["01. Đặt khám online","S1.1","Truy cập chức năng đặt khám Online","TC1.1.1","Kiểm tra hiển thị điểm vào chức năng đặt lịch khám tại nhà","Bệnh nhân đã đăng nhập mobile bằng OTP hợp lệ và đang ở màn hình Trang chủ/Hồ sơ","1. Quan sát các chức năng trên màn hình chính",null,"Hiển thị luồng đặt khám Online với các bước chọn hồ sơ, chuyên khoa, bác sĩ, ngày giờ, xác nhận và QR check-in"]
+  Row 3: [null,null,null,null,null,null,"2. Chọn “Đặt lịch khám tại nhà”"]
+  Row 4: ["01. Đặt khám online","S1.2","Chọn hồ sơ bệnh nhân","TC1.2.1","Hiển thị danh sách hồ sơ bệnh nhân liên kết với số điện thoại đăng nhập","Tài khoản bệnh nhân đã đăng nhập và có ít nhất 1 hồ sơ liên kết","1. Mở chức năng đặt lịch khám tại nhà",null,"Màn hình hiển thị tiêu đề “Chọn hồ sơ”, nút “Thêm hồ sơ”, danh sách hồ sơ gồm họ tên, mã bệnh nhân, số điện thoại đã che một phần"]
+  Row 5: [null,null,null,null,null,null,"2. Quan sát màn hình “Chọn hồ sơ”"]
+  Row 6: ["01. Đặt khám online","S1.2","Chọn hồ sơ bệnh nhân","TC1.2.2","Chọn một hồ sơ hợp lệ để đặt lịch","Đang ở màn hình “Chọn hồ sơ”, danh sách có hồ sơ hợp lệ","1. Nhấn vào hồ sơ cần đặt lịch","Nguyễn Văn A - BN000001","Hồ sơ được chọn và hệ thống chuyển sang bước “Chọn chuyên khoa”"]
+  Row 7: ["01. Đặt khám online","S1.2","Chọn hồ sơ bệnh nhân","TC1.2.3","Chuyển sang tạo hồ sơ mới khi chưa có hồ sơ phù hợp","Đang ở màn hình “Chọn hồ sơ”","1. Nhấn nút “Thêm hồ sơ”",null,"Ứng dụng chuyển sang màn hình “Tạo hồ sơ bệnh nhân” để nhập thông tin người bệnh mới"]
+
+--- Sheet: Phòng Ban ---
+Total Rows: 199
+Non-empty Rows: 199
+Sample Rows:
+  Row 0: ["Test Scenario #","Scenario Description","Test Case #","Test Case Description","Pre-condition","Steps","Data Test Example","Expected Result","Actual Result","Pass/Failed","Notes"]
+  Row 1: ["S2.1","Tạo phòng ban - Kiểm tra hiển thị giao diện tạo phòng ban","TC2.1.1","Kiểm tra popup “Tạo phòng ban” hiển thị đầy đủ các trường","Admin đã đăng nhập và đang ở màn hình quản lý phòng ban","1. Click nút tạo phòng ban",null,"Popup hiển thị đúng tiêu đề “Tạo phòng ban”, có các trường: Mã phòng ban, Tên phòng ban, Tầng, Loại phòng ban, Mô tả nhiệm vụ, nút Đóng, nút Tạo phòng ban"]
+  Row 2: [null,null,null,null,null,"2. Quan sát popup"]
+  Row 3: ["S2.2","Tạo phòng ban thành công","TC2.2.1","Tạo phòng ban với dữ liệu hợp lệ đầy đủ","Admin đã đăng nhập, mã phòng ban chưa tồn tại","1. Click nút tạo phòng ban",null,"Tạo phòng ban thành công, hiển thị thông báo \"Tạo phòng ban thành công!\" toast"]
+  Row 4: [null,null,null,null,null,"2. Nhập mã phòng ban","PB-XRAY"]
+  Row 5: [null,null,null,null,null,"3. Nhập tên phòng ban ","X-Ray"]
+  Row 6: [null,null,null,null,null,"4. Nhập tầng",2]
+  Row 7: [null,null,null,null,null,"5. Chọn loại phòng ban","Phòng khám"]
+
+--- Sheet: Nhân sự ---
+Total Rows: 109
+Non-empty Rows: 109
+Sample Rows:
+  Row 0: ["Test Scenario #","Scenario Description","Test Case #","Test Case Description","Pre-condition","Steps","Data Test Example","Expected Result","Actual Result","Pass/Failed","Notes"]
+  Row 1: ["S3.1","Thêm nhân sự","TC3.1.1","Kiểm tra popup “Thêm nhân sự” hiển thị đầy đủ trường","Admin đã đăng nhập và đang ở màn hình quản lý nhân sự","1. Click nút “Thêm nhân sự”",null,"Popup hiển thị tiêu đề “Thêm nhân sự” và các trường: Loại nhân sự, Họ tên, Tên đăng nhập, Email, Số điện thoại, CCCD/CMND, Ngày sinh, Giới tính, Phòng ban, Chức danh, Địa chỉ, nút Đóng và nút Thêm nhân sự"]
+  Row 2: [null,null,null,null,null,"2. Quan sát popup thêm nhân sự"]
+  Row 3: ["S3.1","Thêm nhân sự","TC3.1.2","Thêm nhân sự với dữ liệu hợp lệ đầy đủ","Popup Thêm nhân sự đang mở","1. Chọn loại nhân sự","Lễ tân","Tạo nhân sự thành công! Mật khẩu mặc định: 123456"]
+  Row 4: [null,null,null,null,null,"2. Nhập họ tên","Nguyễn Văn A"]
+  Row 5: [null,null,null,null,null,"3. Nhập tên đăng nhập","nguyenvana01"]
+  Row 6: [null,null,null,null,null,"4. Nhập email","nguyenvana01@gmail.com"]
+  Row 7: [null,null,null,null,null,"5. Nhập số điện thoại","0912345678"]
+
+--- Sheet: Bác sĩ ---
+Total Rows: 112
+Non-empty Rows: 112
+Sample Rows:
+  Row 0: ["Test Scenario #","Scenario Description","Test Case #","Test Case Description","Pre-condition","Steps","Data Test Example","Expected Result","Actual Result","Pass/Failed","Notes"]
+  Row 1: ["S4.1","Thêm bác sĩ","TC4.1.1","Kiểm tra popup “Thêm bác sĩ” hiển thị đầy đủ trường","Admin đã đăng nhập và đang ở màn hình quản lý bác sĩ","1. Click nút “Thêm bác sĩ”",null,"Popup hiển thị tiêu đề “Thêm bác sĩ” và đầy đủ các nhóm trường thông tin tài khoản, nhân sự, chuyên môn, nút Đóng và nút Thêm bác sĩ"]
+  Row 2: [null,null,null,null,null,"2. Quan sát popup thêm bác sĩ"]
+  Row 3: ["S4.1","Thêm bác sĩ","TC4.1.2","Thêm bác sĩ với dữ liệu hợp lệ đầy đủ","Popup Thêm bác sĩ đang mở","1. Tải ảnh đại diện bác sĩ","avatar bác sĩ","Hiển thị thông báo “Tạo bác sĩ mới thành công! Mật khẩu mặc định là: 123456” và bác sĩ xuất hiện trong danh sách"]
+  Row 4: [null,null,null,null,null,"2. Nhập họ tên","Nguyễn Văn Bác Sĩ"]
+  Row 5: [null,null,null,null,null,"3. Nhập tên đăng nhập","bacsi01"]
+  Row 6: [null,null,null,null,null,"4. Nhập email","bacsi01@gmail.com"]
+  Row 7: [null,null,null,null,null,"5. Nhập số điện thoại","0912345678"]
+
+--- Sheet: Mô hình AI ---
+Total Rows: 79
+Non-empty Rows: 79
+Sample Rows:
+  Row 0: ["Test Scenario #","Scenario Description","Test Case #","Test Case Description","Pre-condition","Steps","Data Test Example","Expected Result","Actual Result","Pass/Failed","Notes"]
+  Row 1: ["S5.1","Thêm mô hình AI","TC5.1.1","Kiểm tra popup “Thêm mô hình AI” hiển thị đầy đủ trường","Admin đã đăng nhập và đang ở màn hình quản lý mô hình AI","1. Click nút “Thêm mô hình AI”",null,"Popup hiển thị tiêu đề “Thêm mô hình AI”, các nhóm Thông tin mô hình, Kết nối và bảo mật, Kiểm tra kết nối, nút Hủy và nút Thêm mô hình AI"]
+  Row 2: [null,null,null,null,null,"2. Quan sát popup thêm mô hình AI"]
+  Row 3: ["S5.1","Thêm mô hình AI","TC5.1.2","Thêm mô hình AI qua API với dữ liệu hợp lệ","Popup Thêm mô hình AI đang mở","1. Nhập tên mô hình","OpenAI Medical","Hiển thị thông báo “Đã thêm mô hình OpenAI Medical.” và mô hình xuất hiện trong danh sách"]
+  Row 4: [null,null,null,null,null,"2. Chọn nền tảng","OpenAI"]
+  Row 5: [null,null,null,null,null,"3. Chọn mô hình","gpt-4o"]
+  Row 6: [null,null,null,null,null,"4. Chọn chuyên khoa","Nội tổng quát"]
+  Row 7: [null,null,null,null,null,"5. Nhập khóa API / Token","sk-test-token"]
+
+--- Sheet: Dữ liệu đã xóa ---
+Total Rows: 109
+Non-empty Rows: 109
+Sample Rows:
+  Row 0: ["Test Scenario #","Scenario Description","Test Case #","Test Case Description","Pre-condition","Steps","Data Test Example","Expected Result","Actual Result","Pass/Failed","Notes"]
+  Row 1: ["S-DEL-1","Xem dữ liệu đã xóa","TC-DEL-001","Hiển thị danh sách dữ liệu đã xóa theo từng nhóm","Admin đã đăng nhập và hệ thống có dữ liệu đã xóa","1. Mở mục Dữ liệu đã xóa","Mỗi nhóm có ít nhất một bản ghi trạng thái DELETE","Danh sách chỉ hiển thị dữ liệu đã xóa của nhóm đang chọn. Mỗi bản ghi có tên hoặc mã giúp Admin nhận biết; dữ liệu đang hoạt động không xuất hiện trong danh sách này."]
+  Row 2: [null,null,null,null,null,"2. Lần lượt chọn Nhân sự, Bác sĩ, Mô hình AI và Phòng ban"]
+  Row 3: ["S-DEL-1","Xem dữ liệu đã xóa","TC-DEL-002","Hiển thị trạng thái dễ hiểu khi không có dữ liệu đã xóa","Admin đã đăng nhập; nhóm được chọn không có bản ghi đã xóa","1. Mở Dữ liệu đã xóa","Nhóm Phòng ban không có status DELETE","Giao diện hiển thị trạng thái trống với nội dung dễ hiểu, không hiển thị dòng dữ liệu giả và vẫn cho phép chuyển sang nhóm khác."]
+  Row 4: [null,null,null,null,null,"2. Chọn nhóm không có dữ liệu"]
+  Row 5: ["S-DEL-2","Khôi phục dữ liệu","TC-DEL-003","Khôi phục nhân sự đã xóa","Admin đã đăng nhập; nhân sự đang ở trạng thái đã xóa và không có xung đột định danh","1. Mở nhóm Nhân sự","Nhân sự NV001 trạng thái DELETE","Bản ghi biến mất khỏi Dữ liệu đã xóa và xuất hiện lại trong danh sách nhân sự có thể quản lý. Hệ thống không tạo một nhân sự mới trùng thông tin."]
+  Row 6: [null,null,null,null,null,"2. Chọn bản ghi cần khôi phục"]
+  Row 7: [null,null,null,null,null,"3. Xác nhận khôi phục"]
+
+--- Sheet: Audit và Blockchain ---
+Total Rows: 15
+Non-empty Rows: 15
+Sample Rows:
+  Row 0: ["Test Scenario #","Scenario Description","Test Case #","Test Case Description","Pre-condition","Steps","Data Test Example","Expected Result","Actual Result","Pass/Failed","Notes"]
+  Row 1: ["KB-KT-01","Xem audit logs và kiểm tra che dữ liệu nhạy cảm","CKT-001","Admin xem danh sách audit logs không cần quét mặt lại","Admin đã đăng nhập thành công; hệ thống đã có ít nhất một audit log của thao tác lưu trữ","Bước 1: Tại menu quản trị, mở màn hình Audit và Blockchain.\nBước 2: Quan sát danh sách audit logs hiển thị trên màn hình.\nBước 3: Mở chi tiết một audit log bất kỳ.\nBước 4: Kiểm tra hệ thống có yêu cầu quét mặt lại hay không.","Tài khoản: Admin; audit log mẫu là thao tác cập nhật bệnh nhân BN-KT-001 lúc 10:00","Admin xem được danh sách và chi tiết audit logs bằng session hiện tại. Hệ thống không yêu cầu quét mặt lại khi chỉ xem audit logs.","Đạt. Chức năng xem audit logs hoạt động bằng session Admin hiện tại và không yêu cầu face step-up.","Passed","Package: Audit logs"]
+  Row 2: ["KB-KT-01","Xem audit logs và kiểm tra che dữ liệu nhạy cảm","CKT-002","Người không phải Admin không được xem audit logs quản trị","Có tài khoản nhân sự không phải Admin đã đăng nhập và xác thực hợp lệ","Bước 1: Đăng nhập bằng tài khoản bác sĩ hoặc lễ tân.\nBước 2: Truy cập màn hình Audit và Blockchain từ đường dẫn hoặc menu nếu có.\nBước 3: Quan sát phản hồi của hệ thống.\nBước 4: Kiểm tra người dùng có nhìn thấy actor, entity, hash, proof hoặc nội dung audit log hay không.","Tài khoản: Doctor hoặc Receptionist; màn hình: Audit và Blockchain","Hệ thống từ chối truy cập hoặc điều hướng về khu vực đúng vai trò. Người dùng không thấy danh sách audit logs, hash, proof hoặc lịch sử thao tác quản trị.","Đạt. Người không đủ quyền không xem được audit logs quản trị.","Passed","Package: Audit logs"]
+  Row 3: ["KB-KT-01","Xem audit logs và kiểm tra che dữ liệu nhạy cảm","CKT-003","Audit log không hiển thị plaintext bệnh án, PII nhạy cảm, ciphertext, key hoặc artifact IPFS","Có audit log liên quan bệnh nhân, chẩn đoán hoặc kết luận khám","Bước 1: Admin mở chi tiết audit log liên quan bệnh nhân.\nBước 2: Kiểm tra phần thông tin thay đổi và fieldsChanged.\nBước 3: Tìm các thông tin nhạy cảm như căn cước công dân, số điện thoại, chẩn đoán, toa thuốc, file y tế, ciphertext, key mã hóa hoặc artifact IPFS.\nBước 4: Đối chiếu với quy định redaction đã chốt.","Audit log mẫu là MedicalConclusion hoặc Patient update có trường nhạy cảm","Màn hình chỉ hiển thị metadata, actor, action, entity, thời điểm, batch, trạng thái kiểm chứng và fieldsChanged đã redaction. Không hiển thị plaintext bệnh án, PII nhạy cảm, ciphertext, key hoặc artifact IPFS.","Đạt. Dữ liệu nhạy cảm bị redaction; màn hình không trả plaintext, ciphertext, key hoặc artifact IPFS cho người dùng.","Passed","Package: Audit logs"]
+  Row 4: ["KB-KT-02","Ghi nhận audit logs theo nghiệp vụ lưu trữ","CKT-004","Thao tác lưu trữ thông thường tạo audit log Tier B ở trạng thái pending","Admin hoặc nhân sự có quyền đã đăng nhập; có entity hợp lệ để cập nhật","Bước 1: Thực hiện một thao tác lưu trữ thông thường, ví dụ cập nhật mô tả phòng ban hoặc cập nhật thông tin không nhạy cảm của bệnh nhân.\nBước 2: Mở màn hình Audit và Blockchain.\nBước 3: Lọc theo entity vừa thao tác hoặc theo thời gian thao tác.\nBước 4: Kiểm tra trạng thái batch hoặc trạng thái on-chain của audit log vừa tạo.","Entity: Department PB-KT-001; thao tác: cập nhật mô tả phòng ban","Hệ thống tạo một audit log mới với actor, action, entity, entityId, thời điểm và fieldsChanged. Vì là Tier B, audit log có thể ở trạng thái pending trước khi được gom batch để anchor lên blockchain.","Đạt. Audit log Tier B được tạo và giữ trạng thái pending trước khi quy trình gom batch chạy.","Passed","Package: Audit logs"]
+  Row 5: ["KB-KT-02","Ghi nhận audit logs theo nghiệp vụ lưu trữ","CKT-005","Thao tác quan trọng tạo audit log Tier A và được anchor ngay","Có lượt khám hợp lệ; bác sĩ phụ trách đã đăng nhập; các chỉ định bắt buộc đã xử lý hợp lệ","Bước 1: Bác sĩ mở lượt khám đang phụ trách.\nBước 2: Nhập kết luận cuối và hoàn tất lượt khám.\nBước 3: Admin mở màn hình Audit và Blockchain.\nBước 4: Lọc theo MedicalConclusion hoặc Visit liên quan.\nBước 5: Kiểm tra audit log có được đưa vào quy trình anchor ngay hay không.","Visit: LK-KT-001; action: tạo hoặc cập nhật kết luận cuối","Audit log kết luận cuối được xếp Tier A. Hệ thống đóng batch cho toàn bộ audit logs đang pending theo đúng thứ tự và bắt đầu quy trình tạo checkpoint.","Đạt. Audit log quan trọng được xử lý theo Tier A và không chờ lịch gom batch thông thường.","Passed","Package: Audit logs"]
+  Row 6: ["KB-KT-03","Kiểm chứng bằng blockchain proof","CKT-006","Batch đã anchor hiển thị merkle root, trạng thái xác nhận và proof hợp lệ","Có batch audit đã được anchor thành công lên blockchain trong môi trường kiểm thử","Bước 1: Admin mở màn hình Audit và Blockchain.\nBước 2: Chọn một audit log thuộc batch đã anchor.\nBước 3: Mở phần kiểm chứng proof của audit log.\nBước 4: So sánh trạng thái batch, merkle root, leaf count và thời điểm anchor.\nBước 5: Thực hiện thao tác xác minh proof nếu màn hình có hỗ trợ.","Một audit log thuộc batch đã anchor thành công","Hệ thống hiển thị batch, merkle root và trạng thái xác nhận. Proof của audit log hợp lệ và khớp với root đã lưu trên blockchain.","Đạt. Batch đã anchor được xác minh bằng proof hợp lệ.","Passed","Package: Audit logs và blockchain"]
+  Row 7: ["KB-KT-03","Kiểm chứng bằng blockchain proof","CKT-007","Proof hoặc nội dung audit log bị thay đổi phải bị phát hiện là không hợp lệ","Môi trường kiểm thử có dữ liệu giả lập proof hoặc audit log bị chỉnh sửa","Bước 1: Chuẩn bị một audit log đã anchor và một bản proof hoặc nội dung audit log đã bị sửa trong môi trường kiểm thử.\nBước 2: Admin chạy chức năng kiểm tra tính toàn vẹn.\nBước 3: Mở chi tiết audit log hoặc batch bị cảnh báo.\nBước 4: Quan sát trạng thái kiểm chứng và thông báo lỗi.","Proof có một sibling hash sai hoặc entryHash không còn khớp","Hệ thống không xác nhận proof hoặc audit log bị sửa là hợp lệ. Màn hình hiển thị trạng thái kiểm chứng thất bại và không tự sửa dữ liệu nếu chưa có thao tác recovery hợp lệ.","Đạt. Proof hoặc audit log bị sửa bị phát hiện và không được đánh dấu hợp lệ.","Passed","Package: Audit logs và blockchain"]
+
+--- Sheet: Thông báo ---
+Total Rows: 17
+Non-empty Rows: 17
+Sample Rows:
+  Row 0: ["Test Scenario #","Scenario Description","Test Case #","Test Case Description","Pre-condition","Steps","Data Test Example","Expected Result","Actual Result","Pass/Failed","Notes"]
+  Row 1: ["S-NOT-1","Danh sách thông báo","TC-NOT-001","Hiển thị thông báo của đúng người đang đăng nhập","Nhân viên A đã đăng nhập và có thông báo riêng","1. Mở danh sách thông báo","Thông báo của A và B tồn tại trong hệ thống","Chỉ thông báo thuộc nhân viên A được hiển thị. Thông báo của nhân viên B không xuất hiện và không bị tính vào số chưa đọc của A."]
+  Row 2: [null,null,null,null,null,"2. Đối chiếu người nhận và nội dung"]
+  Row 3: ["S-NOT-1","Danh sách thông báo","TC-NOT-002","Số thông báo chưa đọc khớp danh sách","Người dùng có cả thông báo đã đọc và chưa đọc","1. Ghi nhận số trên biểu tượng chuông","3 chưa đọc, 2 đã đọc","Số trên biểu tượng chuông là 3 và khớp các bản ghi chưa đọc. Thông báo đã đọc không được tính."]
+  Row 4: [null,null,null,null,null,"2. Mở danh sách và đếm thông báo chưa đọc"]
+  Row 5: ["S-NOT-2","Đánh dấu đã đọc","TC-NOT-003","Đánh dấu một thông báo là đã đọc","Có ít nhất một thông báo chưa đọc","1. Mở danh sách","unread count ban đầu: 3","Thông báo được hiển thị là đã đọc; số chưa đọc giảm đúng một. Các thông báo khác giữ nguyên."]
+  Row 6: [null,null,null,null,null,"2. Chọn một thông báo chưa đọc"]
+  Row 7: [null,null,null,null,null,"3. Quan sát trạng thái và số trên chuông"]
+
+--- Sheet: Thông tin cá nhân ---
+Total Rows: 10
+Non-empty Rows: 10
+Sample Rows:
+  Row 0: ["Test Scenario #","Scenario Description","Test Case #","Test Case Description","Pre-condition","Steps","Data Test Example","Expected Result","Actual Result","Pass/Failed","Notes"]
+  Row 1: ["S-PRO-1","Xem thông tin cá nhân","TC-PRO-001","Hiển thị đúng hồ sơ của người đang đăng nhập","Nhân viên đã đăng nhập và xác thực","1. Mở mục Thông tin cá nhân","Tài khoản DOCTOR có hồ sơ nhân sự liên kết","Giao diện hiển thị thông tin của chính tài khoản đang đăng nhập, không hiển thị hồ sơ của người khác. Các mã kỹ thuật được trình bày dễ đọc khi có thể."]
+  Row 2: [null,null,null,null,null,"2. Đối chiếu họ tên, vai trò và đơn vị làm việc"]
+  Row 3: ["S-PRO-2","Bảo vệ dữ liệu nhạy cảm","TC-PRO-002","Không hiển thị mật khẩu, khóa bí mật hoặc dữ liệu khuôn mặt","Nhân viên đã mở trang Thông tin cá nhân","1. Quan sát toàn bộ trường trên trang","Tài khoản có face embedding và thông tin xác thực trong database","Trang không hiển thị mật khẩu, dữ liệu dùng để kiểm tra mật khẩu, khóa bí mật của ví, mã bí mật tạo OTP hoặc dữ liệu nhận dạng khuôn mặt. Địa chỉ ví công khai chỉ được hiển thị khi cần để người dùng nhận biết tài khoản đã liên kết."]
+  Row 4: [null,null,null,null,null,"2. Kiểm tra phản hồi tải hồ sơ bằng công cụ phù hợp nếu được phép"]
+  Row 5: ["S-PRO-3","Phiên đăng nhập hết hạn","TC-PRO-003","Yêu cầu đăng nhập lại khi phiên hết hạn lúc mở hồ sơ","Phiên đăng nhập đã hết hạn","1. Mở trang Thông tin cá nhân","Phiên đăng nhập đã quá thời hạn sử dụng","Hệ thống không hiển thị hồ sơ từ yêu cầu thất bại và yêu cầu người dùng đăng nhập lại. Không để lại dữ liệu nhạy cảm của phiên trước trên màn hình."]
+  Row 6: [null,null,null,null,null,"2. Chờ hệ thống tải dữ liệu"]
+  Row 7: ["S-PRO-4","Lỗi tải hồ sơ","TC-PRO-004","Hiển thị trạng thái lỗi thay vì trang trống","Người dùng đã đăng nhập; mô phỏng máy chủ không tải được hồ sơ","1. Mở Thông tin cá nhân","Máy chủ trả lỗi khi tải hồ sơ","Giao diện thông báo chưa thể tải thông tin cá nhân và cho phép người dùng thử lại hoặc quay về trang làm việc; không hiển thị thông tin sai."]
