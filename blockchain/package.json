@@ -10,6 +10,7 @@
     "deploy:custom": "npx hardhat run scripts/deploy.js --network custom",
     "deploy:audit:local": "npx hardhat run scripts/deploy-audit.js --network localhost",
     "deploy:audit:custom": "npx hardhat run scripts/deploy-audit.js --network custom",
+    "deploy:test-env": "npx hardhat run scripts/deploy-test-env.js --network localhost",
     "compile-circuit": "node scripts/compile-circuit.js"
   },
   "devDependencies": {

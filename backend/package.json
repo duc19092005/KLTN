@@ -12,8 +12,11 @@
     "prisma:push": "npx prisma db push",
     "prisma:seed": "ts-node prisma/seed.ts",
     "audit:v2:reset:dev": "ts-node src/scripts/reset-audit-v2-dev.ts",
-    "test": "jest",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test": "jest --config ./test/jest-unit.json",
+    "test:unit": "jest --config ./test/jest-unit.json",
+    "test:integration": "jest --config ./test/jest-integration.json",
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:tamper-recovery": "node scripts/run-tamper-recovery-e2e.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1072.0",
@@ -69,18 +72,5 @@
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "testEnvironment": "node"
   }
 }

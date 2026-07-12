@@ -49,9 +49,11 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
   onModuleInit() {
     // Guarantee the append-only trigger exists even when the schema was synced via
     // `prisma db push` (which does not apply raw-SQL migrations / triggers). Idempotent.
-    this.ensureAppendOnlyTrigger().catch((err) =>
-      this.logger.error('Failed to ensure append-only trigger', err),
-    );
+    if (process.env.SKIP_PRISMA_CONNECT !== 'true') {
+      this.ensureAppendOnlyTrigger().catch((err) =>
+        this.logger.error('Failed to ensure append-only trigger', err),
+      );
+    }
 
     if (process.env.AUDIT_BATCH_DISABLED === 'true') {
       this.logger.warn('Audit batch anchoring disabled via AUDIT_BATCH_DISABLED.');
