@@ -10,6 +10,10 @@ date_added: '2026-02-27'
 
 > [!IMPORTANT]
 > **KLTN project overlay (read first):**
+> - Current rule: blockchain is for **audit checkpoint / integrity ONLY**.
+> - Checkpoint contract stores append-only audit batch metadata: `merkleRoot`, `artifactHash`, `artifactUri`, `leafCount`, timestamp/committed status.
+> - Never put PII, medical data, files, plaintext snapshots, encrypted snapshots (`beforeEncrypted`/`afterEncrypted`), AES keys, API keys, or private keys on-chain.
+> - IPFS stores encrypted audit recovery artifacts; blockchain stores only the hash/root/URI needed to verify those artifacts.
 > - In this project, blockchain is used for **audit / integrity ONLY** (anchoring record hashes on-chain). Ignore the DeFi / NFT / DAO / tokenomics / cross-chain scope of this skill.
 > - **Never** put PII or medical data on-chain — only hashes, timestamps, and metadata (per AGENTS.md).
 > - Stack is **Solidity + Hardhat + Ethers.js v6**. `resources/implementation-playbook.md` does not exist — ignore that pointer.
