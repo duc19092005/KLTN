@@ -90,6 +90,50 @@ function buildPatientAuditRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function buildStaffAuditRow(after: Record<string, unknown>) {
+  const base = {
+    id: 'audit-staff-1', seq: 21, prevHash: GENESIS_PREV_HASH,
+    entity: 'StaffProfile', entityId: '22222222-2222-4222-8222-222222222222',
+    action: 'CREATE', actorId: 'admin-1', createdAt: new Date('2026-07-12T09:34:30.514Z'),
+  };
+  const diffJson = buildAuditDiff(null, after);
+  const fieldsChanged = diffJson.fieldsChanged;
+  const beforeHash = computeBeforeHashV2(base.entity, base.entityId, null);
+  const afterHash = computeAfterHashV2(base.entity, base.entityId, after);
+  const diffHash = computeDiffHashV2(diffJson);
+  const dataHash = computeDataHashV2({ entity: base.entity, entityId: base.entityId, action: base.action, beforeHash, afterHash, diffHash, fieldsChanged });
+  const entryHash = computeEntryHashV2({ ...base, beforeHash, afterHash, diffHash, dataHash, createdAtIso: base.createdAt.toISOString() });
+  const aad = buildAuditEncryptionAad({ seq: base.seq, entity: base.entity, entityId: base.entityId, action: base.action, createdAtIso: base.createdAt.toISOString() });
+  return {
+    ...base, dataHash, beforeHash, afterHash, diffHash, hashVersion: AUDIT_ENTRY_V2,
+    beforeEncrypted: encryptAuditSnapshot(canonicalize(null), aad),
+    afterEncrypted: encryptAuditSnapshot(canonicalize(after), aad),
+    diffJson, fieldsChanged, entryHash, onChainStatus: 'ANCHORED', batchId: 13,
+  };
+}
+
+function buildAiDiagnosisAuditRow(after: Record<string, unknown>) {
+  const base = {
+    id: 'audit-ai-1', seq: 30, prevHash: GENESIS_PREV_HASH,
+    entity: 'AiDiagnosis', entityId: '33333333-3333-4333-8333-333333333333',
+    action: 'CREATE', actorId: 'doctor-user-1', createdAt: new Date('2026-07-12T10:00:00.000Z'),
+  };
+  const diffJson = buildAuditDiff(null, after);
+  const fieldsChanged = diffJson.fieldsChanged;
+  const beforeHash = computeBeforeHashV2(base.entity, base.entityId, null);
+  const afterHash = computeAfterHashV2(base.entity, base.entityId, after);
+  const diffHash = computeDiffHashV2(diffJson);
+  const dataHash = computeDataHashV2({ entity: base.entity, entityId: base.entityId, action: base.action, beforeHash, afterHash, diffHash, fieldsChanged });
+  const entryHash = computeEntryHashV2({ ...base, beforeHash, afterHash, diffHash, dataHash, createdAtIso: base.createdAt.toISOString() });
+  const aad = buildAuditEncryptionAad({ seq: base.seq, entity: base.entity, entityId: base.entityId, action: base.action, createdAtIso: base.createdAt.toISOString() });
+  return {
+    ...base, dataHash, beforeHash, afterHash, diffHash, hashVersion: AUDIT_ENTRY_V2,
+    beforeEncrypted: encryptAuditSnapshot(canonicalize(null), aad),
+    afterEncrypted: encryptAuditSnapshot(canonicalize(after), aad),
+    diffJson, fieldsChanged, entryHash, onChainStatus: 'ANCHORED', batchId: 20,
+  };
+}
+
 describe('EntityRecoveryService integrity gate', () => {
   const originalHashKey = process.env.AUDIT_HASH_KEY;
   const originalEncryptionKey = process.env.AUDIT_ENCRYPTION_KEY;
@@ -188,5 +232,78 @@ describe('EntityRecoveryService integrity gate', () => {
     expect(JSON.stringify(result)).not.toContain('Tampered Name');
     expect(JSON.stringify(result)).not.toContain(patientAfter.fullName);
     expect(JSON.stringify(result)).not.toContain('afterEncrypted');
+  });
+
+  it('does not report a false tamper warning for legacy staff snapshots with null user status', async () => {
+    const legacySnapshot = {
+      employeeCode: 'NV-0001', fullName: 'Le Tan', phone: '0914370300', gender: 'Nam',
+      citizenId: '000000000000', birthDate: '2003-01-12T00:00:00.000Z', address: 'Dia chi',
+      avatarUrl: 'https://example.test/avatar.jpg', departmentId: null, position: 'Le tan', status: null,
+    };
+    const row = buildStaffAuditRow(legacySnapshot);
+    const prisma = {
+      blockchainLogger: { findFirst: jest.fn().mockResolvedValue(row) },
+      staffProfile: {
+        findUnique: jest.fn().mockResolvedValue({
+          ...legacySnapshot,
+          birthDate: new Date(String(legacySnapshot.birthDate)),
+          user: { status: 'ACTIVE' },
+        }),
+      },
+    };
+    const anchor = { getInclusionProof: jest.fn().mockResolvedValue({ verified: true }) };
+    const service = new EntityRecoveryService(prisma as never, {} as never, anchor as never);
+
+    await expect(service.assertTrusted('StaffProfile', row.entityId)).resolves.toBeUndefined();
+    expect(anchor.getInclusionProof).not.toHaveBeenCalled();
+  });
+
+  it('restores an AI diagnosis from its latest anchored encrypted snapshot', async () => {
+    const trusted = {
+      aiModelId: '44444444-4444-4444-8444-444444444444',
+      patientId: '55555555-5555-4555-8555-555555555555',
+      visitId: '66666666-6666-4666-8666-666666666666',
+      prompt: 'trusted prompt', result: '{"analysis":"trusted"}', confidence: 0.85,
+      status: 'AI_SUGGESTED', reviewedByDoctorId: null, doctorFeedback: null,
+    };
+    const tampered = { ...trusted, result: '{"analysis":"tampered"}' };
+    const row = buildAiDiagnosisAuditRow(trusted);
+    const tx = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      aiDiagnosis: {
+        findUnique: jest.fn().mockResolvedValueOnce(tampered).mockResolvedValueOnce(trusted),
+        update: jest.fn().mockResolvedValue(trusted),
+      },
+      aiModelRegistry: { findUnique: jest.fn().mockResolvedValue({ id: trusted.aiModelId }) },
+      patient: { findUnique: jest.fn().mockResolvedValue({ id: trusted.patientId }) },
+      visit: { findUnique: jest.fn().mockResolvedValue({ id: trusted.visitId }) },
+    };
+    const prisma = {
+      blockchainLogger: { findFirst: jest.fn().mockResolvedValue(row) },
+      aiDiagnosis: { findUnique: jest.fn().mockResolvedValue(tampered) },
+      $transaction: jest.fn().mockImplementation(async (callback) => callback(tx)),
+    };
+    const audit = {
+      hashSnapshot: jest.fn().mockReturnValue({ hash: 'unused', salt: 'unused' }),
+      recordV2: jest.fn().mockResolvedValue(undefined),
+    };
+    const anchor = { getInclusionProof: jest.fn().mockResolvedValue({ verified: true }) };
+    const service = new EntityRecoveryService(prisma as never, audit as never, anchor as never);
+
+    const result = await service.recoverMany(
+      [{ entity: 'AiDiagnosis', entityId: row.entityId }],
+      'admin-1',
+      'Khôi phục chẩn đoán AI bị thay đổi trái phép',
+    );
+
+    expect(result).toMatchObject({ requested: 1, recovered: 1, failed: 0 });
+    expect(tx.aiDiagnosis.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: row.entityId },
+      data: expect.objectContaining({ result: trusted.result, confidence: trusted.confidence }),
+    }));
+    expect(audit.recordV2).toHaveBeenCalledWith(expect.objectContaining({
+      entity: 'AiDiagnosis', action: 'AUDIT_ENTITY_RECOVERED',
+    }), tx);
+    expect(JSON.stringify(result)).not.toContain(trusted.result);
   });
 });

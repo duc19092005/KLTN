@@ -60,18 +60,25 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
     });
   }
 
-  async createAiDiagnosis(data: CreateAiDiagnosisData): Promise<unknown> {
-    return this.prisma.aiDiagnosis.create({
-      data: {
-        aiModelId: data.aiModelId,
-        patientId: data.patientId,
-        visitId: data.visitId,
-        prompt: data.prompt,
-        result: data.result,
-        ...(data.confidence !== undefined ? { confidence: data.confidence } : {}),
-        status: 'AI_SUGGESTED',
-      },
-      include: { aiModel: true },
+  async createAiDiagnosis(
+    data: CreateAiDiagnosisData,
+    afterWrite?: (diagnosis: unknown, tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<unknown> {
+    return this.prisma.$transaction(async (tx) => {
+      const diagnosis = await tx.aiDiagnosis.create({
+        data: {
+          aiModelId: data.aiModelId,
+          patientId: data.patientId,
+          visitId: data.visitId,
+          prompt: data.prompt,
+          result: data.result,
+          ...(data.confidence !== undefined ? { confidence: data.confidence } : {}),
+          status: 'AI_SUGGESTED',
+        },
+        include: { aiModel: true },
+      });
+      await afterWrite?.(diagnosis, tx);
+      return diagnosis;
     });
   }
 
@@ -91,15 +98,21 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
     };
   }
 
-  async updateAiDiagnosisReview(id: string, reviewedByDoctorId: string, doctorFeedback: string | null): Promise<unknown> {
-    return this.prisma.aiDiagnosis.update({
-      where: { id },
-      data: {
-        status: 'DOCTOR_REVIEWED',
-        reviewedByDoctorId,
-        doctorFeedback,
-      },
-      include: { aiModel: true, reviewedByDoctor: { include: { staffProfile: true } } },
+  async updateAiDiagnosisReview(
+    id: string,
+    reviewedByDoctorId: string,
+    doctorFeedback: string | null,
+    afterWrite?: (before: unknown, after: unknown, tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<unknown> {
+    return this.prisma.$transaction(async (tx) => {
+      const before = await tx.aiDiagnosis.findUniqueOrThrow({ where: { id } });
+      const after = await tx.aiDiagnosis.update({
+        where: { id },
+        data: { status: 'DOCTOR_REVIEWED', reviewedByDoctorId, doctorFeedback },
+        include: { aiModel: true, reviewedByDoctor: { include: { staffProfile: true } } },
+      });
+      await afterWrite?.(before, after, tx);
+      return after;
     });
   }
 

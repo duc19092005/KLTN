@@ -1306,22 +1306,22 @@ SHEET: Dữ liệu đã xóa
     Scenario: [S-DEL-2] Khôi phục dữ liệu
     Steps count: 3
     Expected: Mô hình xuất hiện lại trong trang quản lý với trạng thái có thể sử dụng theo cấu hình hiện hành. Hệ thống khôi phục đúng bản ghi cũ, giữ nguyên mã nhận diện và không tạo thêm bản sao.
-  [TC-DEL-STF-003] Không tạo kết quả xóa trùng khi hai Admin cùng xóa Nhân sự
+  [TC-DEL-STF-003] Không tạo kết quả xóa trùng khi Admin thao tác xóa Nhân sự lặp lại
     Scenario: [S-DEL-E2E-1] Lỗi và thao tác lặp Nhân sự
     Steps count: 4
-    Expected: Sau khi tải lại chỉ có một bản ghi đã xóa với cùng ID/mã, không có bản sao. Nhật ký chỉ được coi là hợp lệ khi mỗi log phản ánh một thay đổi thật; không chấp nhận log DELETE có danh sách trường thay đổi rỗng. Nếu phiên thứ hai bị từ chối, thông báo phải rõ ràng.
-  [TC-DEL-DOC-003] Không tạo kết quả xóa trùng khi hai Admin cùng xóa Bác sĩ
+    Expected: Sau khi tải lại chỉ có một bản ghi đã xóa với cùng ID/mã, không có bản sao. Nhật ký chỉ được coi là hợp lệ khi mỗi log phản ánh một thay đổi thật; không chấp nhận log DELETE có danh sách trường thay đổi rỗng. Nếu thao tác lặp lại bị từ chối, thông báo phải rõ ràng.
+  [TC-DEL-DOC-003] Không tạo kết quả xóa trùng khi Admin thao tác xóa Bác sĩ lặp lại
     Scenario: [S-DEL-E2E-2] Lỗi và thao tác lặp Bác sĩ
     Steps count: 4
-    Expected: Sau khi tải lại chỉ có một bản ghi đã xóa với cùng ID/mã, không có bản sao. Nhật ký chỉ được coi là hợp lệ khi mỗi log phản ánh một thay đổi thật; không chấp nhận log DELETE có danh sách trường thay đổi rỗng. Nếu phiên thứ hai bị từ chối, thông báo phải rõ ràng.
-  [TC-DEL-DEP-003] Không tạo kết quả xóa trùng khi hai Admin cùng xóa Phòng ban
+    Expected: Sau khi tải lại chỉ có một bản ghi đã xóa với cùng ID/mã, không có bản sao. Nhật ký chỉ được coi là hợp lệ khi mỗi log phản ánh một thay đổi thật; không chấp nhận log DELETE có danh sách trường thay đổi rỗng. Nếu thao tác lặp lại bị từ chối, thông báo phải rõ ràng.
+  [TC-DEL-DEP-003] Không tạo kết quả xóa trùng khi Admin thao tác xóa Phòng ban lặp lại
     Scenario: [S-DEL-E2E-3] Lỗi và thao tác lặp Phòng ban
     Steps count: 4
-    Expected: Sau khi tải lại chỉ có một bản ghi đã xóa với cùng ID/mã, không có bản sao. Nhật ký chỉ được coi là hợp lệ khi mỗi log phản ánh một thay đổi thật; không chấp nhận log DELETE có danh sách trường thay đổi rỗng. Nếu phiên thứ hai bị từ chối, thông báo phải rõ ràng.
-  [TC-DEL-AI-003] Không tạo kết quả xóa trùng khi hai Admin cùng xóa Mô hình AI
+    Expected: Sau khi tải lại chỉ có một bản ghi đã xóa với cùng ID/mã, không có bản sao. Nhật ký chỉ được coi là hợp lệ khi mỗi log phản ánh một thay đổi thật; không chấp nhận log DELETE có danh sách trường thay đổi rỗng. Nếu thao tác lặp lại bị từ chối, thông báo phải rõ ràng.
+  [TC-DEL-AI-003] Không tạo kết quả xóa trùng khi Admin thao tác xóa Mô hình AI lặp lại
     Scenario: [S-DEL-E2E-4] Lỗi và thao tác lặp Mô hình AI
     Steps count: 4
-    Expected: Sau khi tải lại chỉ có một bản ghi đã xóa với cùng ID/mã, không có bản sao. Nhật ký chỉ được coi là hợp lệ khi mỗi log phản ánh một thay đổi thật; không chấp nhận log DELETE có danh sách trường thay đổi rỗng. Nếu phiên thứ hai bị từ chối, thông báo phải rõ ràng.
+    Expected: Sau khi tải lại chỉ có một bản ghi đã xóa với cùng ID/mã, không có bản sao. Nhật ký chỉ được coi là hợp lệ khi mỗi log phản ánh một thay đổi thật; không chấp nhận log DELETE có danh sách trường thay đổi rỗng. Nếu thao tác lặp lại bị từ chối, thông báo phải rõ ràng.
 
 --- Non func (6 cases) ---
   [TC-DEL-005] Không thông báo khôi phục thành công khi máy chủ trả lỗi

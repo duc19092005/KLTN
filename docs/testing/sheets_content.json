@@ -7835,11 +7835,11 @@
       "S-DEL-E2E-1",
       "Lỗi và thao tác lặp Nhân sự",
       "TC-DEL-STF-003",
-      "Không tạo kết quả xóa trùng khi hai Admin cùng xóa Nhân sự",
-      "Hai Admin đang xem cùng bản ghi NV-DEL-01 còn hoạt động",
-      "1. Cả hai cùng chọn Xóa NV-DEL-01 trong khoảng thời gian gần nhau",
-      "Hai phiên Admin A và B; NV-DEL-01",
-      "Sau khi tải lại chỉ có một bản ghi đã xóa với cùng ID/mã, không có bản sao. Nhật ký chỉ được coi là hợp lệ khi mỗi log phản ánh một thay đổi thật; không chấp nhận log DELETE có danh sách trường thay đổi rỗng. Nếu phiên thứ hai bị từ chối, thông báo phải rõ ràng."
+      "Không tạo kết quả xóa trùng khi Admin thao tác xóa Nhân sự lặp lại",
+      "Admin đang xem bản ghi NV-DEL-01 còn hoạt động",
+      "1. Admin chọn Xóa NV-DEL-01\n2. Admin tải lại danh sách hoặc quay lại chi tiết bản ghi\n3. Admin thực hiện lại thao tác xóa trên cùng NV-DEL-01",
+      "Một phiên Admin; NV-DEL-01",
+      "Sau khi tải lại chỉ có một bản ghi đã xóa với cùng ID/mã, không có bản sao. Nhật ký chỉ được coi là hợp lệ khi mỗi log phản ánh một thay đổi thật; không chấp nhận log DELETE có danh sách trường thay đổi rỗng. Nếu thao tác lặp lại bị từ chối, thông báo phải rõ ràng."
     ],
     [
       null,
@@ -8027,11 +8027,11 @@
       "S-DEL-E2E-2",
       "Lỗi và thao tác lặp Bác sĩ",
       "TC-DEL-DOC-003",
-      "Không tạo kết quả xóa trùng khi hai Admin cùng xóa Bác sĩ",
-      "Hai Admin đang xem cùng bản ghi BS-DEL-01 còn hoạt động",
-      "1. Cả hai cùng chọn Xóa BS-DEL-01 trong khoảng thời gian gần nhau",
-      "Hai phiên Admin A và B; BS-DEL-01",
-      "Sau khi tải lại chỉ có một bản ghi đã xóa với cùng ID/mã, không có bản sao. Nhật ký chỉ được coi là hợp lệ khi mỗi log phản ánh một thay đổi thật; không chấp nhận log DELETE có danh sách trường thay đổi rỗng. Nếu phiên thứ hai bị từ chối, thông báo phải rõ ràng."
+      "Không tạo kết quả xóa trùng khi Admin thao tác xóa Bác sĩ lặp lại",
+      "Admin đang xem bản ghi BS-DEL-01 còn hoạt động",
+      "1. Admin chọn Xóa BS-DEL-01\n2. Admin tải lại danh sách hoặc quay lại chi tiết bản ghi\n3. Admin thực hiện lại thao tác xóa trên cùng BS-DEL-01",
+      "Một phiên Admin; BS-DEL-01",
+      "Sau khi tải lại chỉ có một bản ghi đã xóa với cùng ID/mã, không có bản sao. Nhật ký chỉ được coi là hợp lệ khi mỗi log phản ánh một thay đổi thật; không chấp nhận log DELETE có danh sách trường thay đổi rỗng. Nếu thao tác lặp lại bị từ chối, thông báo phải rõ ràng."
     ],
     [
       null,
@@ -8219,11 +8219,11 @@
       "S-DEL-E2E-3",
       "Lỗi và thao tác lặp Phòng ban",
       "TC-DEL-DEP-003",
-      "Không tạo kết quả xóa trùng khi hai Admin cùng xóa Phòng ban",
-      "Hai Admin đang xem cùng bản ghi PB-DEL-01 còn hoạt động",
-      "1. Cả hai cùng chọn Xóa PB-DEL-01 trong khoảng thời gian gần nhau",
-      "Hai phiên Admin A và B; PB-DEL-01",
-      "Sau khi tải lại chỉ có một bản ghi đã xóa với cùng ID/mã, không có bản sao. Nhật ký chỉ được coi là hợp lệ khi mỗi log phản ánh một thay đổi thật; không chấp nhận log DELETE có danh sách trường thay đổi rỗng. Nếu phiên thứ hai bị từ chối, thông báo phải rõ ràng."
+      "Không tạo kết quả xóa trùng khi Admin thao tác xóa Phòng ban lặp lại",
+      "Admin đang xem bản ghi PB-DEL-01 còn hoạt động",
+      "1. Admin chọn Xóa PB-DEL-01\n2. Admin tải lại danh sách hoặc quay lại chi tiết bản ghi\n3. Admin thực hiện lại thao tác xóa trên cùng PB-DEL-01",
+      "Một phiên Admin; PB-DEL-01",
+      "Sau khi tải lại chỉ có một bản ghi đã xóa với cùng ID/mã, không có bản sao. Nhật ký chỉ được coi là hợp lệ khi mỗi log phản ánh một thay đổi thật; không chấp nhận log DELETE có danh sách trường thay đổi rỗng. Nếu thao tác lặp lại bị từ chối, thông báo phải rõ ràng."
     ],
     [
       null,
@@ -8411,11 +8411,11 @@
       "S-DEL-E2E-4",
       "Lỗi và thao tác lặp Mô hình AI",
       "TC-DEL-AI-003",
-      "Không tạo kết quả xóa trùng khi hai Admin cùng xóa Mô hình AI",
-      "Hai Admin đang xem cùng bản ghi AI-DEL-01 còn hoạt động",
-      "1. Cả hai cùng chọn Xóa AI-DEL-01 trong khoảng thời gian gần nhau",
-      "Hai phiên Admin A và B; AI-DEL-01",
-      "Sau khi tải lại chỉ có một bản ghi đã xóa với cùng ID/mã, không có bản sao. Nhật ký chỉ được coi là hợp lệ khi mỗi log phản ánh một thay đổi thật; không chấp nhận log DELETE có danh sách trường thay đổi rỗng. Nếu phiên thứ hai bị từ chối, thông báo phải rõ ràng."
+      "Không tạo kết quả xóa trùng khi Admin thao tác xóa Mô hình AI lặp lại",
+      "Admin đang xem bản ghi AI-DEL-01 còn hoạt động",
+      "1. Admin chọn Xóa AI-DEL-01\n2. Admin tải lại danh sách hoặc quay lại chi tiết bản ghi\n3. Admin thực hiện lại thao tác xóa trên cùng AI-DEL-01",
+      "Một phiên Admin; AI-DEL-01",
+      "Sau khi tải lại chỉ có một bản ghi đã xóa với cùng ID/mã, không có bản sao. Nhật ký chỉ được coi là hợp lệ khi mỗi log phản ánh một thay đổi thật; không chấp nhận log DELETE có danh sách trường thay đổi rỗng. Nếu thao tác lặp lại bị từ chối, thông báo phải rõ ràng."
     ],
     [
       null,

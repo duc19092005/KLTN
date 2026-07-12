@@ -364,8 +364,18 @@ export default function AuditLogsPage() {
         entityRecoveryReason.trim(),
       );
       const data = res.data || {};
-      if (data.failed > 0) toast.error(`Khôi phục ${data.recovered || 0}/${data.requested || selected.length} bản ghi; ${data.failed} bản ghi thất bại.`);
-      else toast.success(`Đã khôi phục ${data.recovered || 0} bản ghi từ audit đã xác minh blockchain.`);
+      if (data.failed > 0) {
+        const details = (data.results || [])
+          .filter((item) => item.status === 'FAILED' && item.message)
+          .slice(0, 3)
+          .map((item) => `${entityLabel(item.entity)}: ${item.message}`)
+          .join(' ');
+        toast.error(`Khôi phục ${data.recovered || 0}/${data.requested || selected.length} bản ghi; ${data.failed} bản ghi thất bại.${details ? ` ${details}` : ''}`);
+      } else if (data.recovered > 0) {
+        toast.success(`Đã khôi phục ${data.recovered} bản ghi từ audit đã xác minh blockchain.`);
+      } else {
+        toast.success('Dữ liệu đã khớp audit tin cậy, không cần ghi đè.');
+      }
       setSelectedEntityWarnings([]);
       setEntityRecoveryReason('');
       await refreshAll();
@@ -737,6 +747,7 @@ const ENTITY_LABELS = {
   Patient: 'Bệnh nhân',
   AiModelRegistry: 'Mô hình AI',
   MedicalConclusion: 'Kết luận y khoa',
+  AiDiagnosis: 'Chẩn đoán AI',
   AiQuality: 'Chất lượng AI',
   ParaclinicalShift: 'Ca cận lâm sàng',
   HandoverLog: 'Bàn giao ca',

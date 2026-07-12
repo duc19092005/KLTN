@@ -13,12 +13,14 @@ import { buildStaffSnapshot } from '../../modules/staff/domain/staff-snapshot';
 import { buildUnifiedDoctorSnapshot } from '../../modules/doctor/domain/doctor-snapshot';
 import { buildAiModelSnapshot } from '../../modules/ai-model/domain/ai-model-snapshot';
 import { buildMedicalConclusionSnapshot } from '../../modules/clinical-decision/domain/medical-conclusion-snapshot';
+import { buildAiDiagnosisSnapshot } from '../../modules/clinical-decision/domain/ai-diagnosis-snapshot';
 import { AuditAnchorService } from './audit-anchor.service';
 import { AuditLoggerService } from './audit-logger.service';
 import {
   compareLiveSnapshotToAuditAfter,
   verifyAuditRow,
 } from './audit-verification.util';
+import { canonicalize } from './audit-hash.util';
 
 export const RECOVERABLE_AUDIT_ENTITIES = [
   'Patient',
@@ -27,6 +29,7 @@ export const RECOVERABLE_AUDIT_ENTITIES = [
   'DoctorProfile',
   'AiModelRegistry',
   'MedicalConclusion',
+  'AiDiagnosis',
 ] as const;
 
 export type RecoverableAuditEntity = (typeof RECOVERABLE_AUDIT_ENTITIES)[number];
@@ -60,6 +63,7 @@ const REQUIRED_SNAPSHOT_FIELDS: Record<RecoverableAuditEntity, readonly string[]
   DoctorProfile: ['employeeCode', 'fullName', 'phone', 'gender', 'citizenId', 'birthDate', 'address', 'avatarUrl', 'departmentId', 'position', 'status', 'staffProfileId', 'specialty', 'licenseNumber', 'qualification', 'yearsExperience'],
   AiModelRegistry: ['modelName', 'modelVersion', 'recommendedSpecialty', 'type', 'provider', 'apiEndpoint', 'ipHashPlain', 'description', 'status', 'createdBy'],
   MedicalConclusion: ['visitId', 'patientCode', 'doctorId', 'aiDiagnosisId', 'finalDiagnosis', 'treatmentPlan', 'prescription', 'followUpNote', 'doctorNote'],
+  AiDiagnosis: ['aiModelId', 'patientId', 'visitId', 'prompt', 'result', 'confidence', 'status', 'reviewedByDoctorId', 'doctorFeedback'],
 };
 
 const SENSITIVE_FIELDS: Partial<Record<RecoverableAuditEntity, ReadonlySet<string>>> = {
@@ -68,6 +72,7 @@ const SENSITIVE_FIELDS: Partial<Record<RecoverableAuditEntity, ReadonlySet<strin
   DoctorProfile: new Set(['fullName', 'phone', 'gender', 'citizenId', 'birthDate', 'address', 'avatarUrl']),
   AiModelRegistry: new Set(['apiEndpoint', 'ipHashPlain']),
   MedicalConclusion: new Set(['patientCode', 'finalDiagnosis', 'treatmentPlan', 'prescription', 'followUpNote', 'doctorNote']),
+  AiDiagnosis: new Set(['prompt', 'result', 'doctorFeedback']),
 };
 
 @Injectable()
@@ -165,7 +170,7 @@ export class EntityRecoveryService {
     if (!verification.ok) {
       throw new ConflictException('Audit nguồn không toàn vẹn; phải phục hồi audit batch từ IPFS trước.');
     }
-    const snapshot = this.requireCompleteSnapshot(target.entity, verification.decryptedAfter);
+    const sourceSnapshot = this.requireCompleteSnapshot(target.entity, verification.decryptedAfter);
     const proof = await this.anchor.getInclusionProof(row.seq);
     if (!proof?.verified) {
       throw new ConflictException('Không xác minh được audit nguồn với Merkle root trên blockchain.');
@@ -173,8 +178,8 @@ export class EntityRecoveryService {
 
     const liveSnapshot = await this.loadLiveSnapshot(this.prisma, target.entity, target.entityId);
     if (!liveSnapshot) throw new ConflictException('Bản ghi gốc không còn tồn tại; entity recovery không tự tạo lại quan hệ đã mất.');
-    const comparison = compareLiveSnapshotToAuditAfter(row, liveSnapshot);
-    if (comparison.ok) {
+    const snapshot = this.effectiveRecoverySnapshot(target.entity, sourceSnapshot, liveSnapshot);
+    if (this.snapshotsEqual(snapshot, liveSnapshot)) {
       return { ...target, status: 'SKIPPED', sourceSeq: row.seq, batchId: row.batchId };
     }
 
@@ -182,14 +187,15 @@ export class EntityRecoveryService {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`audit-entity-recovery:${target.entity}:${target.entityId}`}))`;
       const current = await this.loadLiveSnapshot(tx, target.entity, target.entityId);
       if (!current) throw new ConflictException('Bản ghi đã bị xóa trong lúc khôi phục.');
-      const currentComparison = compareLiveSnapshotToAuditAfter(row, current);
-      if (currentComparison.ok) return;
+      const transactionSnapshot = this.effectiveRecoverySnapshot(target.entity, sourceSnapshot, current);
+      if (this.snapshotsEqual(transactionSnapshot, current)) return;
 
-      await this.restoreSnapshot(tx, target.entity, target.entityId, snapshot);
+      await this.restoreSnapshot(tx, target.entity, target.entityId, transactionSnapshot);
       const restored = await this.loadLiveSnapshot(tx, target.entity, target.entityId);
       if (!restored) throw new ConflictException('Không đọc lại được bản ghi sau khôi phục.');
-      const restoredComparison = compareLiveSnapshotToAuditAfter(row, restored);
-      if (!restoredComparison.ok) throw new ConflictException('Dữ liệu sau khôi phục vẫn không khớp audit nguồn.');
+      if (!this.snapshotsEqual(transactionSnapshot, restored)) {
+        throw new ConflictException('Dữ liệu sau khôi phục vẫn không khớp audit nguồn.');
+      }
 
       const integrity = this.audit.hashSnapshot(restored);
       await this.updateIntegrityHash(tx, target.entity, target.entityId, integrity.hash, integrity.salt);
@@ -252,7 +258,11 @@ export class EntityRecoveryService {
       };
     }
 
-    const comparison = compareLiveSnapshotToAuditAfter(row, liveSnapshot);
+    const sourceSnapshot = verification.decryptedAfter as Snapshot;
+    const effectiveSnapshot = this.effectiveRecoverySnapshot(entity, sourceSnapshot, liveSnapshot);
+    const comparison = this.snapshotsEqual(effectiveSnapshot, liveSnapshot)
+      ? { ok: true, suspiciousFields: [] as string[] }
+      : compareLiveSnapshotToAuditAfter(row, liveSnapshot);
     if (comparison.ok) return null;
 
     if (row.onChainStatus !== 'ANCHORED' || row.batchId == null) {
@@ -342,6 +352,10 @@ export class EntityRecoveryService {
       const row = await client.aiModelRegistry.findUnique({ where: { id: entityId } });
       return row ? buildAiModelSnapshot(row) : null;
     }
+    if (entity === 'AiDiagnosis') {
+      const row = await client.aiDiagnosis.findUnique({ where: { id: entityId } });
+      return row ? (buildAiDiagnosisSnapshot(row) as Snapshot) : null;
+    }
     const row = await client.medicalConclusion.findUnique({
       where: { id: entityId },
       include: { visit: { include: { patient: true } } },
@@ -406,6 +420,23 @@ export class EntityRecoveryService {
       } });
       return;
     }
+    if (entity === 'AiDiagnosis') {
+      const aiModelId = this.string(snapshot, 'aiModelId');
+      const patientId = this.nullableString(snapshot, 'patientId');
+      const visitId = this.nullableString(snapshot, 'visitId');
+      const reviewedByDoctorId = this.nullableString(snapshot, 'reviewedByDoctorId');
+      await this.requireRelation(client.aiModelRegistry.findUnique({ where: { id: aiModelId }, select: { id: true } }), 'mô hình AI');
+      if (patientId) await this.requireRelation(client.patient.findUnique({ where: { id: patientId }, select: { id: true } }), 'bệnh nhân');
+      if (visitId) await this.requireRelation(client.visit.findUnique({ where: { id: visitId }, select: { id: true } }), 'lượt khám');
+      if (reviewedByDoctorId) await this.requireRelation(client.doctorProfile.findUnique({ where: { id: reviewedByDoctorId }, select: { id: true } }), 'bác sĩ đánh giá');
+      await client.aiDiagnosis.update({ where: { id: entityId }, data: {
+        aiModelId, patientId, visitId,
+        prompt: this.nullableString(snapshot, 'prompt'), result: this.nullableString(snapshot, 'result'),
+        confidence: this.nullableNumber(snapshot, 'confidence'), status: this.string(snapshot, 'status'),
+        reviewedByDoctorId, doctorFeedback: this.nullableString(snapshot, 'doctorFeedback'),
+      } });
+      return;
+    }
 
     const visitId = this.string(snapshot, 'visitId');
     const doctorId = this.string(snapshot, 'doctorId');
@@ -428,6 +459,7 @@ export class EntityRecoveryService {
     if (entity === 'StaffProfile') return client.staffProfile.update({ where: { id: entityId }, data });
     if (entity === 'DoctorProfile') return client.doctorProfile.update({ where: { id: entityId }, data });
     if (entity === 'AiModelRegistry') return client.aiModelRegistry.update({ where: { id: entityId }, data });
+    if (entity === 'AiDiagnosis') return Promise.resolve(null);
     return client.medicalConclusion.update({ where: { id: entityId }, data });
   }
 
@@ -448,6 +480,24 @@ export class EntityRecoveryService {
   private hasCompleteSnapshot(entity: RecoverableAuditEntity, value: unknown): value is Snapshot {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     return REQUIRED_SNAPSHOT_FIELDS[entity].every((field) => Object.prototype.hasOwnProperty.call(value, field));
+  }
+
+  /**
+   * Early Staff/Doctor CREATE audits were produced before the related User was
+   * loaded, so their otherwise valid encrypted snapshot contains status=null.
+   * User status cannot be reconstructed from that snapshot. Preserve the live
+   * status and recover every other trusted field instead of reporting a false
+   * tamper warning or trying to write null into the UserStatus enum.
+   */
+  private effectiveRecoverySnapshot(entity: RecoverableAuditEntity, source: Snapshot, live: Snapshot): Snapshot {
+    if ((entity === 'StaffProfile' || entity === 'DoctorProfile') && source.status == null) {
+      return { ...source, status: live.status };
+    }
+    return source;
+  }
+
+  private snapshotsEqual(left: Snapshot, right: Snapshot): boolean {
+    return canonicalize(left) === canonicalize(right);
   }
 
   private safeFieldNames(entity: RecoverableAuditEntity, fields: string[]): string[] {

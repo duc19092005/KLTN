@@ -53,10 +53,18 @@ export interface ClinicalDecisionRepositoryPort {
   findAiModelById(id: string): Promise<AiModelRegistry | null>;
   findDefaultAiModelForSpecialty(specialty: string): Promise<AiModelRegistry | null>;
 
-  createAiDiagnosis(data: CreateAiDiagnosisData): Promise<unknown>;
+  createAiDiagnosis(
+    data: CreateAiDiagnosisData,
+    afterWrite?: (diagnosis: unknown, tx: import('@prisma/client').Prisma.TransactionClient) => Promise<void>,
+  ): Promise<unknown>;
 
   findAiDiagnosisWithVisit(id: string): Promise<{ id: string; visit: ClinicalVisitInfo | null } | null>;
-  updateAiDiagnosisReview(id: string, reviewedByDoctorId: string, doctorFeedback: string | null): Promise<unknown>;
+  updateAiDiagnosisReview(
+    id: string,
+    reviewedByDoctorId: string,
+    doctorFeedback: string | null,
+    afterWrite?: (before: unknown, after: unknown, tx: import('@prisma/client').Prisma.TransactionClient) => Promise<void>,
+  ): Promise<unknown>;
 
   findAiDiagnosisById(id: string): Promise<{ id: string; visitId: string } | null>;
   countPendingMedicalOrders(visitId: string): Promise<number>;

@@ -9,6 +9,8 @@ import {
 } from '../ports/clinical-decision.repository.port';
 import { AI_PROVIDER_GATEWAY, AiProviderGatewayPort } from '../ports/ai-provider-gateway.port';
 import { MEDICAL_IMAGE_ATTACHMENT, MedicalImageAttachmentPort } from '../ports/medical-image-attachment.port';
+import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { buildAiDiagnosisSnapshot } from '../../domain/ai-diagnosis-snapshot';
 
 /**
  * Generates an AI suggestion for a visit. Behavior copied verbatim from the
@@ -24,6 +26,7 @@ export class GenerateAiAnalysisUseCase {
     @Inject(MEDICAL_IMAGE_ATTACHMENT) private readonly imageAttachment: MedicalImageAttachmentPort,
     private readonly promptBuilder: ClinicalPromptBuilder,
     private readonly policy: ClinicalDecisionPolicy,
+    private readonly audit: AuditLoggerService,
   ) {}
 
   async execute(dto: GenerateAiAnalysisDto, doctorUserId: string) {
@@ -68,6 +71,11 @@ export class GenerateAiAnalysisUseCase {
       prompt,
       result,
       confidence: providerResponse.confidence,
+    }, async (diagnosis, tx) => {
+      await this.audit.recordV2({
+        entity: 'AiDiagnosis', entityId: (diagnosis as { id: string }).id, action: 'CREATE',
+        actorId: doctorUserId, before: null, after: buildAiDiagnosisSnapshot(diagnosis),
+      }, tx);
     });
   }
 }

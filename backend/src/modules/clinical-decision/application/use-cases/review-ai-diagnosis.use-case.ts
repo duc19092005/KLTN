@@ -5,6 +5,8 @@ import {
   ClinicalDecisionRepositoryPort,
 } from '../ports/clinical-decision.repository.port';
 import { ClinicalDecisionPolicy } from '../policies/clinical-decision.policy';
+import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { buildAiDiagnosisSnapshot } from '../../domain/ai-diagnosis-snapshot';
 
 /**
  * Doctor reviews an AI suggestion for a visit in their department. This only
@@ -15,6 +17,7 @@ export class ReviewAiDiagnosisUseCase {
   constructor(
     @Inject(CLINICAL_DECISION_REPOSITORY) private readonly repo: ClinicalDecisionRepositoryPort,
     private readonly policy: ClinicalDecisionPolicy,
+    private readonly audit: AuditLoggerService,
   ) {}
 
   async execute(id: string, dto: ReviewAiDiagnosisDto, doctorUserId: string) {
@@ -25,6 +28,11 @@ export class ReviewAiDiagnosisUseCase {
     if (!diagnosis) throw new NotFoundException('Không tìm thấy phân tích AI.');
     this.policy.assertDoctorOwnsVisit(diagnosis.visit, doctor);
 
-    return this.repo.updateAiDiagnosisReview(id, doctor.id, dto.doctorFeedback?.trim() || null);
+    return this.repo.updateAiDiagnosisReview(id, doctor.id, dto.doctorFeedback?.trim() || null, async (before, after, tx) => {
+      await this.audit.recordV2({
+        entity: 'AiDiagnosis', entityId: id, action: 'UPDATE', actorId: doctorUserId,
+        before: buildAiDiagnosisSnapshot(before), after: buildAiDiagnosisSnapshot(after),
+      }, tx);
+    });
   }
 }

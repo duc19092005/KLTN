@@ -129,6 +129,9 @@ const CLINICAL_TEXT_FIELDS = new Set([
   'clinicalNote',
   'finalDiagnosis',
   'doctorNote',
+  'prompt',
+  'result',
+  'doctorFeedback',
   'conclusion',
   'symptoms',
 ]);
