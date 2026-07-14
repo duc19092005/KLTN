@@ -5,8 +5,9 @@ import { STAFF_REPOSITORY, StaffRepositoryPort } from '../ports/staff.repository
 import { STAFF_INTEGRITY_ANCHOR, StaffIntegrityAnchorPort } from '../ports/staff-integrity-anchor.port';
 import { PASSWORD_HASHER, PasswordHasherPort } from '../ports/password-hasher.port';
 import { StaffValidator } from '../services/staff.validator';
-
-const DEFAULT_STAFF_PASSWORD = '123456';
+import { generateTemporaryPassword } from '../../../../common/security/temporary-password';
+import { TEMPORARY_CREDENTIAL_MAILER } from '../../../../infrastructure/email/email.constants';
+import { TemporaryCredentialMailerPort } from '../../../../infrastructure/email/email.types';
 
 /**
  * Creates a (non-doctor) staff profile + login user, then anchors the staff
@@ -20,6 +21,7 @@ export class CreateStaffUseCase {
     @Inject(STAFF_REPOSITORY) private readonly repo: StaffRepositoryPort,
     @Inject(STAFF_INTEGRITY_ANCHOR) private readonly integrity: StaffIntegrityAnchorPort,
     @Inject(PASSWORD_HASHER) private readonly passwordHasher: PasswordHasherPort,
+    @Inject(TEMPORARY_CREDENTIAL_MAILER) private readonly mailer: TemporaryCredentialMailerPort,
     private readonly validator: StaffValidator,
   ) {}
 
@@ -39,7 +41,8 @@ export class CreateStaffUseCase {
     await this.validator.assertPhoneUnique(dto.phone);
     const employeeCode = dto.employeeCode || (await this.repo.generateEmployeeCode(dto.role));
     await this.validator.assertEmployeeCodeUnique(employeeCode);
-    const passwordHash = await this.passwordHasher.hash(DEFAULT_STAFF_PASSWORD);
+    const temporaryPassword = generateTemporaryPassword();
+    const passwordHash = await this.passwordHasher.hash(temporaryPassword);
 
     try {
       const user = await this.repo.createStaffUser(
@@ -63,6 +66,12 @@ export class CreateStaffUseCase {
           if (created.staffProfile) {
             await this.integrity.anchorChange(created.staffProfile, 'CREATE', actorId, null, tx);
           }
+          await this.mailer.sendTemporaryPassword({
+            to: dto.email.trim().toLowerCase(),
+            fullName: dto.fullName.trim(),
+            username: dto.username.trim(),
+            temporaryPassword,
+          });
         },
       );
 

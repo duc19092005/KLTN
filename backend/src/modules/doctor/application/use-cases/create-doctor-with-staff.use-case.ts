@@ -4,8 +4,9 @@ import { Prisma } from '@prisma/client';
 import { CreateDoctorWithStaffDto } from '../../dto/doctor.dto';
 import { DOCTOR_REPOSITORY, DoctorRepositoryPort } from '../ports/doctor.repository.port';
 import { DOCTOR_INTEGRITY_ANCHOR, DoctorIntegrityAnchorPort } from '../ports/doctor-integrity-anchor.port';
-
-const DEFAULT_STAFF_PASSWORD = '123456';
+import { generateTemporaryPassword } from '../../../../common/security/temporary-password';
+import { TEMPORARY_CREDENTIAL_MAILER } from '../../../../infrastructure/email/email.constants';
+import { TemporaryCredentialMailerPort } from '../../../../infrastructure/email/email.types';
 
 /**
  * Creates a doctor user + staff profile + doctor profile in one transaction,
@@ -16,6 +17,7 @@ export class CreateDoctorWithStaffUseCase {
   constructor(
     @Inject(DOCTOR_REPOSITORY) private readonly repo: DoctorRepositoryPort,
     @Inject(DOCTOR_INTEGRITY_ANCHOR) private readonly integrity: DoctorIntegrityAnchorPort,
+    @Inject(TEMPORARY_CREDENTIAL_MAILER) private readonly mailer: TemporaryCredentialMailerPort,
   ) {}
 
   async execute(dto: CreateDoctorWithStaffDto, actorId?: string) {
@@ -43,14 +45,23 @@ export class CreateDoctorWithStaffUseCase {
     if (await this.repo.findStaffByEmployeeCode(employeeCode)) {
       throw new ConflictException('Mã nhân viên đã tồn tại.');
     }
-    const passwordHash = await bcrypt.hash(DEFAULT_STAFF_PASSWORD, 12);
+    const temporaryPassword = generateTemporaryPassword();
+    const passwordHash = await bcrypt.hash(temporaryPassword, 12);
 
     try {
       const doctor = await this.repo.createWithStaff(
         dto,
         employeeCode,
         passwordHash,
-        (created, tx) => this.integrity.anchorChange(created, 'CREATE', actorId, null, tx),
+        async (created, tx) => {
+          await this.integrity.anchorChange(created, 'CREATE', actorId, null, tx);
+          await this.mailer.sendTemporaryPassword({
+            to: dto.email.trim().toLowerCase(),
+            fullName: dto.fullName.trim(),
+            username: dto.username.trim(),
+            temporaryPassword,
+          });
+        },
       );
       return doctor;
     } catch (error) {

@@ -6,6 +6,9 @@ import { resolve } from 'path';
 // blockchain env files; docker-compose and native runs should keep boundaries
 // explicit per service folder.
 const envFiles = [
+  ...(process.env.NODE_ENV === 'test'
+    ? [resolve(__dirname, '..', '..', '.env.test'), resolve(process.cwd(), 'backend', '.env.test')]
+    : []),
   resolve(__dirname, '..', '..', '.env'),
   resolve(process.cwd(), 'backend', '.env'),
 ];
