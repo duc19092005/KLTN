@@ -232,6 +232,16 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
             <KeyRound className="h-4 w-4" />
             Kết nối ví và ký xác thực
           </Button>
+          <button
+            type="button"
+            onClick={() => {
+              if (isModal && onClose) onClose();
+              navigate('/forgot-password?account=admin');
+            }}
+            className="mt-4 text-xs font-black text-cyan-700 hover:text-cyan-800"
+          >
+            Không còn quyền truy cập ví Admin?
+          </button>
         </div>
       )}
 

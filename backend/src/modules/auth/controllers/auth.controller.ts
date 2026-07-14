@@ -19,6 +19,9 @@ import {
   ForgotPasswordChallengeDto,
   ForgotPasswordVerifyFaceDto,
   ForgotPasswordResetDto,
+  AdminWalletRecoveryVerifyFaceDto,
+  AdminWalletRecoveryChallengeDto,
+  AdminWalletRecoveryConfirmDto,
 } from '../dto/auth.dto';
 import { getAuthCookieOptions, getClearAuthCookieOptions } from '../constants/auth-security';
 
@@ -304,6 +307,80 @@ export class AuthController {
       return result;
     } catch (error) {
       this.rateLimiter.recordFailure(key, 5 * 60 * 1000);
+      throw error;
+    }
+  }
+
+  @Post('admin-account-recovery/challenge')
+  async adminWalletRecoveryChallenge(@Req() req) {
+    const key = this.rateLimitKey(req, 'admin-recovery-challenge', 'single-admin');
+    this.rateLimiter.assertAllowed(key, 3, 10 * 60 * 1000);
+    try {
+      const result = await this.authService.adminWalletRecoveryChallenge();
+      this.rateLimiter.recordAttempt(key, 10 * 60 * 1000);
+      return result;
+    } catch (error) {
+      this.rateLimiter.recordFailure(key, 10 * 60 * 1000);
+      throw error;
+    }
+  }
+
+  @Post('admin-account-recovery/verify-face')
+  async adminWalletRecoveryVerifyFace(@Body() body: AdminWalletRecoveryVerifyFaceDto, @Req() req) {
+    const key = this.rateLimitKey(req, 'admin-recovery-face', 'single-admin');
+    this.rateLimiter.assertAllowed(key, 5, 15 * 60 * 1000);
+    try {
+      const result = await this.authService.adminWalletRecoveryVerifyFace(
+        body.embedding,
+        body.challenge,
+        this.clientIp(req),
+      );
+      this.rateLimiter.reset(key);
+      return result;
+    } catch (error) {
+      this.rateLimiter.recordFailure(key, 15 * 60 * 1000);
+      throw error;
+    }
+  }
+
+  @Post('admin-account-recovery/wallet-challenge')
+  async adminWalletRecoveryWalletChallenge(@Body() body: AdminWalletRecoveryChallengeDto, @Req() req) {
+    const key = this.rateLimitKey(req, 'admin-recovery-wallet', body.address.toLowerCase());
+    this.rateLimiter.assertAllowed(key, 5, 10 * 60 * 1000);
+    try {
+      const result = await this.authService.adminWalletRecoveryWalletChallenge(
+        body.recoveryToken,
+        body.address,
+      );
+      this.rateLimiter.reset(key);
+      return result;
+    } catch (error) {
+      this.rateLimiter.recordFailure(key, 10 * 60 * 1000);
+      throw error;
+    }
+  }
+
+  @Post('admin-account-recovery/confirm-wallet')
+  async adminWalletRecoveryConfirm(
+    @Body() body: AdminWalletRecoveryConfirmDto,
+    @Req() req,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const key = this.rateLimitKey(req, 'admin-recovery-confirm', body.address.toLowerCase());
+    this.rateLimiter.assertAllowed(key, 5, 10 * 60 * 1000);
+    try {
+      const result = await this.authService.adminWalletRecoveryConfirm(
+        body.recoveryToken,
+        body.address,
+        body.signature,
+        body.message,
+        this.clientIp(req),
+      );
+      this.rateLimiter.reset(key);
+      res.clearCookie('token', getClearAuthCookieOptions());
+      return result;
+    } catch (error) {
+      this.rateLimiter.recordFailure(key, 10 * 60 * 1000);
       throw error;
     }
   }

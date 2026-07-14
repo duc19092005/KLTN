@@ -18,6 +18,10 @@ import { LogoutUseCase } from '../application/use-cases/logout.use-case';
 import { ForgotPasswordChallengeUseCase } from '../application/use-cases/forgot-password-challenge.use-case';
 import { ForgotPasswordVerifyFaceUseCase } from '../application/use-cases/forgot-password-verify-face.use-case';
 import { ForgotPasswordResetUseCase } from '../application/use-cases/forgot-password-reset.use-case';
+import { AdminWalletRecoveryChallengeUseCase } from '../application/use-cases/admin-wallet-recovery-challenge.use-case';
+import { AdminWalletRecoveryVerifyFaceUseCase } from '../application/use-cases/admin-wallet-recovery-verify-face.use-case';
+import { AdminWalletRecoveryWalletChallengeUseCase } from '../application/use-cases/admin-wallet-recovery-wallet-challenge.use-case';
+import { AdminWalletRecoveryConfirmUseCase } from '../application/use-cases/admin-wallet-recovery-confirm.use-case';
 
 /**
  * Facade preserving the controller-facing API. Each method delegates to a
@@ -47,6 +51,10 @@ export class AuthService {
     private readonly forgotPasswordChallengeUseCase: ForgotPasswordChallengeUseCase,
     private readonly forgotPasswordVerifyFaceUseCase: ForgotPasswordVerifyFaceUseCase,
     private readonly forgotPasswordResetUseCase: ForgotPasswordResetUseCase,
+    private readonly adminWalletRecoveryChallengeUseCase: AdminWalletRecoveryChallengeUseCase,
+    private readonly adminWalletRecoveryVerifyFaceUseCase: AdminWalletRecoveryVerifyFaceUseCase,
+    private readonly adminWalletRecoveryWalletChallengeUseCase: AdminWalletRecoveryWalletChallengeUseCase,
+    private readonly adminWalletRecoveryConfirmUseCase: AdminWalletRecoveryConfirmUseCase,
   ) {}
 
   bootstrapFirstAdmin(username: string, email: string, superAdminSecret: string) {
@@ -134,5 +142,33 @@ export class AuthService {
 
   forgotPasswordReset(resetToken: string, newPassword: string, ip?: string) {
     return this.forgotPasswordResetUseCase.execute(resetToken, newPassword, ip);
+  }
+
+  adminWalletRecoveryChallenge() {
+    return this.adminWalletRecoveryChallengeUseCase.execute();
+  }
+
+  adminWalletRecoveryVerifyFace(embedding: number[], challenge: string, ip?: string) {
+    return this.adminWalletRecoveryVerifyFaceUseCase.execute(embedding, challenge, ip);
+  }
+
+  adminWalletRecoveryWalletChallenge(recoveryToken: string, address: string) {
+    return this.adminWalletRecoveryWalletChallengeUseCase.execute(recoveryToken, address);
+  }
+
+  adminWalletRecoveryConfirm(
+    recoveryToken: string,
+    address: string,
+    signature: string,
+    message: string,
+    ip?: string,
+  ) {
+    return this.adminWalletRecoveryConfirmUseCase.execute(
+      recoveryToken,
+      address,
+      signature,
+      message,
+      ip,
+    );
   }
 }

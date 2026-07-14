@@ -618,11 +618,22 @@ Tên mỗi BM trùng khớp với tên nghiệp vụ trong bảng yêu cầu. BM
 
 ## BM53. Quên mật khẩu
 
+### Nhân sự đặt lại mật khẩu
+
 | | |
 |---|---|
 | Tên đăng nhập | nguyenvanan |
-| Mật khẩu | Được che khi nhập |
 | Khuôn mặt | Dữ liệu xác thực trực tiếp |
+| Mật khẩu mới | Được che khi nhập |
+| Xác nhận mật khẩu mới | Được che khi nhập |
+
+### Admin khôi phục ví quản trị
+
+| | |
+|---|---|
+| Khuôn mặt | Dữ liệu xác thực trực tiếp của Admin duy nhất |
+| Địa chỉ ví mới | 0x71C...A92F |
+| Chữ ký ví mới | Chữ ký xác nhận quyền sở hữu ví |
 
 ## BM54. đổi mật khẩu
 

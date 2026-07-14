@@ -23,6 +23,10 @@ export class BlockchainAuthChainGateway implements AuthChainGatewayPort {
     return this.blockchain.authorizeAdmin(walletAddress) as Promise<ChainWriteResult>;
   }
 
+  async rotateAdmin(oldWalletAddress: string, newWalletAddress: string): Promise<ChainWriteResult> {
+    return this.blockchain.rotateAdmin(oldWalletAddress, newWalletAddress) as Promise<ChainWriteResult>;
+  }
+
   async isAuthorized(walletAddress: string): Promise<boolean> {
     return this.blockchain.isAuthorized(walletAddress);
   }

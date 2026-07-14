@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, LockKeyhole, ScanFace, User } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ethers } from 'ethers';
+import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, LockKeyhole, ScanFace, User, Wallet } from 'lucide-react';
 import { authService } from '../apis/authService';
 import FaceCapture from '../components/FaceCapture';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
@@ -16,6 +17,8 @@ const STEPS = [
 export default function ForgotPasswordPage() {
   const navigate = useNavigate();
   const toast = useToast();
+  const [searchParams] = useSearchParams();
+  const [accountType, setAccountType] = useState(searchParams.get('account') === 'admin' ? 'admin' : 'staff');
 
   const [step, setStep] = useState(1);
   const [username, setUsername] = useState('');
@@ -101,9 +104,37 @@ export default function ForgotPasswordPage() {
           <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-cyan-50 text-cyan-700 ring-1 ring-cyan-100">
             <ScanFace className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-950">Khôi phục mật khẩu</h1>
-          <p className="mt-2 text-sm font-semibold text-slate-500">Xác thực sinh trắc học trước khi đặt mật khẩu mới.</p>
+          <h1 className="text-2xl font-black tracking-tight text-slate-950">
+            {accountType === 'admin' ? 'Khôi phục ví Admin' : 'Khôi phục mật khẩu'}
+          </h1>
+          <p className="mt-2 text-sm font-semibold text-slate-500">
+            {accountType === 'admin'
+              ? 'Xác thực khuôn mặt của Admin duy nhất trước khi liên kết ví mới.'
+              : 'Xác thực sinh trắc học trước khi đặt mật khẩu mới.'}
+          </p>
         </div>
+
+        <div className="mb-7 grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+          <button
+            type="button"
+            onClick={() => setAccountType('staff')}
+            className={`rounded-lg px-3 py-2.5 text-xs font-black ${accountType === 'staff' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500'}`}
+          >
+            Nhân sự
+          </button>
+          <button
+            type="button"
+            onClick={() => setAccountType('admin')}
+            className={`rounded-lg px-3 py-2.5 text-xs font-black ${accountType === 'admin' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500'}`}
+          >
+            Admin
+          </button>
+        </div>
+
+        {accountType === 'admin' ? (
+          <AdminWalletRecoveryPanel onBack={() => navigate('/login')} />
+        ) : (
+          <>
 
         <div className="mb-7 grid grid-cols-3 gap-2">
           {STEPS.map((item) => {
@@ -202,8 +233,164 @@ export default function ForgotPasswordPage() {
             </Button>
           </form>
         )}
+          </>
+        )}
       </section>
     </main>
+  );
+}
+
+function AdminWalletRecoveryPanel({ onBack }) {
+  const navigate = useNavigate();
+  const toast = useToast();
+  const [challenge, setChallenge] = useState('');
+  const [recoveryToken, setRecoveryToken] = useState('');
+  const [busy, setBusy] = useState(true);
+  const [status, setStatus] = useState('Đang tạo yêu cầu xác thực khuôn mặt...');
+  const [challengeError, setChallengeError] = useState('');
+
+  const requestChallenge = async () => {
+    setBusy(true);
+    setChallenge('');
+    setChallengeError('');
+    setStatus('Đang tạo yêu cầu xác thực khuôn mặt...');
+    try {
+      const response = await authService.adminWalletRecoveryChallenge();
+      setChallenge(response.data.challenge);
+      setStatus('');
+    } catch (error) {
+      const message = error.response?.data?.message || 'Không thể bắt đầu khôi phục ví Admin.';
+      setStatus('');
+      setChallengeError(message);
+      toast.error(message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+
+    const createChallenge = async () => {
+      try {
+        const response = await authService.adminWalletRecoveryChallenge();
+        if (!active) return;
+        setChallenge(response.data.challenge);
+        setStatus('');
+      } catch (error) {
+        if (!active) return;
+        const message = error.response?.data?.message || 'Không thể bắt đầu khôi phục ví Admin.';
+        setStatus('');
+        setChallengeError(message);
+        toast.error(message);
+      } finally {
+        if (active) setBusy(false);
+      }
+    };
+
+    createChallenge();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleFaceCapture = async (embedding) => {
+    if (!challenge) return;
+    setBusy(true);
+    setStatus('Đang xác thực khuôn mặt Admin...');
+    try {
+      const response = await authService.adminWalletRecoveryVerifyFace(embedding, challenge);
+      setRecoveryToken(response.data.recoveryToken);
+      setStatus('');
+      toast.success('Khuôn mặt hợp lệ. Hãy kết nối ví mới.');
+    } catch (error) {
+      setStatus('');
+      toast.error(error.response?.data?.message || 'Xác thực khuôn mặt Admin thất bại.');
+      await requestChallenge();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleNewWallet = async () => {
+    if (!window.ethereum) {
+      toast.error('Vui lòng cài đặt MetaMask hoặc ví Web3 tương thích.');
+      return;
+    }
+
+    setBusy(true);
+    setStatus('Đang xác minh quyền sở hữu ví mới...');
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      await provider.send('eth_requestAccounts', []);
+      const signer = await provider.getSigner();
+      const address = await signer.getAddress();
+      const challengeResponse = await authService.adminWalletRecoveryWalletChallenge(recoveryToken, address);
+      const signature = await signer.signMessage(challengeResponse.data.message);
+      await authService.adminWalletRecoveryConfirm(
+        recoveryToken,
+        address,
+        signature,
+        challengeResponse.data.message,
+      );
+      setStatus('');
+      toast.success('Đã thay đổi ví Admin. Vui lòng đăng nhập lại bằng ví mới.');
+      navigate('/login', { replace: true });
+    } catch (error) {
+      setStatus('');
+      toast.error(error.response?.data?.message || error.message || 'Không thể thay đổi ví Admin.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      {status && (
+        <div className="flex items-center gap-2 rounded-xl border border-cyan-100 bg-cyan-50 px-4 py-3 text-xs font-bold text-cyan-800">
+          <LoadingIndicator size="sm" tone="cyan" />
+          {status}
+        </div>
+      )}
+
+      {!recoveryToken ? (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          {challenge && (
+            <FaceCapture
+              onCapture={handleFaceCapture}
+              onError={(message) => toast.error(message)}
+              disabled={busy}
+              label="Xác thực khuôn mặt Admin"
+            />
+          )}
+          {!challenge && !busy && challengeError && (
+            <div className="text-center">
+              <p className="text-sm font-semibold text-rose-700">{challengeError}</p>
+              <Button type="button" variant="secondary" className="mt-4" onClick={requestChallenge}>
+                Tạo lại yêu cầu xác thực
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-5 text-center">
+          <CheckCircle2 className="mx-auto h-8 w-8 text-cyan-700" />
+          <h2 className="mt-3 text-base font-black text-slate-950">Khuôn mặt đã được xác thực</h2>
+          <p className="mt-2 text-sm font-semibold text-slate-600">
+            Kết nối ví mới và ký thông điệp để chứng minh bạn sở hữu ví đó.
+          </p>
+          <Button type="button" size="lg" className="mt-5 w-full" onClick={handleNewWallet} loading={busy} disabled={busy}>
+            <Wallet className="h-4 w-4" />
+            Kết nối ví mới
+          </Button>
+        </div>
+      )}
+
+      <Button type="button" variant="secondary" size="lg" className="w-full" onClick={onBack} disabled={busy}>
+        <ArrowLeft className="h-4 w-4" />
+        Quay lại đăng nhập
+      </Button>
+    </div>
   );
 }
 

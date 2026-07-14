@@ -4,11 +4,12 @@ pragma solidity ^0.8.20;
 contract IdentityRegistry {
     address public owner;
     address public pendingOwner;
-    mapping(address => bool) private authorizedAdmins;
+    address private authorizedAdmin;
     mapping(address => bool) private authorizedRelayers;
 
     event AdminAuthorized(address indexed wallet);
     event AdminRevoked(address indexed wallet);
+    event AdminRotated(address indexed oldWallet, address indexed newWallet);
     event RelayerAuthorized(address indexed wallet);
     event RelayerRevoked(address indexed wallet);
     event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
@@ -31,20 +32,33 @@ contract IdentityRegistry {
 
     function authorizeAdmin(address wallet) external onlyRelayerOrOwner {
         require(wallet != address(0), "IdentityRegistry: zero wallet");
-        require(!authorizedAdmins[wallet], "IdentityRegistry: already authorized");
-        authorizedAdmins[wallet] = true;
+        require(authorizedAdmin == address(0), "IdentityRegistry: admin already configured");
+        authorizedAdmin = wallet;
         emit AdminAuthorized(wallet);
     }
 
     function revokeAdmin(address wallet) external onlyRelayerOrOwner {
         require(wallet != address(0), "IdentityRegistry: zero wallet");
-        require(authorizedAdmins[wallet], "IdentityRegistry: not authorized");
-        authorizedAdmins[wallet] = false;
+        require(authorizedAdmin == wallet, "IdentityRegistry: not authorized");
+        authorizedAdmin = address(0);
         emit AdminRevoked(wallet);
     }
 
+    function rotateAdmin(address oldWallet, address newWallet) external onlyRelayerOrOwner {
+        require(oldWallet != address(0), "IdentityRegistry: zero old wallet");
+        require(newWallet != address(0), "IdentityRegistry: zero new wallet");
+        require(oldWallet != newWallet, "IdentityRegistry: wallet unchanged");
+        require(authorizedAdmin == oldWallet, "IdentityRegistry: old wallet not authorized");
+
+        authorizedAdmin = newWallet;
+
+        emit AdminRevoked(oldWallet);
+        emit AdminAuthorized(newWallet);
+        emit AdminRotated(oldWallet, newWallet);
+    }
+
     function isAuthorized(address wallet) external view returns (bool) {
-        return authorizedAdmins[wallet];
+        return wallet != address(0) && authorizedAdmin == wallet;
     }
 
     function addRelayer(address wallet) external onlyOwner {

@@ -44,6 +44,7 @@ export class BlockchainService implements OnModuleInit {
   private readonly abi = [
     'function authorizeAdmin(address wallet) external',
     'function revokeAdmin(address wallet) external',
+    'function rotateAdmin(address oldWallet, address newWallet) external',
     'function isAuthorized(address wallet) external view returns (bool)',
     'function addRelayer(address wallet) external',
     'function removeRelayer(address wallet) external',
@@ -341,6 +342,31 @@ export class BlockchainService implements OnModuleInit {
         };
       } catch (error) {
         return { success: false, error: this.toBlockchainErrorMessage(error, 'Không thể thu hồi quyền admin trên blockchain.') };
+      }
+    });
+  }
+
+  async rotateAdmin(oldWalletAddress: string, newWalletAddress: string) {
+    return this.enqueueWrite(async () => {
+      if (!this.contract || !this.relayerSigner) {
+        return { success: false, error: 'IdentityRegistry hoặc khóa relayer blockchain chưa được cấu hình.' };
+      }
+      try {
+        const oldWallet = ethers.getAddress(oldWalletAddress);
+        const newWallet = ethers.getAddress(newWalletAddress);
+        const writableContract = this.contract.connect(this.relayerSigner) as ethers.Contract;
+        const tx = await writableContract.rotateAdmin(oldWallet, newWallet);
+        const receipt = await tx.wait();
+        return {
+          success: true,
+          txHash: tx.hash,
+          blockNumber: receipt.blockNumber,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: this.toBlockchainErrorMessage(error, 'Không thể thay đổi ví admin trên blockchain.'),
+        };
       }
     });
   }

@@ -61,6 +61,7 @@ export interface AuthRepositoryPort {
 
   findUserByIdentity(username: string, emailLower: string): Promise<UserWithProfile | null>;
   findUserWithProfile(userId: string): Promise<UserWithProfile | null>;
+  findAdminUsers(limit: number): Promise<UserWithProfile[]>;
   /** Full identity graph (admin + staff + department + doctor) for the read-only profile view. */
   findUserFullProfile(userId: string): Promise<UserWithFullProfile | null>;
 
@@ -77,6 +78,11 @@ export interface AuthRepositoryPort {
 
   /** Atomic: set adminProfile.walletAddress + bump user.registrationStep to 3. */
   bindAdminWallet(userId: string, walletAddress: string): Promise<{ profile: AdminProfile; user: UserWithProfile }>;
+  replaceAdminWalletAndInvalidateSessions(
+    userId: string,
+    expectedWalletAddress: string,
+    newWalletAddress: string,
+  ): Promise<void>;
 
   /** Activate admin (firstLogin=false, ACTIVE, step 4, clear invite) + store mfa secret. */
   activateAdminWithMfa(userId: string, encryptedSecret: string): Promise<UserWithProfile>;

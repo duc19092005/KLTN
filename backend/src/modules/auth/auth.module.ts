@@ -13,6 +13,7 @@ import { getJwtSecret } from './constants/auth-security';
 import { AuthUserLookupService } from './application/services/auth-user-lookup.service';
 import { WalletChallengeService } from './application/services/wallet-challenge.service';
 import { FaceMatchService } from './application/services/face-match.service';
+import { AdminWalletRecoveryContextService } from './application/services/admin-wallet-recovery-context.service';
 
 // Use cases
 import { BootstrapAdminUseCase } from './application/use-cases/bootstrap-admin.use-case';
@@ -34,6 +35,10 @@ import { LogoutUseCase } from './application/use-cases/logout.use-case';
 import { ForgotPasswordChallengeUseCase } from './application/use-cases/forgot-password-challenge.use-case';
 import { ForgotPasswordVerifyFaceUseCase } from './application/use-cases/forgot-password-verify-face.use-case';
 import { ForgotPasswordResetUseCase } from './application/use-cases/forgot-password-reset.use-case';
+import { AdminWalletRecoveryChallengeUseCase } from './application/use-cases/admin-wallet-recovery-challenge.use-case';
+import { AdminWalletRecoveryVerifyFaceUseCase } from './application/use-cases/admin-wallet-recovery-verify-face.use-case';
+import { AdminWalletRecoveryWalletChallengeUseCase } from './application/use-cases/admin-wallet-recovery-wallet-challenge.use-case';
+import { AdminWalletRecoveryConfirmUseCase } from './application/use-cases/admin-wallet-recovery-confirm.use-case';
 
 // Ports + adapters
 import { AUTH_REPOSITORY } from './application/ports/auth.repository.port';
@@ -71,6 +76,7 @@ import { StepUpTicketIssuerAdapter } from './infrastructure/adapters/stepup-tick
     AuthUserLookupService,
     WalletChallengeService,
     FaceMatchService,
+    AdminWalletRecoveryContextService,
 
     // Use cases
     BootstrapAdminUseCase,
@@ -92,6 +98,10 @@ import { StepUpTicketIssuerAdapter } from './infrastructure/adapters/stepup-tick
     ForgotPasswordChallengeUseCase,
     ForgotPasswordVerifyFaceUseCase,
     ForgotPasswordResetUseCase,
+    AdminWalletRecoveryChallengeUseCase,
+    AdminWalletRecoveryVerifyFaceUseCase,
+    AdminWalletRecoveryWalletChallengeUseCase,
+    AdminWalletRecoveryConfirmUseCase,
 
     // Ports -> adapters
     { provide: AUTH_REPOSITORY, useClass: PrismaAuthRepository },
