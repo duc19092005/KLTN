@@ -2,24 +2,26 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import axios from 'axios';
-import App from './App';
-import { AuthProvider } from './contexts/AuthContext';
-import { WalletProvider } from './contexts/WalletContext';
-import { ThemeLangProvider } from './contexts/ThemeLangContext';
+import App from './routes/AppRoutes';
+import { AuthProvider } from './providers/AuthProvider';
+import { ToastProvider } from './providers/ToastProvider';
+import { PreferencesProvider } from './providers/PreferencesProvider';
 import './index.css';
+import ModalScrollLockObserver from './shared/components/ModalScrollLockObserver';
 
 axios.defaults.withCredentials = true;
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
-      <ThemeLangProvider>
-        <AuthProvider>
-          <WalletProvider>
+      <AuthProvider>
+        <PreferencesProvider>
+          <ToastProvider>
+            <ModalScrollLockObserver />
             <App />
-          </WalletProvider>
-        </AuthProvider>
-      </ThemeLangProvider>
+          </ToastProvider>
+        </PreferencesProvider>
+      </AuthProvider>
     </BrowserRouter>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

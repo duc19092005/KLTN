@@ -1,67 +1,119 @@
-const hre = require("hardhat");
+const hre = require('hardhat');
+
+function normalizePrivateKey(value) {
+  if (!value || value === 'your_super_admin_private_key_here') return null;
+  const trimmed = value.trim();
+  if (/^0x[0-9a-fA-F]{64}$/.test(trimmed)) return trimmed;
+  if (/^[0-9a-fA-F]{64}$/.test(trimmed)) return `0x${trimmed}`;
+  return null;
+}
+
+function addressFromPrivateKey(value) {
+  const key = normalizePrivateKey(value);
+  return key ? new hre.ethers.Wallet(key).address : null;
+}
 
 async function main() {
-  const [deployer] = await hre.ethers.getSigners();
-  console.log("Deploying contracts with account:", deployer.address);
-  console.log("Account balance:", (await hre.ethers.provider.getBalance(deployer.address)).toString());
-
-  // Deploy Verifier (MockVerifier for dev, Groth16Verifier for production)
-  const useMock = process.env.USE_MOCK_VERIFIER !== "false";
-  let verifierAddress;
-
-  if (useMock) {
-    console.log("\n--- Deploying MockVerifier (development mode) ---");
-    const MockVerifier = await hre.ethers.getContractFactory("MockVerifier");
-    const mockVerifier = await MockVerifier.deploy();
-    await mockVerifier.waitForDeployment();
-    verifierAddress = await mockVerifier.getAddress();
-    console.log("MockVerifier deployed to:", verifierAddress);
-  } else {
-    console.log("\n--- Deploying Groth16Verifier (production mode) ---");
-    const Groth16Verifier = await hre.ethers.getContractFactory("Groth16Verifier");
-    const verifier = await Groth16Verifier.deploy();
-    await verifier.waitForDeployment();
-    verifierAddress = await verifier.getAddress();
-    console.log("Groth16Verifier deployed to:", verifierAddress);
+  if (hre.network.name === 'custom') {
+    if (!process.env.NETWORK_RPC_URL) {
+      throw new Error('NETWORK_RPC_URL is required for custom deploys.');
+    }
+    if (!normalizePrivateKey(process.env.PRIVATE_KEY || process.env.BLOCKCHAIN_OWNER_PRIVATE_KEY || process.env.SUPER_ADMIN_PRIVATE_KEY)) {
+      throw new Error('PRIVATE_KEY or BLOCKCHAIN_OWNER_PRIVATE_KEY is required for custom deploys.');
+    }
   }
 
-  // Deploy IdentityRegistry
-  console.log("\n--- Deploying IdentityRegistry ---");
-  const IdentityRegistry = await hre.ethers.getContractFactory("IdentityRegistry");
-  const registry = await IdentityRegistry.deploy(verifierAddress);
-  await registry.waitForDeployment();
-  const registryAddress = await registry.getAddress();
-  console.log("IdentityRegistry deployed to:", registryAddress);
+  const [deployer] = await hre.ethers.getSigners();
+  if (!deployer) {
+    throw new Error(`No deployer signer configured for network "${hre.network.name}".`);
+  }
+  console.log('Deploying contracts with account:', deployer.address);
+  console.log('Account balance:', (await hre.ethers.provider.getBalance(deployer.address)).toString());
 
-  // Deploy AI Model Registry
-  console.log("\n--- Deploying AiModelRegistry ---");
-  const AiModelRegistry = await hre.ethers.getContractFactory("AiModelRegistry");
-  const aiModelRegistry = await AiModelRegistry.deploy(registryAddress);
-  await aiModelRegistry.waitForDeployment();
-  const aiModelRegistryAddress = await aiModelRegistry.getAddress();
-  console.log("AiModelRegistry deployed to:", aiModelRegistryAddress);
+  const ownerKey = normalizePrivateKey(process.env.BLOCKCHAIN_OWNER_PRIVATE_KEY || process.env.SUPER_ADMIN_PRIVATE_KEY);
+  const configuredOwnerAddress =
+    process.env.BLOCKCHAIN_OWNER_ADDRESS || addressFromPrivateKey(process.env.BLOCKCHAIN_OWNER_PRIVATE_KEY);
+  const ownerAddress = configuredOwnerAddress ? hre.ethers.getAddress(configuredOwnerAddress) : deployer.address;
+  const configuredRelayerAddress =
+    process.env.BLOCKCHAIN_RELAYER_ADDRESS ||
+    addressFromPrivateKey(process.env.BLOCKCHAIN_RELAYER_PRIVATE_KEY) ||
+    addressFromPrivateKey(process.env.BLOCKCHAIN_OWNER_PRIVATE_KEY) ||
+    addressFromPrivateKey(process.env.SUPER_ADMIN_PRIVATE_KEY);
+  const relayerAddress = configuredRelayerAddress ? hre.ethers.getAddress(configuredRelayerAddress) : deployer.address;
 
-  // Deploy DB Backup Registry
-  console.log("\n--- Deploying DbBackupRegistry ---");
-  const DbBackupRegistry = await hre.ethers.getContractFactory("DbBackupRegistry");
-  const dbBackupRegistry = await DbBackupRegistry.deploy();
-  await dbBackupRegistry.waitForDeployment();
-  const dbBackupRegistryAddress = await dbBackupRegistry.getAddress();
-  console.log("DbBackupRegistry deployed to:", dbBackupRegistryAddress);
+  // 1. IdentityRegistry (existing) -------------------------------------------
+  const IdentityRegistry = await hre.ethers.getContractFactory('IdentityRegistry');
+  const identityRegistry = await IdentityRegistry.deploy();
+  await identityRegistry.waitForDeployment();
+  const identityRegistryAddress = await identityRegistry.getAddress();
 
-  // Summary
-  console.log("\n========== Deployment Summary ==========");
-  console.log(`Verifier (${useMock ? "Mock" : "Groth16"}): ${verifierAddress}`);
-  console.log(`IdentityRegistry: ${registryAddress}`);
-  console.log(`AiModelRegistry: ${aiModelRegistryAddress}`);
-  console.log(`DbBackupRegistry: ${dbBackupRegistryAddress}`);
-  console.log(`Admin: ${deployer.address}`);
-  console.log("=========================================");
-  console.log("\nAdd these to your backend .env:");
-  console.log(`IDENTITY_REGISTRY_ADDRESS=${registryAddress}`);
-  console.log(`AI_MODEL_REGISTRY_ADDRESS=${aiModelRegistryAddress}`);
-  console.log(`DB_BACKUP_REGISTRY_ADDRESS=${dbBackupRegistryAddress}`);
-  console.log(`VERIFIER_ADDRESS=${verifierAddress}`);
+  // 2. FaceRegistry (face-template integrity hashes) -------------------------
+  const FaceRegistry = await hre.ethers.getContractFactory('FaceRegistry');
+  const faceRegistry = await FaceRegistry.deploy(identityRegistryAddress);
+  await faceRegistry.waitForDeployment();
+  const faceRegistryAddress = await faceRegistry.getAddress();
+
+  // 3. AuditAnchor (Merkle root logger, shared by services) ------------------
+  const AuditAnchor = await hre.ethers.getContractFactory('AuditAnchor');
+  const auditAnchor = await AuditAnchor.deploy(identityRegistryAddress);
+  await auditAnchor.waitForDeployment();
+  const auditAnchorAddress = await auditAnchor.getAddress();
+
+  if (relayerAddress.toLowerCase() !== ownerAddress.toLowerCase()) {
+    console.log(`Authorizing backend relayer: ${relayerAddress}`);
+    const tx = await identityRegistry.addRelayer(relayerAddress);
+    await tx.wait();
+  } else {
+    console.log(`Backend relayer is the configured owner address: ${relayerAddress}`);
+  }
+
+  let finalOwnerAddress = await identityRegistry.owner();
+  if (ownerAddress.toLowerCase() !== deployer.address.toLowerCase()) {
+    console.log(`Transferring IdentityRegistry ownership to: ${ownerAddress}`);
+    const tx = await identityRegistry.transferOwnership(ownerAddress);
+    await tx.wait();
+
+    if (ownerKey && new hre.ethers.Wallet(ownerKey).address.toLowerCase() === ownerAddress.toLowerCase()) {
+      const ownerSigner = new hre.ethers.Wallet(ownerKey, hre.ethers.provider);
+      console.log(`Accepting ownership with configured owner signer: ${ownerSigner.address}`);
+      const acceptTx = await identityRegistry.connect(ownerSigner).acceptOwnership();
+      await acceptTx.wait();
+      finalOwnerAddress = await identityRegistry.owner();
+    } else {
+      console.log('Ownership transfer is pending. The configured owner wallet must call acceptOwnership().');
+      finalOwnerAddress = await identityRegistry.owner();
+    }
+  }
+
+  console.log('\n========== Deployment Summary ==========');
+  console.log(`IdentityRegistry:   ${identityRegistryAddress}`);
+  console.log(`FaceRegistry:       ${faceRegistryAddress}`);
+  console.log(`AuditAnchor:        ${auditAnchorAddress}`);
+  console.log(`Deployer:           ${deployer.address}`);
+  console.log(`Owner:              ${finalOwnerAddress}`);
+  console.log(`PendingOwner:       ${await identityRegistry.pendingOwner()}`);
+  console.log(`Relayer:            ${relayerAddress}`);
+  console.log('=========================================');
+  const rpcUrl = hre.network.name === 'localhost' ? 'http://127.0.0.1:8545' : process.env.NETWORK_RPC_URL;
+
+  console.log('\nAdd/update these in blockchain/.env:');
+  if (rpcUrl) {
+    console.log(`NETWORK_RPC_URL=${rpcUrl}`);
+  }
+  console.log(`BLOCKCHAIN_OWNER_ADDRESS=${ownerAddress}`);
+  console.log(`BLOCKCHAIN_RELAYER_ADDRESS=${relayerAddress}`);
+
+  console.log('\nAdd/update these in backend/.env:');
+  if (rpcUrl) {
+    console.log(`BLOCKCHAIN_RPC_URL=${rpcUrl}`);
+  }
+  console.log(`IDENTITY_REGISTRY_ADDRESS=${identityRegistryAddress}`);
+  console.log(`FACE_REGISTRY_ADDRESS=${faceRegistryAddress}`);
+  console.log(`AUDIT_ANCHOR_ADDRESS=${auditAnchorAddress}`);
+  console.log(`BLOCKCHAIN_RELAYER_ADDRESS=${relayerAddress}`);
+  console.log('BLOCKCHAIN_RELAYER_PRIVATE_KEY=<backend relayer private key>');
+
+  console.log('\nFrontend does not need blockchain env; wallet authorization is checked by backend.');
 }
 
 main()

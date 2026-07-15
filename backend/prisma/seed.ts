@@ -1,136 +1,133 @@
-import { PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+import { PrismaClient, UserRole, UserStatus } from '@prisma/client';
 import * as crypto from 'crypto';
+import {
+  generateSalt,
+  computeRecordHash,
+  computeEntryHash,
+  GENESIS_PREV_HASH,
+} from '../src/infrastructure/audit/audit-hash.util';
+import { buildDepartmentSnapshot } from '../src/modules/department/domain/department-snapshot';
 
 const prisma = new PrismaClient();
 
+const departments = [
+  { departmentCode: 'PB-XRAY', name: 'X-Ray', floor: '2' },
+  { departmentCode: 'PB-MRI', name: 'MRI', floor: '2' },
+  { departmentCode: 'PB-LAB', name: 'Blood Test', floor: '3' },
+  { departmentCode: 'PB-DERM', name: 'Dermatology Lab', floor: '4' },
+];
+
 async function main() {
-  console.log('🌱 Starting database seeding...');
+  // 1. Clear old seed logs if database is reset (but keep append-only constraints in mind)
+  // Clean upsert avoids breaking append-only if we just modify existing ones.
+  // In seeding, we usually assume a clean database or upsert operations.
 
-  // ============================================================
-  // Admin: NO seed data. Super Admin creates Admin accounts
-  // via the API with invite tokens. This is intentional security.
-  // ============================================================
-  console.log('ℹ️  Admin accounts: Not seeded. Super Admin creates via API with invite tokens.');
+  for (const dept of departments) {
+    const existing = await prisma.department.findUnique({
+      where: { departmentCode: dept.departmentCode },
+    });
 
-  // ============================================================
-  // Seed sample Doctor accounts (with temp password for first login)
-  // ============================================================
-  console.log('🌱 Seeding sample Doctor accounts...');
+    if (existing) {
+      // If already seeded, skip or update without breaking hashes if unchanged
+      console.log(`Department ${dept.departmentCode} already exists, skipping seed.`);
+      continue;
+    }
 
-  const tempPassword = await bcrypt.hash('doctor123', 10);
+    // Prepare snapshots and compute integrity hashes
+    const tempDept = {
+      id: crypto.randomUUID(),
+      departmentCode: dept.departmentCode,
+      name: dept.name,
+      floor: dept.floor,
+      status: 'ACTIVE',
+    };
+    const snapshot = buildDepartmentSnapshot(tempDept);
+    const salt = generateSalt();
+    const hash = computeRecordHash(snapshot, salt);
 
-  const doctor1User = await prisma.user.upsert({
-    where: { username: 'dr.john.doe' },
-    update: {},
+    // Insert Department with integrity hashes
+    const createdDept = await prisma.department.create({
+      data: {
+        id: tempDept.id,
+        departmentCode: tempDept.departmentCode,
+        name: tempDept.name,
+        floor: tempDept.floor,
+        status: 'ACTIVE',
+        hash256: hash,
+        dataSalt: salt,
+      },
+    });
+
+    // Write to BlockchainLogger with hash-chain continuity
+    const tail = await prisma.blockchainLogger.findFirst({
+      where: { seq: { not: null } },
+      orderBy: { seq: 'desc' },
+      select: { seq: true, entryHash: true },
+    });
+    const seq = (tail?.seq ?? 0) + 1;
+    const prevHash = tail?.entryHash ?? GENESIS_PREV_HASH;
+    const createdAt = new Date();
+
+    const entryHash = computeEntryHash(
+      {
+        seq,
+        action: 'CREATE',
+        entity: 'Department',
+        entityId: createdDept.id,
+        dataHash: hash,
+        createdAtIso: createdAt.toISOString(),
+      },
+      prevHash
+    );
+
+    await prisma.blockchainLogger.create({
+      data: {
+        seq,
+        prevHash,
+        entryHash,
+        entity: 'Department',
+        entityId: createdDept.id,
+        action: 'CREATE',
+        dataHash: hash,
+        dataSalt: salt,
+        afterJson: snapshot as any,
+        onChainStatus: 'PENDING',
+        createdAt,
+      },
+    });
+
+    console.log(`Seeded & Logged Department: ${dept.departmentCode}`);
+  }
+
+  // Seed default admin user
+  const rawInviteToken = process.env.SEED_ADMIN_INVITE_TOKEN || 'admin-bootstrap-token';
+  const inviteToken = `sha256:${crypto.createHash('sha256').update(rawInviteToken).digest('hex')}`;
+
+  await prisma.user.upsert({
+    where: { username: 'admin' },
+    update: { role: UserRole.ADMIN, status: UserStatus.PENDING },
     create: {
-      username: 'dr.john.doe',
-      email: 'john.doe@hospital.vn',
-      password: tempPassword,
-      role: 'DOCTOR',
-      status: 'PENDING',
+      username: 'admin',
+      email: 'admin@hospital.local',
+      role: UserRole.ADMIN,
+      status: UserStatus.PENDING,
       firstLogin: true,
-      registrationStep: 1,
+      inviteToken,
+      inviteTokenExpiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      adminProfile: {
+        create: {
+          adminUserName: 'admin',
+        },
+      },
     },
   });
 
-  const doctor2User = await prisma.user.upsert({
-    where: { username: 'dr.jane.smith' },
-    update: {},
-    create: {
-      username: 'dr.jane.smith',
-      email: 'jane.smith@hospital.vn',
-      password: tempPassword,
-      role: 'DOCTOR',
-      status: 'PENDING',
-      firstLogin: true,
-      registrationStep: 1,
-    },
-  });
-
-  const doctor3User = await prisma.user.upsert({
-    where: { username: 'dr.alan.turing' },
-    update: {},
-    create: {
-      username: 'dr.alan.turing',
-      email: 'alan.turing@hospital.vn',
-      password: tempPassword,
-      role: 'DOCTOR',
-      status: 'PENDING',
-      firstLogin: true,
-      registrationStep: 1,
-    },
-  });
-
-  // Create DoctorProfiles
-  const doc1Profile = await prisma.doctorProfile.upsert({
-    where: { userId: doctor1User.id },
-    update: {},
-    create: {
-      userId: doctor1User.id,
-      doctorName: 'Dr. John Doe',
-      licenseId: 'LIC-CARD-001',
-      dateOfBirth: new Date('1980-05-15'),
-      identityNumber: 'ID-001-VN',
-      specialties: 'Cardiology',
-      degree: 'MD, PhD',
-      facultyOfWork: 'Heart Center',
-      position: 'Senior Cardiologist',
-      workingStartDate: new Date('2010-09-01'),
-    },
-  });
-
-  const doc2Profile = await prisma.doctorProfile.upsert({
-    where: { userId: doctor2User.id },
-    update: {},
-    create: {
-      userId: doctor2User.id,
-      doctorName: 'Dr. Jane Smith',
-      licenseId: 'LIC-NEUR-002',
-      dateOfBirth: new Date('1985-08-22'),
-      identityNumber: 'ID-002-VN',
-      specialties: 'Neurology',
-      degree: 'MD',
-      facultyOfWork: 'Neuroscience Department',
-      position: 'Neurologist',
-      workingStartDate: new Date('2015-03-01'),
-    },
-  });
-
-  const doc3Profile = await prisma.doctorProfile.upsert({
-    where: { userId: doctor3User.id },
-    update: {},
-    create: {
-      userId: doctor3User.id,
-      doctorName: 'Dr. Alan Turing',
-      licenseId: 'LIC-GEN-003',
-      dateOfBirth: new Date('1990-06-23'),
-      identityNumber: 'ID-003-VN',
-      specialties: 'General Practice',
-      degree: 'MD',
-      facultyOfWork: 'General Medicine',
-      position: 'General Practitioner',
-      workingStartDate: new Date('2018-07-01'),
-    },
-  });
-
-  console.log(`  ✅ Created 3 Doctor accounts (temp password: doctor123)`);
-
-
-
-  console.log('\n🌱 Seeding finished successfully!');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('📋 Summary:');
-  console.log('   - Admins: None (create via Super Admin API)');
-  console.log('   - Doctors: 3 (password: doctor123)');
-  console.log('   - AI Models: Seeded manually or via API');
-  console.log('   - Diagnoses: Seeded manually or via API');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('Seed completed. Default admin invite token:', rawInviteToken);
 }
 
 main()
-  .catch((e) => {
-    console.error('❌ Error during seeding:', e);
+  .catch((error) => {
+    console.error(error);
     process.exit(1);
   })
   .finally(async () => {

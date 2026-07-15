@@ -1,128 +1,160 @@
-# 🛡️ ZKP Identity Verification System — Hospital Management
+# KLTN Hospital Management System
 
-Hệ thống xác thực danh tính đa lớp tích hợp **Zero-Knowledge Proofs (ZKP - Groth16)**, **Sinh trắc học nhận diện khuôn mặt kèm kiểm tra thực thể sống (Liveness Detection - MediaPipe & face-api.js)**, và **Blockchain (Solidity & Hardhat)** để bảo vệ hệ thống quản lý bệnh viện.
+He thong quan ly benh vien full-stack voi NestJS, React, PostgreSQL, AI ho tro chan doan, xac thuc sinh trac hoc va blockchain audit trail.
 
----
+Blockchain chi dung de neo hash/Merkle root phuc vu kiem chung toan ven. Tuyet doi khong dua PII, noi dung benh an, PDF, X-Ray, anh y te, S3 object key hay file len chain.
 
-## 📖 Tổng quan dự án
-
-Hệ thống này được phát triển nhằm giải quyết triệt để vấn đề rò rỉ dữ liệu y tế do bị chiếm quyền tài khoản quản trị viên.
-
-Bằng cách áp dụng mô hình bảo mật phi tập trung và Zero-Knowledge Proofs (ZKP), hệ thống đảm bảo:
-1. **Admin đăng nhập không cần mật khẩu:** Admin chỉ cần Ví Web3 + Biometric khuôn mặt để tạo ZKP đăng ký và đăng nhập.
-2. **Bác sĩ đăng nhập bằng sinh trắc học:** Sau lần thiết lập mật khẩu đầu tiên, Bác sĩ chỉ cần quét khuôn mặt (kiểm tra liveness) để truy cập nhanh chóng và an toàn.
-3. **Bảo mật Cookies HTTP-Only:** Phiên đăng nhập được quản lý bằng JWT Token lưu trong Cookie HTTP-Only để chống lại các cuộc tấn công XSS và đánh cắp token.
-
----
-
-## 🛡️ Kiến trúc bảo mật đa lớp (Multi-layered Security)
-
-Hệ thống bảo vệ dữ liệu nhạy cảm của bệnh viện qua 3 lớp phòng thủ độc lập:
-
-```
-                            [ YÊU CẦU TRUY CẬP ]
-                                     │
-                                     ▼
-        ┌─────────────────────────────────────────────────────────┐
-        │ Lớp 1: Khóa Ví Web3 & Chữ ký mật mã                     │
-        │ └─ Kiểm tra quyền hạn ví đã đăng ký on-chain            │
-        └────────────────────────────┬────────────────────────────┘
-                                     │ (Hợp lệ)
-                                     ▼
-        ┌─────────────────────────────────────────────────────────┐
-        │ Lớp 2: Quét Sinh trắc học & Kiểm tra Liveness            │
-        │ └─ Chống giả mạo ảnh chụp, deepfake bằng cử chỉ đầu    │
-        └────────────────────────────┬────────────────────────────┘
-                                     │ (Khớp khuôn mặt & Liveness)
-                                     ▼
-        ┌─────────────────────────────────────────────────────────┐
-        │ Lớp 3: Tạo và Kiểm tra Zero-Knowledge Proofs (ZKP)      │
-        │ └─ Chứng minh quyền sở hữu cam kết mà không tiết lộ khóa│
-        └────────────────────────────┬────────────────────────────┘
-                                     │ (Proof hợp lệ)
-                                     ▼
-                          [ ĐĂNG NHẬP THÀNH CÔNG ]
-```
-
-### Chi tiết các lớp bảo mật:
-* **Lớp 1: Chữ ký Ví Web3 (Cryptography):** Yêu cầu người dùng ký một thông báo nonce ngẫu nhiên bằng khóa cá nhân thông qua MetaMask. Địa chỉ ví này phải khớp với ví đã được đăng ký và ủy quyền trong hợp đồng thông minh Smart Contract.
-* **Lớp 2: Xác thực Liveness sinh trắc học (Biometrics):** Yêu cầu người dùng quay đầu theo các góc ngẫu nhiên (lên, xuống, trái, phải, thẳng). Hệ thống so khớp đặc trưng khuôn mặt (128-dimensional embedding) với cơ sở dữ liệu với ngưỡng tin cậy cao (Threshold > 0.85).
-* **Lớp 3: Zero-Knowledge Proofs (ZKP):** Sử dụng Poseidon Hash tạo mật mã cam kết (commitment) từ khóa bí mật MFA và hash khuôn mặt. Khi đăng nhập, một bằng chứng Groth16 Proof được tạo ở phía client để chứng minh danh tính mà không làm lộ khóa bí mật hoặc dữ liệu khuôn mặt.
-
----
-
-## 🛠️ Công nghệ sử dụng (Technology Stack)
-
-### 1. Zero-Knowledge Cryptography
-* **Circom & SnarkJS:** Dùng để biên dịch mạch số (circuits) ZKP và tạo/kiểm tra bằng chứng Groth16 trên trình duyệt và backend.
-
-### 2. Blockchain & Smart Contracts
-* **Solidity & Hardhat:** Viết và kiểm thử các Smart Contract quản lý ví được ủy quyền (`IdentityRegistry.sol`) và bộ kiểm thử Proof (`Verifier.sol`).
-* **Ethers.js:** Thư viện giao tiếp giữa Node.js/React và mạng Blockchain Ethereum Local (Hardhat Node).
-
-### 3. Biometric & Computer Vision
-* **face-api.js & MediaPipe:** Nhận diện điểm mốc khuôn mặt (facial landmarks) và trích xuất vector đặc trưng khuôn mặt ngay trên trình duyệt.
-
-### 4. Backend & Database
-* **NestJS (TypeScript):** Hệ khung làm việc cho API backend, tổ chức module rõ ràng.
-* **Prisma ORM & PostgreSQL:** Quản lý cơ sở dữ liệu quan hệ, lưu trữ thông tin bác sĩ, admin, cấu hình sinh trắc học đã mã hóa và lịch sử hệ thống.
-
-### 5. Frontend & Security
-* **React.js & Vite:** Giao diện SPA nhanh, mượt mà và trực quan.
-* **Cookies HTTP-Only:** Bảo mật thông tin phiên làm việc (JWT) chống tấn công lấy cắp Token.
-
----
-
-## 📂 Cơ cấu thư mục dự án
+## Cau Truc Monorepo
 
 ```text
-├── backend/            # NestJS Backend API
-│   ├── src/
-│   │   ├── auth/       # Mô-đun xác thực & quản lý phiên bằng Cookies
-│   │   ├── face/       # Mô-đun xác thực sinh trắc học khuôn mặt
-│   │   ├── users/      # Quản lý người dùng, tạo mã mời
-│   │   └── zkp/        # Xác minh Proof sinh ra từ trình duyệt
-│   ├── prisma/         # Schema cơ sở dữ liệu & dữ liệu mẫu (seeds)
-│   └── Dockerfile
-│
-├── frontend/           # React.js SPA (Vite)
-│   ├── src/
-│   │   ├── components/ # Camera quét khuôn mặt, Liveness detection, Ví Web3
-│   │   ├── contexts/   # AuthContext quản lý cookies & WalletContext
-│   │   ├── pages/      # Login, Dashboard, Admin Recovery
-│   │   └── services/   # Gọi API giao tiếp Backend
-│   └── Dockerfile
-│
-├── blockchain/         # Mạng Blockchain Local & Smart Contracts
-│   ├── contracts/      # Hợp đồng thông minh Solidity
-│   ├── scripts/        # Kịch bản Deploy Smart Contract tự động
-│   └── start.sh        # Script khởi động tự động trong container
-│
-├── docs/               # Thư mục chứa tài liệu hướng dẫn & quy chuẩn
-│   ├── config/         # Cấu hình cài đặt & khởi chạy dự án
-│   │   └── RUN.md
-│   ├── model/          # Tài liệu về mô hình xác thực khuôn mặt & ZKP
-│   │   └── ZKP_ARCHITECTURE.md
-│   └── design/         # Quy chuẩn hệ thống thiết kế giao diện UI/UX
-│       └── skill-mvp-ui-design.md
-│
-└── docker-compose.yml  # File orchestration khởi chạy toàn bộ hệ thống
+KLTN/
+|-- backend/      NestJS + Prisma + PostgreSQL
+|-- frontend/     React + Vite + Tailwind CSS
+|-- mobile/       Expo React Native patient mobile portal
+|-- blockchain/   Solidity + Hardhat + Ethers.js
+|-- tools/        Cong cu khoi phuc/khan cap offline
+|-- .env.example  Legacy/reference env checklist
 ```
 
----
+## Environment Model
 
-## 📄 Tài liệu hướng dẫn liên quan
+Root `.env` khong con la env tong de Docker Compose bom vao moi service.
 
-Hệ thống cung cấp các tài liệu chi tiết sau trong thư mục `docs/`:
+- `backend/.env`: backend runtime, database, JWT, encryption, audit crypto, S3, Cloudinary avatar, backend blockchain RPC/contract/relayer runtime.
+- `frontend/.env`: public `VITE_*` config cho frontend.
+- `blockchain/.env`: deploy/governance config cho Hardhat scripts.
 
-* **[Hướng dẫn cài đặt & Khởi chạy (RUN.md)](docs/config/RUN.md):**
-  * Cấu hình biến môi trường `.env`.
-  * Khởi chạy dự án bằng **Docker Compose** hoặc chạy **thủ công (Manual)**.
-  * Cấu hình ví **MetaMask** kết nối với mạng blockchain localhost.
-  * Gọi API **Bootstrap** tạo tài khoản Admin đầu tiên và thông tin đăng nhập mẫu.
-* **[Kiến trúc Xác thực Kép (ZKP_ARCHITECTURE.md)](docs/model/ZKP_ARCHITECTURE.md):**
-  * Luồng hoạt động chi tiết của lớp Biometrics (off-chain) và ZKP (on-chain).
-  * Cách hệ thống xử lý sai số sinh trắc học (Fuzziness) kết hợp với ZKP.
-* **[Hệ thống Quy chuẩn Thiết kế UI/UX (skill-mvp-ui-design.md)](docs/design/skill-mvp-ui-design.md):**
-  * Hệ màu (Color Palette), Typography, và các Component UI mẫu.
-  * Hướng dẫn thiết lập theme Light/Dark và cấu hình Tailwind CSS.
+Setup co ban:
+
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+cd blockchain
+cp .env.example .env
+```
+
+Khong commit file `.env` that.
+
+## Blockchain Flow
+
+Co 3 vai tro tach biet:
+
+| Vai tro | Nam o dau | Lam gi |
+|---|---|---|
+| Owner / root governance | `BLOCKCHAIN_OWNER_PRIVATE_KEY` trong `blockchain/.env` cho deploy/governance; production nen la cold wallet/multisig | Authorize/revoke Admin wallets, add/remove relayers, transfer ownership |
+| Relayer / backend writer | `BLOCKCHAIN_RELAYER_PRIVATE_KEY` trong `backend/.env` hoac secret manager backend | Ky giao dich tu dong: `AuditAnchor.commitRoot`, `FaceRegistry.setFaceHash`, `recordAction` |
+
+Backend khong dung vi Admin de tra gas cho audit transaction. Admin ky challenge de chung minh danh tinh; backend relayer moi la vi gui giao dich van hanh len chain.
+
+`IdentityRegistry` la nguon quyen trung tam:
+
+```text
+IdentityRegistry.owner()
+|-- quan tri Admin wallets
+|-- quan tri backend relayers
+|-- transferOwnership
+
+IdentityRegistry.isRelayerOrOwner(address)
+|-- cho phep FaceRegistry ghi face hash
+|-- cho phep AuditAnchor commit Merkle root
+|-- cho phep recordAction
+```
+
+`FaceRegistry` va `AuditAnchor` khong giu danh sach relayer rieng. Khi rotate relayer chi can cap nhat `IdentityRegistry`.
+
+## Neu Mat Key
+
+| Su co | Hau qua | Xu ly |
+|---|---|---|
+| Mat `BLOCKCHAIN_RELAYER_PRIVATE_KEY` | Khong ghi audit root/face hash moi; log co the don `UNANCHORED`/failed | Owner goi `removeRelayer(old)` va `addRelayer(new)`, sau do backend doi relayer key |
+| Relayer bi lo | Ke xau co the gui giao dich operational trong quyen relayer | Owner revoke relayer cu, add relayer moi, audit lai batch trong khoang nghi ngo |
+| Mat Admin wallet | Admin do khong login/step-up/recovery duoc | Owner revoke vi cu, authorize vi moi |
+| Mat Owner key don le | Governance ket; khong rotate relayer/admin duoc | Neu contract khong co recovery thi khong cuu duoc. Production phai dung multisig/cold wallet |
+
+## Chay Blockchain Local
+
+Terminal 1:
+
+```bash
+cd blockchain
+npm install
+npm run node
+```
+
+Terminal 2:
+
+```bash
+cd blockchain
+npm run deploy:local
+```
+
+Sau khi deploy, copy dung phan script in ra vao tung file: `blockchain/.env`, `backend/.env`, `frontend/.env`.
+
+Lenh huu ich:
+
+```bash
+cd blockchain
+npm run compile
+npm test
+npm run deploy:custom
+npm run deploy:audit:local
+```
+
+## Chay Bang Docker Compose
+
+Docker Compose khong chay blockchain container nua. Truoc khi `docker compose up`, hay chay Hardhat node o `blockchain/` nhu phan tren.
+
+```bash
+docker compose up -d
+```
+
+Mac dinh:
+
+```text
+Backend:  http://localhost:3001/api
+Frontend: http://localhost:5173
+Postgres: localhost:5432
+Hardhat:  http://localhost:8545
+```
+
+Trong compose, backend chi doc `backend/.env`; frontend chi doc `frontend/.env`; compose khong doc `blockchain/.env`.
+
+## Luu Tru File Y Te
+
+Medical result upload moi dung AWS S3 private bucket:
+
+- PDF report, X-Ray/MRI/CT/Ultrasound image, ECG, lab attachments.
+- AI image attachments: backend tai anh private tu S3, convert base64 va gui sang AI provider.
+
+Staff/doctor avatar khong di qua S3 private. Avatar dung Cloudinary public/static URL de frontend render truc tiep.
+
+PostgreSQL giu metadata/quyen truy cap (`storageProvider`, `bucket`, `objectKey`, `sha256`, `etag`). S3 chi giu blob. Blockchain chi anchor audit hash/Merkle root da sanitize.
+
+Download file y te di qua:
+
+```text
+/api/medical-orders/results/files/:fileId/download
+```
+
+Backend kiem tra RBAC roi moi tra pre-signed URL ngan han. File Cloudinary medical cu khong migrate trong phase nay; neu DB con `url` legacy va URL con song thi endpoint van mo duoc.
+
+## Patient Mobile
+
+`mobile/` contains the Expo React Native patient portal. Patients sign in with phone OTP or their first-login password, can resend OTP after a 60-second cooldown, choose linked profiles, and view their linked medical visit history transparently.
+
+See [mobile/README.md](./mobile/README.md).
+
+## Tai Lieu Lien Quan
+
+- [AGENTS.md](./AGENTS.md)
+- [blockchain/README.md](./blockchain/README.md)
+- [docs/security/audit-logging.md](./docs/security/audit-logging.md)
+- [docs/security/tiers-and-anchoring.md](./docs/security/tiers-and-anchoring.md)
+
+## Quy Uoc Phat Trien
+
+- Backend dung feature-based modules, DTO validation bang `class-validator`, business logic nam o service/use case.
+- Multi-step workflow phai dung transaction.
+- Entity quan trong phai ghi audit va anchor hash/root.
+- Blockchain khong luu PII, file y te, noi dung chan doan hoac du lieu lon.
+- `.env` khong duoc commit; cap nhat `.env.example` khi them bien moi.

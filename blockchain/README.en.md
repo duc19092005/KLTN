@@ -1,0 +1,27 @@
+**🌐 Language:** [🇻🇳 Tiếng Việt](./README.md) · [🇬🇧 English](./README.en.md) · [🇷🇺 Русский](./README.ru.md)
+
+# KLTN Hospital Management System - Blockchain
+
+Smart contracts for the tamper-evident audit trail. Hardhat is used for development, testing, and deployment.
+
+## Overview
+The blockchain layer is used **strictly for audit trails and integrity verification**. No medical data, PII, PDFs, or X-rays are ever stored on-chain. Only hashes, timestamps, and metadata are anchored via the `AuditAnchor` and registry contracts.
+
+## Setup
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Compile contracts
+npx hardhat compile
+
+# 3. Run tests
+npx hardhat test
+
+# 4. Start a local Hardhat node
+npx hardhat node
+
+# 5. Deploy contracts locally
+npx hardhat run scripts/deploy.js --network localhost
+```
