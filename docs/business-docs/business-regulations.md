@@ -45,7 +45,7 @@ Output:
 | QĐ38 | Khi thêm hồ sơ bệnh nhân phải có họ tên, giới tính, ngày sinh và tối thiểu một phương thức liên hệ; dữ liệu định danh phải được kiểm tra trùng theo chính sách bệnh viện. |
 | QĐ39 | Admin lần đầu phải hoàn tất xác thực quản trị bằng thông tin bí mật/ví quản trị do Developer cấp; thông tin bí mật không được lưu dạng rõ. |
 | QĐ40 | Khi đăng xuất, hệ thống hủy phiên truy cập hiện tại và ghi nhận thời điểm, lý do đăng xuất trong nhật ký hệ thống. |
-| QĐ41 | Quên mật khẩu chỉ áp dụng cho nhân sự theo luồng xác thực bổ sung. Admin và bệnh nhân sử dụng cơ chế xác thực riêng. |
+| QĐ41 | Nhân sự quên mật khẩu phải cung cấp tài khoản và xác thực khuôn mặt trước khi đặt mật khẩu mới. Admin không có mật khẩu nghiệp vụ; khi mất quyền truy cập ví, Admin chọn khôi phục tài khoản, hệ thống tự xác định tài khoản Admin duy nhất, xác thực khuôn mặt, xác minh chữ ký của ví mới, thay thế ví quản trị và vô hiệu hóa toàn bộ phiên cũ. Admin không phải nhập email hoặc tên đăng nhập trong luồng này. Bệnh nhân tiếp tục sử dụng OTP điện thoại. |
 | QĐ42 | Chức năng đổi mật khẩu chỉ áp dụng cho nhân sự; phải xác nhận mật khẩu hiện tại và mật khẩu mới theo chính sách mật khẩu. |
 | QĐ43 | Tệp bệnh án, kết quả xét nghiệm, ảnh chẩn đoán và tài liệu y tế lưu trong kho riêng tư AWS S3, có kiểm soát truy cập, kiểm tra loại tệp và liên kết với bản ghi y tế. |
 | QĐ44 | Cloudinary chỉ lưu ảnh đại diện bác sĩ/nhân sự; không lưu bệnh án, PII, kết quả xét nghiệm hoặc hình ảnh chẩn đoán. |

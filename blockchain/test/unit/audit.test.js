@@ -42,6 +42,35 @@ describe('IdentityRegistry', function () {
     );
   });
 
+  it('rotates the only admin wallet atomically', async function () {
+    await identity.authorizeAdmin(relayer.address);
+
+    await expect(identity.rotateAdmin(relayer.address, other.address))
+      .to.emit(identity, 'AdminRotated')
+      .withArgs(relayer.address, other.address);
+
+    expect(await identity.isAuthorized(relayer.address)).to.equal(false);
+    expect(await identity.isAuthorized(other.address)).to.equal(true);
+  });
+
+  it('rejects an invalid admin wallet rotation', async function () {
+    await identity.authorizeAdmin(relayer.address);
+
+    await expect(identity.rotateAdmin(other.address, owner.address)).to.be.revertedWith(
+      'IdentityRegistry: old wallet not authorized',
+    );
+    await expect(identity.rotateAdmin(relayer.address, relayer.address)).to.be.revertedWith(
+      'IdentityRegistry: wallet unchanged',
+    );
+  });
+
+  it('enforces a single authorized Admin wallet', async function () {
+    await identity.authorizeAdmin(relayer.address);
+    await expect(identity.authorizeAdmin(other.address)).to.be.revertedWith(
+      'IdentityRegistry: admin already configured',
+    );
+  });
+
   it('authorizes and revokes relayers by owner only', async function () {
     await expect(identity.addRelayer(relayer.address)).to.emit(identity, 'RelayerAuthorized');
     expect(await identity.isRelayer(relayer.address)).to.equal(true);

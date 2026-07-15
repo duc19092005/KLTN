@@ -46,4 +46,25 @@ export const authService = {
 
   forgotPasswordReset: (resetToken, newPassword) =>
     api.post('/auth/forgot-password/reset', { resetToken, newPassword }),
+
+  adminWalletRecoveryChallenge: () =>
+    api.post('/auth/admin-account-recovery/challenge'),
+
+  adminWalletRecoveryVerifyFace: (embedding, challenge) =>
+    api.post('/auth/admin-account-recovery/verify-face', { embedding, challenge }),
+
+  adminWalletRecoveryWalletChallenge: (recoveryToken, address) =>
+    api.post('/auth/admin-account-recovery/wallet-challenge', { recoveryToken, address }),
+
+  adminWalletRecoveryConfirm: (recoveryToken, address, signature, message) =>
+    api.post('/auth/admin-account-recovery/confirm-wallet', {
+      recoveryToken,
+      address,
+      signature,
+      message,
+    }),
+
+  faceLoginChallenge: (username) => api.post('/auth/face-login/challenge', { username }),
+
+  faceLogin: (userId, embedding, challenge) => api.post('/auth/face-login', { userId, embedding, challenge }),
 };

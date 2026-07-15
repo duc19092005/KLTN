@@ -13,5 +13,6 @@ export interface AuthChainGatewayPort {
   setFaceHash(userId: string, faceHashBytes32: string): Promise<ChainWriteResult>;
   getFaceHash(userId: string): Promise<string | null>;
   authorizeAdmin(walletAddress: string): Promise<ChainWriteResult>;
+  rotateAdmin(oldWalletAddress: string, newWalletAddress: string): Promise<ChainWriteResult>;
   isAuthorized(walletAddress: string): Promise<boolean>;
 }

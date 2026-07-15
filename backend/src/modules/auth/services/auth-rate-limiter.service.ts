@@ -27,6 +27,10 @@ export class AuthRateLimiterService {
   }
 
   recordFailure(key: string, windowMs = 15 * 60 * 1000) {
+    this.recordAttempt(key, windowMs);
+  }
+
+  recordAttempt(key: string, windowMs = 15 * 60 * 1000) {
     const now = Date.now();
     const bucket = this.buckets.get(key);
 

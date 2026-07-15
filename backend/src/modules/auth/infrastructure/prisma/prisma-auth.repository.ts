@@ -71,6 +71,15 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
     });
   }
 
+  async findAdminUsers(limit: number): Promise<UserWithProfile[]> {
+    return this.prisma.user.findMany({
+      where: { role: 'ADMIN' },
+      include: { adminProfile: true },
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+    });
+  }
+
   async findUserFullProfile(userId: string): Promise<UserWithFullProfile | null> {
     return this.prisma.user.findUnique({
       where: { id: userId },
@@ -153,6 +162,36 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
       this.prisma.user.update({ where: { id: userId }, data: { registrationStep: 3 }, include: { adminProfile: true } }),
     ]);
     return { profile, user };
+  }
+
+  async replaceAdminWalletAndInvalidateSessions(
+    userId: string,
+    expectedWalletAddress: string,
+    newWalletAddress: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.adminProfile.updateMany({
+        where: {
+          userId,
+          walletAddress: { equals: expectedWalletAddress, mode: 'insensitive' },
+        },
+        data: {
+          walletAddress: newWalletAddress,
+          nonce: null,
+          noncePurpose: null,
+          nonceExpiresAt: null,
+        },
+      });
+
+      if (updated.count !== 1) {
+        throw new Error('ADMIN_WALLET_CHANGED_DURING_RECOVERY');
+      }
+
+      await tx.user.update({
+        where: { id: userId },
+        data: { tokenVersion: { increment: 1 } },
+      });
+    });
   }
 
   async activateAdminWithMfa(userId: string, encryptedSecret: string): Promise<UserWithProfile> {

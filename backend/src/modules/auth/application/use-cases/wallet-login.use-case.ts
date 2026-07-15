@@ -41,11 +41,11 @@ export class WalletLoginUseCase {
     }
 
     return {
-      access_token: this.tokenSigner.sign(adminProfile.user, { verified: true, walletAddress: normalizedWalletAddress }),
-      requireVerification: false,
+      access_token: this.tokenSigner.sign(adminProfile.user, { verified: false, walletAddress: normalizedWalletAddress }),
+      requireVerification: true,
       user: toPublicUser(
         { ...adminProfile.user, adminProfile: { ...adminProfile, walletAddress: normalizedWalletAddress } },
-        true,
+        false,
       ),
     };
   }

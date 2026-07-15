@@ -147,3 +147,49 @@ export class ForgotPasswordResetDto {
   @Length(8, 256)
   newPassword: string;
 }
+
+export class AdminWalletRecoveryVerifyFaceDto {
+  @IsArray()
+  embedding: number[];
+
+  @IsString()
+  @Length(32, 128)
+  challenge: string;
+}
+
+export class AdminWalletRecoveryChallengeDto {
+  @IsString()
+  @Length(32, 4096)
+  recoveryToken: string;
+
+  @IsEthereumAddress()
+  address: string;
+}
+
+export class AdminWalletRecoveryConfirmDto extends AdminWalletRecoveryChallengeDto {
+  @IsString()
+  @Length(64, 512)
+  signature: string;
+
+  @IsString()
+  @Length(32, 2048)
+  message: string;
+}
+
+export class FaceLoginChallengeDto {
+  @IsString()
+  @Length(3, 128)
+  username: string;
+}
+
+export class FaceLoginDto {
+  @IsString()
+  userId: string;
+
+  @IsArray()
+  embedding: number[];
+
+  @IsString()
+  @Length(32, 128)
+  challenge: string;
+}

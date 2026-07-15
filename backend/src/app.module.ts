@@ -25,10 +25,12 @@ import { NotificationModule } from './modules/notification/notification.module';
 import { PatientAuthModule } from './modules/patient-auth/patient-auth.module';
 import { PatientPortalModule } from './modules/patient-portal/patient-portal.module';
 import { AdministrativeLifecycleModule } from './common/lifecycle/administrative-lifecycle.module';
+import { EmailModule } from './infrastructure/email/email.module';
 
 @Module({
   imports: [
     PrismaModule,
+    EmailModule,
     StorageModule,
     BlockchainModule,
     AuditModule,

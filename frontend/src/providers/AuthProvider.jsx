@@ -100,6 +100,20 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const loginWithFace = async (userId, embedding, challenge) => {
+    setLoading(true);
+    try {
+      const response = await api.post('/auth/face-login', { userId, embedding, challenge });
+      persistSession(response.data.user);
+      return { success: true, ...response.data };
+    } catch (err) {
+      clearSession();
+      return { success: false, error: err.response?.data?.message || 'Xác thực khuôn mặt thất bại.' };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updateSession = (userData = null) => {
     setToken(COOKIE_SESSION);
     setUser((currentUser) => (userData ? { ...currentUser, ...userData } : currentUser));
@@ -125,6 +139,7 @@ export function AuthProvider({ children }) {
         loginWithWallet,
         loginWithInvite,
         loginWithPassword,
+        loginWithFace,
         logout,
         updateToken,
         updateSession,
