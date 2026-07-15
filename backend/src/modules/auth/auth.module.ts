@@ -39,6 +39,8 @@ import { AdminWalletRecoveryChallengeUseCase } from './application/use-cases/adm
 import { AdminWalletRecoveryVerifyFaceUseCase } from './application/use-cases/admin-wallet-recovery-verify-face.use-case';
 import { AdminWalletRecoveryWalletChallengeUseCase } from './application/use-cases/admin-wallet-recovery-wallet-challenge.use-case';
 import { AdminWalletRecoveryConfirmUseCase } from './application/use-cases/admin-wallet-recovery-confirm.use-case';
+import { FaceLoginChallengeUseCase } from './application/use-cases/face-login-challenge.use-case';
+import { FaceLoginUseCase } from './application/use-cases/face-login.use-case';
 
 // Ports + adapters
 import { AUTH_REPOSITORY } from './application/ports/auth.repository.port';
@@ -102,6 +104,8 @@ import { StepUpTicketIssuerAdapter } from './infrastructure/adapters/stepup-tick
     AdminWalletRecoveryVerifyFaceUseCase,
     AdminWalletRecoveryWalletChallengeUseCase,
     AdminWalletRecoveryConfirmUseCase,
+    FaceLoginChallengeUseCase,
+    FaceLoginUseCase,
 
     // Ports -> adapters
     { provide: AUTH_REPOSITORY, useClass: PrismaAuthRepository },

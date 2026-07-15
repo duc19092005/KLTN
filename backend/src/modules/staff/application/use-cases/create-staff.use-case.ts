@@ -64,6 +64,7 @@ export class CreateStaffUseCase {
         },
         async (created, tx) => {
           if (created.staffProfile) {
+            created.staffProfile.user = created;
             await this.integrity.anchorChange(created.staffProfile, 'CREATE', actorId, null, tx);
           }
           await this.mailer.sendTemporaryPassword({

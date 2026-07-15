@@ -63,4 +63,8 @@ export const authService = {
       signature,
       message,
     }),
+
+  faceLoginChallenge: (username) => api.post('/auth/face-login/challenge', { username }),
+
+  faceLogin: (userId, embedding, challenge) => api.post('/auth/face-login', { userId, embedding, challenge }),
 };

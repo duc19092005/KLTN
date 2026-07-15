@@ -38,7 +38,8 @@ async function main(): Promise<void> {
   console.log(`Đã gửi email kiểm tra tới ${maskEmail(recipient)}.`);
 }
 
-main().catch(() => {
-  console.error('Kiểm tra SMTP thất bại. Kiểm tra lại cấu hình email trong backend/.env.');
+main().catch((err) => {
+  console.error('Kiểm tra SMTP thất bại:', err);
+  console.error('Kiểm tra lại cấu hình email trong backend/.env.');
   process.exitCode = 1;
 });

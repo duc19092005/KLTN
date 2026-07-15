@@ -214,7 +214,7 @@ export default function StaffPage() {
         toast.success('Cập nhật nhân sự thành công!');
       } else {
         await staffService.create(staffPayload);
-        toast.success('Tạo nhân sự thành công! Mật khẩu mặc định: 123456');
+        toast.success('Tạo nhân sự thành công! Thông tin tài khoản đã được gửi đến email của nhân sự.');
       }
       closeForm(); await load(editingStaff ? pagination.page : 1);
     } catch (err) { toast.error(getError(err)); }
