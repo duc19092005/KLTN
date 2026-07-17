@@ -98,7 +98,7 @@ log "Starting database and Kafka dependencies"
 docker compose -f "$COMPOSE_FILE" up -d postgres kafka
 
 log "Running Prisma production migrations"
-docker compose -f "$COMPOSE_FILE" run --rm --no-deps backend npx prisma migrate deploy
+docker compose -f "$COMPOSE_FILE" run --rm --no-deps backend ./node_modules/.bin/prisma migrate deploy
 
 log "Updating application containers"
 docker compose -f "$COMPOSE_FILE" up -d --remove-orphans

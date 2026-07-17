@@ -15,7 +15,10 @@ RUN npm run build
 FROM node:20-alpine AS prod-deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+COPY prisma ./prisma
+RUN npm ci --omit=dev \
+  && npx prisma generate \
+  && npm cache clean --force
 
 FROM node:20-alpine AS production
 ENV NODE_ENV=production
