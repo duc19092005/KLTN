@@ -24,6 +24,8 @@ import { AdminWalletRecoveryWalletChallengeUseCase } from '../application/use-ca
 import { AdminWalletRecoveryConfirmUseCase } from '../application/use-cases/admin-wallet-recovery-confirm.use-case';
 import { AdminFaceRecoveryChallengeUseCase } from '../application/use-cases/admin-face-recovery-challenge.use-case';
 import { AdminFaceRecoveryRestoreUseCase } from '../application/use-cases/admin-face-recovery-restore.use-case';
+import { FaceLoginChallengeUseCase } from '../application/use-cases/face-login-challenge.use-case';
+import { FaceLoginUseCase } from '../application/use-cases/face-login.use-case';
 
 /**
  * Facade preserving the controller-facing API. Each method delegates to a
@@ -59,6 +61,8 @@ export class AuthService {
     private readonly adminWalletRecoveryConfirmUseCase: AdminWalletRecoveryConfirmUseCase,
     private readonly adminFaceRecoveryChallengeUseCase: AdminFaceRecoveryChallengeUseCase,
     private readonly adminFaceRecoveryRestoreUseCase: AdminFaceRecoveryRestoreUseCase,
+    private readonly faceLoginChallengeUseCase: FaceLoginChallengeUseCase,
+    private readonly faceLoginUseCase: FaceLoginUseCase,
   ) {}
 
   bootstrapFirstAdmin(username: string, email: string, superAdminSecret: string) {
@@ -194,5 +198,13 @@ export class AuthService {
       walletAddress,
       ip,
     );
+  }
+
+  faceLoginChallenge(usernameOrEmail: string) {
+    return this.faceLoginChallengeUseCase.execute(usernameOrEmail);
+  }
+
+  faceLogin(userId: string, embedding: number[], challenge: string, ip?: string) {
+    return this.faceLoginUseCase.execute(userId, embedding, challenge, ip);
   }
 }

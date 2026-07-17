@@ -76,6 +76,7 @@ export class UpdateStaffUseCase {
               tx,
             );
           } else if (updatedUser.staffProfile) {
+            updatedUser.staffProfile.user = updatedUser;
             await this.integrity.anchorChange(updatedUser.staffProfile, 'UPDATE', actorId, before, tx);
           }
         },

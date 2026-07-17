@@ -184,3 +184,21 @@ export class AdminFaceRecoveryRestoreDto {
   @Length(32, 128)
   challenge: string;
 }
+
+export class FaceLoginChallengeDto {
+  @IsString()
+  @Length(3, 128)
+  username: string;
+}
+
+export class FaceLoginDto {
+  @IsString()
+  userId: string;
+
+  @IsArray()
+  embedding: number[];
+
+  @IsString()
+  @Length(32, 128)
+  challenge: string;
+}

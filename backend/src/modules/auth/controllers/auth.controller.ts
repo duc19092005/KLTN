@@ -25,6 +25,8 @@ import {
   AdminWalletRecoveryChallengeDto,
   AdminWalletRecoveryConfirmDto,
   AdminFaceRecoveryRestoreDto,
+  FaceLoginChallengeDto,
+  FaceLoginDto,
 } from '../dto/auth.dto';
 import { getAuthCookieOptions, getClearAuthCookieOptions } from '../constants/auth-security';
 
@@ -428,6 +430,44 @@ export class AuthController {
       return result;
     } catch (error) {
       this.rateLimiter.recordFailure(key, 10 * 60 * 1000);
+      throw error;
+    }
+  }
+
+  @Post('face-login/challenge')
+  async faceLoginChallenge(@Body() body: FaceLoginChallengeDto, @Req() req) {
+    const key = this.rateLimitKey(req, 'face-login-challenge', body.username.toLowerCase());
+    this.rateLimiter.assertAllowed(key, 5, 5 * 60 * 1000);
+    try {
+      const result = await this.authService.faceLoginChallenge(body.username);
+      this.rateLimiter.reset(key);
+      return result;
+    } catch (error) {
+      this.rateLimiter.recordFailure(key, 5 * 60 * 1000);
+      throw error;
+    }
+  }
+
+  @Post('face-login')
+  async faceLogin(
+    @Body() body: FaceLoginDto,
+    @Req() req,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const key = this.rateLimitKey(req, 'face-login-verify', body.userId);
+    this.rateLimiter.assertAllowed(key, 5, 5 * 60 * 1000);
+    try {
+      const result = await this.authService.faceLogin(
+        body.userId,
+        body.embedding,
+        body.challenge,
+        this.clientIp(req),
+      );
+      this.rateLimiter.reset(key);
+      this.setAuthCookie(res, result.access_token);
+      return this.stripToken(result);
+    } catch (error) {
+      this.rateLimiter.recordFailure(key, 5 * 60 * 1000);
       throw error;
     }
   }

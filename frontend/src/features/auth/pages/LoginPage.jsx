@@ -19,6 +19,7 @@ import { authService } from '../apis/authService';
 import { getDashboardRoute } from '../../../shared/constants/roleRoutes';
 import { useToast } from '../../../providers/ToastProvider';
 import { Button, FormField, Input } from '../../../shared/components/ui';
+import FaceCapture from '../components/FaceCapture';
 
 const MODES = [
   { id: 'staff', label: 'Nhân sự', Icon: Stethoscope },
@@ -29,16 +30,25 @@ const MODES = [
 export default function LoginPage({ isModal = false, onClose = null, initialMode = 'staff' }) {
   const navigate = useNavigate();
   const toast = useToast();
-  const { loginWithWallet, loginWithInvite, loginWithPassword, loading } = useAuth();
+  const { loginWithWallet, loginWithInvite, loginWithPassword, loginWithFace, loading } = useAuth();
   const [mode, setMode] = useState(initialMode);
   const [inviteToken, setInviteToken] = useState('');
   const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  
+  // Face ID states
+  const [faceStep, setFaceStep] = useState(0);
+  const [faceChallenge, setFaceChallenge] = useState('');
+  const [faceUserId, setFaceUserId] = useState('');
 
   useEffect(() => {
     setMode(initialMode);
   }, [initialMode]);
+
+  useEffect(() => {
+    setFaceStep(0);
+  }, [mode]);
 
   const isFormDisabled = busy || loading;
 
@@ -101,6 +111,39 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
     }
   };
 
+  const handleFaceChallenge = async (e) => {
+    e.preventDefault();
+    const username = credentials.username.trim();
+    if (!username) return;
+    try {
+      setBusy(true);
+      const res = await authService.faceLoginChallenge(username);
+      setFaceChallenge(res.data.challenge);
+      setFaceUserId(res.data.userId);
+      setFaceStep(1);
+      toast.success('Hãy chuẩn bị quét khuôn mặt.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Không thể tạo yêu cầu xác thực FaceID.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleFaceCapture = async (embedding) => {
+    try {
+      setBusy(true);
+      const result = await loginWithFace(faceUserId, embedding, faceChallenge);
+      if (!result.success) throw new Error(result.error);
+      toast.success('Đăng nhập bằng FaceID thành công!');
+      routeAfterLogin(result);
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Xác thực khuôn mặt thất bại.');
+      setFaceStep(0);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const card = (
     <section className="relative w-full max-w-[480px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-xl sm:p-8">
       {isModal && (
@@ -129,7 +172,10 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
             <button
               key={id}
               type="button"
-              onClick={() => setMode(id)}
+              onClick={() => {
+                setMode(id);
+                setFaceStep(0); // Reset face step when changing tabs manually
+              }}
               className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-2.5 text-xs font-black transition-colors ${
                 active ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500 hover:text-slate-900'
               }`}
@@ -142,77 +188,120 @@ export default function LoginPage({ isModal = false, onClose = null, initialMode
       </div>
 
       {mode === 'staff' && (
-        <form onSubmit={handleStaffLogin} className="space-y-4">
-          <FormField label="Email hoặc tên đăng nhập" htmlFor="username">
-            <div className="relative">
-              <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                id="username"
-                name="username"
-                value={credentials.username}
-                onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
-                placeholder="Nhập email hoặc tên đăng nhập"
-                required
-                type="text"
-                disabled={isFormDisabled}
-                className="pl-10"
-              />
-            </div>
-          </FormField>
+        <div className="space-y-4">
+          {faceStep === 0 ? (
+            <form onSubmit={handleStaffLogin} className="space-y-4">
+              <FormField label="Email hoặc tên đăng nhập" htmlFor="username">
+                <div className="relative">
+                  <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    id="username"
+                    name="username"
+                    value={credentials.username}
+                    onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
+                    placeholder="Nhập email hoặc tên đăng nhập"
+                    required
+                    type="text"
+                    disabled={isFormDisabled}
+                    className="pl-10"
+                  />
+                </div>
+              </FormField>
 
-          <FormField label="Mật khẩu" htmlFor="password">
-            <div className="relative">
-              <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                id="password"
-                name="password"
-                value={credentials.password}
-                onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
-                placeholder="Nhập mật khẩu"
-                required
-                type={showPassword ? 'text' : 'password'}
-                disabled={isFormDisabled}
-                className="pl-10 pr-10"
-              />
-              <button
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 transition-colors hover:text-cyan-700"
-                type="button"
-                onClick={() => setShowPassword((value) => !value)}
-                aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              <FormField label="Mật khẩu" htmlFor="password">
+                <div className="relative">
+                  <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    id="password"
+                    name="password"
+                    value={credentials.password}
+                    onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
+                    placeholder="Nhập mật khẩu"
+                    required
+                    type={showPassword ? 'text' : 'password'}
+                    disabled={isFormDisabled}
+                    className="pl-10 pr-10"
+                  />
+                  <button
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 transition-colors hover:text-cyan-700"
+                    type="button"
+                    onClick={() => setShowPassword((value) => !value)}
+                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </FormField>
+
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <label className="flex items-center gap-2 font-semibold text-slate-500">
+                  <input className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500" type="checkbox" />
+                  Ghi nhớ đăng nhập
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isModal && onClose) onClose();
+                    navigate('/forgot-password');
+                  }}
+                  className="font-black text-cyan-700 hover:text-cyan-800"
+                >
+                  Quên mật khẩu?
+                </button>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full"
+                size="lg"
+                loading={busy}
+                disabled={isFormDisabled || !credentials.username.trim() || !credentials.password}
               >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                Đăng nhập hệ thống
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+
+              <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-slate-200"></div>
+                <span className="flex-shrink mx-3 text-slate-400 text-xs font-semibold">Hoặc</span>
+                <div className="flex-grow border-t border-slate-200"></div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                size="lg"
+                onClick={handleFaceChallenge}
+                disabled={isFormDisabled || !credentials.username.trim()}
+              >
+                <ShieldCheck className="h-4 w-4 mr-2" />
+                Đăng nhập nhanh bằng FaceID
+              </Button>
+            </form>
+          ) : (
+            <div className="w-full flex flex-col items-center">
+              <div className="w-full max-w-sm">
+                <FaceCapture
+                  onCapture={handleFaceCapture}
+                  onError={(msg) => {
+                    toast.error(msg);
+                    setFaceStep(0);
+                  }}
+                  disabled={busy}
+                  label="Xác thực sinh trắc học FaceID"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setFaceStep(0)}
+                className="mt-4 text-xs font-semibold text-slate-500 hover:text-cyan-700 transition-colors"
+              >
+                Quay lại nhập mật khẩu
               </button>
             </div>
-          </FormField>
-
-          <div className="flex items-center justify-between gap-3 text-xs">
-            <label className="flex items-center gap-2 font-semibold text-slate-500">
-              <input className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500" type="checkbox" />
-              Ghi nhớ đăng nhập
-            </label>
-            <button
-              type="button"
-              onClick={() => {
-                if (isModal && onClose) onClose();
-                navigate('/forgot-password');
-              }}
-              className="font-black text-cyan-700 hover:text-cyan-800"
-            >
-              Quên mật khẩu?
-            </button>
-          </div>
-
-          <Button
-            type="submit"
-            className="w-full"
-            size="lg"
-            loading={busy}
-            disabled={isFormDisabled || !credentials.username.trim() || !credentials.password}
-          >
-            Đăng nhập hệ thống
-            <ArrowRight className="h-4 w-4" />
-          </Button>
-        </form>
+          )}
+        </div>
       )}
 
       {mode === 'wallet' && (
