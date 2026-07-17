@@ -13,6 +13,7 @@ COPY . .
 RUN npm run build
 
 FROM node:20-alpine AS prod-deps
+ENV PRISMA_CLI_BINARY_TARGETS=linux-musl-openssl-3.0.x
 WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma
