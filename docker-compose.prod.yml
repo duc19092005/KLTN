@@ -95,7 +95,7 @@ services:
     expose:
       - "80"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/health >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -121,7 +121,7 @@ services:
       - internal
       - public
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/health >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 5
