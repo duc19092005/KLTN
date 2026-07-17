@@ -21,7 +21,8 @@ RUN npm ci --omit=dev \
   && npm cache clean --force
 
 FROM node:20-alpine AS production
-ENV NODE_ENV=production
+ENV NODE_ENV=production \
+  PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 WORKDIR /app
 
 RUN apk add --no-cache curl openssl libc6-compat postgresql16-client \
