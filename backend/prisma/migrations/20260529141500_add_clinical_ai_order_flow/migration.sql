@@ -1,26 +1,39 @@
 -- Baseline tables that this historical migration references but earlier
 -- migrations in this repository did not create for a fresh production DB.
-CREATE TYPE IF NOT EXISTS "PatientRelationship" AS ENUM ('SELF', 'CHILD', 'PARENT', 'SPOUSE', 'GUARDIAN', 'OTHER');
-CREATE TYPE IF NOT EXISTS "PatientAccessStatus" AS ENUM ('ACTIVE', 'PENDING', 'REVOKED');
-CREATE TYPE IF NOT EXISTS "MedicalSpecialty" AS ENUM (
-    'GENERAL_INTERNAL_MEDICINE',
-    'GENERAL_SURGERY',
-    'PEDIATRICS',
-    'OBSTETRICS_GYNECOLOGY',
-    'CARDIOLOGY',
-    'ENT',
-    'DENTOMAXILLOFACIAL',
-    'OPHTHALMOLOGY',
-    'DERMATOLOGY',
-    'NEUROLOGY',
-    'ORTHOPEDICS',
-    'GASTROENTEROLOGY',
-    'ENDOCRINOLOGY',
-    'ONCOLOGY',
-    'RESPIRATORY'
-);
-CREATE TYPE IF NOT EXISTS "VisitStatus" AS ENUM ('WAITING', 'IN_PROGRESS', 'WAITING_TEST_RESULT', 'WAITING_CONCLUSION', 'COMPLETED', 'CANCELLED');
-CREATE TYPE IF NOT EXISTS "VisitSource" AS ENUM ('WALK_IN', 'APPOINTMENT');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'PatientRelationship') THEN
+    CREATE TYPE "PatientRelationship" AS ENUM ('SELF', 'CHILD', 'PARENT', 'SPOUSE', 'GUARDIAN', 'OTHER');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'PatientAccessStatus') THEN
+    CREATE TYPE "PatientAccessStatus" AS ENUM ('ACTIVE', 'PENDING', 'REVOKED');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'MedicalSpecialty') THEN
+    CREATE TYPE "MedicalSpecialty" AS ENUM (
+        'GENERAL_INTERNAL_MEDICINE',
+        'GENERAL_SURGERY',
+        'PEDIATRICS',
+        'OBSTETRICS_GYNECOLOGY',
+        'CARDIOLOGY',
+        'ENT',
+        'DENTOMAXILLOFACIAL',
+        'OPHTHALMOLOGY',
+        'DERMATOLOGY',
+        'NEUROLOGY',
+        'ORTHOPEDICS',
+        'GASTROENTEROLOGY',
+        'ENDOCRINOLOGY',
+        'ONCOLOGY',
+        'RESPIRATORY'
+    );
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'VisitStatus') THEN
+    CREATE TYPE "VisitStatus" AS ENUM ('WAITING', 'IN_PROGRESS', 'WAITING_TEST_RESULT', 'WAITING_CONCLUSION', 'COMPLETED', 'CANCELLED');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'VisitSource') THEN
+    CREATE TYPE "VisitSource" AS ENUM ('WALK_IN', 'APPOINTMENT');
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS "AdminProfile" (
     "id" TEXT NOT NULL,
