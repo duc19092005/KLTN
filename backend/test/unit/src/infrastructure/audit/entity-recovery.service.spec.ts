@@ -137,10 +137,12 @@ function buildAiDiagnosisAuditRow(after: Record<string, unknown>) {
 describe('EntityRecoveryService integrity gate', () => {
   const originalHashKey = process.env.AUDIT_HASH_KEY;
   const originalEncryptionKey = process.env.AUDIT_ENCRYPTION_KEY;
+  const originalEncryptionKeyId = process.env.AUDIT_ENCRYPTION_KEY_ID;
 
   beforeEach(() => {
     process.env.AUDIT_HASH_KEY = 'entity-recovery-test-hash-key-00000001';
     process.env.AUDIT_ENCRYPTION_KEY = '22'.repeat(32);
+    process.env.AUDIT_ENCRYPTION_KEY_ID = 'entity-recovery-test-key';
   });
 
   afterAll(() => {
@@ -148,6 +150,8 @@ describe('EntityRecoveryService integrity gate', () => {
     else process.env.AUDIT_HASH_KEY = originalHashKey;
     if (originalEncryptionKey === undefined) delete process.env.AUDIT_ENCRYPTION_KEY;
     else process.env.AUDIT_ENCRYPTION_KEY = originalEncryptionKey;
+    if (originalEncryptionKeyId === undefined) delete process.env.AUDIT_ENCRYPTION_KEY_ID;
+    else process.env.AUDIT_ENCRYPTION_KEY_ID = originalEncryptionKeyId;
   });
 
   function setup(row: ReturnType<typeof buildPatientAuditRow>, live: Record<string, unknown>) {
