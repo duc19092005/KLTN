@@ -37,7 +37,7 @@ export class ForgotPasswordVerifyFaceUseCase {
     const storedDescriptors = this.faceMatch.decodeStoredDescriptors(user.faceEmbedding);
 
     // Integrity gate
-    const integrity = await this.faceMatch.checkIntegrity(userId, storedDescriptors);
+    const integrity = await this.faceMatch.checkIntegrity(userId, storedDescriptors, user.role === 'ADMIN');
     if (!integrity.ok) {
       await this.audit.write(userId, 'FACE_INTEGRITY_FAIL_FORGOT', 'User', userId, {
         recomputedFaceHash: integrity.recomputedFaceHash,

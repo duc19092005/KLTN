@@ -7,6 +7,7 @@ import { AuthRateLimiterService } from './services/auth-rate-limiter.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { EncryptionModule } from '../encryption/encryption.module';
 import { BlockchainModule } from '../../infrastructure/blockchain/blockchain.module';
+import { AuditModule } from '../../infrastructure/audit/audit.module';
 import { getJwtSecret } from './constants/auth-security';
 
 // Application services (shared workflow helpers)
@@ -39,6 +40,8 @@ import { AdminWalletRecoveryChallengeUseCase } from './application/use-cases/adm
 import { AdminWalletRecoveryVerifyFaceUseCase } from './application/use-cases/admin-wallet-recovery-verify-face.use-case';
 import { AdminWalletRecoveryWalletChallengeUseCase } from './application/use-cases/admin-wallet-recovery-wallet-challenge.use-case';
 import { AdminWalletRecoveryConfirmUseCase } from './application/use-cases/admin-wallet-recovery-confirm.use-case';
+import { AdminFaceRecoveryChallengeUseCase } from './application/use-cases/admin-face-recovery-challenge.use-case';
+import { AdminFaceRecoveryRestoreUseCase } from './application/use-cases/admin-face-recovery-restore.use-case';
 
 // Ports + adapters
 import { AUTH_REPOSITORY } from './application/ports/auth.repository.port';
@@ -47,12 +50,14 @@ import { SECURITY_EVENT_LOGGER } from './application/ports/security-event-logger
 import { AUTH_CHAIN_GATEWAY } from './application/ports/auth-chain-gateway.port';
 import { ENCRYPTION_PORT } from './application/ports/encryption.port';
 import { STEPUP_TICKET_ISSUER } from './application/ports/stepup-ticket-issuer.port';
+import { FACE_RECOVERY_ARTIFACT } from './application/ports/face-recovery-artifact.port';
 import { PrismaAuthRepository } from './infrastructure/prisma/prisma-auth.repository';
 import { JwtAccessTokenSigner } from './infrastructure/adapters/jwt-access-token.signer';
 import { DualWriteSecurityEventLogger } from './infrastructure/adapters/dual-write-security-event.logger';
 import { BlockchainAuthChainGateway } from './infrastructure/adapters/blockchain-auth-chain.gateway';
 import { EncryptionAdapter } from './infrastructure/adapters/encryption.adapter';
 import { StepUpTicketIssuerAdapter } from './infrastructure/adapters/stepup-ticket-issuer.adapter';
+import { AdminFaceRecoveryArtifactAdapter } from './infrastructure/adapters/admin-face-recovery-artifact.adapter';
 
 @Module({
   imports: [
@@ -65,6 +70,7 @@ import { StepUpTicketIssuerAdapter } from './infrastructure/adapters/stepup-tick
     }),
     EncryptionModule,
     BlockchainModule,
+    AuditModule,
   ],
   controllers: [AuthController],
   providers: [
@@ -102,6 +108,8 @@ import { StepUpTicketIssuerAdapter } from './infrastructure/adapters/stepup-tick
     AdminWalletRecoveryVerifyFaceUseCase,
     AdminWalletRecoveryWalletChallengeUseCase,
     AdminWalletRecoveryConfirmUseCase,
+    AdminFaceRecoveryChallengeUseCase,
+    AdminFaceRecoveryRestoreUseCase,
 
     // Ports -> adapters
     { provide: AUTH_REPOSITORY, useClass: PrismaAuthRepository },
@@ -110,6 +118,7 @@ import { StepUpTicketIssuerAdapter } from './infrastructure/adapters/stepup-tick
     { provide: AUTH_CHAIN_GATEWAY, useClass: BlockchainAuthChainGateway },
     { provide: ENCRYPTION_PORT, useClass: EncryptionAdapter },
     { provide: STEPUP_TICKET_ISSUER, useClass: StepUpTicketIssuerAdapter },
+    { provide: FACE_RECOVERY_ARTIFACT, useClass: AdminFaceRecoveryArtifactAdapter },
   ],
   exports: [AuthService, JwtModule, FaceMatchService, AUTH_REPOSITORY, SECURITY_EVENT_LOGGER],
 })

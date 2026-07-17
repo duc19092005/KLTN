@@ -175,3 +175,12 @@ export class AdminWalletRecoveryConfirmDto extends AdminWalletRecoveryChallengeD
   @Length(32, 2048)
   message: string;
 }
+
+export class AdminFaceRecoveryRestoreDto {
+  @IsArray()
+  embedding: number[];
+
+  @IsString()
+  @Length(32, 128)
+  challenge: string;
+}

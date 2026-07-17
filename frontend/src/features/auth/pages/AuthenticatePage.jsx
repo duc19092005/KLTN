@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ethers } from 'ethers';
-import { AlertCircle, Check, Copy, Info } from 'lucide-react';
+import { AlertCircle, Check, Copy, Info, ShieldAlert } from 'lucide-react';
 import { authService } from '../apis/authService';
 import { useAuth } from '../../../providers/AuthProvider';
 import FaceCapture from '../components/FaceCapture';
@@ -12,7 +12,7 @@ export default function AuthenticatePage() {
   const navigate = useNavigate();
   const { user, updateSession } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
-  const isFirstLogin = Boolean(user?.firstLogin || user?.isFirstLogin || !user?.hasFace);
+  const isFirstLogin = Boolean(user?.firstLogin || user?.isFirstLogin);
   const initialStep = isAdmin ? Math.min(Math.max(user?.registrationStep || 1, 1), 3) : 1;
   const [step, setStep] = useState(isFirstLogin ? initialStep : 4);
   const [status, setStatus] = useState('');
@@ -20,11 +20,15 @@ export default function AuthenticatePage() {
   const [busy, setBusy] = useState(false);
   const [secret, setSecret] = useState('');
   const [copied, setCopied] = useState(false);
+  const [recoveryMode, setRecoveryMode] = useState(
+    Boolean(isAdmin && !isFirstLogin && !user?.hasFace),
+  );
 
   useEffect(() => {
     const nextInitial = isAdmin ? Math.min(Math.max(user?.registrationStep || 1, 1), 3) : 1;
     setStep(isFirstLogin ? nextInitial : 4);
-  }, [isFirstLogin, isAdmin, user?.registrationStep]);
+    setRecoveryMode(Boolean(isAdmin && !isFirstLogin && !user?.hasFace));
+  }, [isFirstLogin, isAdmin, user?.hasFace, user?.registrationStep]);
 
   const showStatus = (msg, error = false) => { setStatus(msg); setIsError(error); };
   const goDashboard = (targetUser = user) => navigate(getDashboardRoute(targetUser?.role), { replace: true });
@@ -48,6 +52,22 @@ export default function AuthenticatePage() {
       }
     } catch (err) { showStatus(err.response?.data?.message || err.message, true); }
     finally { setBusy(false); }
+  };
+
+  const restoreAdminFace = async (embedding) => {
+    setBusy(true); showStatus('Đang kiểm tra artifact IPFS và mốc toàn vẹn blockchain...');
+    try {
+      const challengeRes = await authService.adminFaceRecoveryChallenge();
+      const result = await authService.adminFaceRecoveryRestore(embedding, challengeRes.data.challenge);
+      const verifiedUser = result.data.user || { ...user, hasFace: true, verified: true };
+      updateSession(verifiedUser);
+      showStatus('Đã phục hồi dữ liệu khuôn mặt Admin và vô hiệu hóa các phiên cũ.');
+      goDashboard(verifiedUser);
+    } catch (err) {
+      showStatus(err.response?.data?.message || err.message, true);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const bindWallet = async () => {
@@ -88,7 +108,14 @@ export default function AuthenticatePage() {
       // Login already proved a live face match; the backend opens a step-up privilege session from
       updateSession(verifiedUser);
       goDashboard(verifiedUser);
-    } catch (err) { showStatus(err.response?.data?.message || err.message, true); }
+    } catch (err) {
+      if (isAdmin && err.response?.data?.code === 'FACE_TEMPLATE_TAMPERED') {
+        setRecoveryMode(true);
+        showStatus('Dữ liệu khuôn mặt trong cơ sở dữ liệu không còn toàn vẹn. Hãy quét lại để phục hồi từ bản IPFS đã được blockchain xác thực.', true);
+      } else {
+        showStatus(err.response?.data?.message || err.message, true);
+      }
+    }
     finally { setBusy(false); }
   };
 
@@ -114,7 +141,18 @@ export default function AuthenticatePage() {
           {isAdmin && isFirstLogin && step === 2 && <ActionPanel title="Xác thực quyền hạn trên chuỗi" desc="Liên kết địa chỉ ví mật mã làm định danh bất biến." button="Kết nối MetaMask & Xác nhận" onClick={bindWallet} busy={busy} id="bind-wallet-button" />}
           {isAdmin && isFirstLogin && step === 3 && !secret && <ActionPanel title="Tạo lập bằng chứng Zero-Knowledge" desc="Mã hóa thông tin nội bộ thành biểu thức toán học bảo mật." button="Khởi tạo định danh ZKP" onClick={generateZkpIdentity} busy={busy} id="generate-zkp-button" />}
           {secret && <SecretPanel secret={secret} copied={copied} onCopy={handleCopySecret} onDone={() => goDashboard({ ...user, role: 'ADMIN' })} />}
-          {!isFirstLogin && !secret && <div className="w-full max-w-sm animate-in fade-in duration-300"><FaceCapture onCapture={verifyFaceLogin} onError={(msg) => showStatus(msg, true)} disabled={busy} label="Xác thực sinh trắc học" /></div>}
+          {!isFirstLogin && !secret && !recoveryMode && <div className="w-full max-w-sm animate-in fade-in duration-300"><FaceCapture onCapture={verifyFaceLogin} onError={(msg) => showStatus(msg, true)} disabled={busy} label="Xác thực sinh trắc học" /></div>}
+          {!isFirstLogin && !secret && recoveryMode && isAdmin && (
+            <div className="w-full max-w-sm animate-in fade-in duration-300">
+              <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-amber-900">
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                <p className="text-xs font-semibold leading-relaxed">
+                  Phiên ví Admin sẽ dùng khuôn mặt sống để mở bản mã hóa IPFS và khôi phục embedding gốc.
+                </p>
+              </div>
+              <FaceCapture onCapture={restoreAdminFace} onError={(msg) => showStatus(msg, true)} disabled={busy} label="Quét để phục hồi khuôn mặt Admin" />
+            </div>
+          )}
         </div>
       </section>
     </main>

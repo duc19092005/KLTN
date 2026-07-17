@@ -67,6 +67,7 @@ export interface AuthRepositoryPort {
 
   updatePasswordChange(userId: string, passwordHash: string, registrationStep: number): Promise<UserWithProfile>;
   updateFaceEnrollment(userId: string, data: FaceEnrollmentData): Promise<void>;
+  restoreFaceEnrollmentAndInvalidateSessions(userId: string, data: FaceEnrollmentData): Promise<UserWithProfile>;
   setFaceChallenge(userId: string, challenge: string, expiresAt: Date): Promise<void>;
 
   findAdminByWalletExcludingUser(walletAddress: string, excludeUserId: string): Promise<{ id: string } | null>;

@@ -120,6 +120,30 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
     });
   }
 
+  async restoreFaceEnrollmentAndInvalidateSessions(
+    userId: string,
+    data: FaceEnrollmentData,
+  ): Promise<UserWithProfile> {
+    return this.prisma.$transaction(async (tx) => {
+      return tx.user.update({
+        where: { id: userId },
+        data: {
+          faceEmbedding: data.faceEmbedding,
+          faceHash: data.faceHash,
+          faceModelVersion: data.faceModelVersion,
+          faceEnrolledAt: new Date(),
+          faceSampleCount: data.faceSampleCount,
+          failedFaceAttempts: 0,
+          faceLockedUntil: null,
+          faceChallenge: null,
+          faceChallengeExpiresAt: null,
+          tokenVersion: { increment: 1 },
+        },
+        include: { adminProfile: true },
+      });
+    });
+  }
+
   async setFaceChallenge(userId: string, challenge: string, expiresAt: Date): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
