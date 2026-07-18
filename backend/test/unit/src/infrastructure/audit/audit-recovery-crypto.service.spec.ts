@@ -6,6 +6,7 @@ describe('AuditRecoveryCryptoService', () => {
   const originalKeyId = process.env.AUDIT_RECOVERY_ENCRYPTION_KEY_ID;
   const originalNodeEnv = process.env.NODE_ENV;
   const originalLocalProductionOptIn = process.env.AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION;
+  const originalVaultEnabled = process.env.AUDIT_RECOVERY_VAULT_ENABLED;
 
   beforeEach(() => {
     process.env.NODE_ENV = 'test';
@@ -13,6 +14,7 @@ describe('AuditRecoveryCryptoService', () => {
     process.env.AUDIT_RECOVERY_ENCRYPTION_KEY = '44'.repeat(32);
     process.env.AUDIT_RECOVERY_ENCRYPTION_KEY_ID = 'recovery-test-v1';
     delete process.env.AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION;
+    delete process.env.AUDIT_RECOVERY_VAULT_ENABLED;
   });
 
   afterAll(() => {
@@ -29,6 +31,8 @@ describe('AuditRecoveryCryptoService', () => {
     } else {
       process.env.AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION = originalLocalProductionOptIn;
     }
+    if (originalVaultEnabled === undefined) delete process.env.AUDIT_RECOVERY_VAULT_ENABLED;
+    else process.env.AUDIT_RECOVERY_VAULT_ENABLED = originalVaultEnabled;
   });
 
   it('encrypts one bundle with a wrapped per-batch DEK and decrypts it', async () => {
@@ -61,9 +65,18 @@ describe('AuditRecoveryCryptoService', () => {
     );
   });
 
-  it('permits local wrapping in production with explicit opt-in and a valid key', async () => {
+  it('rejects invalid production Vault feature flag values', () => {
     process.env.NODE_ENV = 'production';
-    process.env.AUDIT_RECOVERY_KEY_PROVIDER = 'local';
+    process.env.AUDIT_RECOVERY_VAULT_ENABLED = 'yes';
+
+    expect(() => new AuditRecoveryCryptoService().assertReady()).toThrow(
+      'AUDIT_RECOVERY_VAULT_ENABLED must be either true or false',
+    );
+  });
+
+  it('permits local wrapping when the production Vault flag is false', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.AUDIT_RECOVERY_VAULT_ENABLED = 'false';
     process.env.AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION = 'true';
 
     const service = new AuditRecoveryCryptoService();
@@ -75,7 +88,7 @@ describe('AuditRecoveryCryptoService', () => {
 
   it('rejects malformed local key material after production opt-in', () => {
     process.env.NODE_ENV = 'production';
-    process.env.AUDIT_RECOVERY_KEY_PROVIDER = 'local';
+    process.env.AUDIT_RECOVERY_VAULT_ENABLED = 'false';
     process.env.AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION = 'true';
     process.env.AUDIT_RECOVERY_ENCRYPTION_KEY = 'not-a-32-byte-hex-key';
 
@@ -86,7 +99,7 @@ describe('AuditRecoveryCryptoService', () => {
 
   it('requires complete Vault configuration in production', () => {
     process.env.NODE_ENV = 'production';
-    process.env.AUDIT_RECOVERY_KEY_PROVIDER = 'vault';
+    process.env.AUDIT_RECOVERY_VAULT_ENABLED = 'true';
     delete process.env.VAULT_ADDR;
     delete process.env.VAULT_TOKEN;
     delete process.env.VAULT_AUDIT_TRANSIT_KEY;
@@ -96,7 +109,7 @@ describe('AuditRecoveryCryptoService', () => {
 
   it('round-trips a bundle through mocked Vault Transit envelope wrapping', async () => {
     process.env.NODE_ENV = 'production';
-    process.env.AUDIT_RECOVERY_KEY_PROVIDER = 'vault';
+    process.env.AUDIT_RECOVERY_VAULT_ENABLED = 'true';
     process.env.VAULT_ADDR = 'http://vault:8200';
     process.env.VAULT_TOKEN = 'test-token-must-not-appear';
     process.env.VAULT_AUDIT_TRANSIT_KEY = 'kltn-audit-recovery';

@@ -110,7 +110,17 @@ export class AuditRecoveryCryptoService {
   }
 
   private provider(): 'local' | 'vault' {
-    const configured = (process.env.AUDIT_RECOVERY_KEY_PROVIDER ?? 'local').toLowerCase();
+    let configured: string;
+    if (process.env.NODE_ENV === 'production') {
+      const vaultEnabled = (process.env.AUDIT_RECOVERY_VAULT_ENABLED ?? 'false').toLowerCase();
+      if (vaultEnabled !== 'true' && vaultEnabled !== 'false') {
+        throw new Error('AUDIT_RECOVERY_VAULT_ENABLED must be either true or false.');
+      }
+      configured = vaultEnabled === 'true' ? 'vault' : 'local';
+    } else {
+      configured = (process.env.AUDIT_RECOVERY_KEY_PROVIDER ?? 'local').toLowerCase();
+    }
+
     if (configured !== 'local' && configured !== 'vault') {
       throw new Error(`Unsupported AUDIT_RECOVERY_KEY_PROVIDER: ${configured}`);
     }

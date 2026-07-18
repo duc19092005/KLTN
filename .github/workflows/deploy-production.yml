@@ -159,7 +159,7 @@ jobs:
 
           rsync -az --delete \
             -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT }}" \
-            docker-compose.prod.yml nginx scripts \
+            docker-compose.prod.yml nginx scripts vault \
             "${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}:${{ secrets.VPS_DEPLOY_PATH }}/"
 
       - name: Deploy production
