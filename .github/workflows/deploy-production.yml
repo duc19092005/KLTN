@@ -135,11 +135,21 @@ jobs:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
       - name: Prepare SSH key
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
         run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "${{ secrets.VPS_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p "${{ secrets.VPS_PORT }}" "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+          set -Eeuo pipefail
+          : "${VPS_HOST:?Missing production secret VPS_HOST}"
+          : "${VPS_SSH_PRIVATE_KEY:?Missing production secret VPS_SSH_PRIVATE_KEY}"
+          VPS_PORT="${VPS_PORT:-22}"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" | tr -d '\r' > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+          ssh-keygen -y -f "$HOME/.ssh/deploy_key" >/dev/null \
+            || { echo 'VPS_SSH_PRIVATE_KEY is not a valid private key'; exit 1; }
+          ssh-keyscan -T 15 -p "$VPS_PORT" "$VPS_HOST" >> "$HOME/.ssh/known_hosts"
 
       - name: Sync deployment files
         run: |
@@ -149,7 +159,7 @@ jobs:
 
           rsync -az --delete \
             -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT }}" \
-            docker-compose.prod.yml nginx scripts \
+            docker-compose.prod.yml nginx scripts vault \
             "${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}:${{ secrets.VPS_DEPLOY_PATH }}/"
 
       - name: Deploy production
