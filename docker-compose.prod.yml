@@ -56,6 +56,29 @@ services:
       start_period: 40s
     logging: *default-logging
 
+  vault:
+    image: hashicorp/vault:1.17.6
+    container_name: kltn-vault
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    command: server -config=/vault/config/vault.hcl
+    volumes:
+      - ./vault/config:/vault/config:ro
+      - ./vault/policies:/vault/policies:ro
+      - kltn_vault_data:/vault/file
+    networks:
+      - internal
+    expose:
+      - "8200"
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    logging: *default-logging
+
   backend:
     image: ${BACKEND_IMAGE}
     container_name: kltn-backend
@@ -71,6 +94,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      vault:
+        condition: service_started
     networks:
       - internal
       - public
@@ -141,3 +166,5 @@ volumes:
     name: kltn_postgres_data
   kltn_kafka_data:
     name: kltn_kafka_data
+  kltn_vault_data:
+    name: kltn_vault_data

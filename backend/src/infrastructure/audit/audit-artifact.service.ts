@@ -58,7 +58,19 @@ export class AuditArtifactService {
   ) {}
 
   isReady(): boolean {
-    return this.ipfs.isReady();
+    try {
+      this.assertReady();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  assertReady(): void {
+    if (!this.ipfs.isReady()) {
+      throw new Error('Audit recovery IPFS is not configured.');
+    }
+    this.crypto.assertReady();
   }
 
   async createAndUpload(input: AuditRecoveryBundle): Promise<{

@@ -77,6 +77,15 @@ if [[ -n "$REQUESTED_APP_VERSION" ]]; then APP_VERSION="$REQUESTED_APP_VERSION";
 [[ -n "${BACKEND_IMAGE:-}" ]] || fail "BACKEND_IMAGE is required"
 [[ -n "${FRONTEND_IMAGE:-}" ]] || fail "FRONTEND_IMAGE is required"
 
+if [[ "${AUDIT_BATCH_DISABLED:-false}" != "true" ]]; then
+  if [[ "${AUDIT_RECOVERY_KEY_PROVIDER:-}" != "vault" \
+     || -z "${VAULT_ADDR:-}" \
+     || -z "${VAULT_TOKEN:-}" \
+     || -z "${VAULT_AUDIT_TRANSIT_KEY:-}" ]]; then
+    log "WARNING: audit anchoring will remain paused until Vault Transit is initialized and backend/.env contains the required Vault settings"
+  fi
+fi
+
 log "Saving current image references for rollback"
 current_image backend > "$PREVIOUS_BACKEND_FILE" || true
 current_image frontend > "$PREVIOUS_FRONTEND_FILE" || true
@@ -92,10 +101,10 @@ export BACKEND_IMAGE FRONTEND_IMAGE
 export APP_VERSION="${APP_VERSION:-$(printf '%s' "$BACKEND_IMAGE" | awk -F: '{print $NF}')}"
 
 log "Pulling new images"
-docker compose -f "$COMPOSE_FILE" pull backend frontend nginx postgres kafka
+docker compose -f "$COMPOSE_FILE" pull backend frontend nginx postgres kafka vault
 
-log "Starting database and Kafka dependencies"
-docker compose -f "$COMPOSE_FILE" up -d postgres kafka
+log "Starting database, Kafka, and Vault dependencies"
+docker compose -f "$COMPOSE_FILE" up -d postgres kafka vault
 
 log "Running Prisma production migrations"
 docker compose -f "$COMPOSE_FILE" run --rm --no-deps backend ./node_modules/.bin/prisma migrate deploy

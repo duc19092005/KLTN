@@ -44,4 +44,55 @@ describe('AuditRecoveryCryptoService', () => {
 
     await expect(service.decrypt(Buffer.from(JSON.stringify(parsed)), 2)).rejects.toThrow();
   });
+
+  it('rejects local wrapping in production before a batch is prepared', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.AUDIT_RECOVERY_KEY_PROVIDER = 'local';
+
+    expect(() => new AuditRecoveryCryptoService().assertReady()).toThrow(
+      'Local audit recovery wrapping key is forbidden in production',
+    );
+  });
+
+  it('requires complete Vault configuration in production', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.AUDIT_RECOVERY_KEY_PROVIDER = 'vault';
+    delete process.env.VAULT_ADDR;
+    delete process.env.VAULT_TOKEN;
+    delete process.env.VAULT_AUDIT_TRANSIT_KEY;
+
+    expect(() => new AuditRecoveryCryptoService().assertReady()).toThrow('VAULT_ADDR is required');
+  });
+
+  it('round-trips a bundle through mocked Vault Transit envelope wrapping', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.AUDIT_RECOVERY_KEY_PROVIDER = 'vault';
+    process.env.VAULT_ADDR = 'http://vault:8200';
+    process.env.VAULT_TOKEN = 'test-token-must-not-appear';
+    process.env.VAULT_AUDIT_TRANSIT_KEY = 'kltn-audit-recovery';
+    const wrappedDeks = new Map<string, string>();
+    const fetchMock = jest.spyOn(global, 'fetch').mockImplementation(async (_input, init) => {
+      const body = JSON.parse(String(init?.body)) as { plaintext?: string; ciphertext?: string };
+      if (body.plaintext) {
+        const ciphertext = `vault:v1:${Buffer.from(body.plaintext).toString('base64')}`;
+        wrappedDeks.set(ciphertext, body.plaintext);
+        return new Response(JSON.stringify({ data: { ciphertext } }), { status: 200 });
+      }
+      const plaintext = body.ciphertext ? wrappedDeks.get(body.ciphertext) : undefined;
+      return new Response(JSON.stringify({ data: { plaintext } }), { status: 200 });
+    });
+
+    try {
+      const service = new AuditRecoveryCryptoService();
+      expect(() => service.assertReady()).not.toThrow();
+      const plaintext = Buffer.from('production recovery payload');
+      const encrypted = await service.encrypt(plaintext, 7);
+      await expect(service.decrypt(encrypted.bytes, 7)).resolves.toEqual(plaintext);
+    } finally {
+      fetchMock.mockRestore();
+      delete process.env.VAULT_ADDR;
+      delete process.env.VAULT_TOKEN;
+      delete process.env.VAULT_AUDIT_TRANSIT_KEY;
+    }
+  });
 });

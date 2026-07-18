@@ -71,6 +71,14 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
     try {
       if (process.env.AUDIT_BATCH_DISABLED === 'true') return;
 
+      try {
+        this.artifacts.assertReady();
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Audit recovery configuration is invalid.';
+        this.logger.error(`Audit batch anchoring is paused: ${reason}`);
+        return;
+      }
+
       await this.recoverPendingBatches();
 
       const onChainLatest = await this.blockchain.getLatestAuditBatchId();
@@ -209,8 +217,11 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
         return { committed: false, reason: 'Chưa cấu hình AuditAnchor.' };
       }
 
-      if (!this.artifacts.isReady()) {
-        return { committed: false, reason: 'Audit recovery IPFS is not configured.' };
+      try {
+        this.artifacts.assertReady();
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Audit recovery configuration is invalid.';
+        return { committed: false, reason };
       }
 
       const chainCheck = await this.verifyFullChainBeforeAnchor();
