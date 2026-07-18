@@ -62,7 +62,7 @@ services:
     restart: unless-stopped
     cap_add:
       - IPC_LOCK
-    command: server -config=/vault/config/vault.hcl
+    command: server
     volumes:
       - ./vault/config:/vault/config:ro
       - ./vault/policies:/vault/policies:ro
