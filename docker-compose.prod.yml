@@ -73,6 +73,7 @@ services:
         condition: service_healthy
     networks:
       - internal
+      - public
     expose:
       - "3001"
     healthcheck:
