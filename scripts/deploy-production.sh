@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 ENV_FILE="${ENV_FILE:-.env}"
+BACKEND_ENV_FILE="${BACKEND_ENV_FILE:-backend/.env}"
 HEALTH_URL="${HEALTH_URL:-http://localhost/api/health}"
 PREVIOUS_BACKEND_FILE=".previous_backend_image"
 PREVIOUS_FRONTEND_FILE=".previous_frontend_image"
@@ -60,6 +61,7 @@ require_cmd curl
 docker compose version >/dev/null 2>&1 || fail "Docker Compose plugin is not available"
 [[ -f "$COMPOSE_FILE" ]] || fail "Missing ${COMPOSE_FILE}"
 [[ -f "$ENV_FILE" ]] || fail "Missing ${ENV_FILE}. Create it on the VPS from .env.example"
+[[ -f "$BACKEND_ENV_FILE" ]] || fail "Missing ${BACKEND_ENV_FILE}. Create it on the VPS from backend/.env.example"
 
 REQUESTED_BACKEND_IMAGE="${BACKEND_IMAGE:-}"
 REQUESTED_FRONTEND_IMAGE="${FRONTEND_IMAGE:-}"
@@ -68,6 +70,8 @@ REQUESTED_APP_VERSION="${APP_VERSION:-}"
 set -a
 # shellcheck disable=SC1090
 source "$ENV_FILE"
+# shellcheck disable=SC1090
+source "$BACKEND_ENV_FILE"
 set +a
 
 if [[ -n "$REQUESTED_BACKEND_IMAGE" ]]; then BACKEND_IMAGE="$REQUESTED_BACKEND_IMAGE"; fi
@@ -78,12 +82,14 @@ if [[ -n "$REQUESTED_APP_VERSION" ]]; then APP_VERSION="$REQUESTED_APP_VERSION";
 [[ -n "${FRONTEND_IMAGE:-}" ]] || fail "FRONTEND_IMAGE is required"
 
 if [[ "${AUDIT_BATCH_DISABLED:-false}" != "true" ]]; then
-  if [[ "${AUDIT_RECOVERY_KEY_PROVIDER:-}" != "vault" \
-     || -z "${VAULT_ADDR:-}" \
-     || -z "${VAULT_TOKEN:-}" \
-     || -z "${VAULT_AUDIT_TRANSIT_KEY:-}" ]]; then
-    log "WARNING: audit anchoring will remain paused until Vault Transit is initialized and backend/.env contains the required Vault settings"
-  fi
+  [[ "${AUDIT_RECOVERY_KEY_PROVIDER:-}" == "local" ]] \
+    || fail "AUDIT_RECOVERY_KEY_PROVIDER must be local when audit anchoring is enabled"
+  [[ "${AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION:-}" == "true" ]] \
+    || fail "AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION must be true"
+  [[ "${AUDIT_RECOVERY_ENCRYPTION_KEY:-}" =~ ^[0-9A-Fa-f]{64}$ ]] \
+    || fail "AUDIT_RECOVERY_ENCRYPTION_KEY must contain exactly 64 hexadecimal characters"
+  [[ "${AUDIT_RECOVERY_ENCRYPTION_KEY}" != "$(printf '00%.0s' {1..32})" ]] \
+    || fail "AUDIT_RECOVERY_ENCRYPTION_KEY must not be an all-zero placeholder"
 fi
 
 log "Saving current image references for rollback"
@@ -101,10 +107,10 @@ export BACKEND_IMAGE FRONTEND_IMAGE
 export APP_VERSION="${APP_VERSION:-$(printf '%s' "$BACKEND_IMAGE" | awk -F: '{print $NF}')}"
 
 log "Pulling new images"
-docker compose -f "$COMPOSE_FILE" pull backend frontend nginx postgres kafka vault
+docker compose -f "$COMPOSE_FILE" pull backend frontend nginx postgres kafka
 
-log "Starting database, Kafka, and Vault dependencies"
-docker compose -f "$COMPOSE_FILE" up -d postgres kafka vault
+log "Starting database and Kafka dependencies"
+docker compose -f "$COMPOSE_FILE" up -d postgres kafka
 
 log "Running Prisma production migrations"
 docker compose -f "$COMPOSE_FILE" run --rm --no-deps backend ./node_modules/.bin/prisma migrate deploy

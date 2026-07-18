@@ -5,12 +5,14 @@ describe('AuditRecoveryCryptoService', () => {
   const originalKey = process.env.AUDIT_RECOVERY_ENCRYPTION_KEY;
   const originalKeyId = process.env.AUDIT_RECOVERY_ENCRYPTION_KEY_ID;
   const originalNodeEnv = process.env.NODE_ENV;
+  const originalLocalProductionOptIn = process.env.AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION;
 
   beforeEach(() => {
     process.env.NODE_ENV = 'test';
     process.env.AUDIT_RECOVERY_KEY_PROVIDER = 'local';
     process.env.AUDIT_RECOVERY_ENCRYPTION_KEY = '44'.repeat(32);
     process.env.AUDIT_RECOVERY_ENCRYPTION_KEY_ID = 'recovery-test-v1';
+    delete process.env.AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION;
   });
 
   afterAll(() => {
@@ -22,6 +24,11 @@ describe('AuditRecoveryCryptoService', () => {
     else process.env.AUDIT_RECOVERY_ENCRYPTION_KEY_ID = originalKeyId;
     if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = originalNodeEnv;
+    if (originalLocalProductionOptIn === undefined) {
+      delete process.env.AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION;
+    } else {
+      process.env.AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION = originalLocalProductionOptIn;
+    }
   });
 
   it('encrypts one bundle with a wrapped per-batch DEK and decrypts it', async () => {
@@ -45,12 +52,35 @@ describe('AuditRecoveryCryptoService', () => {
     await expect(service.decrypt(Buffer.from(JSON.stringify(parsed)), 2)).rejects.toThrow();
   });
 
-  it('rejects local wrapping in production before a batch is prepared', () => {
+  it('rejects local wrapping in production without explicit opt-in', () => {
     process.env.NODE_ENV = 'production';
     process.env.AUDIT_RECOVERY_KEY_PROVIDER = 'local';
 
     expect(() => new AuditRecoveryCryptoService().assertReady()).toThrow(
-      'Local audit recovery wrapping key is forbidden in production',
+      'AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION=true',
+    );
+  });
+
+  it('permits local wrapping in production with explicit opt-in and a valid key', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.AUDIT_RECOVERY_KEY_PROVIDER = 'local';
+    process.env.AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION = 'true';
+
+    const service = new AuditRecoveryCryptoService();
+    expect(() => service.assertReady()).not.toThrow();
+    const plaintext = Buffer.from('production local recovery payload');
+    const encrypted = await service.encrypt(plaintext, 19);
+    await expect(service.decrypt(encrypted.bytes, 19)).resolves.toEqual(plaintext);
+  });
+
+  it('rejects malformed local key material after production opt-in', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.AUDIT_RECOVERY_KEY_PROVIDER = 'local';
+    process.env.AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION = 'true';
+    process.env.AUDIT_RECOVERY_ENCRYPTION_KEY = 'not-a-32-byte-hex-key';
+
+    expect(() => new AuditRecoveryCryptoService().assertReady()).toThrow(
+      'AUDIT_RECOVERY_ENCRYPTION_KEY must be a 32-byte hex string',
     );
   });
 
