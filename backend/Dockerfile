@@ -1,9 +1,9 @@
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json ./
@@ -12,7 +12,7 @@ RUN npx prisma generate
 COPY . .
 RUN npm run build
 
-FROM node:20-alpine AS prod-deps
+FROM node:22-alpine AS prod-deps
 ENV PRISMA_CLI_BINARY_TARGETS=linux-musl-openssl-3.0.x
 WORKDIR /app
 COPY package*.json ./
@@ -21,7 +21,7 @@ RUN npm ci --omit=dev \
   && npx prisma generate \
   && npm cache clean --force
 
-FROM node:20-alpine AS production
+FROM node:22-alpine AS production
 ENV NODE_ENV=production \
   PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 WORKDIR /app

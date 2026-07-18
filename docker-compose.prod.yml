@@ -89,6 +89,12 @@ services:
       NODE_ENV: production
       PORT: 3001
       APP_VERSION: ${APP_VERSION:-production}
+      KAFKA_ENABLED: "true"
+      KAFKA_BROKERS: kafka:9092
+      AUDIT_RECOVERY_KEY_PROVIDER: vault
+      VAULT_ADDR: http://vault:8200
+      VAULT_TRANSIT_MOUNT: transit
+      VAULT_AUDIT_TRANSIT_KEY: kltn-audit-recovery
     depends_on:
       postgres:
         condition: service_healthy
