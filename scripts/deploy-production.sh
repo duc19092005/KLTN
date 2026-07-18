@@ -67,12 +67,13 @@ REQUESTED_BACKEND_IMAGE="${BACKEND_IMAGE:-}"
 REQUESTED_FRONTEND_IMAGE="${FRONTEND_IMAGE:-}"
 REQUESTED_APP_VERSION="${APP_VERSION:-}"
 
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-# shellcheck disable=SC1090
-source "$BACKEND_ENV_FILE"
-set +a
+DOTENV_LIBRARY="$(dirname "${BASH_SOURCE[0]}")/lib/dotenv.sh"
+[[ -f "$DOTENV_LIBRARY" ]] || fail "Missing dotenv loader: ${DOTENV_LIBRARY}"
+# shellcheck source=scripts/lib/dotenv.sh
+source "$DOTENV_LIBRARY"
+
+load_dotenv_file "$ENV_FILE"
+load_dotenv_file "$BACKEND_ENV_FILE"
 
 if [[ -n "$REQUESTED_BACKEND_IMAGE" ]]; then BACKEND_IMAGE="$REQUESTED_BACKEND_IMAGE"; fi
 if [[ -n "$REQUESTED_FRONTEND_IMAGE" ]]; then FRONTEND_IMAGE="$REQUESTED_FRONTEND_IMAGE"; fi
