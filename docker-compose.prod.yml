@@ -63,6 +63,8 @@ services:
     cap_add:
       - IPC_LOCK
     command: server
+    environment:
+      VAULT_ADDR: http://127.0.0.1:8200
     volumes:
       - ./vault/config:/vault/config:ro
       - ./vault/policies:/vault/policies:ro
@@ -72,7 +74,7 @@ services:
     expose:
       - "8200"
     healthcheck:
-      test: ["CMD", "vault", "status"]
+      test: ["CMD-SHELL", "vault status >/dev/null 2>&1; code=$$?; [ $$code -eq 0 ] || [ $$code -eq 2 ]"]
       interval: 10s
       timeout: 5s
       retries: 12
