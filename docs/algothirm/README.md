@@ -785,6 +785,38 @@ Nếu sát deadline, giữ V2 hiện tại.
 Nếu muốn nâng cấp sau bảo vệ, thêm beforeEncryptedHash/afterEncryptedHash trong Audit V3.
 ```
 
+## 19.1. Phục hồi face embedding của Admin
+
+Luồng này dùng cùng hạ tầng IPFS nhưng artifact tách biệt hoàn toàn với audit batch.
+
+```text
+Đăng ký Admin
+-> validate 3-15 descriptor
+-> faceHash = SHA-256(canonical descriptors)
+-> mã hóa bundle bằng AES-256-GCM, AAD = SHA-256(userId + faceHash)
+-> upload encrypted artifact lên IPFS
+-> artifactHash = SHA-256(chính bytes đã upload)
+-> FaceRegistry.setFaceRecovery(faceHash, artifactHash, ipfs://CID)
+-> lưu ciphertext vận hành vào User.faceEmbedding
+```
+
+Khi DB bị đổi hoặc xóa embedding:
+
+```text
+phiên ví Admin chưa verified
+-> challenge một lần
+-> đọc faceHash + artifactHash + URI từ FaceRegistry
+-> tải IPFS và kiểm artifactHash
+-> giải mã AES-256-GCM và kiểm AAD
+-> tính lại faceHash và so với chain
+-> so khuôn mặt sống bằng Euclidean distance
+-> ghi lại User.faceEmbedding, tăng tokenVersion và xóa lockout
+```
+
+Không trả descriptor, ciphertext, AES key, artifact URI hoặc internal hash ra API/UI. Nếu bất kỳ bước kiểm tra nào sai, hệ thống fail closed và không tự fallback sang dữ liệu DB.
+
+`FaceRegistry` cũ không có ABI phục hồi, nên khi triển khai phiên bản này phải deploy lại contract, cập nhật `FACE_REGISTRY_ADDRESS` và re-enroll/reseed Admin trong cửa sổ bảo trì.
+
 ## 20. Tóm tắt dễ nhớ
 
 ```text

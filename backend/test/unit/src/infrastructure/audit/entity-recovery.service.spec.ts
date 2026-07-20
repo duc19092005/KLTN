@@ -193,6 +193,51 @@ describe('EntityRecoveryService integrity gate', () => {
     expect(JSON.stringify(response)).not.toContain(patientAfter.fullName);
   });
 
+  it('does not allow entity recovery from a tampered audit row that is still pending', async () => {
+    const row = buildPatientAuditRow();
+    const { service, anchor } = setup(row, { ...patientAfter, phone: '0999999999' });
+
+    let response: unknown;
+    try {
+      await service.assertTrusted('Patient', row.entityId);
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConflictException);
+      response = (error as ConflictException).getResponse();
+    }
+
+    expect(response).toMatchObject({
+      code: 'ENTITY_INTEGRITY_WARNING',
+      recoveryRequired: false,
+    });
+    expect(response).toMatchObject({ message: expect.stringMatching(/chưa được neo|audit này chưa được neo/i) });
+    expect(anchor.getInclusionProof).not.toHaveBeenCalled();
+    expect(JSON.stringify(response)).not.toContain('0999999999');
+    expect(JSON.stringify(response)).not.toContain(patientAfter.phone);
+  });
+
+  it('blocks entity recovery when the blockchain inclusion proof is not verified', async () => {
+    const row = buildPatientAuditRow({ onChainStatus: 'ANCHORED', batchId: 7 });
+    const { service, anchor } = setup(row, { ...patientAfter, fullName: 'Tampered Name' });
+    anchor.getInclusionProof.mockResolvedValueOnce({ verified: false });
+
+    let response: unknown;
+    try {
+      await service.assertTrusted('Patient', row.entityId);
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConflictException);
+      response = (error as ConflictException).getResponse();
+    }
+
+    expect(response).toMatchObject({
+      code: 'ENTITY_INTEGRITY_WARNING',
+      recoveryRequired: false,
+    });
+    expect(response).toMatchObject({ message: expect.stringMatching(/chưa xác minh|kiểm tra batch/i) });
+    expect(anchor.getInclusionProof).toHaveBeenCalledWith(row.seq);
+    expect(JSON.stringify(response)).not.toContain('Tampered Name');
+    expect(JSON.stringify(response)).not.toContain(patientAfter.fullName);
+  });
+
   it('restores only the selected entity and returns no decrypted snapshot', async () => {
     const row = buildPatientAuditRow({ onChainStatus: 'ANCHORED', batchId: 7 });
     const tampered = { ...patientAfter, fullName: 'Tampered Name', birthDate: new Date(patientAfter.birthDate) };

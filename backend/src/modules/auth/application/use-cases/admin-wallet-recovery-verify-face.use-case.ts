@@ -28,7 +28,7 @@ export class AdminWalletRecoveryVerifyFaceUseCase {
     }
 
     const storedDescriptors = this.faceMatch.decodeStoredDescriptors(admin.faceEmbedding);
-    const integrity = await this.faceMatch.checkIntegrity(admin.id, storedDescriptors);
+    const integrity = await this.faceMatch.checkIntegrity(admin.id, storedDescriptors, true);
     if (!integrity.ok) {
       await this.audit.write(admin.id, 'ADMIN_WALLET_RECOVERY_FACE_INTEGRITY_FAILED', 'User', admin.id, { ip });
       throw new UnauthorizedException('Dữ liệu khuôn mặt Admin đã bị thay đổi. Không thể khôi phục ví.');

@@ -102,9 +102,6 @@ export class AuditRecoveryCryptoService {
     if (configured !== 'local' && configured !== 'vault') {
       throw new Error(`Unsupported AUDIT_RECOVERY_KEY_PROVIDER: ${configured}`);
     }
-    if (process.env.NODE_ENV === 'production' && configured === 'local') {
-      throw new Error('Local audit recovery wrapping key is forbidden in production; configure Vault.');
-    }
     return configured;
   }
 
