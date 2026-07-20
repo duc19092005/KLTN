@@ -1,0 +1,176 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kltn-postgres
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - kltn_postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    logging: &default-logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  kafka:
+    image: bitnamilegacy/kafka:3.7
+    container_name: kltn-kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_ENABLE_KRAFT: "yes"
+      KAFKA_CFG_NODE_ID: 1
+      KAFKA_CFG_PROCESS_ROLES: broker,controller
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_LISTENERS: INTERNAL://:9092,CONTROLLER://:9093
+      KAFKA_CFG_ADVERTISED_LISTENERS: INTERNAL://kafka:9092
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    volumes:
+      - kltn_kafka_data:/bitnami/kafka
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 40s
+    logging: *default-logging
+
+  vault:
+    profiles: ["vault"]
+    image: hashicorp/vault:1.17.6
+    container_name: kltn-vault
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    command: server
+    environment:
+      VAULT_ADDR: http://127.0.0.1:8200
+    volumes:
+      - ./vault/config:/vault/config:ro
+      - ./vault/policies:/vault/policies:ro
+      - kltn_vault_data:/vault/file
+    networks:
+      - internal
+    expose:
+      - "8200"
+    healthcheck:
+      test: ["CMD-SHELL", "vault status >/dev/null 2>&1; code=$$?; [ $$code -eq 0 ] || [ $$code -eq 2 ]"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    logging: *default-logging
+
+  backend:
+    image: ${BACKEND_IMAGE}
+    container_name: kltn-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      APP_VERSION: ${APP_VERSION:-production}
+      KAFKA_ENABLED: "true"
+      KAFKA_BROKERS: kafka:9092
+      AUDIT_RECOVERY_VAULT_ENABLED: ${AUDIT_RECOVERY_VAULT_ENABLED:-false}
+      AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+    networks:
+      - internal
+      - public
+    expose:
+      - "3001"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3001/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging: *default-logging
+
+  frontend:
+    image: ${FRONTEND_IMAGE}
+    container_name: kltn-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging: *default-logging
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: kltn-nginx
+    restart: unless-stopped
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      # Enable after TLS certificates are mounted/configured.
+      # - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    networks:
+      - internal
+      - public
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging: *default-logging
+
+networks:
+  public:
+    name: kltn_public
+  internal:
+    name: kltn_internal
+    internal: true
+
+volumes:
+  kltn_postgres_data:
+    name: kltn_postgres_data
+  kltn_kafka_data:
+    name: kltn_kafka_data
+  kltn_vault_data:
+    name: kltn_vault_data

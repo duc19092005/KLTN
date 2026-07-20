@@ -34,6 +34,18 @@ export interface EncryptedRecoveryArtifact {
 
 @Injectable()
 export class AuditRecoveryCryptoService {
+  assertReady(): void {
+    const provider = this.provider();
+    if (provider === 'local') {
+      this.localKey();
+      return;
+    }
+
+    this.requiredEnv('VAULT_ADDR');
+    this.requiredEnv('VAULT_TOKEN');
+    this.requiredEnv('VAULT_AUDIT_TRANSIT_KEY');
+  }
+
   async encrypt(plaintext: Buffer, batchId: number): Promise<{ bytes: Buffer; artifactHash: string; keyId: string }> {
     const dek = randomBytes(32);
     const iv = randomBytes(IV_BYTES);
@@ -98,9 +110,28 @@ export class AuditRecoveryCryptoService {
   }
 
   private provider(): 'local' | 'vault' {
-    const configured = (process.env.AUDIT_RECOVERY_KEY_PROVIDER ?? 'local').toLowerCase();
+    let configured: string;
+    if (process.env.NODE_ENV === 'production') {
+      const vaultEnabled = (process.env.AUDIT_RECOVERY_VAULT_ENABLED ?? 'false').toLowerCase();
+      if (vaultEnabled !== 'true' && vaultEnabled !== 'false') {
+        throw new Error('AUDIT_RECOVERY_VAULT_ENABLED must be either true or false.');
+      }
+      configured = vaultEnabled === 'true' ? 'vault' : 'local';
+    } else {
+      configured = (process.env.AUDIT_RECOVERY_KEY_PROVIDER ?? 'local').toLowerCase();
+    }
+
     if (configured !== 'local' && configured !== 'vault') {
       throw new Error(`Unsupported AUDIT_RECOVERY_KEY_PROVIDER: ${configured}`);
+    }
+    if (
+      process.env.NODE_ENV === 'production'
+      && configured === 'local'
+      && process.env.AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION !== 'true'
+    ) {
+      throw new Error(
+        'Local audit recovery wrapping in production requires AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION=true.',
+      );
     }
     return configured;
   }
@@ -163,11 +194,16 @@ export class AuditRecoveryCryptoService {
     const address = this.requiredEnv('VAULT_ADDR').replace(/\/$/, '');
     const token = this.requiredEnv('VAULT_TOKEN');
     const mount = (process.env.VAULT_TRANSIT_MOUNT ?? 'transit').replace(/^\/+|\/+$/g, '');
-    const response = await fetch(`${address}/v1/${mount}/${path}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-vault-token': token },
-      body: JSON.stringify(body),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${address}/v1/${mount}/${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-vault-token': token },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      throw new Error('Vault Transit request failed: service is unreachable.');
+    }
     if (!response.ok) throw new Error(`Vault Transit request failed with HTTP ${response.status}.`);
     return response.json();
   }

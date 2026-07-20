@@ -8,6 +8,7 @@ import { StaffValidator } from '../services/staff.validator';
 import { generateTemporaryPassword } from '../../../../common/security/temporary-password';
 import { TEMPORARY_CREDENTIAL_MAILER } from '../../../../infrastructure/email/email.constants';
 import { TemporaryCredentialMailerPort } from '../../../../infrastructure/email/email.types';
+import { toStaffAuditProfile } from '../mappers/staff-audit-profile';
 
 /**
  * Creates a (non-doctor) staff profile + login user, then anchors the staff
@@ -64,8 +65,8 @@ export class CreateStaffUseCase {
         },
         async (created, tx) => {
           if (created.staffProfile) {
-            created.staffProfile.user = created;
-            await this.integrity.anchorChange(created.staffProfile, 'CREATE', actorId, null, tx);
+            const auditProfile = toStaffAuditProfile(created.staffProfile, created);
+            await this.integrity.anchorChange(auditProfile, 'CREATE', actorId, null, tx);
           }
           await this.mailer.sendTemporaryPassword({
             to: dto.email.trim().toLowerCase(),

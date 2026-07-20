@@ -1,20 +1,44 @@
-FROM node:20-alpine
-
-# postgresql16-client provides pg_dump/pg_restore matching the Postgres 16 server (the backup
-# feature shells out to pg_dump; its version must be >= the server's, so pin to 16).
-RUN apk add --no-cache openssl libc6-compat netcat-openbsd postgresql16-client
-
+FROM node:22-alpine AS deps
 WORKDIR /app
-
 COPY package*.json ./
 RUN npm ci
 
-COPY prisma ./prisma/
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY package*.json ./
+COPY prisma ./prisma
 RUN npx prisma generate
-
 COPY . .
 RUN npm run build
 
+FROM node:22-alpine AS prod-deps
+ENV PRISMA_CLI_BINARY_TARGETS=linux-musl-openssl-3.0.x
+WORKDIR /app
+COPY package*.json ./
+COPY prisma ./prisma
+RUN npm ci --omit=dev \
+  && npx prisma generate \
+  && npm cache clean --force
+
+FROM node:22-alpine AS production
+ENV NODE_ENV=production \
+  PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
+WORKDIR /app
+
+RUN apk add --no-cache curl openssl libc6-compat postgresql16-client \
+  && addgroup -S appgroup -g 1001 \
+  && adduser -S appuser -u 1001 -G appgroup
+
+COPY --from=prod-deps --chown=appuser:appgroup /app/node_modules ./node_modules
+COPY --from=builder --chown=appuser:appgroup /app/dist ./dist
+COPY --from=builder --chown=appuser:appgroup /app/prisma ./prisma
+COPY --from=builder --chown=appuser:appgroup /app/package*.json ./
+
+USER appuser
 EXPOSE 3001
 
-CMD ["sh", "-c", "until nc -z db 5432; do echo 'Waiting for PostgreSQL...'; sleep 2; done; until nc -z blockchain 8545; do echo 'Waiting for blockchain...'; sleep 2; done; sleep 6; npx prisma db push; npm run start:prod"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -fsS http://localhost:${PORT:-3001}/api/health || exit 1
+
+CMD ["npm", "run", "start:prod"]

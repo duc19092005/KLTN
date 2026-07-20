@@ -8,6 +8,7 @@ import { buildStaffSnapshot } from '../../domain/staff-snapshot';
 import { DOCTOR_REANCHOR, DoctorReanchorPort } from '../../../doctor/application/ports/doctor-reanchor.port';
 import { buildUnifiedDoctorSnapshot } from '../../../doctor/domain/doctor-snapshot';
 import { EntityRecoveryService } from '../../../../infrastructure/audit/entity-recovery.service';
+import { toStaffAuditProfile } from '../mappers/staff-audit-profile';
 
 /**
  * Updates a staff profile + linked user account. Behavior copied verbatim from
@@ -76,8 +77,8 @@ export class UpdateStaffUseCase {
               tx,
             );
           } else if (updatedUser.staffProfile) {
-            updatedUser.staffProfile.user = updatedUser;
-            await this.integrity.anchorChange(updatedUser.staffProfile, 'UPDATE', actorId, before, tx);
+            const auditProfile = toStaffAuditProfile(updatedUser.staffProfile, updatedUser);
+            await this.integrity.anchorChange(auditProfile, 'UPDATE', actorId, before, tx);
           }
         },
       );

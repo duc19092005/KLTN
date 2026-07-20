@@ -65,11 +65,18 @@ describe('UpdateStaffUseCase audit V2', () => {
   it('records encrypted V2 StaffProfile diff inside the update transaction', async () => {
     const { useCase, repo, integrity } = setup();
 
-    await useCase.execute('staff-1', { fullName: 'def', avatarUrl: 'https://cdn.example/new.png' } as any, 'admin-1');
+    const result = await useCase.execute('staff-1', { fullName: 'def', avatarUrl: 'https://cdn.example/new.png' } as any, 'admin-1');
 
+    expect(() => JSON.stringify(result)).not.toThrow();
+    expect(result.staffProfile.user).not.toBe(result);
+    expect(result.staffProfile.user).not.toHaveProperty('staffProfile');
     expect(repo.updateStaffUser).toHaveBeenCalledTimes(1);
     expect(integrity.anchorChange).toHaveBeenCalledWith(
-      expect.objectContaining({ fullName: 'def', avatarUrl: 'https://cdn.example/new.png' }),
+      expect.objectContaining({
+        fullName: 'def',
+        avatarUrl: 'https://cdn.example/new.png',
+        user: { status: null },
+      }),
       'UPDATE',
       'admin-1',
       expect.objectContaining({ fullName: 'abc', avatarUrl: 'https://cdn.example/old.png' }),

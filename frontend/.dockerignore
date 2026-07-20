@@ -2,4 +2,14 @@ node_modules
 dist
 coverage
 .env
+.env.*
+!.env.example
 npm-debug.log*
+Dockerfile*
+.dockerignore
+.git
+.gitignore
+README*
+.vscode
+.idea
+*.log
