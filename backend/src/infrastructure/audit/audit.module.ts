@@ -30,6 +30,13 @@ import { EntityRecoveryService } from './entity-recovery.service';
     AuditKafkaService,
     EntityRecoveryService,
   ],
-  exports: [AuditLoggerService, AuditAnchorService, AuditArtifactService, AuditRecoveryService, EntityRecoveryService],
+  exports: [
+    AuditLoggerService,
+    AuditAnchorService,
+    AuditArtifactService,
+    AuditRecoveryService,
+    EntityRecoveryService,
+    IpfsArtifactService,
+  ],
 })
 export class AuditModule {}

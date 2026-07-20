@@ -51,14 +51,17 @@ export class VerifyFaceUseCase {
     const storedDescriptors = this.faceMatch.decodeStoredDescriptors(user.faceEmbedding);
 
     // Integrity gate: stored template hash must still match the on-chain anchor (if anchored).
-    const integrity = await this.faceMatch.checkIntegrity(userId, storedDescriptors);
+    const integrity = await this.faceMatch.checkIntegrity(userId, storedDescriptors, user.role === 'ADMIN');
     if (!integrity.ok) {
       await this.audit.write(userId, 'FACE_INTEGRITY_FAIL', 'User', userId, {
         recomputedFaceHash: integrity.recomputedFaceHash,
         onChainFaceHash: integrity.onChainFaceHash,
         ip,
       });
-      throw new UnauthorizedException('Dữ liệu khuôn mặt đã bị thay đổi. Vui lòng liên hệ quản trị viên.');
+      throw new UnauthorizedException({
+        code: 'FACE_TEMPLATE_TAMPERED',
+        message: 'Dữ liệu khuôn mặt đã bị thay đổi hoặc mất mốc toàn vẹn trên blockchain.',
+      });
     }
 
     const match = this.faceMatch.computeMatch(descriptor, storedDescriptors);

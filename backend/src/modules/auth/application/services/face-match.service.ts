@@ -30,7 +30,10 @@ export class FaceMatchService {
       const parsed = JSON.parse(plaintext);
       return validateFaceDescriptorSet(parsed);
     } catch {
-      throw new UnauthorizedException('Dữ liệu khuôn mặt đã lưu không hợp lệ.');
+      throw new UnauthorizedException({
+        code: 'FACE_TEMPLATE_TAMPERED',
+        message: 'Dữ liệu khuôn mặt đã lưu không hợp lệ hoặc đã bị thay đổi.',
+      });
     }
   }
 
@@ -39,9 +42,13 @@ export class FaceMatchService {
    * immutable on-chain anchor. A missing anchor is treated as "not protected
    * yet" (ok=true). The use case audits + throws when ok=false.
    */
-  async checkIntegrity(userId: string, storedDescriptors: number[][]): Promise<IntegrityCheck> {
+  async checkIntegrity(
+    userId: string,
+    storedDescriptors: number[][],
+    requireAnchor = false,
+  ): Promise<IntegrityCheck> {
     const onChainFaceHash = await this.chain.getFaceHash(userId);
-    if (!onChainFaceHash) return { ok: true, recomputedFaceHash: null, onChainFaceHash: null };
+    if (!onChainFaceHash) return { ok: !requireAnchor, recomputedFaceHash: null, onChainFaceHash: null };
     const recomputedFaceHash = hashToBytes32(computeFaceHash(storedDescriptors)).toLowerCase();
     return {
       ok: recomputedFaceHash === onChainFaceHash.toLowerCase(),

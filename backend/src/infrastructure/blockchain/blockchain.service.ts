@@ -59,8 +59,10 @@ export class BlockchainService implements OnModuleInit {
 
   private readonly faceRegistryAbi = [
     'function setFaceHash(bytes32 key, bytes32 value) external',
+    'function setFaceRecovery(bytes32 key, bytes32 faceHash, bytes32 artifactHash, string artifactUri) external',
     'function removeFaceHash(bytes32 key) external',
     'function getFaceHash(bytes32 key) external view returns (bytes32)',
+    'function getFaceRecovery(bytes32 key) external view returns (bytes32 faceHash, bytes32 artifactHash, string artifactUri, bool isActive, uint256 updatedAt)',
     'function hasFaceHash(bytes32 key) external view returns (bool)',
     'function owner() external view returns (address)',
   ];
@@ -207,6 +209,29 @@ export class BlockchainService implements OnModuleInit {
       const value: string = await this.faceRegistry.getFaceHash(key);
       if (!value || value === ethers.ZeroHash) return null;
       return value;
+    } catch {
+      return null;
+    }
+  }
+
+  async getFaceRecovery(userId: string): Promise<{
+    faceHash: string;
+    artifactHash: string;
+    artifactUri: string;
+    updatedAt: number;
+  } | null> {
+    if (!this.faceRegistry) return null;
+    try {
+      const key = this.faceKey(userId);
+      const [faceHash, artifactHash, artifactUri, isActive, updatedAt] =
+        await this.faceRegistry.getFaceRecovery(key);
+      if (!isActive || faceHash === ethers.ZeroHash || artifactHash === ethers.ZeroHash || !artifactUri) return null;
+      return {
+        faceHash: String(faceHash).toLowerCase(),
+        artifactHash: String(artifactHash).toLowerCase(),
+        artifactUri: String(artifactUri),
+        updatedAt: Number(updatedAt),
+      };
     } catch {
       return null;
     }
@@ -366,6 +391,27 @@ export class BlockchainService implements OnModuleInit {
         return {
           success: false,
           error: this.toBlockchainErrorMessage(error, 'Không thể thay đổi ví admin trên blockchain.'),
+        };
+      }
+    });
+  }
+
+  /** Atomically anchor an Admin face hash and the encrypted IPFS recovery checkpoint. */
+  async setFaceRecovery(userId: string, faceHash: string, artifactHash: string, artifactUri: string) {
+    return this.enqueueWrite(async () => {
+      if (!this.faceRegistry || !this.relayerSigner) {
+        return { success: false, error: 'FaceRegistry or blockchain relayer key is not configured.' };
+      }
+      try {
+        const key = this.faceKey(userId);
+        const writable = this.faceRegistry.connect(this.relayerSigner) as ethers.Contract;
+        const tx = await writable.setFaceRecovery(key, faceHash, artifactHash, artifactUri);
+        const receipt = await tx.wait();
+        return { success: true, key, txHash: tx.hash, blockNumber: receipt.blockNumber };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to set face recovery checkpoint',
         };
       }
     });

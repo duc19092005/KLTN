@@ -15,8 +15,26 @@ export class BlockchainAuthChainGateway implements AuthChainGatewayPort {
     return this.blockchain.setFaceHash(userId, faceHashBytes32) as Promise<ChainWriteResult>;
   }
 
+  async setFaceRecovery(
+    userId: string,
+    faceHashBytes32: string,
+    artifactHashBytes32: string,
+    artifactUri: string,
+  ): Promise<ChainWriteResult> {
+    return this.blockchain.setFaceRecovery(
+      userId,
+      faceHashBytes32,
+      artifactHashBytes32,
+      artifactUri,
+    ) as Promise<ChainWriteResult>;
+  }
+
   async getFaceHash(userId: string): Promise<string | null> {
     return this.blockchain.getFaceHash(userId);
+  }
+
+  async getFaceRecovery(userId: string) {
+    return this.blockchain.getFaceRecovery(userId);
   }
 
   async authorizeAdmin(walletAddress: string): Promise<ChainWriteResult> {

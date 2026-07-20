@@ -50,9 +50,13 @@ export class AuditRecoveryService {
       const currentRows = await this.prisma.blockchainLogger.findMany({
         where: { batchId },
         orderBy: { seq: 'asc' },
-        select: { entryHash: true },
       });
-      if (currentRows.length === checkpoint.leafCount && currentRows.every((row) => Boolean(row.entryHash))) {
+      const currentRowsAreInternallyValid = currentRows.every((row) => verifyAuditRow(row).ok);
+      if (
+        currentRowsAreInternallyValid
+        && currentRows.length === checkpoint.leafCount
+        && currentRows.every((row) => Boolean(row.entryHash))
+      ) {
         const currentRoot = computeMerkleRootForAlgorithm(
           currentRows.map((row) => row.entryHash!),
           batch.algorithmVersion,

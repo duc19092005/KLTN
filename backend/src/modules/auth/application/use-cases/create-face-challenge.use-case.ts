@@ -20,6 +20,12 @@ export class CreateFaceChallengeUseCase {
     const user = await this.lookup.getAuthUser(userId);
 
     if (!user.faceEmbedding) {
+      if (!user.firstLogin) {
+        throw new UnauthorizedException({
+          code: 'FACE_TEMPLATE_TAMPERED',
+          message: 'Dữ liệu khuôn mặt trong hệ thống bị thiếu hoặc đã bị thay đổi.',
+        });
+      }
       throw new UnauthorizedException('Tài khoản chưa đăng ký dữ liệu khuôn mặt.');
     }
 
