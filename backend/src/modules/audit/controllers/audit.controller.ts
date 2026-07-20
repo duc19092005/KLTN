@@ -15,7 +15,7 @@ import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.de
 import { AuditRecoveryService } from '../../../infrastructure/audit/audit-recovery.service';
 import { RecoverAuditBatchDto } from '../dto/recover-audit-batch.dto';
 import { EntityRecoveryService } from '../../../infrastructure/audit/entity-recovery.service';
-import { RecoverAuditEntitiesDto } from '../dto/recover-audit-entities.dto';
+import { PreviewRecoverAuditEntitiesDto, RecoverAuditEntitiesDto } from '../dto/recover-audit-entities.dto';
 
 /**
  * Admin-only audit + integrity API. Surfaces the tamper-evidence machinery so it can be
@@ -51,6 +51,12 @@ export class AuditController {
   @ApiOperation({ summary: 'Recover selected business entities from verified encrypted audit snapshots' })
   recoverEntities(@Body() body: RecoverAuditEntitiesDto, @CurrentUser() user: AuthUser) {
     return this.entityRecovery.recoverMany(body.items, user.sub, body.reason.trim());
+  }
+
+  @Post('recovery/entities/preview')
+  @ApiOperation({ summary: 'Preview entity recovery without returning decrypted audit snapshots' })
+  previewRecoverEntities(@Body() body: PreviewRecoverAuditEntitiesDto) {
+    return this.entityRecovery.previewMany(body.items);
   }
 
   @Get('logs')

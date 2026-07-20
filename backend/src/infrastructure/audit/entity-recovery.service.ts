@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, Optional } from '@nestjs/common';
 import {
   DepartmentType,
   MedicalSpecialty,
@@ -21,6 +21,7 @@ import {
   verifyAuditRow,
 } from './audit-verification.util';
 import { canonicalize } from './audit-hash.util';
+import { EntityRecreationBundleCache, EntityRecreationService } from './entity-recreation.service';
 
 export const RECOVERABLE_AUDIT_ENTITIES = [
   'Patient',
@@ -81,7 +82,40 @@ export class EntityRecoveryService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditLoggerService,
     private readonly anchor: AuditAnchorService,
+    @Optional() private readonly recreation?: EntityRecreationService,
   ) {}
+
+  async previewMany(targets: EntityRecoveryTarget[]) {
+    const uniqueTargets = [...new Map(targets.map((target) => [this.targetKey(target.entity, target.entityId), target])).values()];
+    const items: Array<Record<string, unknown>> = [];
+    const recreationCache = this.recreation?.createBundleCache();
+    for (const target of uniqueTargets) {
+      const live = await this.loadLiveSnapshot(this.prisma, target.entity, target.entityId);
+      if (!live) {
+        if (!this.recreation) {
+          items.push({ ...target, state: 'MISSING', operation: 'RECREATE', recoverable: false, blockers: ['ENTITY_RECREATION_UNAVAILABLE'], sensitiveDataHidden: true });
+        } else {
+          items.push({ ...(await this.recreation.previewOne(target, recreationCache)) });
+        }
+        continue;
+      }
+
+      const row = await this.findLatestRow(target.entity, target.entityId);
+      const warning = row ? await this.evaluateRow(row) : null;
+      items.push({
+        ...target,
+        state: 'EXISTS',
+        operation: warning?.recoverable ? 'UPDATE' : 'NONE',
+        recoverable: Boolean(warning?.recoverable),
+        sourceSeq: warning?.latestTrustedSeq ?? null,
+        sourceBatchId: warning?.batchId ?? null,
+        source: warning?.recoverable ? 'ANCHORED_AUDIT' : null,
+        blockers: warning && !warning.recoverable ? [warning.status] : [],
+        sensitiveDataHidden: true,
+      });
+    }
+    return { items, total: items.length, recoverable: items.filter((item) => item.recoverable === true).length };
+  }
 
   async listWarnings(limit = 100): Promise<{ items: EntityIntegrityWarning[]; total: number }> {
     const groups = await this.prisma.blockchainLogger.groupBy({
@@ -108,8 +142,9 @@ export class EntityRecoveryService {
     }
 
     const warnings: EntityIntegrityWarning[] = [];
+    const recreationCache = this.recreation?.createBundleCache();
     for (const row of latest.values()) {
-      const warning = await this.evaluateRow(row);
+      const warning = await this.evaluateRow(row, recreationCache);
       if (warning) warnings.push(warning);
     }
 
@@ -138,10 +173,11 @@ export class EntityRecoveryService {
   async recoverMany(targets: EntityRecoveryTarget[], actorId: string, reason: string) {
     const uniqueTargets = [...new Map(targets.map((target) => [this.targetKey(target.entity, target.entityId), target])).values()];
     const results: Array<Record<string, unknown>> = [];
+    const recreationCache = this.recreation?.createBundleCache();
 
     for (const target of uniqueTargets) {
       try {
-        results.push(await this.recoverOne(target, actorId, reason));
+        results.push(await this.recoverOne(target, actorId, reason, recreationCache));
       } catch (error) {
         results.push({
           ...target,
@@ -153,14 +189,25 @@ export class EntityRecoveryService {
 
     return {
       requested: uniqueTargets.length,
-      recovered: results.filter((result) => result.status === 'RECOVERED').length,
+      recovered: results.filter((result) => result.status === 'RECOVERED' || result.status === 'RECREATED').length,
       skipped: results.filter((result) => result.status === 'SKIPPED').length,
       failed: results.filter((result) => result.status === 'FAILED').length,
       results,
     };
   }
 
-  private async recoverOne(target: EntityRecoveryTarget, actorId: string, reason: string) {
+  private async recoverOne(
+    target: EntityRecoveryTarget,
+    actorId: string,
+    reason: string,
+    recreationCache?: EntityRecreationBundleCache,
+  ) {
+    const liveSnapshot = await this.loadLiveSnapshot(this.prisma, target.entity, target.entityId);
+    if (!liveSnapshot) {
+      if (!this.recreation) throw new ConflictException('Entity recreation service chưa được cấu hình.');
+      return this.recreation.recreate(target, actorId, reason, recreationCache);
+    }
+
     const row = await this.findLatestAnchoredRow(target.entity, target.entityId);
     if (!row || row.seq == null || row.batchId == null) {
       throw new ConflictException('Không có audit đã neo để làm nguồn khôi phục.');
@@ -176,8 +223,6 @@ export class EntityRecoveryService {
       throw new ConflictException('Không xác minh được audit nguồn với Merkle root trên blockchain.');
     }
 
-    const liveSnapshot = await this.loadLiveSnapshot(this.prisma, target.entity, target.entityId);
-    if (!liveSnapshot) throw new ConflictException('Bản ghi gốc không còn tồn tại; entity recovery không tự tạo lại quan hệ đã mất.');
     const snapshot = this.effectiveRecoverySnapshot(target.entity, sourceSnapshot, liveSnapshot);
     if (this.snapshotsEqual(snapshot, liveSnapshot)) {
       return { ...target, status: 'SKIPPED', sourceSeq: row.seq, batchId: row.batchId };
@@ -213,7 +258,10 @@ export class EntityRecoveryService {
     return { ...target, status: 'RECOVERED', sourceSeq: row.seq, batchId: row.batchId };
   }
 
-  private async evaluateRow(row: AnchoredAuditRow): Promise<EntityIntegrityWarning | null> {
+  private async evaluateRow(
+    row: AnchoredAuditRow,
+    recreationCache?: EntityRecreationBundleCache,
+  ): Promise<EntityIntegrityWarning | null> {
     if (!this.isRecoverableEntity(row.entity) || !row.entityId) return null;
     const entity = row.entity;
     const base = {
@@ -248,13 +296,19 @@ export class EntityRecoveryService {
 
     const liveSnapshot = await this.loadLiveSnapshot(this.prisma, entity, row.entityId);
     if (!liveSnapshot) {
-      if (await this.hasVerifiedPermanentDeletion(row.entityId, row.seq)) return null;
+      const preview = this.recreation
+        ? await this.recreation.previewOne({ entity, entityId: row.entityId }, recreationCache)
+        : null;
       return {
         ...base,
         status: 'MISSING',
-        recoverable: false,
+        recoverable: Boolean(preview?.recoverable),
+        latestTrustedSeq: preview?.sourceSeq ?? base.latestTrustedSeq,
+        batchId: preview?.sourceBatchId ?? base.batchId,
         fieldsChanged: [],
-        message: 'Bản ghi gốc không còn tồn tại. Cần dùng PostgreSQL PITR hoặc quy trình phục hồi quan hệ.',
+        message: preview?.recoverable
+          ? 'Bản ghi gốc không còn tồn tại nhưng có snapshot IPFS đã xác minh để tạo lại.'
+          : 'Bản ghi gốc không còn tồn tại và chưa đủ điều kiện khôi phục an toàn từ IPFS.',
       };
     }
 
@@ -313,19 +367,6 @@ export class EntityRecoveryService {
       where: { entity, entityId, seq: { not: null } },
       orderBy: { seq: 'desc' },
     });
-  }
-
-  private async hasVerifiedPermanentDeletion(entityId: string, afterSeq: number | null): Promise<boolean> {
-    const deletion = await this.prisma.blockchainLogger.findFirst({
-      where: {
-        entity: 'AdministrativeDeletion',
-        entityId,
-        action: 'PERMANENT_DELETE',
-        ...(afterSeq == null ? {} : { seq: { gt: afterSeq } }),
-      },
-      orderBy: { seq: 'desc' },
-    });
-    return deletion ? verifyAuditRow(deletion).ok : false;
   }
 
   private async loadLiveSnapshot(client: DbClient, entity: RecoverableAuditEntity, entityId: string): Promise<Snapshot | null> {

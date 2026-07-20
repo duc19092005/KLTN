@@ -74,14 +74,21 @@ export class AdministrativeLifecycleService {
         entityId: id,
         action: 'PERMANENT_DELETE',
         actorId,
-        before: this.snapshot(entity, current),
+        before: this.permanentDeletionSnapshot(entity, current),
         after: null,
         metadata: { targetEntity: this.auditEntity(entity) },
       }, tx);
+      // Entity FKs are not part of the V2 entry hash. Allow PostgreSQL's
+      // onDelete:SetNull actions for this audited administrative operation while
+      // keeping actorId and every hash-committed audit column unchanged.
+      await tx.$executeRaw`SELECT set_config('app.audit_recovery_authorized', 'true', true)`;
       if (entity === 'ai-models') await tx.aiModelRegistry.delete({ where: { id } });
       if (entity === 'departments') await tx.department.delete({ where: { id } });
-      if (entity === 'staff') await tx.user.delete({ where: { id: row.userId } });
-      if (entity === 'doctors') await tx.user.delete({ where: { id: row.staffProfile.userId } });
+      // User is an immutable audit actor (BlockchainLogger.actorId uses Restrict).
+      // Keep the already soft-deleted account as a tombstone and remove only the
+      // business profile. Recovery can safely relink the same User later.
+      if (entity === 'staff') await tx.staffProfile.delete({ where: { id } });
+      if (entity === 'doctors') await tx.staffProfile.delete({ where: { id: row.staffProfileId } });
     });
     return { permanentlyDeleted: true, id };
   }
@@ -90,7 +97,13 @@ export class AdministrativeLifecycleService {
     if (entity === 'ai-models') return this.prisma.aiModelRegistry.findUnique({ where: { id }, include: { _count: { select: { diagnoses: true, aiQualities: true, blockchainLogs: true } } } });
     if (entity === 'departments') return this.prisma.department.findUnique({ where: { id }, include: { _count: { select: { staffs: true, visits: true, medicalOrders: true, appointments: true, blockchainLogs: true } } } });
     if (entity === 'staff') return this.prisma.staffProfile.findUnique({ where: { id }, include: { user: true, _count: { select: { assignedVisits: true, blockchainLogs: true } }, doctorProfile: true, managedDepartment: true } });
-    return this.prisma.doctorProfile.findUnique({ where: { id }, include: { staffProfile: { include: { user: true } }, _count: { select: { aiQualities: true, medicalOrders: true, appointments: true, reviewedAiDiagnoses: true, medicalConclusions: true, blockchainLogs: true } } } });
+    return this.prisma.doctorProfile.findUnique({
+      where: { id },
+      include: {
+        staffProfile: { include: { user: true, managedDepartment: true, _count: { select: { assignedVisits: true } } } },
+        _count: { select: { aiQualities: true, medicalOrders: true, appointments: true, reviewedAiDiagnoses: true, medicalConclusions: true, blockchainLogs: true } },
+      },
+    });
   }
 
   private async updateLifecycle(tx: any, entity: LifecycleEntity, current: any, userStatus: UserStatus, operationalStatus: OperationalStatus, metadata: any) {
@@ -111,10 +124,70 @@ export class AdministrativeLifecycleService {
     if (entity === 'staff') return buildStaffSnapshot(row);
     return buildUnifiedDoctorSnapshot(row);
   }
+
+  /**
+   * Permanent deletion needs more than the integrity snapshot: deleting a
+   * Staff/Doctor cascades through User, while AiModelRegistry has required
+   * encrypted fields that are intentionally absent from its display snapshot.
+   * This envelope is stored only inside beforeEncrypted and is authenticated by
+   * the V2 audit hashes before it can be used for recreation.
+   */
+  private permanentDeletionSnapshot(entity: LifecycleEntity, row: any) {
+    const business = this.snapshot(entity, row);
+    const user = entity === 'staff' ? row.user : entity === 'doctors' ? row.staffProfile.user : null;
+    const staff = entity === 'staff' ? row : entity === 'doctors' ? row.staffProfile : null;
+    return {
+      ...business,
+      _recovery: {
+        schema: 'KLTN_ENTITY_RECOVERY_V1',
+        targetEntity: this.auditEntity(entity),
+        user: user ? {
+          id: user.id,
+          username: user.username ?? null,
+          email: user.email ?? null,
+          phone: user.phone ?? null,
+          phoneNormalized: user.phoneNormalized ?? null,
+          passwordHash: user.passwordHash ?? null,
+          role: user.role,
+          status: user.status,
+          firstLogin: user.firstLogin,
+          registrationStep: user.registrationStep,
+          tokenVersion: user.tokenVersion,
+          faceEmbedding: user.faceEmbedding ?? null,
+          faceHash: user.faceHash ?? null,
+          faceModelVersion: user.faceModelVersion ?? null,
+          faceEnrolledAt: this.iso(user.faceEnrolledAt),
+          faceSampleCount: user.faceSampleCount ?? null,
+        } : null,
+        staff: staff ? {
+          userId: staff.userId,
+          labSpecialty: staff.labSpecialty ?? null,
+          createdAt: this.iso(staff.createdAt),
+        } : null,
+        entity: entity === 'ai-models' ? {
+          modelId: row.modelId,
+          ipHashEncrypted: row.ipHashEncrypted,
+          isActiveOnChain: row.isActiveOnChain,
+          createdAt: this.iso(row.createdAt),
+        } : entity === 'departments' ? {
+          createdAt: this.iso(row.createdAt),
+        } : entity === 'doctors' ? {
+          createdAt: this.iso(row.createdAt),
+        } : null,
+      },
+    };
+  }
+
+  private iso(value: unknown): string | null {
+    if (value instanceof Date) return value.toISOString();
+    return typeof value === 'string' ? value : null;
+  }
   private async referenceCount(entity: LifecycleEntity, row: any) {
     if (entity === 'ai-models') return row._count.diagnoses + row._count.aiQualities;
     if (entity === 'departments') return row._count.staffs + row._count.visits + row._count.medicalOrders + row._count.appointments;
     if (entity === 'staff') return row._count.assignedVisits + Number(Boolean(row.doctorProfile)) + Number(Boolean(row.managedDepartment));
-    return row._count.aiQualities + row._count.medicalOrders + row._count.appointments + row._count.reviewedAiDiagnoses + row._count.medicalConclusions;
+    return row._count.aiQualities + row._count.medicalOrders + row._count.appointments
+      + row._count.reviewedAiDiagnoses + row._count.medicalConclusions
+      + row.staffProfile._count.assignedVisits + Number(Boolean(row.staffProfile.managedDepartment));
   }
 }
