@@ -269,26 +269,26 @@ Add-EvidenceCase 'Quản lý mô hình AI' 'Non func' 'S-AI-NF-01' 'Giới hạn
     'Field đối chiếu: id, modelName, modelVersion, recommendedSpecialty, reliability và trạng thái dùng lâm sàng.' `
     'Chỉ trả field lựa chọn lâm sàng và độ tin cậy được tính; không trả secret quản trị.' `
     'Unit test xác nhận response chỉ chứa field lựa chọn lâm sàng và reliability.' `
-    'backend/test/unit/src/modules/ai-model/application/use-cases/list-available-ai-models.use-case.spec.ts'
+    'apps/hospital-api/test/unit/src/modules/ai-model/application/use-cases/list-available-ai-models.use-case.spec.ts'
 Add-EvidenceCase 'Quản lý mô hình AI' 'Non func' 'S-AI-NF-02' 'Ràng buộc đánh giá mô hình' 'AUTO-AI-002' `
     'Từ chối đánh giá khi bác sĩ chưa sử dụng mô hình trong AI diagnosis tương ứng' 'Có bác sĩ, mô hình và AI diagnosis trong dữ liệu test nhưng không có quan hệ sử dụng hợp lệ' `
     @('Chọn AI diagnosis chưa được bác sĩ sử dụng hợp lệ','Gửi đánh giá mô hình','Đối chiếu kết quả và dữ liệu đánh giá') `
     'Field đối chiếu: aiDiagnosisId, satisfied, feedback; quan hệ doctorId và aiModelId.' `
     'Hệ thống từ chối và không tạo đánh giá.' 'Unit test xác nhận hệ thống từ chối đánh giá không có lần sử dụng hợp lệ.' `
-    'backend/test/unit/src/modules/ai-model/application/use-cases/rate-ai-model.use-case.spec.ts'
+    'apps/hospital-api/test/unit/src/modules/ai-model/application/use-cases/rate-ai-model.use-case.spec.ts'
 
 Add-EvidenceCase 'Quản lý nhân sự' 'Non func' 'S-STAFF-NF-01' 'Tính nhất quán khi sửa nhân sự' 'AUTO-STAFF-001' `
     'Rollback cập nhật nhân sự khi ghi audit trong transaction thất bại' 'Có nhân sự hợp lệ trong dữ liệu test' `
     @('Chuẩn bị cập nhật hồ sơ nhân sự','Giả lập lỗi ghi audit trong transaction','Đối chiếu lỗi được trả ra để transaction rollback') `
     'Field đối chiếu: các field UpdateStaffDto; không có username hoặc password.' `
     'Lỗi audit được truyền ra, không được nuốt lỗi để báo cập nhật thành công.' 'Unit test xác nhận lỗi audit được truyền ra khỏi use case.' `
-    'backend/test/unit/src/modules/staff/application/use-cases/update-staff.use-case.spec.ts'
+    'apps/hospital-api/test/unit/src/modules/staff/application/use-cases/update-staff.use-case.spec.ts'
 Add-EvidenceCase 'Quản lý nhân sự' 'Non func' 'S-STAFF-NF-02' 'Giới hạn quyền nhân sự' 'AUTO-STAFF-002' `
     'Không cho nâng role nhân sự thành Admin qua luồng cập nhật hồ sơ' 'Có nhân sự không phải Admin trong dữ liệu test' `
     @('Chuẩn bị yêu cầu thay đổi role thành Admin','Thực hiện cập nhật','Đối chiếu role và audit') `
     'Field đối chiếu: role; giá trị Admin không thuộc tập role nhân sự cho phép.' `
     'Hệ thống từ chối trước khi ghi thay đổi.' 'Unit test xác nhận role escalation thành Admin bị chặn.' `
-    'backend/test/unit/src/modules/staff/application/use-cases/update-staff.use-case.spec.ts'
+    'apps/hospital-api/test/unit/src/modules/staff/application/use-cases/update-staff.use-case.spec.ts'
 
 Add-EvidenceCase 'Quản lý phòng ban' 'Func test' 'S-DEP-FUNC-01' 'Bắt buộc field phòng ban' 'AUTO-DEP-001' `
     'Từ chối tạo phòng ban khi thiếu type hoặc canReceiveOrders' 'Admin có quyền quản lý phòng ban' `
@@ -296,14 +296,14 @@ Add-EvidenceCase 'Quản lý phòng ban' 'Func test' 'S-DEP-FUNC-01' 'Bắt bu�
     'Field bắt buộc: departmentCode, name, floor, type, canReceiveOrders.' `
     'Cả hai trường hợp thiếu field đều bị từ chối; hệ thống không tự mặc định canReceiveOrders.' `
     'Unit test xác nhận type và canReceiveOrders đều bắt buộc.' `
-    'backend/test/unit/src/modules/department/dto/department.dto.spec.ts'
+    'apps/hospital-api/test/unit/src/modules/department/dto/department.dto.spec.ts'
 Add-EvidenceCase 'Quản lý phòng ban' 'Non func' 'S-DEP-NF-01' 'Bảo vệ field cấu trúc phòng ban' 'AUTO-DEP-002' `
     'Chặn đổi field cấu trúc khi phòng ban đã có dữ liệu nghiệp vụ' 'Phòng ban có business relation trong dữ liệu test' `
     @('Chọn phòng ban đã có quan hệ nghiệp vụ','Yêu cầu đổi field cấu trúc','Đối chiếu kết quả; sau đó thử sửa description') `
     'Field cấu trúc: departmentCode, type, canReceiveOrders; field được phép: description.' `
     'Field cấu trúc bị chặn, còn description vẫn được cập nhật.' `
     'Unit test xác nhận chặn field cấu trúc và cho phép sửa description.' `
-    'backend/test/unit/src/modules/department/application/use-cases/update-department.use-case.spec.ts'
+    'apps/hospital-api/test/unit/src/modules/department/application/use-cases/update-department.use-case.spec.ts'
 
 Add-EvidenceCase 'Quản lý bác sĩ' 'Non func' 'S-DOC-NF-01' 'Kiểm chứng integrity bác sĩ' 'AUTO-DOC-001' `
     'Đối chiếu bác sĩ với afterHash của audit đã anchor' 'Có DoctorProfile và audit đã anchor trong dữ liệu test' `
@@ -311,7 +311,7 @@ Add-EvidenceCase 'Quản lý bác sĩ' 'Non func' 'S-DOC-NF-01' 'Kiểm chứng 
     'Field kiểm chứng: entityId, afterHash, trạng thái anchor; không hiển thị snapshot nhạy cảm.' `
     'Bản ghi hợp lệ được xác minh bằng afterHash của audit đã anchor.' `
     'Unit test xác nhận adapter integrity dùng audited afterHash.' `
-    'backend/test/unit/src/modules/doctor/infrastructure/adapters/blockchain-doctor-integrity.anchor.spec.ts'
+    'apps/hospital-api/test/unit/src/modules/doctor/infrastructure/adapters/blockchain-doctor-integrity.anchor.spec.ts'
 Add-EvidenceCase 'Quản lý bác sĩ' 'Non func' 'S-DOC-NF-02' 'Không sửa tên đăng nhập bác sĩ' 'MANUAL-DOC-001' `
     'Form và nghiệp vụ cập nhật bác sĩ không cho thay đổi username' 'Có bác sĩ trong dữ liệu test và Admin đã đăng nhập' `
     @('Mở chức năng cập nhật bác sĩ','Kiểm tra field được phép cập nhật','Thử gửi thay đổi username bằng luồng web') `
@@ -328,27 +328,27 @@ Add-EvidenceCase 'Quản lý Log hệ thống' 'Non func' 'S-AUD-NF-01' 'Redacti
     @('Tạo safe snapshot cho từng entity','Đối chiếu field được phép hiển thị','Kiểm tra field nhạy cảm đã được redaction') `
     'Field kiểm tra theo allowlist; không ghi plaintext bệnh án, URL file, ciphertext hoặc key.' `
     'PII và clinical free text bị che; metadata an toàn vẫn còn.' 'Unit test xác nhận redaction cho Patient, MedicalConclusion, MedicalResult và Staff.' `
-    'backend/test/unit/src/infrastructure/audit/audit-sanitizer.util.spec.ts'
+    'apps/hospital-api/test/unit/src/infrastructure/audit/audit-sanitizer.util.spec.ts'
 Add-EvidenceCase 'Quản lý Log hệ thống' 'Non func' 'S-AUD-NF-02' 'Cảnh báo integrity trước thao tác entity' 'AUTO-AUD-002' `
     'Cho phép mutation tiếp theo khi latest Tier B đúng nhưng pending; chặn khi live data lệch audit đã anchor' 'Có hai trạng thái test: pending hợp lệ và anchored bị tamper' `
     @('Kiểm tra entity có latest audit Tier B pending nhưng khớp','Thực hiện mutation hợp lệ','Lặp lại với entity lệch snapshot đã anchor') `
     'Field kiểm chứng: entity, entityId, afterHash, anchoredAt, suspiciousFields đã redaction.' `
     'Pending hợp lệ không bị coi là tamper; entity lệch anchored bị cảnh báo và chặn mutation.' `
     'Unit test xác nhận cả hai nhánh pending hợp lệ và anchored bị tamper.' `
-    'backend/test/unit/src/infrastructure/audit/entity-recovery.service.spec.ts'
+    'apps/hospital-api/test/unit/src/infrastructure/audit/entity-recovery.service.spec.ts'
 Add-EvidenceCase 'Quản lý Log hệ thống' 'Func test' 'S-AUD-FUNC-01' 'Recovery nhiều entity được chọn' 'AUTO-AUD-003' `
     'Phục hồi đúng các entity được Admin chọn và không trả snapshot đã giải mã' 'Có entity warning với latest trusted audit đã anchor' `
     @('Chọn một hoặc nhiều entity warning','Nhập reason hợp lệ','Thực hiện recovery và đối chiếu danh sách kết quả') `
     'Field request: items gồm entity và entityId, tối đa 50 phần tử; reason dài 10-500 ký tự.' `
     'Chỉ entity được chọn được restore; response không chứa decrypted snapshot.' `
     'Unit test xác nhận restore đúng entity được chọn và không trả snapshot giải mã.' `
-    'backend/test/unit/src/infrastructure/audit/entity-recovery.service.spec.ts'
+    'apps/hospital-api/test/unit/src/infrastructure/audit/entity-recovery.service.spec.ts'
 Add-EvidenceCase 'Quản lý Log hệ thống' 'Non func' 'S-AUD-NF-03' 'Từ chối artifact bị sửa' 'AUTO-AUD-004' `
     'Dừng recovery khi encrypted artifact bị thay đổi' 'Có encrypted artifact và dữ liệu kiểm chứng hợp lệ ban đầu' `
     @('Thay đổi nội dung encrypted artifact trong môi trường test','Yêu cầu giải mã để recovery','Đối chiếu DB không bị ghi đè') `
     'Field kiểm chứng: artifact hash, AES-GCM tag và metadata batch; không ghi key vào tài liệu.' `
     'Xác thực AES-GCM thất bại và recovery dừng.' 'Unit test xác nhận encrypted artifact bị tamper không giải mã được.' `
-    'backend/test/unit/src/infrastructure/audit/audit-recovery-crypto.service.spec.ts'
+    'apps/hospital-api/test/unit/src/infrastructure/audit/audit-recovery-crypto.service.spec.ts'
 
 Add-EvidenceCase 'Quản lý khám bệnh' 'Func test' 'S-CLINIC-FUNC-01' 'Tạo hồ sơ bệnh nhân hợp lệ' 'AUTO-CLINIC-001' `
     'Yêu cầu ít nhất một thông tin liên hệ hoặc định danh và chặn hồ sơ trùng' 'Có repository bệnh nhân trong dữ liệu test' `
@@ -356,28 +356,28 @@ Add-EvidenceCase 'Quản lý khám bệnh' 'Func test' 'S-CLINIC-FUNC-01' 'Tạo
     'Field: fullName, gender, birthDate, address và ít nhất một trong phone, citizenId, insuranceNumber, emergencyContact.' `
     'Thiếu toàn bộ thông tin liên hệ/định danh hoặc trùng định danh đều bị từ chối.' `
     'Unit test xác nhận hai điều kiện validation và duplicate.' `
-    'backend/test/unit/src/modules/patient/application/use-cases/create-patient.use-case.spec.ts'
+    'apps/hospital-api/test/unit/src/modules/patient/application/use-cases/create-patient.use-case.spec.ts'
 Add-EvidenceCase 'Quản lý khám bệnh' 'Non func' 'S-CLINIC-NF-01' 'Audit transaction khi tạo lượt khám' 'AUTO-CLINIC-002' `
     'Rollback tạo lượt khám khi audit trong transaction thất bại' 'Có Patient, Department và Doctor hợp lệ trong dữ liệu test' `
     @('Chuẩn bị yêu cầu tạo lượt khám','Giả lập lỗi audit trong transaction','Đối chiếu lỗi được truyền ra') `
     'Field: patientId hoặc patient, departmentId, staffId; audit entity Visit và Patient khi tạo inline.' `
     'Không báo tạo lượt khám thành công khi audit bắt buộc thất bại.' `
     'Unit test xác nhận Visit/Patient audit dùng transaction callback và lỗi được truyền ra.' `
-    'backend/test/unit/src/modules/visit/application/use-cases/create-visit.use-case.spec.ts'
+    'apps/hospital-api/test/unit/src/modules/visit/application/use-cases/create-visit.use-case.spec.ts'
 Add-EvidenceCase 'Quản lý khám bệnh' 'Non func' 'S-CLINIC-NF-02' 'File kết quả y tế dùng S3 private' 'AUTO-CLINIC-003' `
     'Từ chối Cloudinary metadata, public URL hoặc S3 file thiếu objectKey' 'Có MedicalOrder chưa hoàn tất trong dữ liệu test' `
     @('Tạo kết quả với storageProvider Cloudinary','Lặp lại với public URL','Lặp lại với S3 thiếu objectKey') `
     'Field file: fileName, originalName, mimeType, size, storageProvider=S3, bucket, objectKey, sha256, etag.' `
     'Cả ba dữ liệu file không hợp lệ đều bị từ chối trước khi hoàn tất kết quả.' `
     'Unit test xác nhận ba nhánh Cloudinary, public URL và thiếu objectKey đều bị chặn.' `
-    'backend/test/unit/src/modules/medical-order/application/use-cases/create-medical-result.use-case.spec.ts'
+    'apps/hospital-api/test/unit/src/modules/medical-order/application/use-cases/create-medical-result.use-case.spec.ts'
 Add-EvidenceCase 'Quản lý khám bệnh' 'Func test' 'S-CLINIC-FUNC-02' 'Điều kiện kết luận cuối' 'AUTO-CLINIC-004' `
     'Chỉ cho tạo kết luận khi mọi chỉ định chưa hủy đã RESULT_READY' 'Lượt khám có nhiều MedicalOrder trong dữ liệu test' `
     @('Để một chỉ định ở trạng thái chưa có kết quả','Yêu cầu kết luận cuối và đối chiếu lỗi','Chuyển mọi chỉ định chưa hủy sang RESULT_READY rồi thử lại') `
     'Field: visitId, aiDiagnosisId, finalDiagnosis, treatmentPlan, prescription, followUpNote, doctorNote; trạng thái từng MedicalOrder.' `
     'Còn chỉ định pending thì bị chặn; tất cả đã RESULT_READY thì được tiếp tục.' `
     'Unit test xác nhận cả nhánh bị chặn và nhánh hợp lệ.' `
-    'backend/test/unit/src/modules/clinical-decision/application/use-cases/create-medical-conclusion.use-case.spec.ts'
+    'apps/hospital-api/test/unit/src/modules/clinical-decision/application/use-cases/create-medical-conclusion.use-case.spec.ts'
 
 Add-EvidenceCase 'Quản lý xác thực' 'Non func' 'S-AUTH-NF-01' 'Giới hạn đổi mật khẩu theo role' 'AUTO-AUTH-001' `
     'Admin và Patient không dùng luồng đổi mật khẩu nhân sự; sai current password bị từ chối' 'Có tài khoản Admin, Patient và nhân sự trong dữ liệu test' `
@@ -385,14 +385,14 @@ Add-EvidenceCase 'Quản lý xác thực' 'Non func' 'S-AUTH-NF-01' 'Giới hạ
     'Field: currentPassword, newPassword; role lấy từ CurrentUser, không nhận từ client.' `
     'Cả ba trường hợp đều bị từ chối và security event quan trọng được audit theo source.' `
     'Unit test xác nhận Admin, Patient và current password sai đều bị từ chối.' `
-    'backend/test/unit/src/modules/auth/application/use-cases/password-role-rules.spec.ts'
+    'apps/hospital-api/test/unit/src/modules/auth/application/use-cases/password-role-rules.spec.ts'
 Add-EvidenceCase 'Quản lý xác thực' 'Non func' 'S-AUTH-NF-02' 'Giới hạn quên mật khẩu theo role' 'AUTO-AUTH-002' `
     'Admin và Patient không dùng luồng quên mật khẩu nhân sự' 'Có tài khoản Admin và Patient trong dữ liệu test' `
     @('Yêu cầu challenge quên mật khẩu bằng username Admin','Lặp lại với tài khoản Patient','Đối chiếu không phát hành challenge hợp lệ') `
     'Field: username; role được tra từ tài khoản trong hệ thống.' `
     'Hệ thống từ chối vì chức năng chỉ áp dụng cho tài khoản nhân sự.' `
     'Unit test xác nhận Admin và Patient đều bị từ chối.' `
-    'backend/test/unit/src/modules/auth/application/use-cases/password-role-rules.spec.ts'
+    'apps/hospital-api/test/unit/src/modules/auth/application/use-cases/password-role-rules.spec.ts'
 Add-EvidenceCase 'Quản lý xác thực' 'GUI' 'S-AUTH-GUI-01' 'Thông báo nghiệp vụ xác thực' 'MANUAL-AUTH-GUI-001' `
     'Màn đăng nhập, quên mật khẩu, đổi mật khẩu và quét khuôn mặt hiển thị đúng trạng thái' 'Có môi trường web và tài khoản test theo từng role' `
     @('Mở từng màn xác thực','Thực hiện một trường hợp hợp lệ và một trường hợp lỗi','Đối chiếu field, validation và thông báo') `
