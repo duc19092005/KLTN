@@ -23,3 +23,12 @@ export class RecoverAuditEntitiesDto {
   @MaxLength(500)
   reason!: string;
 }
+
+export class PreviewRecoverAuditEntitiesDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => RecoverAuditEntityTargetDto)
+  items!: RecoverAuditEntityTargetDto[];
+}

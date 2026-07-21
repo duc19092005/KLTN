@@ -160,9 +160,16 @@ export class AuditKafkaService implements OnApplicationBootstrap, OnModuleDestro
     try {
       const replicationFactor = Number(process.env.KAFKA_REPLICATION_FACTOR ?? 1);
       const retentionMs = String(Number(process.env.KAFKA_AUDIT_RETENTION_MS ?? 14 * 24 * 60 * 60 * 1000));
+      const existingTopics = new Set(await admin.listTopics());
+      const missingTopics = [this.tierATopic(), this.tierBTopic()].filter((topic) => !existingTopics.has(topic));
+
+      if (missingTopics.length === 0) {
+        return;
+      }
+
       await admin.createTopics({
         waitForLeaders: true,
-        topics: [this.tierATopic(), this.tierBTopic()].map((topic) => ({
+        topics: missingTopics.map((topic) => ({
           topic,
           numPartitions: Number(process.env.KAFKA_AUDIT_PARTITIONS ?? 3),
           replicationFactor,

@@ -26,6 +26,7 @@ describe('AdministrativeLifecycleService', () => {
         update: jest.fn().mockResolvedValue({ ...department, status: 'INACTIVE' }),
       },
       $transaction: jest.fn().mockImplementation(async (fn) => fn({
+        $executeRaw: jest.fn().mockResolvedValue(1),
         department: {
           update: jest.fn().mockResolvedValue({ ...department, status: 'INACTIVE', deletedAt: null }),
           delete: jest.fn().mockResolvedValue(department),
@@ -65,5 +66,54 @@ describe('AdministrativeLifecycleService', () => {
       id: 'dept-1',
     });
     expect(audit.recordV2).toHaveBeenCalled();
+  });
+
+  it('builds a versioned encrypted-recovery payload for a cascaded staff user', () => {
+    const { service } = makeService();
+    const staff = {
+      id: 'staff-1', userId: 'user-1', employeeCode: 'NV-0001', fullName: 'Nhan Vien A',
+      phone: '0900000001', gender: 'MALE', citizenId: '001122334455', birthDate: new Date('1990-01-01'),
+      address: null, avatarUrl: '/avatar.png', departmentId: null, position: 'Receptionist', labSpecialty: null,
+      user: {
+        id: 'user-1', username: 'nhanviena', email: 'staff@example.test', phone: '0900000001',
+        phoneNormalized: '84900000001', passwordHash: '$argon2id$trusted-hash', role: 'RECEPTIONIST', status: 'DELETE',
+        firstLogin: false, registrationStep: 2, tokenVersion: 4,
+      },
+    };
+
+    const snapshot = (service as any).permanentDeletionSnapshot('staff', staff);
+    expect(snapshot._recovery).toMatchObject({
+      schema: 'KLTN_ENTITY_RECOVERY_V1', targetEntity: 'StaffProfile',
+      user: { id: 'user-1', passwordHash: '$argon2id$trusted-hash', role: 'RECEPTIONIST' },
+      staff: { userId: 'user-1' },
+    });
+  });
+
+  it('keeps the audit-actor User tombstone and deletes only StaffProfile', async () => {
+    const staff = {
+      id: 'staff-1', userId: 'user-1', employeeCode: 'NV-0001', fullName: 'Nhan Vien A', phone: '0900000001',
+      gender: 'MALE', citizenId: '001122334455', birthDate: new Date('1990-01-01'), address: null,
+      avatarUrl: '/avatar.png', departmentId: null, position: 'Receptionist', labSpecialty: null,
+      user: { id: 'user-1', role: 'RECEPTIONIST', status: 'DELETE', tokenVersion: 2 },
+      doctorProfile: null, managedDepartment: null, _count: { assignedVisits: 0, blockchainLogs: 4 },
+    };
+    const tx = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      staffProfile: { delete: jest.fn().mockResolvedValue(staff) },
+      user: { delete: jest.fn() },
+    };
+    const prisma = {
+      staffProfile: { findUnique: jest.fn().mockResolvedValue(staff) },
+      $transaction: jest.fn(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx)),
+    };
+    const audit = { recordV2: jest.fn().mockResolvedValue(undefined) };
+    const entityRecovery = { assertTrusted: jest.fn().mockResolvedValue(undefined) };
+    const service = new AdministrativeLifecycleService(prisma as never, audit as never, entityRecovery as never);
+
+    await service.permanentDelete('staff', 'staff-1', 'admin-1');
+
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(tx.staffProfile.delete).toHaveBeenCalledWith({ where: { id: 'staff-1' } });
+    expect(tx.user.delete).not.toHaveBeenCalled();
   });
 });

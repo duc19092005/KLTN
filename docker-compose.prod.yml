@@ -56,34 +56,11 @@ services:
       start_period: 40s
     logging: *default-logging
 
-  vault:
-    profiles: ["vault"]
-    image: hashicorp/vault:1.17.6
-    container_name: kltn-vault
-    restart: unless-stopped
-    cap_add:
-      - IPC_LOCK
-    command: server
-    environment:
-      VAULT_ADDR: http://127.0.0.1:8200
-    volumes:
-      - ./vault/config:/vault/config:ro
-      - ./vault/policies:/vault/policies:ro
-      - kltn_vault_data:/vault/file
-    networks:
-      - internal
-    expose:
-      - "8200"
-    healthcheck:
-      test: ["CMD-SHELL", "vault status >/dev/null 2>&1; code=$$?; [ $$code -eq 0 ] || [ $$code -eq 2 ]"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 10s
-    logging: *default-logging
-
   backend:
-    image: ${BACKEND_IMAGE}
+    image: ${BACKEND_IMAGE:-kltn-backend:prod}
+    build:
+      context: ./backend
+      target: production
     container_name: kltn-backend
     restart: unless-stopped
     env_file:
@@ -92,10 +69,10 @@ services:
       NODE_ENV: production
       PORT: 3001
       APP_VERSION: ${APP_VERSION:-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       KAFKA_ENABLED: "true"
       KAFKA_BROKERS: kafka:9092
-      AUDIT_RECOVERY_VAULT_ENABLED: ${AUDIT_RECOVERY_VAULT_ENABLED:-false}
-      AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION: "true"
+    command: sh -c "npx prisma db push && npm run start:prod"
     depends_on:
       postgres:
         condition: service_healthy
@@ -116,7 +93,12 @@ services:
     logging: *default-logging
 
   frontend:
-    image: ${FRONTEND_IMAGE}
+    image: ${FRONTEND_IMAGE:-kltn-frontend:prod}
+    build:
+      context: ./frontend
+      target: production
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
     container_name: kltn-frontend
     restart: unless-stopped
     depends_on:
@@ -172,5 +154,3 @@ volumes:
     name: kltn_postgres_data
   kltn_kafka_data:
     name: kltn_kafka_data
-  kltn_vault_data:
-    name: kltn_vault_data

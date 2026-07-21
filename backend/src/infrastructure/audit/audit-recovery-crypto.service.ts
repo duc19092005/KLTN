@@ -13,13 +13,7 @@ interface LocalWrappedDek {
   ciphertext: string;
 }
 
-interface VaultWrappedDek {
-  provider: 'vault';
-  keyId: string;
-  ciphertext: string;
-}
-
-type WrappedDek = LocalWrappedDek | VaultWrappedDek;
+type WrappedDek = LocalWrappedDek;
 
 export interface EncryptedRecoveryArtifact {
   schema: typeof ARTIFACT_SCHEMA;
@@ -35,15 +29,7 @@ export interface EncryptedRecoveryArtifact {
 @Injectable()
 export class AuditRecoveryCryptoService {
   assertReady(): void {
-    const provider = this.provider();
-    if (provider === 'local') {
-      this.localKey();
-      return;
-    }
-
-    this.requiredEnv('VAULT_ADDR');
-    this.requiredEnv('VAULT_TOKEN');
-    this.requiredEnv('VAULT_AUDIT_TRANSIT_KEY');
+    this.localKey();
   }
 
   async encrypt(plaintext: Buffer, batchId: number): Promise<{ bytes: Buffer; artifactHash: string; keyId: string }> {
@@ -109,43 +95,7 @@ export class AuditRecoveryCryptoService {
     return value as EncryptedRecoveryArtifact;
   }
 
-  private provider(): 'local' | 'vault' {
-    let configured: string;
-    if (process.env.NODE_ENV === 'production') {
-      const vaultEnabled = (process.env.AUDIT_RECOVERY_VAULT_ENABLED ?? 'false').toLowerCase();
-      if (vaultEnabled !== 'true' && vaultEnabled !== 'false') {
-        throw new Error('AUDIT_RECOVERY_VAULT_ENABLED must be either true or false.');
-      }
-      configured = vaultEnabled === 'true' ? 'vault' : 'local';
-    } else {
-      configured = (process.env.AUDIT_RECOVERY_KEY_PROVIDER ?? 'local').toLowerCase();
-    }
-
-    if (configured !== 'local' && configured !== 'vault') {
-      throw new Error(`Unsupported AUDIT_RECOVERY_KEY_PROVIDER: ${configured}`);
-    }
-    if (
-      process.env.NODE_ENV === 'production'
-      && configured === 'local'
-      && process.env.AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION !== 'true'
-    ) {
-      throw new Error(
-        'Local audit recovery wrapping in production requires AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION=true.',
-      );
-    }
-    return configured;
-  }
-
   private async wrapDek(dek: Buffer): Promise<WrappedDek> {
-    if (this.provider() === 'vault') {
-      const keyId = this.requiredEnv('VAULT_AUDIT_TRANSIT_KEY');
-      const response = await this.vaultRequest(`encrypt/${encodeURIComponent(keyId)}`, {
-        plaintext: dek.toString('base64'),
-      });
-      const ciphertext = this.readVaultCiphertext(response);
-      return { provider: 'vault', keyId, ciphertext };
-    }
-
     const kek = this.localKey();
     const iv = randomBytes(IV_BYTES);
     const cipher = createCipheriv('aes-256-gcm', kek, iv);
@@ -161,16 +111,6 @@ export class AuditRecoveryCryptoService {
   }
 
   private async unwrapDek(wrapped: WrappedDek): Promise<Buffer> {
-    if (wrapped.provider === 'vault') {
-      const response = await this.vaultRequest(`decrypt/${encodeURIComponent(wrapped.keyId)}`, {
-        ciphertext: wrapped.ciphertext,
-      });
-      const plaintext = this.readVaultPlaintext(response);
-      const dek = Buffer.from(plaintext, 'base64');
-      if (dek.length !== 32) throw new Error('Vault returned an invalid recovery DEK.');
-      return dek;
-    }
-
     const decipher = createDecipheriv('aes-256-gcm', this.localKey(), Buffer.from(wrapped.iv, 'base64'));
     decipher.setAAD(Buffer.from(ARTIFACT_SCHEMA, 'utf8'));
     decipher.setAuthTag(Buffer.from(wrapped.tag, 'base64'));
@@ -188,36 +128,6 @@ export class AuditRecoveryCryptoService {
       throw new Error('AUDIT_RECOVERY_ENCRYPTION_KEY must be a 32-byte hex string.');
     }
     return Buffer.from(hex, 'hex');
-  }
-
-  private async vaultRequest(path: string, body: Record<string, string>): Promise<unknown> {
-    const address = this.requiredEnv('VAULT_ADDR').replace(/\/$/, '');
-    const token = this.requiredEnv('VAULT_TOKEN');
-    const mount = (process.env.VAULT_TRANSIT_MOUNT ?? 'transit').replace(/^\/+|\/+$/g, '');
-    let response: Response;
-    try {
-      response = await fetch(`${address}/v1/${mount}/${path}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-vault-token': token },
-        body: JSON.stringify(body),
-      });
-    } catch {
-      throw new Error('Vault Transit request failed: service is unreachable.');
-    }
-    if (!response.ok) throw new Error(`Vault Transit request failed with HTTP ${response.status}.`);
-    return response.json();
-  }
-
-  private readVaultCiphertext(value: unknown): string {
-    const ciphertext = (value as { data?: { ciphertext?: unknown } })?.data?.ciphertext;
-    if (typeof ciphertext !== 'string') throw new Error('Vault encrypt response is missing ciphertext.');
-    return ciphertext;
-  }
-
-  private readVaultPlaintext(value: unknown): string {
-    const plaintext = (value as { data?: { plaintext?: unknown } })?.data?.plaintext;
-    if (typeof plaintext !== 'string') throw new Error('Vault decrypt response is missing plaintext.');
-    return plaintext;
   }
 
   private requiredEnv(name: string): string {
