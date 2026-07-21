@@ -8,6 +8,14 @@ import { AuditLoggerService } from './audit-logger.service';
 import { computeMerkleRootForAlgorithm, rootToBytes32 } from './merkle.util';
 import { verifyAuditRow } from './audit-verification.util';
 
+export interface VerifiedAuditRecoveryBundle {
+  batchId: number;
+  artifactHash: string;
+  artifactUri: string;
+  merkleRoot: string;
+  logs: AuditRecoveryBundleRow[];
+}
+
 @Injectable()
 export class AuditRecoveryService {
   private readonly runningBatches = new Set<number>();
@@ -19,6 +27,49 @@ export class AuditRecoveryService {
     private readonly anchor: AuditAnchorService,
     private readonly audit: AuditLoggerService,
   ) {}
+
+  /**
+   * Read an anchored recovery artifact without mutating PostgreSQL. The returned
+   * rows have been authenticated against both the IPFS artifact hash and the
+   * blockchain checkpoint, then re-verified as a complete hash/Merkle chain.
+   */
+  async loadVerifiedBundle(batchId: number): Promise<VerifiedAuditRecoveryBundle> {
+    if (!Number.isSafeInteger(batchId) || batchId <= 0) throw new BadRequestException('Invalid audit batch id.');
+    const batch = await this.prisma.auditBatch.findUnique({ where: { batchId } });
+    if (!batch) throw new NotFoundException('Audit batch was not found.');
+    if (batch.status !== 'ANCHORED') throw new BadRequestException('Only anchored audit batches can be used for recovery.');
+    if (batch.fromSeq == null || batch.toSeq == null) throw new BadRequestException('The audit batch sequence range is incomplete.');
+
+    const checkpoint = await this.blockchain.getAuditCheckpoint(batchId);
+    if (!checkpoint?.committed) throw new BadRequestException('The batch has no committed blockchain checkpoint.');
+    if (!checkpoint.artifactUri || !checkpoint.artifactHash) {
+      throw new BadRequestException('The blockchain checkpoint has no recovery artifact.');
+    }
+
+    const bundle = await this.artifacts.downloadAndDecrypt(
+      batchId,
+      checkpoint.artifactUri,
+      checkpoint.artifactHash,
+    );
+    this.validateBundle(bundle.logs, {
+      batchId,
+      merkleRoot: batch.merkleRoot,
+      fromSeq: batch.fromSeq,
+      toSeq: batch.toSeq,
+      leafCount: batch.leafCount,
+      algorithmVersion: batch.algorithmVersion,
+      onChainRoot: checkpoint.root,
+      onChainLeafCount: checkpoint.leafCount,
+    });
+
+    return {
+      batchId,
+      artifactHash: checkpoint.artifactHash,
+      artifactUri: checkpoint.artifactUri,
+      merkleRoot: bundle.batch.merkleRoot,
+      logs: bundle.logs,
+    };
+  }
 
   async recover(batchId: number, adminId: string, reason: string): Promise<{
     batchId: number;
@@ -50,9 +101,13 @@ export class AuditRecoveryService {
       const currentRows = await this.prisma.blockchainLogger.findMany({
         where: { batchId },
         orderBy: { seq: 'asc' },
-        select: { entryHash: true },
       });
-      if (currentRows.length === checkpoint.leafCount && currentRows.every((row) => Boolean(row.entryHash))) {
+      const currentRowsAreInternallyValid = currentRows.every((row) => verifyAuditRow(row).ok);
+      if (
+        currentRowsAreInternallyValid
+        && currentRows.length === checkpoint.leafCount
+        && currentRows.every((row) => Boolean(row.entryHash))
+      ) {
         const currentRoot = computeMerkleRootForAlgorithm(
           currentRows.map((row) => row.entryHash!),
           batch.algorithmVersion,
@@ -62,17 +117,19 @@ export class AuditRecoveryService {
         }
       }
 
-      const bundle = await this.artifacts.downloadAndDecrypt(batchId, checkpoint.artifactUri, checkpoint.artifactHash);
-      this.validateBundle(bundle.logs, {
-        batchId,
-        merkleRoot: bundle.batch.merkleRoot,
-        fromSeq: bundle.batch.fromSeq,
-        toSeq: bundle.batch.toSeq,
-        leafCount: bundle.batch.leafCount,
-        algorithmVersion: bundle.batch.algorithmVersion,
-        onChainRoot: checkpoint.root,
-        onChainLeafCount: checkpoint.leafCount,
-      });
+      const verifiedBundle = await this.loadVerifiedBundle(batchId);
+      const bundle = {
+        schema: 'KLTN_AUDIT_RECOVERY_BUNDLE_V1' as const,
+        batch: {
+          batchId,
+          merkleRoot: batch.merkleRoot,
+          leafCount: batch.leafCount,
+          fromSeq: batch.fromSeq!,
+          toSeq: batch.toSeq!,
+          algorithmVersion: batch.algorithmVersion,
+        },
+        logs: verifiedBundle.logs,
+      };
 
       const following = await this.prisma.blockchainLogger.findFirst({
         where: { seq: bundle.batch.toSeq + 1 },

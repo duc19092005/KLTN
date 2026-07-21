@@ -21,8 +21,12 @@ export class CreateDoctorUseCase {
     if (staff.userRole !== UserRole.DOCTOR) throw new BadRequestException('Nhân sự phải có vai trò bác sĩ.');
     if (staff.hasDoctorProfile) throw new ConflictException('Nhân sự này đã có hồ sơ bác sĩ.');
 
+    if (staff.departmentId && !(await this.repo.findDepartment(staff.departmentId))) {
+      throw new NotFoundException('Không tìm thấy phòng ban.');
+    }
     if (staff.departmentId) {
       const dept = await this.repo.findDepartment(staff.departmentId);
+      if (!dept) throw new NotFoundException('Không tìm thấy phòng ban.');
       if (dept) {
         if (dept.type !== 'EXAMINATION' && dept.type !== 'CLINICAL') {
           throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng khám hoặc lâm sàng.');

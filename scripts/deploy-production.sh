@@ -82,23 +82,11 @@ if [[ -n "$REQUESTED_APP_VERSION" ]]; then APP_VERSION="$REQUESTED_APP_VERSION";
 [[ -n "${BACKEND_IMAGE:-}" ]] || fail "BACKEND_IMAGE is required"
 [[ -n "${FRONTEND_IMAGE:-}" ]] || fail "FRONTEND_IMAGE is required"
 
-AUDIT_RECOVERY_VAULT_ENABLED="${AUDIT_RECOVERY_VAULT_ENABLED:-false}"
-[[ "$AUDIT_RECOVERY_VAULT_ENABLED" == "true" || "$AUDIT_RECOVERY_VAULT_ENABLED" == "false" ]] \
-  || fail "AUDIT_RECOVERY_VAULT_ENABLED must be either true or false"
-
-if [[ "${AUDIT_BATCH_DISABLED:-false}" != "true" ]]; then
-  if [[ "$AUDIT_RECOVERY_VAULT_ENABLED" == "true" ]]; then
-    [[ -n "${VAULT_ADDR:-}" ]] || fail "VAULT_ADDR is required when Vault recovery is enabled"
-    [[ -n "${VAULT_TOKEN:-}" ]] || fail "VAULT_TOKEN is required when Vault recovery is enabled"
-    [[ -n "${VAULT_AUDIT_TRANSIT_KEY:-}" ]] || fail "VAULT_AUDIT_TRANSIT_KEY is required when Vault recovery is enabled"
-  else
-    [[ "${AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION:-}" == "true" ]] \
-      || fail "AUDIT_ALLOW_LOCAL_RECOVERY_KEY_IN_PRODUCTION must be true"
-    [[ "${AUDIT_RECOVERY_ENCRYPTION_KEY:-}" =~ ^[0-9A-Fa-f]{64}$ ]] \
-      || fail "AUDIT_RECOVERY_ENCRYPTION_KEY must contain exactly 64 hexadecimal characters"
-    [[ "${AUDIT_RECOVERY_ENCRYPTION_KEY}" != "$(printf '00%.0s' {1..32})" ]] \
-      || fail "AUDIT_RECOVERY_ENCRYPTION_KEY must not be an all-zero placeholder"
-  fi
+if [[ "\${AUDIT_BATCH_DISABLED:-false}" != "true" ]]; then
+  [[ "\${AUDIT_RECOVERY_ENCRYPTION_KEY:-}" =~ ^[0-9A-Fa-f]{64}$ ]] \
+    || fail "AUDIT_RECOVERY_ENCRYPTION_KEY must contain exactly 64 hexadecimal characters"
+  [[ "\${AUDIT_RECOVERY_ENCRYPTION_KEY}" != "$(printf '00%.0s' {1..32})" ]] \
+    || fail "AUDIT_RECOVERY_ENCRYPTION_KEY must not be an all-zero placeholder"
 fi
 
 log "Saving current image references for rollback"
@@ -116,17 +104,10 @@ export BACKEND_IMAGE FRONTEND_IMAGE
 export APP_VERSION="${APP_VERSION:-$(printf '%s' "$BACKEND_IMAGE" | awk -F: '{print $NF}')}"
 
 log "Pulling new images"
-if [[ "$AUDIT_RECOVERY_VAULT_ENABLED" == "true" ]]; then
-  docker compose --profile vault -f "$COMPOSE_FILE" pull backend frontend nginx postgres kafka vault
-  log "Starting database, Kafka, and optional Vault dependencies"
-  docker compose --profile vault -f "$COMPOSE_FILE" up -d postgres kafka vault
-  COMPOSE_DEPLOY=(docker compose --profile vault -f "$COMPOSE_FILE")
-else
-  docker compose -f "$COMPOSE_FILE" pull backend frontend nginx postgres kafka
-  log "Starting database and Kafka dependencies"
-  docker compose -f "$COMPOSE_FILE" up -d postgres kafka
-  COMPOSE_DEPLOY=(docker compose -f "$COMPOSE_FILE")
-fi
+docker compose -f "$COMPOSE_FILE" pull backend frontend nginx postgres kafka
+log "Starting database and Kafka dependencies"
+docker compose -f "$COMPOSE_FILE" up -d postgres kafka
+COMPOSE_DEPLOY=(docker compose -f "$COMPOSE_FILE")
 
 log "Running Prisma production migrations"
 "${COMPOSE_DEPLOY[@]}" run --rm --no-deps backend ./node_modules/.bin/prisma migrate deploy

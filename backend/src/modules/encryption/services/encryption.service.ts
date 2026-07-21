@@ -14,16 +14,17 @@ export class EncryptionService {
     return crypto.randomBytes(32).toString('hex');
   }
 
-  encryptSecret(secret: string): string {
+  encryptSecret(secret: string, aad?: string): string {
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv('aes-256-gcm', this.encryptionKey, iv);
+    if (aad) cipher.setAAD(Buffer.from(aad, 'utf8'));
     const ciphertext = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()]);
     const tag = cipher.getAuthTag();
 
     return `v1:${iv.toString('base64')}:${tag.toString('base64')}:${ciphertext.toString('base64')}`;
   }
 
-  decryptSecret(encryptedSecret: string): string {
+  decryptSecret(encryptedSecret: string, aad?: string): string {
     if (!encryptedSecret.startsWith('v1:')) {
       const legacyKey = process.env.ENCRYPTION_KEY || 'default_encryption_key_32bytes!!';
       const bytes = CryptoJS.AES.decrypt(encryptedSecret, legacyKey);
@@ -36,6 +37,7 @@ export class EncryptionService {
     }
 
     const decipher = crypto.createDecipheriv('aes-256-gcm', this.encryptionKey, Buffer.from(ivValue, 'base64'));
+    if (aad) decipher.setAAD(Buffer.from(aad, 'utf8'));
     decipher.setAuthTag(Buffer.from(tagValue, 'base64'));
 
     return Buffer.concat([

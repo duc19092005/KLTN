@@ -28,15 +28,24 @@ contract FaceRegistry {
     IIdentityRegistry public immutable identityRegistry;
 
     struct FaceRecord {
-        bytes32 hash;      // SHA256(face embedding JSON), mirrored from off-chain
-        bool isActive;     // true while enrolled; false once removed
-        uint256 updatedAt; // block timestamp of the last write
+        bytes32 hash;                 // SHA256(face embedding JSON), mirrored from off-chain
+        bytes32 recoveryArtifactHash; // SHA256(encrypted IPFS artifact bytes), Admin only
+        string recoveryArtifactUri;   // Content-addressed ipfs:// URI, never plaintext biometrics
+        bool isActive;                // true while enrolled; false once removed
+        uint256 updatedAt;            // block timestamp of the last write
     }
 
     // key (keccak256 of userId) => record
     mapping(bytes32 => FaceRecord) private records;
 
     event FaceHashSet(bytes32 indexed key, bytes32 value, uint256 timestamp);
+    event FaceRecoverySet(
+        bytes32 indexed key,
+        bytes32 faceHash,
+        bytes32 artifactHash,
+        string artifactUri,
+        uint256 timestamp
+    );
     event FaceHashRemoved(bytes32 indexed key, uint256 timestamp);
 
     modifier onlyWriter() {
@@ -58,14 +67,52 @@ contract FaceRegistry {
     function setFaceHash(bytes32 key, bytes32 value) external onlyWriter {
         require(key != bytes32(0), "FaceRegistry: empty key");
         require(value != bytes32(0), "FaceRegistry: empty value");
-        records[key] = FaceRecord({ hash: value, isActive: true, updatedAt: block.timestamp });
+        require(
+            records[key].recoveryArtifactHash == bytes32(0),
+            "FaceRegistry: recovery record is protected"
+        );
+        records[key] = FaceRecord({
+            hash: value,
+            recoveryArtifactHash: bytes32(0),
+            recoveryArtifactUri: "",
+            isActive: true,
+            updatedAt: block.timestamp
+        });
         emit FaceHashSet(key, value, block.timestamp);
+    }
+
+    /// @notice Atomically anchor an Admin face hash and its encrypted IPFS recovery artifact.
+    /// @dev The URI is content-addressed metadata only. Biometric ciphertext and keys stay off-chain.
+    function setFaceRecovery(
+        bytes32 key,
+        bytes32 faceHash,
+        bytes32 artifactHash,
+        string calldata artifactUri
+    ) external onlyWriter {
+        require(key != bytes32(0), "FaceRegistry: empty key");
+        require(faceHash != bytes32(0), "FaceRegistry: empty value");
+        require(artifactHash != bytes32(0), "FaceRegistry: empty artifact hash");
+        require(!records[key].isActive, "FaceRegistry: record already active");
+        uint256 uriLength = bytes(artifactUri).length;
+        require(uriLength > 0 && uriLength <= 256, "FaceRegistry: invalid artifact uri");
+
+        records[key] = FaceRecord({
+            hash: faceHash,
+            recoveryArtifactHash: artifactHash,
+            recoveryArtifactUri: artifactUri,
+            isActive: true,
+            updatedAt: block.timestamp
+        });
+        emit FaceHashSet(key, faceHash, block.timestamp);
+        emit FaceRecoverySet(key, faceHash, artifactHash, artifactUri, block.timestamp);
     }
 
     /// @notice Remove the face hash (e.g. when biometric enrollment is reset).
     function removeFaceHash(bytes32 key) external onlyWriter {
         require(records[key].isActive, "FaceRegistry: key not found");
         records[key].hash = bytes32(0);
+        records[key].recoveryArtifactHash = bytes32(0);
+        records[key].recoveryArtifactUri = "";
         records[key].isActive = false;
         records[key].updatedAt = block.timestamp;
         emit FaceHashRemoved(key, block.timestamp);
@@ -79,6 +126,22 @@ contract FaceRegistry {
     /// @notice Whether a face hash currently exists (is active) for the key.
     function hasFaceHash(bytes32 key) external view returns (bool) {
         return records[key].isActive;
+    }
+
+    /// @notice Read the trusted Admin recovery checkpoint for a face record.
+    function getFaceRecovery(bytes32 key)
+        external
+        view
+        returns (
+            bytes32 faceHash,
+            bytes32 artifactHash,
+            string memory artifactUri,
+            bool isActive,
+            uint256 updatedAt
+        )
+    {
+        FaceRecord storage r = records[key];
+        return (r.hash, r.recoveryArtifactHash, r.recoveryArtifactUri, r.isActive, r.updatedAt);
     }
 
     /// @notice Full record: hash, active flag, and on-chain last-updated timestamp.

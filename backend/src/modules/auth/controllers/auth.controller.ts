@@ -4,7 +4,9 @@ import { AuthService } from '../services/auth.service';
 import { AuthRateLimiterService } from '../services/auth-rate-limiter.service';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { Roles } from '../../../common/decorators/roles.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
+import { RolesGuard } from '../guards/roles.guard';
 import {
   BootstrapAdminDto,
   FaceDescriptorDto,
@@ -22,6 +24,7 @@ import {
   AdminWalletRecoveryVerifyFaceDto,
   AdminWalletRecoveryChallengeDto,
   AdminWalletRecoveryConfirmDto,
+  AdminFaceRecoveryRestoreDto,
   FaceLoginChallengeDto,
   FaceLoginDto,
 } from '../dto/auth.dto';
@@ -309,6 +312,50 @@ export class AuthController {
       return result;
     } catch (error) {
       this.rateLimiter.recordFailure(key, 5 * 60 * 1000);
+      throw error;
+    }
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Post('admin-face-recovery/challenge')
+  async adminFaceRecoveryChallenge(@CurrentUser() user: AuthUser, @Req() req) {
+    const key = this.rateLimitKey(req, 'admin-face-recovery-challenge', user.sub);
+    this.rateLimiter.assertAllowed(key, 3, 10 * 60 * 1000);
+    try {
+      const result = await this.authService.adminFaceRecoveryChallenge(user.sub, user.walletAddress);
+      this.rateLimiter.recordAttempt(key, 10 * 60 * 1000);
+      return result;
+    } catch (error) {
+      this.rateLimiter.recordFailure(key, 10 * 60 * 1000);
+      throw error;
+    }
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Post('admin-face-recovery/restore')
+  async adminFaceRecoveryRestore(
+    @CurrentUser() user: AuthUser,
+    @Body() body: AdminFaceRecoveryRestoreDto,
+    @Req() req,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const key = this.rateLimitKey(req, 'admin-face-recovery-restore', user.sub);
+    this.rateLimiter.assertAllowed(key, 5, 15 * 60 * 1000);
+    try {
+      const result = await this.authService.adminFaceRecoveryRestore(
+        user.sub,
+        body.embedding,
+        body.challenge,
+        user.walletAddress,
+        this.clientIp(req),
+      );
+      this.rateLimiter.reset(key);
+      this.setAuthCookie(res, result.access_token);
+      return this.stripToken(result);
+    } catch (error) {
+      this.rateLimiter.recordFailure(key, 15 * 60 * 1000);
       throw error;
     }
   }
