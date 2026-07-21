@@ -31,26 +31,26 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: apps/hospital-api/package-lock.json
 
       - name: Install backend dependencies
-        working-directory: backend
+        working-directory: apps/hospital-api
         run: npm ci
 
       - name: Generate Prisma client
-        working-directory: backend
+        working-directory: apps/hospital-api
         run: npx prisma generate
 
       - name: TypeScript check backend
-        working-directory: backend
+        working-directory: apps/hospital-api
         run: npm exec -- tsc --noEmit -p tsconfig.build.json
 
       - name: Test backend
-        working-directory: backend
+        working-directory: apps/hospital-api
         run: npm test
 
       - name: Build backend
-        working-directory: backend
+        working-directory: apps/hospital-api
         run: npm run build
 
       - name: Setup Node.js for frontend
@@ -58,14 +58,14 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: apps/hospital-web/package-lock.json
 
       - name: Install frontend dependencies
-        working-directory: frontend
+        working-directory: apps/hospital-web
         run: npm ci
 
       - name: Build frontend
-        working-directory: frontend
+        working-directory: apps/hospital-web
         run: npm run build
 
   build-and-push:
@@ -99,7 +99,7 @@ jobs:
       - name: Build and push backend image
         uses: docker/build-push-action@v6
         with:
-          context: backend
+          context: apps/hospital-api
           push: true
           tags: |
             ${{ steps.image.outputs.backend_image }}:${{ github.sha }}
@@ -110,7 +110,7 @@ jobs:
       - name: Build and push frontend image
         uses: docker/build-push-action@v6
         with:
-          context: frontend
+          context: apps/hospital-web
           push: true
           build-args: |
             VITE_API_URL=/api
@@ -159,7 +159,7 @@ jobs:
 
           rsync -az --delete \
             -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT }}" \
-            docker-compose.prod.yml nginx scripts \
+            infrastructure \
             "${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}:${{ secrets.VPS_DEPLOY_PATH }}/"
 
       - name: Deploy production
@@ -167,9 +167,9 @@ jobs:
           ssh -i ~/.ssh/deploy_key -p "${{ secrets.VPS_PORT }}" \
             "${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}" \
             "cd '${{ secrets.VPS_DEPLOY_PATH }}' && \
-             chmod +x scripts/*.sh && \
+             chmod +x infrastructure/scripts/*.sh && \
              BACKEND_IMAGE='${{ needs.build-and-push.outputs.backend_image }}:${{ github.sha }}' \
              FRONTEND_IMAGE='${{ needs.build-and-push.outputs.frontend_image }}:${{ github.sha }}' \
              GHCR_USERNAME='${{ secrets.GHCR_USERNAME }}' \
              GHCR_TOKEN='${{ secrets.GHCR_TOKEN }}' \
-             ./scripts/deploy-production.sh"
+             ./infrastructure/scripts/deploy-production.sh"

@@ -50,7 +50,7 @@ graph LR
 | `modules/audit/` | **Mới** — `AuditController` (API admin: xem log, verify chain, list batch, lấy proof, neo thủ công). |
 
 ### Smart contract (đã có sẵn, nay được nối vào backend)
-- `blockchain/contracts/AuditAnchor.sol` — append-only Merkle-root logger. **Không có** hàm update/delete.
+- `apps/audit-contracts/contracts/AuditAnchor.sol` — append-only Merkle-root logger. **Không có** hàm update/delete.
 
 ---
 
@@ -169,11 +169,11 @@ Trigger Postgres `trg_blockchain_logger_append_only`:
 
 ```bash
 # 1. Áp schema (chọn 1)
-cd backend && npx prisma migrate deploy      # production
+cd apps/hospital-api && npx prisma migrate deploy      # production
 # hoặc: npx prisma db push                    # dev (trigger tự áp khi boot)
 
 # 2. Deploy contract (nếu chưa có) — AuditAnchor đã nằm trong deploy.js
-cd blockchain && npm run deploy:local
+cd apps/audit-contracts && npm run deploy:local
 # Copy AUDIT_ANCHOR_ADDRESS vào .env
 
 # 3. Đảm bảo .env có:
