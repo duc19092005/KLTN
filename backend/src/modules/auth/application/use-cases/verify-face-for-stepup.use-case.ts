@@ -50,7 +50,7 @@ export class VerifyFaceForStepUpUseCase {
     const storedDescriptors = this.faceMatch.decodeStoredDescriptors(user.faceEmbedding);
 
     // Integrity gate: stored template hash must still match the on-chain anchor (if anchored).
-    const integrity = await this.faceMatch.checkIntegrity(userId, storedDescriptors);
+    const integrity = await this.faceMatch.checkIntegrity(userId, storedDescriptors, user.role === 'ADMIN');
     if (!integrity.ok) {
       await this.audit.write(userId, 'FACE_INTEGRITY_FAIL', 'User', userId, {
         context: 'STEPUP',

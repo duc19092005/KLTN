@@ -32,6 +32,14 @@ import { EntityRecreationService } from './entity-recreation.service';
     EntityRecoveryService,
     EntityRecreationService,
   ],
-  exports: [AuditLoggerService, AuditAnchorService, AuditArtifactService, AuditRecoveryService, EntityRecoveryService, EntityRecreationService],
+  exports: [
+    AuditLoggerService,
+    AuditAnchorService,
+    AuditArtifactService,
+    AuditRecoveryService,
+    EntityRecoveryService,
+    EntityRecreationService,
+    IpfsArtifactService,
+  ],
 })
 export class AuditModule {}

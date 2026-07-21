@@ -119,6 +119,8 @@ describe('FaceRegistry', function () {
 
   const key = ethers.keccak256(ethers.toUtf8Bytes('user-uuid-1'));
   const value = ethers.sha256(ethers.toUtf8Bytes('[[0.12,0.34,...]]'));
+  const artifactHash = ethers.sha256(ethers.toUtf8Bytes('encrypted-face-artifact'));
+  const artifactUri = 'ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3';
 
   it('derives owner from IdentityRegistry', async function () {
     expect(await registry.owner()).to.equal(await identity.owner());
@@ -148,6 +150,27 @@ describe('FaceRegistry', function () {
     expect(await registry.getFaceHash(key)).to.equal(value2);
   });
 
+  it('sets and reads an Admin recovery checkpoint atomically', async function () {
+    await expect(registry.setFaceRecovery(key, value, artifactHash, artifactUri)).to.emit(registry, 'FaceRecoverySet');
+
+    const recovery = await registry.getFaceRecovery(key);
+    expect(recovery.faceHash).to.equal(value);
+    expect(recovery.artifactHash).to.equal(artifactHash);
+    expect(recovery.artifactUri).to.equal(artifactUri);
+    expect(recovery.isActive).to.equal(true);
+  });
+
+  it('protects an Admin recovery checkpoint from either write path', async function () {
+    await registry.setFaceRecovery(key, value, artifactHash, artifactUri);
+    const value2 = ethers.sha256(ethers.toUtf8Bytes('replacement'));
+    await expect(registry.setFaceHash(key, value2)).to.be.revertedWith(
+      'FaceRegistry: recovery record is protected',
+    );
+    await expect(registry.setFaceRecovery(key, value2, artifactHash, artifactUri)).to.be.revertedWith(
+      'FaceRegistry: record already active',
+    );
+  });
+
   it('rejects non-writer calls', async function () {
     await expect(registry.connect(other).setFaceHash(key, value)).to.be.revertedWith(
       'FaceRegistry: caller is not writer',
@@ -157,6 +180,12 @@ describe('FaceRegistry', function () {
   it('rejects empty key/value and removing missing key', async function () {
     await expect(registry.setFaceHash(ethers.ZeroHash, value)).to.be.revertedWith('FaceRegistry: empty key');
     await expect(registry.setFaceHash(key, ethers.ZeroHash)).to.be.revertedWith('FaceRegistry: empty value');
+    await expect(registry.setFaceRecovery(key, value, ethers.ZeroHash, artifactUri)).to.be.revertedWith(
+      'FaceRegistry: empty artifact hash',
+    );
+    await expect(registry.setFaceRecovery(key, value, artifactHash, '')).to.be.revertedWith(
+      'FaceRegistry: invalid artifact uri',
+    );
     await expect(registry.removeFaceHash(key)).to.be.revertedWith('FaceRegistry: key not found');
   });
 });

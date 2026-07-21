@@ -22,6 +22,8 @@ import { AdminWalletRecoveryChallengeUseCase } from '../application/use-cases/ad
 import { AdminWalletRecoveryVerifyFaceUseCase } from '../application/use-cases/admin-wallet-recovery-verify-face.use-case';
 import { AdminWalletRecoveryWalletChallengeUseCase } from '../application/use-cases/admin-wallet-recovery-wallet-challenge.use-case';
 import { AdminWalletRecoveryConfirmUseCase } from '../application/use-cases/admin-wallet-recovery-confirm.use-case';
+import { AdminFaceRecoveryChallengeUseCase } from '../application/use-cases/admin-face-recovery-challenge.use-case';
+import { AdminFaceRecoveryRestoreUseCase } from '../application/use-cases/admin-face-recovery-restore.use-case';
 import { FaceLoginChallengeUseCase } from '../application/use-cases/face-login-challenge.use-case';
 import { FaceLoginUseCase } from '../application/use-cases/face-login.use-case';
 
@@ -57,6 +59,8 @@ export class AuthService {
     private readonly adminWalletRecoveryVerifyFaceUseCase: AdminWalletRecoveryVerifyFaceUseCase,
     private readonly adminWalletRecoveryWalletChallengeUseCase: AdminWalletRecoveryWalletChallengeUseCase,
     private readonly adminWalletRecoveryConfirmUseCase: AdminWalletRecoveryConfirmUseCase,
+    private readonly adminFaceRecoveryChallengeUseCase: AdminFaceRecoveryChallengeUseCase,
+    private readonly adminFaceRecoveryRestoreUseCase: AdminFaceRecoveryRestoreUseCase,
     private readonly faceLoginChallengeUseCase: FaceLoginChallengeUseCase,
     private readonly faceLoginUseCase: FaceLoginUseCase,
   ) {}
@@ -172,6 +176,26 @@ export class AuthService {
       address,
       signature,
       message,
+      ip,
+    );
+  }
+
+  adminFaceRecoveryChallenge(userId: string, walletAddress?: string) {
+    return this.adminFaceRecoveryChallengeUseCase.execute(userId, walletAddress);
+  }
+
+  adminFaceRecoveryRestore(
+    userId: string,
+    embedding: number[],
+    challenge: string,
+    walletAddress?: string,
+    ip?: string,
+  ) {
+    return this.adminFaceRecoveryRestoreUseCase.execute(
+      userId,
+      embedding,
+      challenge,
+      walletAddress,
       ip,
     );
   }

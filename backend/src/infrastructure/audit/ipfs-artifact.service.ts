@@ -3,7 +3,8 @@ import { Injectable, Logger } from '@nestjs/common';
 type IpfsProvider = 'kubo' | 'pinata';
 
 /**
- * Uploads/downloads encrypted audit recovery artifacts.
+ * Uploads/downloads encrypted recovery artifacts. Callers own encryption,
+ * content validation, and authorization; this service only handles IPFS bytes.
  *
  * Providers:
  *  - kubo:   local/self-hosted IPFS HTTP API (/api/v0/add, /api/v0/cat)
@@ -22,11 +23,11 @@ export class IpfsArtifactService {
     return Boolean(process.env.IPFS_API_URL?.trim());
   }
 
-  async upload(bytes: Buffer, fileName: string): Promise<{ cid: string; uri: string }> {
+  async upload(bytes: Buffer, fileName: string, purpose = 'audit-recovery'): Promise<{ cid: string; uri: string }> {
     const provider = this.requireProvider();
     const primaryCid =
       provider === 'pinata'
-        ? await this.pinataAdd(bytes, fileName)
+        ? await this.pinataAdd(bytes, fileName, purpose)
         : await this.kuboAdd(this.requiredApiUrl('IPFS_API_URL'), bytes, fileName, 'IPFS_API_AUTHORIZATION');
 
     const secondary = process.env.IPFS_SECONDARY_API_URL?.trim();
@@ -137,7 +138,7 @@ export class IpfsArtifactService {
     }
   }
 
-  private async pinataAdd(bytes: Buffer, fileName: string): Promise<string> {
+  private async pinataAdd(bytes: Buffer, fileName: string, purpose: string): Promise<string> {
     const jwt = this.pinataJwt();
     if (!jwt) throw new Error('PINATA_JWT is required.');
 
@@ -148,7 +149,7 @@ export class IpfsArtifactService {
       'pinataMetadata',
       JSON.stringify({
         name: fileName,
-        keyvalues: { app: 'kltn', purpose: 'audit-recovery' },
+        keyvalues: { app: 'kltn', purpose },
       }),
     );
     form.append(
