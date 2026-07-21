@@ -57,7 +57,10 @@ services:
     logging: *default-logging
 
   backend:
-    image: ${BACKEND_IMAGE}
+    image: ${BACKEND_IMAGE:-kltn-backend:prod}
+    build:
+      context: ./backend
+      target: production
     container_name: kltn-backend
     restart: unless-stopped
     env_file:
@@ -66,8 +69,10 @@ services:
       NODE_ENV: production
       PORT: 3001
       APP_VERSION: ${APP_VERSION:-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       KAFKA_ENABLED: "true"
       KAFKA_BROKERS: kafka:9092
+    command: sh -c "npx prisma db push && npm run start:prod"
     depends_on:
       postgres:
         condition: service_healthy
@@ -88,7 +93,12 @@ services:
     logging: *default-logging
 
   frontend:
-    image: ${FRONTEND_IMAGE}
+    image: ${FRONTEND_IMAGE:-kltn-frontend:prod}
+    build:
+      context: ./frontend
+      target: production
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
     container_name: kltn-frontend
     restart: unless-stopped
     depends_on:
