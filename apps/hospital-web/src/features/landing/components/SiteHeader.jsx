@@ -13,11 +13,23 @@ export default function SiteHeader({ onOpenStaffLogin, onSearch }) {
   }, [searchOpen]);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 50);
+    const onScroll = () => setScrolled(window.scrollY > 30);
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  const handleNavClick = (e, href) => {
+    if (href.startsWith('#')) {
+      e.preventDefault();
+      const targetId = href.replace('#', '');
+      const element = document.getElementById(targetId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      setMenuOpen(false);
+    }
+  };
 
   const submitSearch = (event) => {
     event.preventDefault();
@@ -27,142 +39,140 @@ export default function SiteHeader({ onOpenStaffLogin, onSearch }) {
 
   return (
     <header
-      className={`fixed top-0 left-0 z-50 w-full border-b border-[#c3c6d0] bg-[#f7f9fb] transition-shadow duration-200 ${
-        scrolled ? 'editorial-shadow' : ''
+      className={`fixed top-0 left-0 z-50 w-full border-b border-slate-200 bg-white/95 backdrop-blur-md transition-all duration-300 ${
+        scrolled ? 'shadow-md shadow-slate-900/5' : ''
       }`}
     >
       <nav className="mx-auto flex h-20 max-w-[1280px] items-center justify-between px-4 sm:px-6">
-        <a href="#top" className="flex items-center gap-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#001836]">
-          <div className="flex h-10 w-10 items-center justify-center bg-[#001836] text-xl font-bold text-white le-display">
+        {/* Brand Logo */}
+        <a
+          href="#top"
+          onClick={(e) => handleNavClick(e, '#top')}
+          className="flex items-center gap-3 shrink-0 group"
+        >
+          <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-2xl bg-sky-600 text-lg sm:text-xl font-bold text-white shadow-md shadow-sky-600/30 group-hover:bg-sky-700 transition-all le-display">
             K
           </div>
-          <div className="hidden leading-none sm:block">
-            <div className="le-display text-2xl font-bold text-[#001836]">Bệnh Viện KLTN</div>
-            <div className="mt-1 text-xs font-medium uppercase tracking-normal text-[#43474f]">
+          <div className="leading-tight">
+            <div className="le-display text-lg sm:text-xl font-bold text-slate-900 group-hover:text-sky-600 transition-colors whitespace-nowrap">
+              Bệnh Viện KLTN
+            </div>
+            <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-sky-600 whitespace-nowrap">
               International Hospital
             </div>
           </div>
         </a>
 
-        <div className="hidden items-center gap-8 md:flex">
-          {NAV_LINKS.map((link, index) => (
+        {/* Desktop Navigation Links (Single Line, No Wrap) */}
+        <div className="hidden lg:flex items-center gap-4 xl:gap-6 shrink">
+          {NAV_LINKS.map((link) => (
             <a
               key={link.href}
               href={link.href}
-              className={`text-sm font-semibold tracking-normal transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#001836] ${
-                index === 0
-                  ? 'border-b-2 border-[#001836] pb-1 text-[#001836]'
-                  : 'text-[#43474f] hover:text-[#001836]'
-              }`}
+              onClick={(e) => handleNavClick(e, link.href)}
+              className="text-xs font-semibold tracking-wide text-slate-700 hover:text-sky-600 transition-colors whitespace-nowrap px-1 py-1"
             >
               {link.label}
             </a>
           ))}
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-4">
+        {/* Header Right Actions */}
+        <div className="flex items-center gap-2.5 shrink-0">
           <button
             type="button"
             onClick={() => setSearchOpen((v) => !v)}
-            className="p-2 text-[#43474f] transition-colors hover:text-[#001836] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#001836]"
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
             aria-label={searchOpen ? 'Đóng tìm kiếm' : 'Mở tìm kiếm'}
-            aria-expanded={searchOpen}
           >
-            <span className="material-symbols-outlined" aria-hidden="true">search</span>
+            <span className="material-symbols-outlined text-xl">search</span>
           </button>
 
           <a
-            href="#dat-lich"
-            className="le-btn hidden bg-[#001836] px-6 py-3 text-sm font-semibold uppercase tracking-normal text-white transition-colors hover:bg-[#002d5b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#001836] sm:inline-flex"
+            href="tel:19001234"
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-sky-50 px-3.5 py-2 text-xs font-bold text-sky-700 border border-sky-200 hover:bg-sky-100 transition-all whitespace-nowrap"
           >
-            Đặt lịch khám
+            <span className="material-symbols-outlined text-base text-sky-600">call</span>
+            1900 1234
           </a>
 
           <button
             type="button"
             onClick={onOpenStaffLogin}
-            className="hidden items-center gap-2 text-sm font-semibold tracking-normal text-[#43474f] transition-colors hover:text-[#001836] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#001836] lg:flex"
+            className="hidden xl:flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition-all shadow-sm whitespace-nowrap"
             aria-label="Đăng nhập cổng nhân sự"
           >
-            <span className="material-symbols-outlined" aria-hidden="true">login</span>
-            Nhân sự
+            <span className="material-symbols-outlined text-base">login</span>
+            Cổng Nhân sự
           </button>
 
+          {/* Mobile & Tablet Drawer Menu Button */}
           <button
             type="button"
-            className="p-2 text-[#43474f] md:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#001836]"
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-700 hover:bg-slate-100 lg:hidden"
             onClick={() => setMenuOpen((v) => !v)}
             aria-expanded={menuOpen}
-            aria-label={menuOpen ? 'Đóng menu' : 'Mở menu'}
           >
-            <span className="material-symbols-outlined" aria-hidden="true">
+            <span className="material-symbols-outlined text-2xl">
               {menuOpen ? 'close' : 'menu'}
             </span>
           </button>
         </div>
       </nav>
 
+      {/* Search Bar Overlay */}
       {searchOpen && (
-        <div className="border-t border-[#c3c6d0] bg-white">
+        <div className="border-t border-slate-200 bg-white">
           <form
             onSubmit={submitSearch}
             className="mx-auto flex max-w-[1280px] items-center gap-3 px-4 py-3 sm:px-6"
             role="search"
           >
-            <label htmlFor="home-search" className="sr-only">
-              Tìm chuyên khoa hoặc dịch vụ
-            </label>
-            <span className="material-symbols-outlined text-[#43474f]" aria-hidden="true">search</span>
+            <span className="material-symbols-outlined text-slate-400">search</span>
             <input
               ref={inputRef}
               id="home-search"
               name="q"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Chuyên khoa, bác sĩ, dịch vụ…"
+              placeholder="Nhập tên bác sĩ, chuyên khoa hoặc dịch vụ y tế..."
               autoComplete="off"
-              className="h-11 w-full border-0 bg-transparent text-base text-[#191c1e] outline-none placeholder:text-[#737780] focus:ring-0"
+              className="h-10 w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
             />
             <button
               type="submit"
-              className="le-btn border border-[#001836] px-4 py-2 text-xs font-semibold uppercase tracking-normal text-[#001836] hover:bg-[#001836] hover:text-white"
+              className="rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-sky-700"
             >
-              Tìm
+              Tìm kiếm
             </button>
           </form>
         </div>
       )}
 
+      {/* Mobile & Tablet Drawer Menu */}
       {menuOpen && (
-        <div className="border-t border-[#c3c6d0] bg-white px-4 py-4 md:hidden">
-          <nav className="flex flex-col" aria-label="Menu mobile">
+        <div className="border-t border-slate-200 bg-white px-4 py-4 lg:hidden shadow-lg">
+          <nav className="flex flex-col gap-1">
             {NAV_LINKS.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
-                onClick={() => setMenuOpen(false)}
-                className="flex min-h-12 items-center border-b border-[#e0e3e5] text-sm font-semibold tracking-normal text-[#43474f]"
+                onClick={(e) => handleNavClick(e, link.href)}
+                className="flex min-h-11 items-center px-3 text-sm font-bold text-slate-800 rounded-lg hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-none"
               >
                 {link.label}
               </a>
             ))}
-            <a
-              href="#dat-lich"
-              onClick={() => setMenuOpen(false)}
-              className="le-btn mt-4 flex min-h-12 items-center justify-center bg-[#001836] text-sm font-semibold uppercase tracking-normal text-white"
-            >
-              Đặt lịch khám
-            </a>
             <button
               type="button"
               onClick={() => {
                 setMenuOpen(false);
                 onOpenStaffLogin?.();
               }}
-              className="mt-2 flex min-h-12 items-center justify-center gap-2 text-sm font-semibold text-[#43474f]"
+              className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 text-xs font-bold uppercase tracking-wider text-white"
             >
-              <span className="material-symbols-outlined" aria-hidden="true">login</span>
-              Nhân sự
+              <span className="material-symbols-outlined text-base">login</span>
+              Cổng Nhân sự
             </button>
           </nav>
         </div>

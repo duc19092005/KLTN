@@ -9,13 +9,10 @@ import DoctorsSection from '../components/DoctorsSection';
 import FacilitiesSection from '../components/FacilitiesSection';
 import NewsSection from '../components/NewsSection';
 import BookingCtaSection from '../components/BookingCtaSection';
+import SideNavProgress from '../components/SideNavProgress';
 import SiteFooter from '../components/SiteFooter';
 import '../landing.css';
 
-/**
- * Home — full editorial mock rewrite (Libre Caslon + hospital MD tokens).
- * Stack remains Vite + React (not Next.js). Staff login preserved.
- */
 export default function HospitalLandingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const showLogin = searchParams.get('login') === 'true';
@@ -51,11 +48,11 @@ export default function HospitalLandingPage() {
       document.getElementById('chuyen-khoa')?.scrollIntoView({ behavior: 'smooth' });
       return;
     }
-    document.getElementById('dat-lich')?.scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('lien-he')?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
   return (
-    <div className="landing-editorial min-h-screen">
+    <div className="landing-editorial min-h-screen relative">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:border focus:border-[#001836] focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-medium focus:text-[#001836]"
@@ -64,6 +61,9 @@ export default function HospitalLandingPage() {
       </a>
 
       <SiteHeader onOpenStaffLogin={openStaffLogin} onSearch={onSearch} />
+
+      {/* Side Bar Scroll Status & Navigation Indicator */}
+      <SideNavProgress />
 
       <main id="main-content" className="pt-20">
         <HeroSection />

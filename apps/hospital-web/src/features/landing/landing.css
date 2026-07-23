@@ -1,22 +1,23 @@
 /**
- * Landing — editorial hospital UI
- * Fonts chosen for correct Vietnamese diacritics (no broken "Trờ i" gaps).
+ * Landing Editorial — Bright White Theme & Smooth Scroll Engine
  */
 
+html {
+  scroll-behavior: smooth !important;
+}
+
 .landing-editorial {
-  --le-surface: #f7f9fb;
+  --le-surface: #ffffff;
+  --le-surface-soft: #f8fafc;
   --le-white: #ffffff;
-  --le-primary: #001836;
-  --le-primary-container: #002d5b;
-  --le-on-primary: #ffffff;
-  --le-on-surface: #191c1e;
-  --le-on-surface-variant: #43474f;
-  --le-outline-variant: #c3c6d0;
-  --le-surface-low: #f2f4f6;
-  --le-tertiary: #00a4b9;
-  --le-tertiary-fixed: #a1efff;
-  --le-primary-fixed: #d5e3ff;
-  /* Noto Serif has proper Vietnamese precomposed glyphs */
+  --le-primary: #0284c7;
+  --le-primary-dark: #0369a1;
+  --le-navy: #0f172a;
+  --le-on-surface: #0f172a;
+  --le-on-surface-variant: #475569;
+  --le-outline: #e2e8f0;
+  --le-accent-green: #059669;
+
   --le-serif: "Noto Serif", "Times New Roman", serif;
   --le-sans: "Be Vietnam Pro", Inter, system-ui, sans-serif;
 
@@ -25,24 +26,12 @@
   background: var(--le-surface);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-kerning: normal;
-  letter-spacing: normal;
-  word-spacing: normal;
 }
 
 .landing-editorial .le-display {
   font-family: var(--le-serif);
+  letter-spacing: -0.015em;
   font-weight: 600;
-  /* Slightly tight — never positive tracking on Vietnamese display type */
-  letter-spacing: -0.01em;
-  word-spacing: 0;
-  font-kerning: normal;
-  font-feature-settings: "kern" 1, "liga" 1;
-}
-
-/* Mild label tracking only for short uppercase labels — keep small for VI accents */
-.landing-editorial .le-label {
-  letter-spacing: 0.04em;
 }
 
 .landing-editorial .material-symbols-outlined {
@@ -51,55 +40,30 @@
   font-style: normal;
   font-size: 24px;
   line-height: 1;
-  letter-spacing: normal;
-  text-transform: none;
   display: inline-block;
-  white-space: nowrap;
-  word-wrap: normal;
-  direction: ltr;
-  font-variation-settings: "FILL" 0, "wght" 300, "GRAD" 0, "opsz" 24;
   vertical-align: middle;
   -webkit-font-smoothing: antialiased;
-}
-
-.landing-editorial button,
-.landing-editorial input,
-.landing-editorial select,
-.landing-editorial a.le-btn {
-  border-radius: 0.125rem;
-  letter-spacing: normal;
-}
-
-.landing-editorial img {
-  border-radius: 0;
 }
 
 .landing-editorial [id] {
   scroll-margin-top: 6rem;
 }
 
-.landing-editorial .hero-title {
-  width: 100%;
-  max-width: none;
-  line-height: 1.15;
-  letter-spacing: -0.015em;
-  word-spacing: 0;
-  text-wrap: pretty;
+/* Bright Soft Shadows */
+.landing-editorial .card-bright {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.landing-editorial .editorial-shadow {
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.05);
+.landing-editorial .card-bright:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 20px 40px -15px rgba(2, 132, 199, 0.12);
+  transform: translateY(-2px);
 }
 
-.landing-editorial .image-reveal {
-  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.landing-editorial .image-reveal:hover {
-  transform: scale(1.02);
-}
-
-/* ── Scroll reveal ───────────────────────────────────────── */
+/* Smooth Reveal Animations */
 .landing-editorial .reveal {
   opacity: 0;
   transition:
@@ -109,23 +73,15 @@
 }
 
 .landing-editorial .reveal-up {
-  transform: translate3d(0, 36px, 0);
+  transform: translate3d(0, 24px, 0);
 }
 
 .landing-editorial .reveal-left {
-  transform: translate3d(-32px, 0, 0);
-}
-
-.landing-editorial .reveal-right {
-  transform: translate3d(32px, 0, 0);
-}
-
-.landing-editorial .reveal-fade {
-  transform: none;
+  transform: translate3d(-24px, 0, 0);
 }
 
 .landing-editorial .reveal-scale {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 
 .landing-editorial .reveal.is-visible {
@@ -134,12 +90,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .landing-editorial .image-reveal,
-  .landing-editorial .image-reveal:hover {
-    transition: none;
-    transform: none;
+  html {
+    scroll-behavior: auto !important;
   }
-
   .landing-editorial .reveal {
     opacity: 1 !important;
     transform: none !important;
