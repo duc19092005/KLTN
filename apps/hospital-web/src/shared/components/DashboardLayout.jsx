@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LayoutGrid,
@@ -20,6 +20,7 @@ import {
   Search,
   LogOut,
   Trash2,
+  Sparkles,
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import LiveClock from './LiveClock';
@@ -40,8 +41,6 @@ const ROLE_LABELS = {
   LAB_MANAGER: 'Quản lý xét nghiệm',
 };
 
-// Map sidebar item.icon string -> Lucide component. Centralized so callers can keep using the
-// existing string-based API (e.g. `{ icon: 'grid' }`) without importing Lucide directly.
 const ICON_COMPONENTS = {
   grid: LayoutGrid,
   shield: ShieldCheck,
@@ -60,10 +59,10 @@ const ICON_COMPONENTS = {
 
 function SidebarIcon({ name, isActive, compact = false }) {
   const Icon = ICON_COMPONENTS[name] || LayoutGrid;
-  const className = `w-5 h-5 shrink-0 transition-colors duration-300 ${compact ? '' : 'mr-3'} ${
+  const className = `w-4.5 h-4.5 shrink-0 transition-transform duration-300 ${
     isActive
-      ? 'scale-105 text-cyan-600'
-      : 'text-slate-400 group-hover:scale-105 group-hover:text-cyan-500'
+      ? 'scale-110 text-sky-600 font-bold'
+      : 'text-slate-400 group-hover:scale-110 group-hover:text-sky-500'
   }`;
   return <Icon className={className} strokeWidth={isActive ? 2.25 : 1.75} />;
 }
@@ -77,12 +76,26 @@ export default function DashboardLayout({
   children,
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('admin_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebarCollapsed = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('admin_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
   const navigate = useNavigate();
 
-  // Both the avatar icon and the gear go to the shared user page (/profile) for every role, but to
-  // different tabs: the avatar opens personal info, the gear opens the settings/personalization tab.
-  // Using useNavigate directly keeps it self-contained so callers don't each need to wire it up.
   const openProfile = () => {
     setIsSidebarOpen(false);
     navigate('/profile', { state: { tab: 'profile' } });
@@ -92,17 +105,45 @@ export default function DashboardLayout({
     navigate('/profile', { state: { tab: 'personalize' } });
   };
 
+  const filteredNavItems = navItems;
+  const activeIndex = filteredNavItems.findIndex((item) => item.id === activeItem);
+
+  // Persistent index for ultra-smooth sliding animation across route transitions
+  const [sliderIndex, setSliderIndex] = useState(() => {
+    try {
+      const prev = sessionStorage.getItem('admin_nav_prev_index');
+      if (prev !== null && !isNaN(Number(prev))) {
+        return Number(prev);
+      }
+    } catch {}
+    return activeIndex !== -1 ? activeIndex : 0;
+  });
+
+  useEffect(() => {
+    if (activeIndex !== -1) {
+      const raf = requestAnimationFrame(() => {
+        setSliderIndex(activeIndex);
+        try {
+          sessionStorage.setItem('admin_nav_prev_index', String(activeIndex));
+        } catch {}
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [activeIndex]);
+
   const handleNavigate = (id) => {
+    try {
+      sessionStorage.setItem('admin_nav_prev_index', String(activeIndex));
+    } catch {}
     onNavigate?.(id);
     setIsSidebarOpen(false);
   };
 
-  const filteredNavItems = navItems;
-
-  const activeLabel = filteredNavItems.find(item => item.id === activeItem)?.label || 'Tổng quan';
+  const activeLabel = filteredNavItems.find((item) => item.id === activeItem)?.label || 'Tổng quan';
   const roleLabel = ROLE_LABELS[user?.role] || user?.role || 'Quản trị viên';
 
-  const initials = (user?.username || user?.email || 'A')
+  const initials = (user?.fullName || user?.username || user?.email || 'A')
+    .trim()
     .split(/[\s@._-]+/)
     .filter(Boolean)
     .slice(0, 2)
@@ -110,48 +151,63 @@ export default function DashboardLayout({
     .join('') || 'A';
 
   return (
-    <div className="flex h-screen w-full bg-[#F4F7FA] font-sans text-slate-800 overflow-hidden selection:bg-cyan-100 selection:text-cyan-700 antialiased">
-
+    <div className="flex h-screen w-full bg-[#F8FAFC] font-sans text-slate-800 overflow-hidden selection:bg-sky-100 selection:text-sky-700 antialiased">
       {/* OVERLAY FOR MOBILE/TABLET */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 lg:hidden transition-opacity duration-300"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* SIDEBAR */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0
-        transition-colors duration-300 ease-in-out lg:static lg:translate-x-0
-        ${isSidebarCollapsed ? 'lg:w-[92px]' : 'lg:w-[260px]'} w-[260px]
-        ${isSidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full'}
-      `}>
+      <aside
+        className={`
+        fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200/80 flex flex-col justify-between shrink-0
+        transition-all duration-300 ease-in-out lg:static lg:translate-x-0
+        ${isSidebarCollapsed ? 'lg:w-[84px]' : 'lg:w-[260px]'} w-[260px]
+        ${isSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}
+      `}
+      >
         <div className="flex flex-col h-full">
           {/* Brand / Logo Bệnh Viện */}
-          <div className={`h-20 flex items-center border-b border-slate-100 transition-colors duration-300 ${isSidebarCollapsed ? 'lg:justify-center lg:px-0' : 'justify-between px-6'}`}>
+          <div
+            className={`h-20 flex items-center border-b border-slate-100 transition-colors duration-300 ${
+              isSidebarCollapsed ? 'lg:justify-center lg:px-0' : 'justify-between px-6'
+            }`}
+          >
             <div className={`flex items-center min-w-0 ${isSidebarCollapsed ? 'lg:hidden' : ''}`}>
-              <div className="w-9 h-9 bg-cyan-600 text-white font-bold rounded-lg flex items-center justify-center mr-3 shrink-0 shadow-sm">
-                <Plus className="w-5 h-5" strokeWidth={2.5} />
+              <div className="w-10 h-10 bg-sky-600 text-white font-black rounded-2xl flex items-center justify-center mr-3 shrink-0 shadow-md shadow-sky-600/30">
+                K
               </div>
-              <div className={`flex flex-col min-w-0 transition-colors duration-200 ${isSidebarCollapsed ? 'lg:hidden' : ''}`}>
-                <strong className="text-slate-900 text-[15px] font-bold tracking-tight leading-tight">Định danh Y tế</strong>
-                <span className="text-[10px] text-cyan-600 font-bold uppercase tracking-wider mt-0.5">Hệ thống bệnh viện</span>
+              <div className={`flex flex-col min-w-0 ${isSidebarCollapsed ? 'lg:hidden' : ''}`}>
+                <strong className="text-slate-900 text-[15px] font-bold tracking-tight leading-tight whitespace-nowrap">
+                  Bệnh Viện KLTN
+                </strong>
+                <span className="text-[10px] text-sky-600 font-bold uppercase tracking-wider mt-0.5 whitespace-nowrap">
+                  Hệ thống Quản trị
+                </span>
               </div>
             </div>
 
             <button
               id="dashboard-sidebar-collapse-button"
               type="button"
-              className={`hidden lg:flex rounded-xl border border-cyan-100 bg-cyan-50 text-cyan-600 hover:bg-cyan-600 hover:text-white transition-colors duration-200 ${isSidebarCollapsed ? 'h-9 w-9 items-center justify-center' : 'p-1.5'}`}
-              onClick={() => setIsSidebarCollapsed((value) => !value)}
+              className={`hidden lg:flex rounded-xl border border-slate-200/80 bg-slate-50 text-slate-500 hover:bg-sky-600 hover:text-white hover:border-sky-600 transition-all duration-200 ${
+                isSidebarCollapsed ? 'h-9 w-9 items-center justify-center' : 'p-1.5'
+              }`}
+              onClick={toggleSidebarCollapsed}
               title={isSidebarCollapsed ? 'Mở rộng thanh điều hướng' : 'Thu gọn thanh điều hướng'}
               aria-label={isSidebarCollapsed ? 'Mở rộng thanh điều hướng' : 'Thu gọn thanh điều hướng'}
             >
-              <ChevronLeft className={`w-5 h-5 transition-transform duration-300 ${isSidebarCollapsed ? 'rotate-180' : ''}`} strokeWidth={2} />
+              <ChevronLeft
+                className={`w-4.5 h-4.5 transition-transform duration-300 ${
+                  isSidebarCollapsed ? 'rotate-180' : ''
+                }`}
+                strokeWidth={2}
+              />
             </button>
 
-            {/* Close Button on Mobile */}
             <button
               type="button"
               className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-600"
@@ -161,43 +217,62 @@ export default function DashboardLayout({
             </button>
           </div>
 
-          {/* Navigation Items */}
-          <nav className={`flex-1 overflow-y-auto py-6 space-y-1 transition-colors duration-300 ${isSidebarCollapsed ? 'lg:px-4' : 'px-3'}`} aria-label="Điều hướng bảng làm việc">
+          {/* Navigation Items with Cross-Route Liquid-Smooth Sliding Active Background Frame */}
+          <nav
+            className="relative flex-1 overflow-y-auto py-5 px-3 transition-all duration-300"
+            aria-label="Điều hướng bảng làm việc"
+          >
+            {/* Liquid-Smooth Sliding Active Background Frame */}
+            {activeIndex !== -1 && (
+              <div
+                className="absolute top-5 left-3 right-3 h-11 bg-sky-50/90 border border-sky-200/90 rounded-xl shadow-[0_2px_12px_-2px_rgba(2,132,199,0.18)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none"
+                style={{
+                  transform: `translateY(${sliderIndex * 50}px)`,
+                }}
+              />
+            )}
+
             {filteredNavItems.map((item) => {
               const isActive = activeItem === item.id;
               return (
                 <button
                   key={item.id}
                   type="button"
-                  className={`group relative w-full flex items-center rounded-xl text-[14px] font-medium transition-colors duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-cyan-400
-                    ${isSidebarCollapsed ? 'lg:justify-center lg:px-0 lg:py-3' : 'px-4 py-2.5'}
-                    ${isActive
-                      ? 'bg-cyan-50/80 text-cyan-700 font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]'
-                      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                  className={`group relative z-10 w-full h-11 mb-1.5 flex items-center px-3.5 rounded-xl text-[13.5px] font-bold transition-all duration-300 outline-none focus-visible:ring-2 focus-visible:ring-sky-400
+                    ${isSidebarCollapsed ? 'lg:justify-center lg:px-0' : 'gap-3'}
+                    ${
+                      isActive
+                        ? 'text-sky-800 font-extrabold'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   onClick={() => handleNavigate(item.id)}
                 >
-                  {/* Thanh sọc xanh nhỏ bên mép trái khi active */}
-                  {isActive && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-cyan-600 rounded-r-full" />
-                  )}
                   <SidebarIcon name={item.icon} isActive={isActive} compact={isSidebarCollapsed} />
-                  <span className={`truncate transition-colors duration-200 ${isSidebarCollapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
+                  <span
+                    className={`truncate transition-colors duration-200 ${
+                      isSidebarCollapsed ? 'lg:hidden' : ''
+                    }`}
+                  >
+                    {item.label}
+                  </span>
                 </button>
               );
             })}
           </nav>
 
-
-          {/* Profile + Settings (đáy sidebar). Avatar mở thông tin cá nhân, bánh răng mở cài đặt. */}
-          <div className={`p-4 border-t border-slate-100 mt-3 flex items-center gap-2 ${isSidebarCollapsed ? 'lg:flex-col lg:justify-center' : 'justify-center'}`}>
+          {/* Bottom Profile & Settings */}
+          <div
+            className={`p-4 border-t border-slate-100 mt-2 flex items-center gap-2 ${
+              isSidebarCollapsed ? 'lg:flex-col lg:justify-center' : 'justify-center'
+            }`}
+          >
             <button
               id="sidebar-profile-button"
               type="button"
               onClick={openProfile}
               title="Thông tin cá nhân"
               aria-label="Thông tin cá nhân"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-50 text-cyan-600 border border-cyan-100 text-sm font-bold shadow-sm hover:bg-cyan-600 hover:text-white transition-colors"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 text-sky-700 border border-sky-200 text-xs font-black shadow-xs hover:bg-sky-600 hover:text-white transition-all"
             >
               {initials}
             </button>
@@ -207,7 +282,7 @@ export default function DashboardLayout({
               onClick={openSettings}
               title="Cài đặt"
               aria-label="Cài đặt người dùng"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 border border-transparent hover:border-cyan-100 transition-colors"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-slate-400 hover:text-sky-600 hover:bg-sky-50 border border-transparent hover:border-sky-100 transition-all"
             >
               <Settings className="w-5 h-5" strokeWidth={2} />
             </button>
@@ -215,70 +290,63 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {/* MAIN CONTENT AREA */}
-      <div className="flex-1 flex flex-col min-w-0 relative overflow-hidden transition-colors duration-300">
-
+      {/* MAIN CONTENT AREA WITH ULTRA-SMOOTH PAGE ENTER ANIMATION */}
+      <div className="flex-1 flex flex-col min-w-0 relative overflow-hidden transition-all duration-300">
         {/* TOPBAR */}
-        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-30 shrink-0">
-
+        <header className="h-20 bg-white/95 border-b border-slate-200/80 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-30 shrink-0 backdrop-blur-md">
           <div className="flex items-center gap-4">
-            {/* Hamburger Button (Mobile/Tablet) */}
             <button
               type="button"
-              className="lg:hidden p-2 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-cyan-600 border border-slate-200 transition-colors"
+              className="lg:hidden p-2 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-sky-600 border border-slate-200 transition-colors"
               onClick={() => setIsSidebarOpen(true)}
               aria-label="Mở thanh điều hướng"
             >
               <Menu className="w-5 h-5" strokeWidth={2} />
             </button>
 
-            {/* Dynamic Page Titles */}
             <div className="min-w-0">
-              <p className="hidden sm:block text-[10px] font-bold text-cyan-600 uppercase tracking-widest mb-0.5">Hệ thống định danh bệnh viện</p>
-              <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight truncate">{activeLabel}</h1>
+              <p className="hidden sm:block text-[10px] font-bold text-sky-600 uppercase tracking-widest mb-0.5">
+                Bệnh Viện Đa Khoa KLTN
+              </p>
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight truncate">
+                {activeLabel}
+              </h1>
             </div>
           </div>
 
           {/* Right Actions */}
           <div className="flex items-center gap-3 sm:gap-4">
-
-            {/* Search (Ẩn hẳn trên Mobile) */}
             <div className="relative hidden md:flex items-center">
               <Search className="w-4 h-4 absolute left-3.5 text-slate-400" strokeWidth={2} />
               <input
                 type="text"
                 placeholder="Tra cứu nhanh..."
-                className="pl-10 pr-4 py-1.5 bg-slate-50 border border-slate-200 text-sm rounded-lg focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-colors outline-none w-48 lg:w-60 text-slate-700 placeholder-slate-400"
+                className="pl-10 pr-4 py-1.5 bg-slate-50 border border-slate-200 text-xs font-semibold rounded-xl focus:bg-white focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition-colors outline-none w-48 lg:w-60 text-slate-700 placeholder-slate-400"
               />
             </div>
 
-
             <div className="h-5 w-[1px] bg-slate-200 hidden md:block"></div>
 
-            {/* Live clock */}
             <div className="hidden sm:flex">
               <LiveClock />
             </div>
 
-
-            {/* Notifications */}
             <NotificationBell />
 
-
-            {/* Profile Info */}
             <div className="flex items-center gap-2.5">
               <div className="text-right hidden sm:block">
-                <strong className="block text-xs font-bold text-slate-900 leading-tight">{user?.username || 'Bác sĩ trực'}</strong>
-                <span className="text-[11px] text-cyan-600 font-semibold">{roleLabel}</span>
+                <strong className="block text-xs font-bold text-slate-900 leading-tight">
+                  {user?.fullName || user?.username || 'Bác sĩ trực'}
+                </strong>
+                <span className="text-[11px] text-sky-600 font-semibold">{roleLabel}</span>
               </div>
-              <div className="w-9 h-9 rounded-full bg-cyan-50 text-cyan-600 border border-cyan-100 flex items-center justify-center text-xs font-bold shadow-sm">
+              <div className="w-9 h-9 rounded-full bg-sky-100 text-sky-700 border border-sky-200 flex items-center justify-center text-xs font-bold shadow-xs">
                 {initials}
               </div>
             </div>
 
             <div className="h-5 w-[1px] bg-slate-200"></div>
 
-            {/* Logout Button */}
             <button
               id="dashboard-logout-button"
               type="button"
@@ -291,11 +359,12 @@ export default function DashboardLayout({
           </div>
         </header>
 
-        {/* PAGE CONTENT */}
+        {/* PAGE CONTENT WITH ULTRA-SMOOTH TAB CHANGE ANIMATION */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-[#F8FAFC] scroll-smooth">
-          {children}
+          <div key={activeItem} className="animate-tab-smooth">
+            {children}
+          </div>
         </main>
-
       </div>
     </div>
   );
