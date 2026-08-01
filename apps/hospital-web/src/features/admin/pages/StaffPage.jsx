@@ -10,13 +10,13 @@ import { staffService } from '../apis/staffService';
 import StaffDetailModal from '../components/StaffDetailModal';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { Calendar, ExternalLink, MapPin, Search, Trash2, X } from 'lucide-react';
+import { Calendar, ExternalLink, MapPin, Search, Trash2, X, Plus, Filter, Users, UserCheck } from 'lucide-react';
 
 const emptyStaff = { username: '', email: '', fullName: '', avatarUrl: '', departmentId: '', phone: '', gender: '', citizenId: '', birthDate: '', address: '', position: '', role: 'LAB_MANAGER' };
-const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100', INACTIVE: 'bg-rose-50 text-rose-700 border-rose-100', PENDING: 'bg-amber-50 text-amber-700 border-amber-100' };
+const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200/80', INACTIVE: 'bg-rose-50 text-rose-700 border-rose-200/80', PENDING: 'bg-amber-50 text-amber-700 border-amber-200/80' };
 const statusLabel = { ACTIVE: 'Đang hoạt động', INACTIVE: 'Ngưng hoạt động', PENDING: 'Chờ kích hoạt' };
 const ROLE_LABEL = { RECEPTIONIST: 'Lễ tân', LAB_MANAGER: 'KTV cận lâm sàng', ADMIN: 'Quản trị viên' };
-const ROLE_TONE = { RECEPTIONIST: 'bg-cyan-50 text-cyan-700 border-cyan-100', LAB_MANAGER: 'bg-cyan-50 text-cyan-700 border-cyan-100', ADMIN: 'bg-slate-100 text-slate-700 border-slate-200' };
+const ROLE_TONE = { RECEPTIONIST: 'bg-sky-50 text-sky-700 border-sky-200/80', LAB_MANAGER: 'bg-indigo-50 text-indigo-700 border-indigo-200/80', ADMIN: 'bg-slate-100 text-slate-700 border-slate-200' };
 const OSM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
 const MIN_BIRTH_YEAR = 1900;
 const VN_PHONE_REGEX = /^(0)(3[2-9]|5[2689]|7[06-9]|8[1-689]|9[0-46-9])\d{7}$/;
@@ -28,6 +28,7 @@ const MAX_FULL_NAME_LENGTH = 80;
 const MAX_USERNAME_LENGTH = 30;
 const MAX_POSITION_LENGTH = 80;
 const MAX_ADDRESS_LENGTH = 255;
+
 function getError(err) { return err?.response?.data?.message || err.message || 'Thao tác thất bại'; }
 function buildGoogleMapsDirectionsUrl(lat, lng) { return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`; }
 function buildAddressQueries(query) {
@@ -255,9 +256,9 @@ export default function StaffPage() {
 
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="staff" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
-      <div className="max-w-[1600px] mx-auto space-y-6">
-        <Hero onCreate={openCreate} onTrash={() => navigate('/admin/staff/trash')} />
-        {loading ? <LoadingIndicator size="lg" label="Đang tải nhân sự..." /> : (
+      <div className="max-w-[1600px] mx-auto space-y-6 pb-10">
+        <Hero onCreate={openCreate} onTrash={() => navigate('/admin/staff/trash')} total={pagination.total} />
+        {loading ? <LoadingIndicator size="lg" label="Đang tải danh sách nhân sự..." /> : (
           <>
             <StaffSearch filters={filters} setFilters={setFilters} onSearch={search} onReset={resetFilters} departments={departments} />
             <StaffList staffs={staffs} totalLabel={totalLabel} onEdit={openEdit} onToggleStatus={toggleStatus} onRemove={removeStaff} onViewDetails={setDetailStaffId} busy={busy} pagination={pagination} onPageChange={load} />
@@ -269,11 +270,49 @@ export default function StaffPage() {
     </DashboardLayout>
   );
 }
-function Hero({ onCreate, onTrash }) { return <div className="flex justify-end gap-2"><button type="button" title="Nhân sự đã xóa" onClick={onTrash} className="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600"><Trash2 size={18} /></button><button onClick={onCreate} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ Thêm nhân sự</button></div>; }
+
+function Hero({ onCreate, onTrash, total }) {
+  return (
+    <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-8 shadow-sm">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 border border-indigo-200/60">
+              Quản lý Nhân viên ({total} hồ sơ)
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            Danh sách Nhân sự Bệnh viện
+          </h1>
+          <p className="text-sm font-medium text-slate-500">
+            Quản lý hồ sơ nhân viên, lễ tân, kỹ thuật viên cận lâm sàng và phân quyền vận hành.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            title="Nhân sự đã xóa"
+            onClick={onTrash}
+            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all shadow-xs"
+          >
+            <Trash2 size={18} strokeWidth={2} />
+          </button>
+          <button
+            onClick={onCreate}
+            className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-sky-700 transition-all"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Thêm nhân sự mới
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const ROLE_OPTIONS = [{ value: 'RECEPTIONIST', label: 'Lễ tân' }, { value: 'LAB_MANAGER', label: 'Kỹ thuật viên cận lâm sàng' }];
 
-// Remove empty/falsey filter values so we never send blank `departmentId` (the backend
-// validates it as a UUID and would 400 on an empty string) or `isManager=false`.
 function cleanFilters(filters) {
   const out = {};
   if (filters.fullName?.trim()) out.fullName = filters.fullName.trim();
@@ -289,54 +328,78 @@ function cleanFilters(filters) {
 function StaffSearch({ filters, setFilters, onSearch, onReset, departments }) {
   const activeCount = [filters.fullName, filters.employeeCode, filters.citizenId, filters.departmentId, filters.role, filters.status, filters.isManager].filter(Boolean).length;
   return (
-    <form onSubmit={onSearch} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+    <form onSubmit={onSearch} className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm">
       <div className="mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600"><Search className="h-4 w-4" strokeWidth={2.5} /></span>
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-50 text-sky-600 border border-sky-100">
+            <Filter className="h-5 w-5" strokeWidth={2} />
+          </span>
           <div>
-            <p className="text-sm font-black text-slate-800">Bộ lọc nhân sự</p>
-            <p className="text-xs font-semibold text-slate-400">{activeCount > 0 ? `${activeCount} bộ lọc đang áp dụng` : 'Tìm theo hồ sơ, phòng ban, vai trò và trạng thái.'}</p>
+            <p className="text-base font-bold text-slate-900">Bộ lọc nhân sự</p>
+            <p className="text-xs font-medium text-slate-400">{activeCount > 0 ? `${activeCount} bộ lọc đang áp dụng` : 'Tìm theo hồ sơ, phòng ban, vai trò và trạng thái.'}</p>
           </div>
         </div>
-        {activeCount > 0 && <button type="button" onClick={onReset} className="inline-flex w-fit items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-500 hover:bg-slate-50"><X className="h-3.5 w-3.5" /> Xóa lọc</button>}
+        {activeCount > 0 && <button type="button" onClick={onReset} className="inline-flex items-center gap-1 rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all"><X className="h-3.5 w-3.5" /> Xóa lọc</button>}
       </div>
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.2fr_1fr_1.15fr_1fr_1fr_150px] lg:items-end">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_1fr_1.15fr_1fr_1fr_140px] lg:items-end">
         <FilterInput label="Họ tên / Mã NV" value={filters.fullName} onChange={(v) => setFilters({ ...filters, fullName: v })} placeholder="Nhập tên hoặc mã NV..." />
         <FilterInput label="CCCD/CMND" value={filters.citizenId} onChange={(v) => setFilters({ ...filters, citizenId: v })} placeholder="Số căn cước..." />
         <Select label="Phòng ban" value={filters.departmentId} onChange={(v) => setFilters({ ...filters, departmentId: v })} options={departments.map((d) => ({ value: d.id, label: `${d.departmentCode} · ${d.name}` }))} empty="Tất cả phòng ban" />
         <Select label="Vai trò" value={filters.role} onChange={(v) => setFilters({ ...filters, role: v })} options={ROLE_OPTIONS} empty="Tất cả vai trò" />
         <Select label="Ẩn / hiện" value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })} options={[{ value: 'ACTIVE', label: 'Đang hiện' }, { value: 'INACTIVE', label: 'Đã ẩn' }]} empty="Tất cả trạng thái" />
-        <div className="space-y-1.5"><span className="block text-xs font-black text-transparent">Tìm kiếm</span><button className="inline-flex h-[42px] w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 px-5 text-sm font-black text-white shadow-sm hover:bg-cyan-700 whitespace-nowrap"><Search className="h-4 w-4" strokeWidth={2.5} /> Tìm kiếm</button></div>
+        <div className="space-y-1.5"><span className="block text-xs font-bold text-transparent">Tìm kiếm</span><button className="inline-flex h-[42px] w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 text-xs font-bold text-white shadow-xs hover:bg-sky-700 whitespace-nowrap"><Search className="h-4 w-4" strokeWidth={2.5} /> Tìm kiếm</button></div>
       </div>
-      <label className="mt-3 inline-flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">
-        <input type="checkbox" checked={filters.isManager} onChange={(e) => setFilters({ ...filters, isManager: e.target.checked })} className="h-4 w-4 rounded accent-cyan-600" />
-        <span className="text-sm font-bold text-slate-700">Chỉ hiện trưởng phòng / trưởng khoa</span>
+      <label className="mt-4 inline-flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 py-2.5">
+        <input type="checkbox" checked={filters.isManager} onChange={(e) => setFilters({ ...filters, isManager: e.target.checked })} className="h-4 w-4 rounded accent-sky-600" />
+        <span className="text-xs font-bold text-slate-700">Chỉ hiện trưởng phòng / trưởng khoa</span>
       </label>
     </form>
   );
 }
-function FilterInput({ label, value, onChange, placeholder }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><input value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-[42px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100 outline-none" /></label>; }
-function StaffList({ staffs, totalLabel, onEdit, onToggleStatus, onRemove, onViewDetails, busy, pagination, onPageChange }) { return <section className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden"><div className="p-5 border-b border-slate-100 flex items-center justify-between"><div><h3 className="text-xl font-black text-slate-950">Danh sách nhân sự</h3></div><span className="rounded-xl bg-slate-50 px-3 py-1 text-xs font-black text-slate-600 border border-slate-100">{totalLabel}</span></div><div className="divide-y divide-slate-100">{staffs.map((staff) => <StaffRow key={staff.id} staff={staff} onEdit={onEdit} onToggleStatus={onToggleStatus} onRemove={onRemove} onViewDetails={onViewDetails} busy={busy} />)}{!staffs.length && <div className="p-6"><Empty title="Không có nhân sự" desc="Thử đổi bộ lọc hoặc tạo nhân sự mới." /></div>}</div><Pagination pagination={pagination} onPageChange={onPageChange} /></section>; }
+
+function FilterInput({ label, value, onChange, placeholder }) { return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}</span><input value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-[42px] w-full rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 text-xs font-semibold focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 outline-none" /></label>; }
+
+function StaffList({ staffs, totalLabel, onEdit, onToggleStatus, onRemove, onViewDetails, busy, pagination, onPageChange }) {
+  return (
+    <section className="rounded-3xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+      <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Users className="h-5 w-5 text-sky-600" strokeWidth={2} />
+          <h3 className="text-lg font-bold text-slate-900">Danh sách nhân sự</h3>
+        </div>
+        <span className="rounded-xl bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-600 border border-slate-200/80">{totalLabel}</span>
+      </div>
+      <div className="divide-y divide-slate-100">
+        {staffs.map((staff) => (
+          <StaffRow key={staff.id} staff={staff} onEdit={onEdit} onToggleStatus={onToggleStatus} onRemove={onRemove} onViewDetails={onViewDetails} busy={busy} />
+        ))}
+        {!staffs.length && <div className="p-8"><Empty title="Không có nhân sự" desc="Thử đổi bộ lọc hoặc tạo nhân sự mới." /></div>}
+      </div>
+      <Pagination pagination={pagination} onPageChange={onPageChange} />
+    </section>
+  );
+}
+
 function StaffRow({ staff, onEdit, onToggleStatus, onRemove, onViewDetails, busy }) {
   return (
-    <article className="p-5 hover:bg-slate-50/70">
-      <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr_0.8fr_0.7fr_0.8fr_190px] gap-4 xl:items-center">
-        <div className="flex items-center gap-3">
-          <img src={staff.avatarUrl} alt={staff.fullName} className="w-11 h-11 rounded-2xl object-cover border border-cyan-100 bg-cyan-50" />
+    <article className="p-6 hover:bg-slate-50/80 transition-all">
+      <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr_0.8fr_0.7fr_0.8fr_200px] gap-4 xl:items-center">
+        <div className="flex items-center gap-3.5">
+          <img src={staff.avatarUrl} alt={staff.fullName} className="w-12 h-12 rounded-2xl object-cover border border-sky-100 bg-sky-50 shadow-xs" />
           <div className="min-w-0">
-            <strong className="block text-slate-950 truncate">{staff.fullName}</strong>
-            <span className="text-xs text-slate-500 truncate block">{staff.user?.email}</span>
+            <strong className="block text-slate-900 font-bold truncate text-sm">{staff.fullName}</strong>
+            <span className="text-xs font-medium text-slate-400 truncate block">{staff.user?.email}</span>
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              <span className={`px-2 py-0.5 rounded-md border text-[10px] font-black ${ROLE_TONE[staff.user?.role] || ROLE_TONE.ADMIN}`}>{ROLE_LABEL[staff.user?.role] || staff.user?.role || 'N/A'}</span>
-              {staff.managedDepartment && <span className="px-2 py-0.5 rounded-md border border-amber-200 bg-amber-50 text-amber-700 text-[10px] font-black">★ Trưởng {staff.managedDepartment.name}</span>}
+              <span className={`px-2 py-0.5 rounded-md border text-[10px] font-bold ${ROLE_TONE[staff.user?.role] || ROLE_TONE.ADMIN}`}>{ROLE_LABEL[staff.user?.role] || staff.user?.role || 'N/A'}</span>
+              {staff.managedDepartment && <span className="px-2 py-0.5 rounded-md border border-amber-200 bg-amber-50 text-amber-700 text-[10px] font-bold">★ Trưởng {staff.managedDepartment.name}</span>}
             </div>
           </div>
         </div>
         <Info label="Phòng ban" value={staff.department?.name || 'Chưa gán'} />
         <Info label="Mã NV" value={staff.employeeCode} mono />
-        <span className={`w-fit px-2.5 py-1 rounded-lg border text-xs font-black ${statusTone[staff.user?.status] || statusTone.ACTIVE}`}>{statusLabel[staff.user?.status] || 'Không rõ'}</span>
+        <span className={`w-fit px-2.5 py-1 rounded-lg border text-xs font-bold ${statusTone[staff.user?.status] || statusTone.ACTIVE}`}>{statusLabel[staff.user?.status] || 'Không rõ'}</span>
         <div>
-          <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Trạng thái dữ liệu</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Trạng thái dữ liệu</p>
           <BlockchainStatusBadge status={staff.blockchainStatus} size="xs" />
         </div>
         <div className="flex flex-wrap gap-2 xl:justify-end">
@@ -349,6 +412,7 @@ function StaffRow({ staff, onEdit, onToggleStatus, onRemove, onViewDetails, busy
     </article>
   );
 }
+
 function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editingStaff }) {
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [addressLoading, setAddressLoading] = useState(false);
@@ -481,12 +545,12 @@ function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editi
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
-      <form onSubmit={handleSubmit} noValidate className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-5">
+      <form onSubmit={handleSubmit} noValidate className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-2xl font-black text-slate-950">{editingStaff ? 'Chỉnh sửa nhân sự' : 'Thêm nhân sự'}</h3>
+            <h3 className="text-2xl font-bold text-slate-900">{editingStaff ? 'Chỉnh sửa nhân sự' : 'Thêm nhân sự'}</h3>
           </div>
-          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500">Đóng</button>
+          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50">Đóng</button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Select label="Loại nhân sự" value={form.role} onChange={(v) => setForm({ ...form, role: v })} options={[{ value: 'RECEPTIONIST', label: 'Lễ tân' }, { value: 'LAB_MANAGER', label: 'Kỹ thuật viên cận lâm sàng' }]} required disabled={Boolean(editingStaff)} />
@@ -499,7 +563,7 @@ function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editi
           <DateInput label="Ngày sinh" value={form.birthDate} onChange={(v) => setForm({ ...form, birthDate: v })} onBlur={(nextValue) => validateField('birthDate', nextValue)} error={fieldErrors.birthDate} required />
           <Select label="Giới tính" value={form.gender} onChange={(v) => setForm({ ...form, gender: v })} options={['Nam', 'Nữ']} empty="Chọn giới tính" required />
           <Select label="Phòng ban" value={form.departmentId} onChange={(v) => setForm({ ...form, departmentId: v })} options={departmentOptions} empty="Chưa gán phòng ban" />
-          <Input label="Chức danh" value={form.position} onChange={(v) => setForm({ ...form, position: limitPosition(v) })} onBlur={() => validateField('position')} error={fieldErrors.position} placeholder="Lễ tân, KTV xét nghiệm, KTV chẩn đoán hình ảnh..." maxLength={MAX_POSITION_LENGTH} required />
+          <Input label="Chức danh" value={form.position} onChange={(v) => setForm({ ...form, position: limitPosition(v) })} onBlur={() => validateField('position')} error={fieldErrors.position} placeholder="Lễ tân, KTV xét nghiệm..." maxLength={MAX_POSITION_LENGTH} required />
           <AddressInput
             label="Địa chỉ"
             value={form.address}
@@ -518,7 +582,7 @@ function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editi
             onSelect={selectAddress}
           />
         </div>
-        <button disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 disabled:opacity-70">
+        <button disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-sky-700 disabled:opacity-70">
           {busy && <LoadingIndicator size="sm" tone="white" />}{editingStaff ? 'Lưu thay đổi' : 'Tạo nhân sự'}
         </button>
       </form>
@@ -526,11 +590,32 @@ function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editi
   );
 }
 
-function Pagination({ pagination, onPageChange }) { return <div className="flex items-center justify-between border-t border-slate-100 p-4"><p className="text-sm font-semibold text-slate-500">Trang {pagination.page}/{pagination.totalPages}</p><div className="flex gap-2"><SmallButton disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>Trước</SmallButton><SmallButton disabled={pagination.page >= pagination.totalPages} onClick={() => onPageChange(pagination.page + 1)}>Sau</SmallButton></div></div>; }
-function Info({ label, value, mono }) { return <div><p className="text-[11px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className={`text-sm text-slate-700 ${mono ? 'font-mono' : 'font-bold'}`}>{value}</p></div>; }
-function Empty({ title, desc }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><strong>{title}</strong><p className="mt-1 text-sm text-slate-500">{desc}</p></div>; }
-function SmallButton({ children, onClick, disabled, danger }) { return <button type="button" disabled={disabled} onClick={onClick} className={`rounded-xl border px-3 py-2 text-xs font-black disabled:opacity-50 ${danger ? 'border-rose-100 bg-rose-50 text-rose-600 hover:bg-rose-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-cyan-50 hover:text-cyan-600'}`}>{children}</button>; }
-function Input({ label, value, onChange, onBlur, error, required, placeholder, type = 'text', inputMode, maxLength, pattern, disabled = false }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><input type={type} required={required} disabled={disabled} value={value || ''} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder} inputMode={inputMode} maxLength={maxLength} pattern={pattern} min={type === 'number' ? '0' : undefined} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none disabled:cursor-not-allowed disabled:opacity-60 ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} /><p className={`min-h-[16px] text-xs font-semibold leading-4 ${error ? 'text-rose-600' : 'text-transparent'}`}>{error || 'Không có lỗi'}</p></label>; }
+function Pagination({ pagination, onPageChange }) {
+  return (
+    <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
+      <p className="text-xs font-bold text-slate-500">Trang {pagination.page}/{pagination.totalPages}</p>
+      <div className="flex gap-2">
+        <SmallButton disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>Trang trước</SmallButton>
+        <SmallButton disabled={pagination.page >= pagination.totalPages} onClick={() => onPageChange(pagination.page + 1)}>Trang sau</SmallButton>
+      </div>
+    </div>
+  );
+}
+
+function Info({ label, value, mono }) { return <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</p><p className={`text-xs text-slate-800 ${mono ? 'font-mono' : 'font-bold'}`}>{value}</p></div>; }
+function Empty({ title, desc }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><strong className="text-sm font-bold text-slate-800">{title}</strong><p className="mt-1 text-xs text-slate-400">{desc}</p></div>; }
+function SmallButton({ children, onClick, disabled, danger }) { return <button type="button" disabled={disabled} onClick={onClick} className={`rounded-xl border px-3 py-2 text-xs font-bold transition-all disabled:opacity-50 ${danger ? 'border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-sky-50 hover:text-sky-600 hover:border-sky-200'}`}>{children}</button>; }
+
+function Input({ label, value, onChange, onBlur, error, required, placeholder, type = 'text', inputMode, maxLength, pattern, disabled = false }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-xs font-bold text-slate-700">{label}</span>
+      <input type={type} required={required} disabled={disabled} value={value || ''} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder} inputMode={inputMode} maxLength={maxLength} pattern={pattern} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 outline-none disabled:cursor-not-allowed disabled:opacity-60 transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`} />
+      <p className={`min-h-[14px] text-[11px] font-bold leading-3 ${error ? 'text-rose-600' : 'text-transparent'}`}>{error || 'Lỗi'}</p>
+    </label>
+  );
+}
+
 function DateInput({ label, value, onChange, onBlur, error, required }) {
   const pickerRef = useRef(null);
   const openPicker = () => {
@@ -549,7 +634,7 @@ function DateInput({ label, value, onChange, onBlur, error, required }) {
 
   return (
     <label className="block space-y-1.5">
-      <span className="text-[13px] font-bold text-slate-700">{label}</span>
+      <span className="text-xs font-bold text-slate-700">{label}</span>
       <div className="relative">
         <input
           type="text"
@@ -560,9 +645,9 @@ function DateInput({ label, value, onChange, onBlur, error, required }) {
           placeholder="dd/mm/yyyy"
           inputMode="numeric"
           maxLength={10}
-          className={`w-full px-3.5 py-2.5 pr-10 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`}
+          className={`w-full px-3.5 py-2.5 pr-10 bg-slate-50 border rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 outline-none transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`}
         />
-        <button type="button" onClick={openPicker} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-500 hover:bg-cyan-50 hover:text-cyan-600" title="Chọn ngày sinh">
+        <button type="button" onClick={openPicker} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 hover:bg-sky-50 hover:text-sky-600" title="Chọn ngày sinh">
           <Calendar className="h-4 w-4" />
         </button>
         <input
@@ -576,37 +661,45 @@ function DateInput({ label, value, onChange, onBlur, error, required }) {
           tabIndex={-1}
         />
       </div>
-      <p className={`min-h-[16px] text-xs font-semibold leading-4 ${error ? 'text-rose-600' : 'text-transparent'}`}>{error || 'Không có lỗi'}</p>
+      <p className={`min-h-[14px] text-[11px] font-bold leading-3 ${error ? 'text-rose-600' : 'text-transparent'}`}>{error || 'Lỗi'}</p>
     </label>
   );
 }
+
 function AddressInput({ label, value, onChange, onBlur, onFocus, error, maxLength, suggestions, loading, searched, open, onSelect }) {
   return (
     <label className="relative block space-y-1.5">
-      <span className="text-[13px] font-bold text-slate-700">{label}</span>
+      <span className="text-xs font-bold text-slate-700">{label}</span>
       <div className="relative">
-        <input value={value || ''} onChange={(e) => onChange(e.target.value)} onFocus={onFocus} onBlur={onBlur} placeholder="Nhập địa chỉ để gợi ý..." title={value || ''} required maxLength={maxLength} className={`w-full px-3.5 py-2.5 pr-10 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} />
+        <input value={value || ''} onChange={(e) => onChange(e.target.value)} onFocus={onFocus} onBlur={onBlur} placeholder="Nhập địa chỉ để gợi ý..." title={value || ''} required maxLength={maxLength} className={`w-full px-3.5 py-2.5 pr-10 bg-slate-50 border rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 outline-none transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`} />
         <MapPin className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
       </div>
       {open && (loading || searched || suggestions.length > 0) && (
         <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl">
-          {loading && <p className="px-3.5 py-3 text-sm font-semibold text-slate-500">Đang tìm địa chỉ...</p>}
-          {!loading && searched && suggestions.length === 0 && <p className="px-3.5 py-3 text-sm font-semibold text-slate-500">Chưa tìm thấy trên OpenStreetMap. Thử nhập thêm phường/quận/thành phố.</p>}
+          {loading && <p className="px-3.5 py-3 text-xs font-semibold text-slate-500">Đang tìm địa chỉ...</p>}
+          {!loading && searched && suggestions.length === 0 && <p className="px-3.5 py-3 text-xs font-semibold text-slate-500">Chưa tìm thấy địa chỉ. Thử nhập thêm chi tiết.</p>}
           {!loading && suggestions.map((item) => (
-            <div key={item.place_id} className="flex items-start gap-2 border-b border-slate-100 p-2.5 last:border-b-0 hover:bg-cyan-50/60">
+            <div key={item.place_id} className="flex items-start gap-2 border-b border-slate-100 p-2.5 last:border-b-0 hover:bg-sky-50/60">
               <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => onSelect(item)} className="min-w-0 flex-1 text-left">
-                <span className="block text-sm font-bold leading-5 text-slate-800 line-clamp-2" title={item.displayName || item.display_name}>{item.displayName || item.display_name}</span>
-                <span className="mt-1 block text-xs font-semibold text-slate-400">{item.lat}, {item.lon}</span>
+                <span className="block text-xs font-bold leading-5 text-slate-800 line-clamp-2" title={item.displayName || item.display_name}>{item.displayName || item.display_name}</span>
               </button>
-              <a href={buildGoogleMapsDirectionsUrl(item.lat, item.lon)} target="_blank" rel="noreferrer" className="rounded-xl border border-cyan-100 bg-white p-2 text-cyan-600 hover:bg-cyan-600 hover:text-white" title="Mở chỉ đường Google Maps" onClick={(e) => e.stopPropagation()}>
-                <ExternalLink className="h-4 w-4" />
-              </a>
             </div>
           ))}
         </div>
       )}
-      <p className={`min-h-[16px] text-xs font-semibold leading-4 ${error ? 'text-rose-600' : 'text-transparent'}`}>{error || 'Không có lỗi'}</p>
+      <p className={`min-h-[14px] text-[11px] font-bold leading-3 ${error ? 'text-rose-600' : 'text-transparent'}`}>{error || 'Lỗi'}</p>
     </label>
   );
 }
-function Select({ label, value, onChange, options, empty, required, disabled = false }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><select required={required} disabled={disabled} value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 outline-none disabled:cursor-not-allowed disabled:opacity-60">{empty && <option value="">{empty}</option>}{options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>; }
+
+function Select({ label, value, onChange, options, empty, required, disabled = false }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-xs font-bold text-slate-700">{label}</span>
+      <select required={required} disabled={disabled} value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-sky-400 focus:ring-2 focus:ring-sky-100 outline-none disabled:cursor-not-allowed disabled:opacity-60 transition-all">
+        {empty && <option value="">{empty}</option>}
+        {options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+      </select>
+    </label>
+  );
+}

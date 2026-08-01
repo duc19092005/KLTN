@@ -8,11 +8,8 @@ import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { aiModelService } from '../apis/aiModelService';
 import { useToast } from '../../../providers/ToastProvider';
 import AiModelDetailModal from '../components/AiModelDetailModal';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Cpu, Plus, Filter, Search, Sparkles, ShieldCheck, CheckCircle2, AlertTriangle } from 'lucide-react';
 
-// A provider is either a managed cloud API (endpoint auto-filled, key required) or a
-// self-hosted / custom endpoint (admin types the URL, key optional). "local" covers
-// OpenAI-compatible servers like Ollama, vLLM, LM Studio running Llama and friends.
 const PROVIDERS = [
   { value: 'chatgpt', label: 'ChatGPT / OpenAI', endpoint: 'https://api.openai.com/v1/chat/completions', hint: 'API Chat Completions của OpenAI', cloud: true },
   { value: 'gemini', label: 'Gemini / Google', endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent', hint: 'API generateContent của Google Gemini', cloud: true },
@@ -133,16 +130,9 @@ function modelOptions(provider) { return MODEL_OPTIONS[provider] || []; }
 function defaultModelForProvider(provider) { return modelOptions(provider)[0]?.value || ''; }
 function isKnownModel(provider, modelVersion) { return modelOptions(provider).some((model) => model.value === modelVersion); }
 function isCloudProvider(provider) { return Boolean(providerInfo(provider).cloud); }
-// local + other have no preset URL → the admin must type the endpoint themselves.
 function needsManualEndpoint(provider) { return !isCloudProvider(provider); }
-// Cloud providers authenticate with a key; self-hosted/custom can run keyless.
 function requiresKey(provider) { return isCloudProvider(provider); }
 function providerLabel(provider) { return providerInfo(provider).label; }
-function resolvedEndpoint(form) {
-  const custom = form.apiEndpoint.trim();
-  if (custom) return custom;
-  return providerInfo(form.provider).endpoint.replace('{model}', form.modelVersion || defaultModelForProvider(form.provider) || 'gemini-2.5-flash');
-}
 
 export default function AiModelsPage() {
   const { user, logout } = useAuth();
@@ -150,7 +140,7 @@ export default function AiModelsPage() {
   const toast = useToast();
   const [models, setModels] = useState([]);
   const [form, setForm] = useState(emptyForm);
-  const [filter, setFilter] = useState(''); // '' | cloud | local
+  const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
@@ -163,11 +153,9 @@ export default function AiModelsPage() {
   const [testResult, setTestResult] = useState(null);
 
   const [statsData, setStatsData] = useState(null);
-  const [statsLoading, setStatsLoading] = useState(false);
 
   const load = async (page = pagination.page, currentFilter = filter, currentSearch = search, currentStatus = statusFilter) => {
     setLoading(true);
-    setStatsLoading(true);
     try {
       const [res, statsRes] = await Promise.all([
         aiModelService.list({
@@ -194,7 +182,6 @@ export default function AiModelsPage() {
       toast.error(err.response?.data?.message || 'Không tải được danh mục mô hình AI');
     } finally {
       setLoading(false);
-      setStatsLoading(false);
     }
   };
 
@@ -253,8 +240,6 @@ export default function AiModelsPage() {
     setForm((current) => ({
       ...current,
       [key]: value,
-      // Switching provider resets the model id to that provider's default and clears any
-      // previously typed endpoint (cloud providers auto-resolve theirs).
       ...(key === 'provider' ? { modelVersion: defaultModelForProvider(value), apiEndpoint: '' } : {}),
     }));
   };
@@ -283,8 +268,6 @@ export default function AiModelsPage() {
     }
     setSaving(true);
     try {
-      // Unified flow: every model is registered as an API endpoint. Self-hosted (local) just
-      // points at its own URL. type is kept for backend compatibility.
       const payload = {
         modelName: form.modelName,
         modelVersion: form.modelVersion,
@@ -343,52 +326,54 @@ export default function AiModelsPage() {
 
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="aiModels" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
-      <div className="mx-auto max-w-[1600px] space-y-5">
-        <div className="flex justify-end gap-2">
-          <button type="button" title="Mô hình AI đã xóa" onClick={() => navigate('/admin/ai-models/trash')} className="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"><Trash2 size={18} /></button>
-          <button type="button" onClick={openCreateModal} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700 transition-colors">+ Thêm mô hình AI</button>
-        </div>
+      <div className="mx-auto max-w-[1600px] space-y-6 pb-10">
+        <Hero onCreate={openCreateModal} onTrash={() => navigate('/admin/ai-models/trash')} total={pagination.total} />
 
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {stats.map((item) => <div key={item.label} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"><p className="text-[10px] uppercase tracking-wider text-slate-400 font-black">{item.label}</p><strong className="mt-1 block text-2xl font-black text-slate-950">{String(item.value).padStart(2, '0')}</strong></div>)}
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((item) => (
+            <div key={item.label} className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">{item.label}</p>
+              <strong className="mt-1 block text-3xl font-extrabold text-slate-900">{String(item.value).padStart(2, '0')}</strong>
+            </div>
+          ))}
         </section>
 
-        <section className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-slate-100">
+        <section className="rounded-3xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-slate-100">
             <div className="mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-xl font-black text-slate-950">Danh mục hiện tại</h2>
-                <p className="text-xs font-semibold text-slate-400">Lọc theo nền tảng, trạng thái hiển thị và từ khóa mô hình.</p>
+                <h2 className="text-lg font-bold text-slate-900">Danh mục mô hình AI</h2>
+                <p className="text-xs font-medium text-slate-400">Lọc theo nền tảng, trạng thái hiển thị và từ khóa mô hình.</p>
               </div>
               {(filter || statusFilter || search) && (
-                <button type="button" onClick={() => { setFilter(''); setStatusFilter(''); setSearch(''); load(1, '', '', ''); }} className="inline-flex w-fit items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-500 hover:bg-slate-50">Xóa lọc</button>
+                <button type="button" onClick={() => { setFilter(''); setStatusFilter(''); setSearch(''); load(1, '', '', ''); }} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">Xóa lọc</button>
               )}
             </div>
-            <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 gap-3 lg:grid-cols-[1.15fr_1fr_1.4fr_150px] lg:items-end">
+            <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 gap-4 lg:grid-cols-[1.15fr_1fr_1.4fr_140px] lg:items-end">
               <label className="block space-y-1.5">
-                <span className="text-xs font-black text-slate-600">Nền tảng</span>
-                <select value={filter} onChange={(event) => handleFilterChange(event.target.value)} className="h-[42px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm font-semibold outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100">
+                <span className="text-xs font-bold text-slate-700">Nền tảng</span>
+                <select value={filter} onChange={(event) => handleFilterChange(event.target.value)} className="h-[42px] w-full rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 text-xs font-semibold outline-none transition focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100">
                   <option value="">Tất cả nền tảng</option>
                   <option value="cloud">API đám mây</option>
                   <option value="local">Tự lưu trữ</option>
                 </select>
               </label>
               <label className="block space-y-1.5">
-                <span className="text-xs font-black text-slate-600">Ẩn / hiện</span>
-                <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); load(1, filter, search, event.target.value); }} className="h-[42px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm font-semibold outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100">
+                <span className="text-xs font-bold text-slate-700">Ẩn / hiện</span>
+                <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); load(1, filter, search, event.target.value); }} className="h-[42px] w-full rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 text-xs font-semibold outline-none transition focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100">
                   <option value="">Tất cả trạng thái</option>
                   <option value="ACTIVE">Đang hiện</option>
                   <option value="INACTIVE">Đã ẩn</option>
                 </select>
               </label>
               <label className="block space-y-1.5">
-                <span className="text-xs font-black text-slate-600">Tìm kiếm</span>
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm tên mô hình, nền tảng..." className="h-[42px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm font-semibold outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100" />
+                <span className="text-xs font-bold text-slate-700">Tìm kiếm</span>
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm tên mô hình, nền tảng..." className="h-[42px] w-full rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 text-xs font-semibold outline-none transition focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100" />
               </label>
-              <div className="space-y-1.5"><span className="block text-xs font-black text-transparent">Tìm kiếm</span><button type="submit" className="inline-flex h-[42px] w-full items-center justify-center rounded-xl bg-cyan-600 px-5 text-sm font-black text-white hover:bg-cyan-700 whitespace-nowrap">Tìm kiếm</button></div>
+              <div className="space-y-1.5"><span className="block text-xs font-bold text-transparent">Tìm kiếm</span><button type="submit" className="inline-flex h-[42px] w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 text-xs font-bold text-white shadow-xs hover:bg-sky-700 whitespace-nowrap"><Search className="h-4 w-4" strokeWidth={2.5} /> Tìm kiếm</button></div>
             </form>
           </div>
-          <div className="p-5 space-y-3 max-h-[760px] overflow-y-auto">
+          <div className="p-6 space-y-4 max-h-[760px] overflow-y-auto">
             {loading && <LoadingIndicator size="lg" label="Đang tải mô hình AI..." />}
             {!loading && visibleModels.map((model) => <ModelCard key={model.id} model={model} onViewDetails={setDetailModelId} onEdit={openEditModal} onToggleStatus={toggleModelStatus} onDelete={requestDelete} busy={saving} />)}
             {!loading && !visibleModels.length && <Empty title="Chưa có mô hình AI" desc="Bấm + Thêm mô hình AI để mở cửa sổ đăng ký mô hình." />}
@@ -396,119 +381,47 @@ export default function AiModelsPage() {
           <Pagination pagination={pagination} onPageChange={load} />
         </section>
 
-        {/* Bảng phân tích & Xác thực toàn vẹn Đánh giá AI */}
         {statsData && (
-          <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm space-y-6">
+          <section className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm space-y-6">
             <div>
-              <h2 className="text-xl font-black text-slate-950">Bảng điều khiển Chất lượng & Xác thực Đánh giá AI</h2>
+              <h2 className="text-lg font-bold text-slate-900">Bảng điều khiển Chất lượng & Xác thực Đánh giá AI</h2>
             </div>
 
-            {/* Top & Bottom Models */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="rounded-2xl border border-slate-100 bg-white p-5 space-y-4 shadow-sm">
-                <h3 className="text-sm font-black text-slate-950 flex items-center gap-2">
-	              Mô hình được đánh giá cao nhất
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 space-y-4 shadow-xs">
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                  Mô hình được đánh giá cao nhất
                 </h3>
                 <div className="space-y-2">
                   {statsData.topModels?.map((m) => (
                     <div key={m.id} className="flex justify-between items-center rounded-xl bg-slate-50 border border-slate-100 p-3 shadow-xs">
                       <div>
                         <strong className="block text-xs text-slate-900">{m.modelName}</strong>
-	                        <span className="text-[10px] font-bold text-slate-400">Phiên bản {m.modelVersion} · {providerLabel(m.provider) || m.provider}</span>
+                        <span className="text-[10px] font-bold text-slate-400">Phiên bản {m.modelVersion} · {providerLabel(m.provider) || m.provider}</span>
                       </div>
-                      <span className="rounded-lg bg-cyan-50 px-2 py-1 text-xs font-black text-cyan-700">{m.averageAccuracy}% tin cậy</span>
+                      <span className="rounded-lg bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700">{m.averageAccuracy}% tin cậy</span>
                     </div>
                   ))}
-                  {!statsData.topModels?.length && <div className="text-xs text-slate-500 italic text-center py-4">Chưa có đánh giá nào.</div>}
+                  {!statsData.topModels?.length && <div className="text-xs text-slate-400 italic text-center py-4">Chưa có đánh giá nào.</div>}
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-100 bg-white p-5 space-y-4 shadow-sm">
-                <h3 className="text-sm font-black text-slate-950 flex items-center gap-2">
-	                  Mô hình được đánh giá thấp nhất
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 space-y-4 shadow-xs">
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                  Mô hình được đánh giá thấp nhất
                 </h3>
                 <div className="space-y-2">
                   {statsData.bottomModels?.map((m) => (
                     <div key={m.id} className="flex justify-between items-center rounded-xl bg-slate-50 border border-slate-100 p-3 shadow-xs">
                       <div>
                         <strong className="block text-xs text-slate-900">{m.modelName}</strong>
-	                        <span className="text-[10px] font-bold text-slate-400">Phiên bản {m.modelVersion} · {providerLabel(m.provider) || m.provider}</span>
+                        <span className="text-[10px] font-bold text-slate-400">Phiên bản {m.modelVersion} · {providerLabel(m.provider) || m.provider}</span>
                       </div>
-                      <span className="rounded-lg bg-rose-50 px-2 py-1 text-xs font-black text-rose-700">{m.averageAccuracy}% tin cậy</span>
+                      <span className="rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700">{m.averageAccuracy}% tin cậy</span>
                     </div>
                   ))}
-                  {!statsData.bottomModels?.length && <div className="text-xs text-slate-500 italic text-center py-4">Chưa có đánh giá nào.</div>}
+                  {!statsData.bottomModels?.length && <div className="text-xs text-slate-400 italic text-center py-4">Chưa có đánh giá nào.</div>}
                 </div>
-              </div>
-            </div>
-
-            {/* Ý kiến phản hồi & Xác thực toàn vẹn từ Blockchain */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                Ý kiến phản hồi gần đây & Xác thực toàn vẹn dữ liệu
-              </h3>
-              <div className="space-y-3">
-                {statsData.recentNegativeFeedbacks?.map((f) => {
-                  let statusLabel = 'Chưa xác thực';
-                  let statusClass = 'bg-slate-100 text-slate-600 border-slate-200';
-                  if (f.audit?.status === 'VERIFIED') {
-                    statusLabel = 'Hợp lệ (trên chuỗi)';
-                    statusClass = 'bg-emerald-50 text-emerald-700 border-emerald-100';
-                  } else if (f.audit?.status === 'TAMPERED') {
-                    statusLabel = 'BỊ GIẢ MẠO!';
-                    statusClass = 'bg-rose-50 text-rose-700 border-rose-100 animate-pulse';
-                  } else if (f.audit?.status === 'UNANCHORED') {
-                    statusLabel = 'Chờ neo (5 phút)';
-                    statusClass = 'bg-amber-50 text-amber-700 border-amber-100';
-                  }
-
-                  return (
-                    <div key={f.id} className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 space-y-3">
-                      <div className="flex flex-wrap justify-between items-start gap-2">
-                        <div>
-                          <strong className="block text-xs text-slate-900">
-                            Mô hình: {f.modelName} (v{f.modelVersion})
-                          </strong>
-                          <span className="text-[10px] font-semibold text-slate-400">
-                            Bác sĩ: {f.doctorName} · {new Date(f.createdAt).toLocaleString('vi-VN')}
-                          </span>
-                        </div>
-                        <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-black ${statusClass}`}>
-                          {statusLabel}
-                        </span>
-                      </div>
-
-                      <div className="rounded-xl bg-white border border-slate-100 p-3">
-                        <p className="text-xs text-slate-700 italic">" {f.feedback} "</p>
-                      </div>
-
-                      {/* Audit Details */}
-                      {f.audit && (
-                        <div className="text-[10px] font-mono bg-white rounded-lg border border-slate-100 p-2 text-slate-500 space-y-1">
-                          <div className="flex justify-between">
-                            <span>Hash CSDL:</span>
-                            <span className="font-bold truncate max-w-[200px] text-slate-700">{f.audit.storedHash || 'N/A'}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Hash Neo (Blockchain):</span>
-                            <span className="font-bold truncate max-w-[200px] text-slate-700">{f.audit.onChainHash || 'Chưa neo'}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Đối khớp cục bộ:</span>
-                            <span className={`font-bold ${f.audit.dbMatches ? 'text-emerald-600' : 'text-rose-600'}`}>
-                              {f.audit.dbMatches ? 'KHỚP' : 'LỆCH (Cảnh báo)'}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {!statsData.recentNegativeFeedbacks?.length && (
-                  <div className="text-xs text-slate-500 italic text-center py-6 border border-dashed border-slate-200 rounded-2xl bg-slate-50">
-                    Không có phản hồi kém chất lượng nào gần đây.
-                  </div>
-                )}
               </div>
             </div>
           </section>
@@ -517,6 +430,46 @@ export default function AiModelsPage() {
       {showCreateModal && <CreateModelModal form={form} updateForm={updateForm} onSubmit={submit} onClose={closeCreateModal} saving={saving} testing={testing} testApi={testApi} testResult={testResult} editing={Boolean(editingModel)} />}
       {detailModelId && <AiModelDetailModal modelId={detailModelId} onClose={() => setDetailModelId(null)} />}
     </DashboardLayout>
+  );
+}
+
+function Hero({ onCreate, onTrash, total }) {
+  return (
+    <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-8 shadow-sm">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 border border-sky-200/60">
+              Quản lý AI & Chẩn đoán ({total} mô hình)
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            Quản lý Mô hình AI
+          </h1>
+          <p className="text-sm font-medium text-slate-500">
+            Đăng ký điểm cuối API, bảo mật AES-256 token và đối chiếu độ tin cậy trên Blockchain.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            title="Mô hình AI đã xóa"
+            onClick={onTrash}
+            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all shadow-xs"
+          >
+            <Trash2 size={18} strokeWidth={2} />
+          </button>
+          <button
+            onClick={onCreate}
+            className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-sky-700 transition-all"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Thêm mô hình AI
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -550,16 +503,16 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
-      <form onSubmit={handleSubmit} noValidate className="w-full max-w-[1280px] max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-4">
+      <form onSubmit={handleSubmit} noValidate className="w-full max-w-[1280px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
         <div className="flex justify-between gap-4">
           <div>
-            <h3 className="text-2xl font-black text-slate-950">{editing ? 'Cập nhật mô hình AI' : 'Thêm mô hình AI'}</h3>
+            <h3 className="text-2xl font-bold text-slate-900">{editing ? 'Cập nhật mô hình AI' : 'Thêm mô hình AI'}</h3>
           </div>
-          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500">Đóng</button>
+          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50">Đóng</button>
         </div>
 
         <SectionTitle title="Thông tin mô hình" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Field label="Tên mô hình" value={form.modelName} onChange={(v) => changeField('modelName', limitText(v, MAX_MODEL_NAME_LENGTH))} onBlur={() => validateField('modelName')} error={fieldErrors.modelName} required placeholder="VD: OpenAI" maxLength={MAX_MODEL_NAME_LENGTH} />
           <SelectField label="Nền tảng" value={form.provider} onChange={(v) => changeField('provider', v)} onBlur={() => validateField('provider')} error={fieldErrors.provider} options={PROVIDERS.map((p) => ({ value: p.value, label: p.label }))} required />
           <ModelPicker form={form} updateForm={changeField} errors={fieldErrors} validateField={validateField} />
@@ -567,7 +520,7 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
         </div>
 
         <SectionTitle title="Kết nối và bảo mật" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {manualEndpoint && <div className="md:col-span-2"><Field label="Điểm cuối API" value={form.apiEndpoint} onChange={(v) => changeField('apiEndpoint', limitText(v.trim(), MAX_ENDPOINT_LENGTH))} onBlur={() => validateField('apiEndpoint')} error={fieldErrors.apiEndpoint} required placeholder="http://localhost:11434/v1/chat/completions" maxLength={MAX_ENDPOINT_LENGTH} /></div>}
           <TextAreaField
             label={editing ? 'Khóa API / Token (để trống nếu giữ secret hiện tại)' : 'Khóa API / Token'}
@@ -586,23 +539,23 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
         </div>
 
         <SectionTitle title="Kiểm tra kết nối" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <button type="button" disabled={testing || !canTest} onClick={testApi} className="w-full rounded-2xl border border-cyan-200 bg-cyan-50 px-5 py-3 text-sm font-black text-cyan-700 hover:bg-cyan-100 disabled:opacity-50">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button type="button" disabled={testing || !canTest} onClick={testApi} className="w-full rounded-2xl border border-sky-200 bg-sky-50 px-5 py-3 text-xs font-bold text-sky-700 hover:bg-sky-100 transition-all disabled:opacity-50">
             {testing ? 'Đang kiểm tra kết nối...' : 'Kiểm tra kết nối mô hình'}
           </button>
-          {testResult && <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-bold text-emerald-700">Thành công · {testResult.provider} · {testResult.latencyMs}ms · {testResult.endpoint}</div>}
+          {testResult && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-700">Thành công · {testResult.provider} · {testResult.latencyMs}ms · {testResult.endpoint}</div>}
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
-          <button type="button" onClick={onClose} className="flex-1 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600 hover:bg-slate-50">Hủy</button>
-          <button disabled={saving} className="flex-1 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-cyan-700 disabled:opacity-60">{saving ? 'Đang lưu...' : editing ? 'Lưu thay đổi' : 'Thêm mô hình AI'}</button>
+          <button type="button" onClick={onClose} className="flex-1 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50">Hủy</button>
+          <button disabled={saving} className="flex-1 rounded-2xl bg-sky-600 px-5 py-3 text-xs font-bold text-white shadow-sm transition-all hover:bg-sky-700 disabled:opacity-60">{saving ? 'Đang lưu...' : editing ? 'Lưu thay đổi' : 'Thêm mô hình AI'}</button>
         </div>
       </form>
     </div>
   );
 }
 
-function SectionTitle({ title }) { return <h4 className="border-t border-slate-100 pt-3 text-sm font-black text-slate-800 first:border-t-0 first:pt-0">{title}</h4>; }
+function SectionTitle({ title }) { return <h4 className="border-t border-slate-100 pt-4 text-xs font-extrabold uppercase tracking-wider text-slate-700 first:border-t-0 first:pt-0">{title}</h4>; }
 
 function ModelPicker({ form, updateForm, errors = {}, validateField = () => true }) {
   const options = modelOptions(form.provider);
@@ -612,16 +565,16 @@ function ModelPicker({ form, updateForm, errors = {}, validateField = () => true
 }
 
 function Field({ label, value, onChange, onBlur, error, required = false, placeholder = '', maxLength }) {
-  return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}{required && <span className="text-rose-500"> *</span>}</span><input required={required} value={value || ''} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} placeholder={placeholder} maxLength={maxLength} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} /><FieldError message={error} /></label>;
+  return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}{required && <span className="text-rose-500"> *</span>}</span><input required={required} value={value || ''} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} placeholder={placeholder} maxLength={maxLength} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 outline-none transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`} /><FieldError message={error} /></label>;
 }
 function SelectField({ label, value, onChange, onBlur, options, empty, required, error }) {
-  return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}{required && <span className="text-rose-500"> *</span>}</span><select required={required} value={value || ''} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`}>{empty && <option value="">{empty}</option>}{options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select><FieldError message={error} /></label>;
+  return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}{required && <span className="text-rose-500"> *</span>}</span><select required={required} value={value || ''} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 outline-none transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`}>{empty && <option value="">{empty}</option>}{options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select><FieldError message={error} /></label>;
 }
 function TextAreaField({ label, value, onChange, onBlur, error, required = false, optional = false, rows = 2, maxLength, className = '', inputType }) {
-  const fieldClass = `w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`;
+  const fieldClass = `w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 outline-none transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`;
   return (
     <label className={`block space-y-1.5 ${className}`}>
-      <span className="text-[13px] font-bold text-slate-700">
+      <span className="text-xs font-bold text-slate-700">
         {label}
         {required && <span className="text-rose-500"> *</span>}
         {optional && <span className="font-semibold text-slate-400"> (tùy chọn)</span>}
@@ -654,88 +607,76 @@ function TextAreaField({ label, value, onChange, onBlur, error, required = false
     </label>
   );
 }
-function FieldError({ message }) { return <p className={`min-h-[1rem] text-xs font-bold leading-4 transition-colors ${message ? 'text-rose-600' : 'text-transparent'}`}>{message || 'Không có lỗi'}</p>; }
+function FieldError({ message }) { return <p className={`min-h-[14px] text-[11px] font-bold leading-3 transition-colors ${message ? 'text-rose-600' : 'text-transparent'}`}>{message || 'Lỗi'}</p>; }
+
 function ModelCard({ model, onViewDetails, onEdit, onToggleStatus, onDelete, busy }) {
   const isLocal = model.provider === 'local';
-  const badgeCls = isLocal ? 'bg-cyan-50 text-cyan-700 border-cyan-100' : 'bg-cyan-50 text-cyan-700 border-cyan-100';
+  const badgeCls = 'bg-sky-50 text-sky-700 border-sky-200/80';
   const badge = isLocal ? 'TỰ LƯU TRỮ' : (providerLabel(model.provider) || model.provider || 'API').toUpperCase();
   const hasAccuracy = model.averageAccuracy !== null && model.averageAccuracy !== undefined;
   const isInactive = model.status === 'INACTIVE';
-  const statusClass = isInactive ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100';
+  const statusClass = isInactive ? 'bg-amber-50 text-amber-700 border-amber-200/80' : 'bg-emerald-50 text-emerald-700 border-emerald-200/80';
   const statusLabel = isInactive ? 'Đang ẩn' : 'Đang hoạt động';
 
   return (
-    <article className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+    <article className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-5 space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-black text-slate-950">{model.modelName}</h3>
-            <span className={`rounded-full border px-2 py-1 text-[10px] font-black ${badgeCls}`}>{badge}</span>
+            <h3 className="font-bold text-slate-900 text-base">{model.modelName}</h3>
+            <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${badgeCls}`}>{badge}</span>
             {hasAccuracy && (
-              <span className={`rounded-full border px-2 py-1 text-[10px] font-black ${model.averageAccuracy >= 80 ? 'bg-cyan-50 text-cyan-700 border-cyan-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
+              <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${model.averageAccuracy >= 80 ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
                 Độ tin cậy: {model.averageAccuracy}% ({model.totalRatings} đánh giá)
               </span>
             )}
-            <span className={`rounded-full border px-2 py-1 text-[10px] font-black ${statusClass}`}>{statusLabel}</span>
+            <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${statusClass}`}>{statusLabel}</span>
           </div>
-          <p className="mt-1 text-xs font-semibold text-slate-500">Phiên bản {model.modelVersion} · {model.recommendedSpecialty || 'Chưa gán chuyên khoa'}</p>
+          <p className="mt-1 text-xs font-semibold text-slate-400">Phiên bản {model.modelVersion} · {model.recommendedSpecialty || 'Chưa gán chuyên khoa'}</p>
         </div>
         <div className="flex gap-2 items-center">
           <BlockchainStatusBadge status={model.blockchainStatus} />
-          <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-cyan-700 border border-slate-100 shadow-xs">AES-256</span>
+          <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-sky-700 border border-slate-200/80 shadow-xs">AES-256</span>
         </div>
       </div>
-      <p className="mt-3 text-sm text-slate-600">{model.description || 'Chưa có mô tả'}</p>
+      <p className="text-xs font-medium text-slate-600">{model.description || 'Chưa có mô tả'}</p>
       {model.apiEndpoint && (
-        <div className="mt-3 rounded-xl bg-white border border-slate-100 p-3">
-          <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">Điểm cuối API</p>
+        <div className="rounded-xl bg-white border border-slate-200/80 p-3">
+          <p className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400">Điểm cuối API</p>
           <p className="mt-1 break-all text-xs font-mono text-slate-600">{model.apiEndpoint}</p>
         </div>
       )}
-      <div className="mt-3 rounded-xl bg-white border border-slate-100 p-3">
-        <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">Cấu hình secret</p>
+      <div className="rounded-xl bg-white border border-slate-200/80 p-3">
+        <p className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400">Cấu hình secret</p>
         <p className="mt-1 text-xs font-semibold text-slate-600">
           {model.secretConfigured ? 'Đã cấu hình secret (không hiển thị plaintext)' : 'Chưa cấu hình secret'}
         </p>
         {(model.secretFingerprint || model.ipHashPlain) && (
           <>
-            <p className="mt-2 text-[10px] uppercase tracking-wider font-black text-slate-400">Dấu vân tay SHA-256</p>
+            <p className="mt-2 text-[10px] uppercase tracking-wider font-extrabold text-slate-400">Dấu vân tay SHA-256</p>
             <p className="mt-1 break-all text-xs font-mono text-slate-600">{model.secretFingerprint || model.ipHashPlain}</p>
           </>
         )}
       </div>
-      <div className="mt-3 flex flex-wrap justify-end gap-2">
-        <button type="button" onClick={() => onViewDetails(model.id)} className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-100">Chi tiết</button>
-        <button type="button" disabled={busy} onClick={() => onEdit(model)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-700 disabled:opacity-50">Sửa</button>
-        <button type="button" disabled={busy} onClick={() => onToggleStatus(model)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50">{isInactive ? 'Hiện' : 'Ẩn'}</button>
-        <button type="button" disabled={busy} onClick={() => onDelete(model)} className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-100 disabled:opacity-50">Xóa</button>
+      <div className="flex flex-wrap justify-end gap-2">
+        <SmallButton onClick={() => onViewDetails(model.id)}>Chi tiết</SmallButton>
+        <SmallButton onClick={() => onEdit(model)} disabled={busy}>Sửa</SmallButton>
+        <SmallButton onClick={() => onToggleStatus(model)} disabled={busy}>{isInactive ? 'Hiện' : 'Ẩn'}</SmallButton>
+        <SmallButton danger onClick={() => onDelete(model)} disabled={busy}>Xóa</SmallButton>
       </div>
     </article>
   );
 }
-function Alert({ tone, message }) { const cls = tone === 'error' ? 'bg-rose-50 border-rose-100 text-rose-700' : 'bg-emerald-50 border-emerald-100 text-emerald-800'; return <div className={`rounded-2xl border p-4 text-sm font-bold ${cls}`}>{message}</div>; }
-function Empty({ title, desc }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><strong className="text-slate-800">{title}</strong><p className="mt-1 text-sm text-slate-500">{desc}</p></div>; }
+
+function Empty({ title, desc }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><strong className="text-sm font-bold text-slate-800">{title}</strong><p className="mt-1 text-xs text-slate-400">{desc}</p></div>; }
+function SmallButton({ children, onClick, disabled, danger }) { return <button type="button" disabled={disabled} onClick={onClick} className={`rounded-xl border px-3 py-2 text-xs font-bold transition-all disabled:opacity-50 ${danger ? 'border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-sky-50 hover:text-sky-600 hover:border-sky-200'}`}>{children}</button>; }
 function Pagination({ pagination, onPageChange }) {
   return (
-    <div className="flex items-center justify-between border-t border-slate-100 p-4">
-      <p className="text-sm font-semibold text-slate-500">Trang {pagination.page}/{pagination.totalPages}</p>
+    <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
+      <p className="text-xs font-bold text-slate-500">Trang {pagination.page}/{pagination.totalPages}</p>
       <div className="flex gap-2">
-        <button
-          type="button"
-          disabled={pagination.page <= 1}
-          onClick={() => onPageChange(pagination.page - 1)}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 disabled:opacity-50"
-        >
-          Trước
-        </button>
-        <button
-          type="button"
-          disabled={pagination.page >= pagination.totalPages}
-          onClick={() => onPageChange(pagination.page + 1)}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 disabled:opacity-50"
-        >
-          Sau
-        </button>
+        <SmallButton disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>Trang trước</SmallButton>
+        <SmallButton disabled={pagination.page >= pagination.totalPages} onClick={() => onPageChange(pagination.page + 1)}>Trang sau</SmallButton>
       </div>
     </div>
   );

@@ -9,10 +9,7 @@
     <meta name="theme-color" content="#f7f9fb" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet"/>
-    <!-- Noto Serif + Be Vietnam Pro: full Vietnamese diacritic support (Libre Caslon breaks accents) -->
-    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,300,0,0&display=swap" rel="stylesheet"/>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script id="tailwind-config">
@@ -88,14 +85,15 @@
               "margin-desktop": "32px"
             },
             "fontFamily": {
-              "headline-md": ["Inter"],
-              "headline-lg": ["Inter"],
-              "body-lg": ["Inter"],
-              "headline-lg-mobile": ["Inter"],
-              "display-lg": ["Inter"],
-              "caption": ["Inter"],
-              "body-md": ["Inter"],
-              "label-md": ["Inter"],
+              "sans": ["'Be Vietnam Pro'", "'Plus Jakarta Sans'", "system-ui", "-apple-system", "sans-serif"],
+              "headline-md": ["'Be Vietnam Pro'"],
+              "headline-lg": ["'Be Vietnam Pro'"],
+              "body-lg": ["'Be Vietnam Pro'"],
+              "headline-lg-mobile": ["'Be Vietnam Pro'"],
+              "display-lg": ["'Be Vietnam Pro'"],
+              "caption": ["'Be Vietnam Pro'"],
+              "body-md": ["'Be Vietnam Pro'"],
+              "label-md": ["'Be Vietnam Pro'"],
               "data-mono": ["JetBrains Mono"]
             },
             "fontSize": {
@@ -114,7 +112,7 @@
       }
     </script>
   </head>
-  <body>
+  <body class="font-sans antialiased text-slate-800 selection:bg-sky-100 selection:text-sky-700">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

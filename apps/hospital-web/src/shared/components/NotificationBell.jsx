@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Bell, BellRing, Check, Trash2, AlertCircle, SlidersHorizontal } from 'lucide-react';
+import { Bell, BellRing, Check, Trash2, AlertCircle, SlidersHorizontal, CheckCheck, Calendar, X } from 'lucide-react';
 import api from '../apis/api';
 import { useToast } from '../../providers/ToastProvider';
 
@@ -10,15 +10,6 @@ const READ_FILTERS = [
   { id: 'read', label: 'Đã đọc', param: 'true' },
 ];
 
-/**
- * Notification bell + dropdown, shared across every authenticated role.
- *
- * Notifications are keyed only by userId on the backend, so this component works the same for
- * ADMIN / DOCTOR / RECEPTIONIST / LAB_MANAGER — the content differs per feature, the UI does not.
- *
- * Server-side filtering: the dropdown exposes a read-state segment (all/unread/read) and an
- * optional date range, mapped to the backend's `isRead` / `from` / `to` query params.
- */
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -61,10 +52,9 @@ export default function NotificationBell() {
       try {
         const payload = JSON.parse(event.data);
         if (payload?.type === 'ping') {
-          return; // ignore ping
+          return;
         }
 
-        // Add the notification to local state if it's not a duplicate
         setNotifications((prev) => {
           if (prev.some((n) => n.id === payload.id)) {
             return prev;
@@ -72,10 +62,8 @@ export default function NotificationBell() {
           return [payload, ...prev];
         });
 
-        // Trigger visual toast notification
         toast.info(payload.message || 'Có thông báo mới');
 
-        // Dispatch global CustomEvent for real-time page updates
         const customEvent = new CustomEvent('app:notification-received', { detail: payload });
         window.dispatchEvent(customEvent);
       } catch (err) {
@@ -92,7 +80,6 @@ export default function NotificationBell() {
     };
   }, [fetchNotifications, toast]);
 
-  // Close dropdown on clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -133,7 +120,6 @@ export default function NotificationBell() {
       await api.patch('/notifications/read-all');
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       toast.success('Đã đánh dấu tất cả là đã đọc.');
-      // Re-fetch so the "unread" filter reflects the change immediately.
       fetchNotifications();
     } catch (err) {
       toast.error('Có lỗi xảy ra khi cập nhật.');
@@ -146,6 +132,7 @@ export default function NotificationBell() {
   }
 
   function formatRelativeTime(dateString) {
+    if (!dateString) return 'Vừa xong';
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -160,19 +147,21 @@ export default function NotificationBell() {
   }
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative antialiased" ref={dropdownRef}>
       {/* Trigger button */}
       <button
         id="notification-bell-button"
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-500 hover:text-cyan-600 transition-colors border border-slate-200 outline-none"
-        title="Thông báo"
+        className={`relative p-2.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-600 transition-all border outline-none shadow-xs ${
+          isOpen ? 'border-sky-300 ring-2 ring-sky-100 text-sky-600' : 'border-slate-200'
+        }`}
+        title="Thông báo hệ thống"
       >
         {unreadCount > 0 ? (
           <>
-            <BellRing className="w-5 h-5 text-cyan-600 animate-swing" strokeWidth={2} />
-            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white ring-2 ring-white">
+            <BellRing className="w-5 h-5 text-sky-600 animate-pulse" strokeWidth={2} />
+            <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-rose-500 text-[9px] font-extrabold text-white ring-2 ring-white shadow-xs">
               {unreadCount}
             </span>
           </>
@@ -183,73 +172,91 @@ export default function NotificationBell() {
 
       {/* Dropdown panel */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-slate-100 bg-white shadow-xl z-50 overflow-hidden transform origin-top-right transition-colors duration-200">
+        <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-3xl border border-slate-200/80 bg-white shadow-2xl z-50 overflow-hidden transform origin-top-right transition-all animate-fadeIn">
           {/* Header */}
-          <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+          <div className="p-4 border-b border-slate-100 bg-slate-50/70 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-black text-slate-800">Thông báo của bạn</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-slate-900">Thông báo hệ thống</span>
+                {unreadCount > 0 && (
+                  <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-extrabold text-sky-700">
+                    {unreadCount} mới
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setShowFilters((v) => !v)}
-                  className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-black transition-colors ${
+                  className={`inline-flex items-center gap-1 rounded-xl px-2.5 py-1 text-xs font-bold transition-all ${
                     showFilters || hasDateFilter
-                      ? 'bg-cyan-100 text-cyan-700'
+                      ? 'bg-sky-100 text-sky-700 border border-sky-200'
                       : 'text-slate-500 hover:bg-slate-100'
                   }`}
-                  title="Bộ lọc"
+                  title="Bộ lọc ngày"
                 >
-                  <SlidersHorizontal className="w-3 h-3" />
-                  Lọc
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span>Lọc</span>
                 </button>
                 {unreadCount > 0 && (
                   <button
                     type="button"
                     onClick={handleMarkAllAsRead}
-                    className="text-[11px] font-black text-cyan-600 hover:text-cyan-700"
+                    className="text-xs font-bold text-sky-600 hover:text-sky-700 transition-colors flex items-center gap-1"
                   >
-                    Đọc tất cả
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    <span>Đọc tất cả</span>
                   </button>
                 )}
               </div>
             </div>
 
             {/* Read-state segmented control */}
-            <div className="mt-3 flex gap-1 rounded-xl bg-slate-100 p-1">
-              {READ_FILTERS.map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => setReadFilter(f.id)}
-                  className={`flex-1 rounded-lg px-2 py-1 text-[11px] font-black transition-colors ${
-                    readFilter === f.id ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
+            <div className="flex gap-1 rounded-xl bg-slate-200/60 p-1">
+              {READ_FILTERS.map((f) => {
+                const count = f.id === 'unread' ? unreadCount : f.id === 'all' ? notifications.length : notifications.filter(n => n.isRead).length;
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setReadFilter(f.id)}
+                    className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      readFilter === f.id ? 'bg-white text-sky-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <span>{f.label}</span>
+                    <span className={`text-[10px] rounded-full px-1.5 py-0.2 ${readFilter === f.id ? 'bg-sky-50 text-sky-700' : 'bg-slate-100 text-slate-400'}`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Date range filter (collapsible) */}
             {showFilters && (
-              <div className="mt-3 space-y-2">
+              <div className="space-y-2 pt-1 border-t border-slate-200/60 animate-fadeIn">
                 <div className="flex items-center gap-2">
                   <div className="flex-1">
-                    <label className="block text-[10px] font-black uppercase tracking-wide text-slate-400 mb-1">Từ ngày</label>
+                    <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">
+                      Từ ngày
+                    </label>
                     <input
                       type="date"
                       value={fromDate}
                       onChange={(e) => setFromDate(e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold text-slate-700 outline-none focus:border-cyan-400"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="block text-[10px] font-black uppercase tracking-wide text-slate-400 mb-1">Đến ngày</label>
+                    <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">
+                      Đến ngày
+                    </label>
                     <input
                       type="date"
                       value={toDate}
                       onChange={(e) => setToDate(e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold text-slate-700 outline-none focus:border-cyan-400"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                     />
                   </div>
                 </div>
@@ -257,26 +264,31 @@ export default function NotificationBell() {
                   <button
                     type="button"
                     onClick={clearDateFilter}
-                    className="text-[11px] font-black text-slate-400 hover:text-rose-600"
+                    className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1"
                   >
-                    Xóa lọc ngày
+                    <X className="w-3 h-3" /> Xóa bộ lọc ngày
                   </button>
                 )}
               </div>
             )}
           </div>
 
-          {/* List */}
-          <div className="max-h-[350px] overflow-y-auto divide-y divide-slate-50">
+          {/* Notifications List */}
+          <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100 scrollbar-thin">
             {notifications.length === 0 ? (
-              <div className="py-10 text-center flex flex-col items-center justify-center">
-                <Bell className="w-8 h-8 text-slate-300 mb-2" strokeWidth={1.5} />
-                <p className="text-xs font-bold text-slate-400">
+              <div className="py-12 text-center flex flex-col items-center justify-center px-4">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
+                  <Bell className="w-6 h-6 stroke-[1.75]" />
+                </div>
+                <p className="text-xs font-bold text-slate-700">
                   {readFilter === 'unread'
                     ? 'Không có thông báo chưa đọc'
                     : hasDateFilter
-                      ? 'Không có thông báo trong khoảng ngày này'
-                      : 'Không có thông báo mới nào'}
+                    ? 'Không có thông báo trong khoảng thời gian này'
+                    : 'Chưa có thông báo mới nào'}
+                </p>
+                <p className="text-[11px] font-medium text-slate-400 mt-1">
+                  Hệ thống sẽ tự động cập nhật khi có lượt khám mới hoặc chỉ định cận lâm sàng.
                 </p>
               </div>
             ) : (
@@ -284,15 +296,17 @@ export default function NotificationBell() {
                 <div
                   key={n.id}
                   onClick={() => !n.isRead && handleMarkAsRead(n.id)}
-                  className={`p-4 flex gap-3 hover:bg-slate-50/80 cursor-pointer transition-colors ${
-                    !n.isRead ? 'bg-cyan-50/30' : ''
+                  className={`p-4 flex gap-3.5 hover:bg-sky-50/40 cursor-pointer transition-colors ${
+                    !n.isRead ? 'bg-sky-50/20' : 'bg-white'
                   }`}
                 >
                   {/* Icon indicator */}
                   <div className="mt-0.5 shrink-0">
                     <div
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-                        !n.isRead ? 'bg-cyan-100 text-cyan-600' : 'bg-slate-100 text-slate-400'
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                        !n.isRead
+                          ? 'bg-sky-100 text-sky-700 border border-sky-200'
+                          : 'bg-slate-100 text-slate-400 border border-slate-200'
                       }`}
                     >
                       <AlertCircle className="w-4 h-4" />
@@ -301,35 +315,40 @@ export default function NotificationBell() {
 
                   {/* Text details */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className={`text-xs truncate ${!n.isRead ? 'font-black text-slate-900' : 'font-semibold text-slate-600'}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className={`text-xs truncate ${!n.isRead ? 'font-bold text-slate-900' : 'font-semibold text-slate-600'}`}>
                         {n.title}
                       </p>
-                      <span className="text-[10px] text-slate-400 font-medium">
+                      <span className="text-[10px] text-slate-400 font-medium shrink-0">
                         {formatRelativeTime(n.createdAt)}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-1 leading-relaxed break-words">
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed break-words font-medium">
                       {n.message}
                     </p>
-                    <div className="mt-2 flex items-center gap-2">
-                      {!n.isRead && (
+
+                    <div className="mt-2.5 flex items-center justify-between gap-2">
+                      {!n.isRead ? (
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleMarkAsRead(n.id);
                           }}
-                          className="inline-flex items-center gap-1 text-[10px] font-black text-cyan-600 hover:text-cyan-700 bg-cyan-50 hover:bg-cyan-100/70 px-2 py-0.5 rounded"
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-700 hover:text-sky-800 bg-sky-50 hover:bg-sky-100 px-2.5 py-1 rounded-lg border border-sky-100 transition-colors"
                         >
                           <Check className="w-3 h-3" />
                           Đánh dấu đã đọc
                         </button>
+                      ) : (
+                        <span className="text-[10px] font-semibold text-slate-400">Đã đọc</span>
                       )}
+
                       <button
                         type="button"
                         onClick={(e) => handleDelete(n.id, e)}
-                        className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-2 py-0.5 rounded ml-auto"
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-2 py-1 rounded-lg transition-colors ml-auto"
+                        title="Xóa thông báo"
                       >
                         <Trash2 className="w-3 h-3" />
                         Xóa

@@ -11,7 +11,7 @@ import { departmentService } from '../apis/departmentService';
 import DoctorDetailModal from '../components/DoctorDetailModal';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { Calendar, ExternalLink, MapPin, Search, Trash2 } from 'lucide-react';
+import { Calendar, ExternalLink, MapPin, Search, Trash2, Plus, Stethoscope, Filter, UserCheck } from 'lucide-react';
 
 const OSM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
 const MIN_BIRTH_YEAR = 1900;
@@ -27,8 +27,9 @@ const MAX_ADDRESS_LENGTH = 255;
 const MIN_YEARS_EXPERIENCE = 1;
 const MAX_YEARS_EXPERIENCE = 50;
 const MAX_LICENSE_NUMBER_LENGTH = 30;
-const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100', INACTIVE: 'bg-rose-50 text-rose-700 border-rose-100', PENDING: 'bg-amber-50 text-amber-700 border-amber-100' };
+const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200/80', INACTIVE: 'bg-rose-50 text-rose-700 border-rose-200/80', PENDING: 'bg-amber-50 text-amber-700 border-amber-200/80' };
 const statusLabel = { ACTIVE: 'Đang hoạt động', INACTIVE: 'Ngưng hoạt động', PENDING: 'Chờ kích hoạt' };
+
 function buildGoogleMapsDirectionsUrl(lat, lng) { return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`; }
 function buildAddressQueries(query) {
   const normalized = query.replace(/[\/\\]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -129,9 +130,6 @@ const QUALIFICATIONS = [
   'Bác sĩ Chuyên khoa II',
   'Tiến sĩ'
 ];
-
-
-
 
 const emptyForm = {
   username: '',
@@ -319,19 +317,25 @@ export default function DoctorsPage() {
 
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="doctors" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
-      <div className="max-w-[1600px] mx-auto space-y-6">
-        <Hero totalLabel={totalLabel} onCreate={openCreate} onTrash={() => navigate('/admin/doctors/trash')} />
-        {loading ? <LoadingIndicator size="lg" label="Đang tải bác sĩ..." /> : (
+      <div className="max-w-[1600px] mx-auto space-y-6 pb-10">
+        <Hero totalLabel={totalLabel} onCreate={openCreate} onTrash={() => navigate('/admin/doctors/trash')} total={pagination.total} />
+        {loading ? <LoadingIndicator size="lg" label="Đang tải danh sách bác sĩ..." /> : (
           <>
             <SearchBar filters={filters} setFilters={setFilters} onSearch={search} onReset={() => setFilters({ specialty: '', search: '', status: '' })} />
-            <section className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-              <div className="p-5 border-b border-slate-100">
-                <h3 className="text-xl font-black text-slate-950">Danh sách bác sĩ</h3>
-                <p className="text-sm text-slate-500">Quản lý hồ sơ chuyên môn và phòng khám phụ trách.</p>
+            <section className="rounded-3xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Stethoscope className="h-5 w-5 text-sky-600" strokeWidth={2} />
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">Danh sách bác sĩ</h3>
+                    <p className="text-xs font-medium text-slate-400">Quản lý hồ sơ chuyên môn và phòng khám phụ trách.</p>
+                  </div>
+                </div>
+                <span className="rounded-xl bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-600 border border-slate-200/80">{totalLabel}</span>
               </div>
               <div className="divide-y divide-slate-100">
                 {doctors.map((doctor) => <DoctorRow key={doctor.id} doctor={doctor} onEdit={openEdit} onToggleStatus={toggleDoctorStatus} onRemove={removeDoctor} onViewDetails={setDetailDoctorId} busy={busy} />)}
-                {!doctors.length && <div className="p-6 text-center text-sm text-slate-500">Chưa có bác sĩ.</div>}
+                {!doctors.length && <div className="p-8 text-center text-xs font-bold text-slate-400">Chưa có bác sĩ nào.</div>}
               </div>
               <Pagination pagination={pagination} onPageChange={load} />
             </section>
@@ -344,60 +348,104 @@ export default function DoctorsPage() {
   );
 }
 
-function Hero({ totalLabel, onCreate, onTrash }) { return <div className="flex items-center justify-between gap-3"><span className="rounded-xl bg-white px-3 py-1 text-xs font-black text-cyan-700 border border-cyan-100">{totalLabel}</span><div className="flex gap-2"><button type="button" title="Bác sĩ đã xóa" onClick={onTrash} className="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600"><Trash2 size={18} /></button><button onClick={onCreate} className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ Thêm bác sĩ</button></div></div>; }
+function Hero({ onCreate, onTrash, total }) {
+  return (
+    <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-8 shadow-sm">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-200/60">
+              Đội ngũ Bác sĩ ({total} chuyên gia)
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            Quản lý Đội ngũ Bác sĩ
+          </h1>
+          <p className="text-sm font-medium text-slate-500">
+            Quản lý chứng chỉ hành nghề, chuyên khoa khám và lịch phân công bác sĩ.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            title="Bác sĩ đã xóa"
+            onClick={onTrash}
+            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all shadow-xs"
+          >
+            <Trash2 size={18} strokeWidth={2} />
+          </button>
+          <button
+            onClick={onCreate}
+            className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-sky-700 transition-all"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Thêm bác sĩ mới
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SearchBar({ filters, setFilters, onSearch, onReset }) {
   const activeCount = [filters.specialty, filters.search, filters.status].filter(Boolean).length;
   return (
-    <form onSubmit={onSearch} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+    <form onSubmit={onSearch} className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm">
       <div className="mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600"><Search className="h-4 w-4" strokeWidth={2.5} /></span>
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-50 text-sky-600 border border-sky-100">
+            <Filter className="h-5 w-5" strokeWidth={2} />
+          </span>
           <div>
-            <p className="text-sm font-black text-slate-800">Bộ lọc bác sĩ</p>
-            <p className="text-xs font-semibold text-slate-400">{activeCount > 0 ? `${activeCount} bộ lọc đang áp dụng` : 'Tìm theo chuyên khoa, từ khóa và trạng thái hiển thị.'}</p>
+            <p className="text-base font-bold text-slate-900">Bộ lọc bác sĩ</p>
+            <p className="text-xs font-medium text-slate-400">{activeCount > 0 ? `${activeCount} bộ lọc đang áp dụng` : 'Tìm theo chuyên khoa, từ khóa và trạng thái hiển thị.'}</p>
           </div>
         </div>
-        {activeCount > 0 && <button type="button" onClick={onReset} className="inline-flex w-fit items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-500 hover:bg-slate-50">Xóa lọc</button>}
+        {activeCount > 0 && <button type="button" onClick={onReset} className="inline-flex items-center gap-1 rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">Xóa lọc</button>}
       </div>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.15fr_1.4fr_1fr_150px] lg:items-end">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.15fr_1.4fr_1fr_140px] lg:items-end">
         <FilterSelect label="Chuyên khoa" value={filters.specialty} onChange={(v) => setFilters({ ...filters, specialty: v })} empty="Tất cả chuyên khoa" options={SPECIALTIES} />
         <FilterInput label="Tìm kiếm" value={filters.search} onChange={(v) => setFilters({ ...filters, search: v })} placeholder="Tên bác sĩ, chứng chỉ..." />
         <FilterSelect label="Ẩn / hiện" value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })} empty="Tất cả trạng thái" options={[{ value: 'ACTIVE', label: 'Đang hiện' }, { value: 'INACTIVE', label: 'Đã ẩn' }]} />
-        <div className="space-y-1.5"><span className="block text-xs font-black text-transparent">Tìm kiếm</span><button className="inline-flex h-[42px] w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 px-5 text-sm font-black text-white shadow-sm hover:bg-cyan-700 whitespace-nowrap"><Search className="h-4 w-4" strokeWidth={2.5} /> Tìm kiếm</button></div>
+        <div className="space-y-1.5"><span className="block text-xs font-bold text-transparent">Tìm kiếm</span><button className="inline-flex h-[42px] w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 text-xs font-bold text-white shadow-xs hover:bg-sky-700 whitespace-nowrap"><Search className="h-4 w-4" strokeWidth={2.5} /> Tìm kiếm</button></div>
       </div>
     </form>
   );
 }
-function FilterInput({ label, value, onChange, placeholder }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><input value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-[42px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100 outline-none" /></label>; }
-function FilterSelect({ label, value, onChange, options, empty }) { return <label className="block space-y-1.5"><span className="text-[13px] font-bold text-slate-700">{label}</span><select value={value || ''} onChange={(e) => onChange(e.target.value)} className="h-[42px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100 outline-none">{empty && <option value="">{empty}</option>}{options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>; }
+
+function FilterInput({ label, value, onChange, placeholder }) { return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}</span><input value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-[42px] w-full rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 text-xs font-semibold focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 outline-none" /></label>; }
+function FilterSelect({ label, value, onChange, options, empty }) { return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}</span><select value={value || ''} onChange={(e) => onChange(e.target.value)} className="h-[42px] w-full rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 text-xs font-semibold focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 outline-none">{empty && <option value="">{empty}</option>}{options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>; }
+
 function DoctorRow({ doctor, onEdit, onToggleStatus, onRemove, onViewDetails, busy }) {
   return (
-    <article className="p-5 hover:bg-slate-50/70">
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_0.9fr_0.9fr_0.85fr_0.9fr_230px] xl:items-center">
-        <div className="flex items-center gap-3">
-          <img src={doctor.staffProfile?.avatarUrl} alt={doctor.staffProfile?.fullName || 'Bác sĩ'} className="w-11 h-11 rounded-2xl object-cover border border-cyan-100 bg-cyan-50" />
-          <div>
-            <strong className="block text-slate-950">{doctor.staffProfile?.fullName}</strong>
-            <span className="text-xs text-slate-500">{doctor.staffProfile?.user?.email}</span>
+    <article className="p-6 hover:bg-slate-50/80 transition-all">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_0.9fr_0.9fr_0.85fr_0.9fr_220px] xl:items-center">
+        <div className="flex items-center gap-3.5">
+          <img src={doctor.staffProfile?.avatarUrl} alt={doctor.staffProfile?.fullName || 'Bác sĩ'} className="w-12 h-12 rounded-2xl object-cover border border-sky-100 bg-sky-50 shadow-xs" />
+          <div className="min-w-0">
+            <strong className="block text-slate-900 font-bold truncate text-sm">{doctor.staffProfile?.fullName}</strong>
+            <span className="text-xs font-medium text-slate-400 truncate block">{doctor.staffProfile?.user?.email}</span>
           </div>
         </div>
         <Info label="Chuyên khoa" value={getSpecialtyLabel(doctor.specialty)} />
         <Info label="Phòng khám" value={doctor.staffProfile?.department?.name || 'Chưa gán'} />
-        <span className={`w-fit rounded-lg border px-2.5 py-1 text-xs font-black ${statusTone[doctor.staffProfile?.user?.status] || statusTone.ACTIVE}`}>{statusLabel[doctor.staffProfile?.user?.status] || 'Không rõ'}</span>
+        <span className={`w-fit rounded-lg border px-2.5 py-1 text-xs font-bold ${statusTone[doctor.staffProfile?.user?.status] || statusTone.ACTIVE}`}>{statusLabel[doctor.staffProfile?.user?.status] || 'Không rõ'}</span>
         <div>
-          <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Trạng thái dữ liệu</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Trạng thái dữ liệu</p>
           <BlockchainStatusBadge status={doctor.blockchainStatus} size="xs" />
         </div>
         <div className="flex flex-wrap gap-2 xl:justify-end">
-          <button type="button" disabled={busy} onClick={() => onViewDetails(doctor.id)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-cyan-600 hover:bg-cyan-50 disabled:opacity-50">Chi tiết</button>
-          <button type="button" disabled={busy} onClick={() => onEdit(doctor)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 disabled:opacity-50">Sửa</button>
-          <button type="button" disabled={busy} onClick={() => onToggleStatus(doctor)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 disabled:opacity-50">{doctor.staffProfile?.user?.status === 'INACTIVE' ? 'Hiện' : 'Ẩn'}</button>
-          <button type="button" disabled={busy} onClick={() => onRemove(doctor)} className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-100 disabled:opacity-50">Xóa</button>
+          <SmallButton onClick={() => onViewDetails(doctor.id)} disabled={busy}>Chi tiết</SmallButton>
+          <SmallButton onClick={() => onEdit(doctor)} disabled={busy}>Sửa</SmallButton>
+          <SmallButton onClick={() => onToggleStatus(doctor)} disabled={busy}>{doctor.staffProfile?.user?.status === 'INACTIVE' ? 'Hiện' : 'Ẩn'}</SmallButton>
+          <SmallButton danger onClick={() => onRemove(doctor)} disabled={busy}>Xóa</SmallButton>
         </div>
       </div>
     </article>
   );
 }
+
 function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy }) {
   const isCreate = mode === 'create';
   const [fieldErrors, setFieldErrors] = useState({});
@@ -542,20 +590,20 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
-      <form onSubmit={handleSubmit} className="w-full max-w-[1280px] max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-4">
+      <form onSubmit={handleSubmit} className="w-full max-w-[1280px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
         <div className="flex justify-between gap-4">
           <div>
-            <h3 className="text-2xl font-black text-slate-950">{isCreate ? 'Thêm bác sĩ' : 'Cập nhật bác sĩ'}</h3>
-            <p className="text-sm text-slate-500">
+            <h3 className="text-2xl font-bold text-slate-900">{isCreate ? 'Thêm bác sĩ' : 'Cập nhật bác sĩ'}</h3>
+            <p className="text-xs font-semibold text-slate-400">
               {isCreate
-                ? ''
+                ? 'Tạo mới hồ sơ nhân sự kèm thông tin chứng chỉ bác sĩ.'
                 : 'Cập nhật thông tin nhân sự, chuyên môn và phòng khám phụ trách.'}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-500">Đóng</button>
+          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50">Đóng</button>
         </div>
         <SectionTitle title="Thông tin tài khoản và nhân sự" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Input label="Họ tên" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: onlyVietnameseNameChars(v) })} onBlur={() => validateField('fullName')} error={fieldErrors.fullName} required maxLength={MAX_FULL_NAME_LENGTH} />
           <AvatarUpload value={form.avatarUrl} onChange={(url) => setForm({ ...form, avatarUrl: url })} uploadFn={doctorService.uploadAvatar} />
           <Input label="Tên đăng nhập" value={form.username} onChange={(v) => setForm({ ...form, username: onlyUsernameChars(v) })} onBlur={() => validateField('username')} error={fieldErrors.username} disabled={!isCreate} required maxLength={MAX_USERNAME_LENGTH} />
@@ -585,13 +633,13 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
           />
         </div>
         <SectionTitle title="Thông tin chuyên môn" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Select label="Chuyên khoa" value={form.specialty} onChange={(v) => { setForm({ ...form, specialty: v }); validateField('specialty', v); }} error={fieldErrors.specialty} empty="Chọn chuyên khoa" required options={SPECIALTIES} />
           <Input label="Số chứng chỉ" value={form.licenseNumber} onChange={(v) => setForm({ ...form, licenseNumber: v.slice(0, MAX_LICENSE_NUMBER_LENGTH) })} onBlur={() => validateField('licenseNumber')} error={fieldErrors.licenseNumber} required maxLength={MAX_LICENSE_NUMBER_LENGTH} />
           <Select label="Trình độ" value={form.qualification} onChange={(v) => { setForm({ ...form, qualification: v }); validateField('qualification', v); }} error={fieldErrors.qualification} empty="Chọn trình độ" required options={QUALIFICATIONS} />
           <Input type="text" label="Số năm kinh nghiệm" value={form.yearsExperience} onChange={(v) => setForm({ ...form, yearsExperience: onlyDigits(v).slice(0, 2) })} onBlur={() => validateField('yearsExperience')} error={fieldErrors.yearsExperience} required maxLength={2} inputMode="numeric" pattern="[0-9]*" />
         </div>
-        <button disabled={busy} className="w-full rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white hover:bg-cyan-700 disabled:opacity-70">
+        <button disabled={busy} className="w-full rounded-2xl bg-sky-600 px-5 py-3 text-sm font-bold text-white hover:bg-sky-700 disabled:opacity-70 shadow-sm transition-all">
           {isCreate ? 'Tạo bác sĩ' : 'Lưu thay đổi'}
         </button>
       </form>
@@ -599,15 +647,27 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
   );
 }
 
-function SectionTitle({ title }) { return <h4 className="border-t border-slate-100 pt-3 text-sm font-black text-slate-800 first:border-t-0 first:pt-0">{title}</h4>; }
-function Pagination({ pagination, onPageChange }) { return <div className="flex items-center justify-between border-t border-slate-100 p-4"><p className="text-sm font-semibold text-slate-500">Trang {pagination.page}/{pagination.totalPages}</p><div className="flex gap-2"><SmallButton disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>Trước</SmallButton><SmallButton disabled={pagination.page >= pagination.totalPages} onClick={() => onPageChange(pagination.page + 1)}>Sau</SmallButton></div></div>; }
-function Info({ label, value }) { return <div><p className="text-[11px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className="text-sm font-bold text-slate-700">{value}</p></div>; }
-function Alert({ children }) { return <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">{children}</div>; }
-function SmallButton({ children, onClick, disabled }) { return <button type="button" disabled={disabled} onClick={onClick} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 disabled:opacity-50">{children}</button>; }
+function SectionTitle({ title }) { return <h4 className="border-t border-slate-100 pt-4 text-xs font-extrabold uppercase tracking-wider text-slate-700 first:border-t-0 first:pt-0">{title}</h4>; }
+
+function Pagination({ pagination, onPageChange }) {
+  return (
+    <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
+      <p className="text-xs font-bold text-slate-500">Trang {pagination.page}/{pagination.totalPages}</p>
+      <div className="flex gap-2">
+        <SmallButton disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>Trang trước</SmallButton>
+        <SmallButton disabled={pagination.page >= pagination.totalPages} onClick={() => onPageChange(pagination.page + 1)}>Trang sau</SmallButton>
+      </div>
+    </div>
+  );
+}
+
+function Info({ label, value }) { return <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</p><p className="text-xs font-bold text-slate-800">{value}</p></div>; }
+function SmallButton({ children, onClick, disabled, danger }) { return <button type="button" disabled={disabled} onClick={onClick} className={`rounded-xl border px-3 py-2 text-xs font-bold transition-all disabled:opacity-50 ${danger ? 'border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-sky-50 hover:text-sky-600 hover:border-sky-200'}`}>{children}</button>; }
+
 function Input({ label, value, onChange, onBlur, error, required, placeholder, type = 'text', disabled, maxLength, inputMode, pattern }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-[13px] font-bold text-slate-700">{label}</span>
+      <span className="text-xs font-bold text-slate-700">{label}</span>
       <input
         type={type}
         required={required}
@@ -621,12 +681,13 @@ function Input({ label, value, onChange, onBlur, error, required, placeholder, t
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
         placeholder={placeholder}
-        className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none disabled:opacity-60 disabled:cursor-not-allowed transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`}
+        className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 outline-none disabled:opacity-60 disabled:cursor-not-allowed transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`}
       />
       <FieldError message={error} />
     </label>
   );
 }
+
 function DateInput({ label, value, onChange, onBlur, error, required }) {
   const pickerRef = useRef(null);
   const openPicker = () => {
@@ -645,7 +706,7 @@ function DateInput({ label, value, onChange, onBlur, error, required }) {
 
   return (
     <label className="block space-y-1.5">
-      <span className="text-[13px] font-bold text-slate-700">{label}</span>
+      <span className="text-xs font-bold text-slate-700">{label}</span>
       <div className="relative">
         <input
           type="text"
@@ -657,9 +718,9 @@ function DateInput({ label, value, onChange, onBlur, error, required }) {
           placeholder="dd/mm/yyyy"
           inputMode="numeric"
           maxLength={10}
-          className={`w-full px-3.5 py-2.5 pr-10 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`}
+          className={`w-full px-3.5 py-2.5 pr-10 bg-slate-50 border rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 outline-none transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`}
         />
-        <button type="button" onClick={openPicker} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-500 hover:bg-cyan-50 hover:text-cyan-600" title="Chọn ngày sinh">
+        <button type="button" onClick={openPicker} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 hover:bg-sky-50 hover:text-sky-600" title="Chọn ngày sinh">
           <Calendar className="h-4 w-4" />
         </button>
         <input
@@ -677,27 +738,24 @@ function DateInput({ label, value, onChange, onBlur, error, required }) {
     </label>
   );
 }
+
 function AddressInput({ label, value, onChange, onBlur, onFocus, error, maxLength, suggestions, loading, searched, open, onSelect }) {
   return (
     <label className="relative block space-y-1.5">
-      <span className="text-[13px] font-bold text-slate-700">{label}</span>
+      <span className="text-xs font-bold text-slate-700">{label}</span>
       <div className="relative">
-        <input value={value || ''} onChange={(e) => onChange(e.target.value)} onFocus={onFocus} onBlur={onBlur} placeholder="Nhập địa chỉ để gợi ý..." title={value || ''} required maxLength={maxLength} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 pr-10 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`} />
+        <input value={value || ''} onChange={(e) => onChange(e.target.value)} onFocus={onFocus} onBlur={onBlur} placeholder="Nhập địa chỉ để gợi ý..." title={value || ''} required maxLength={maxLength} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 pr-10 bg-slate-50 border rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 outline-none transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`} />
         <MapPin className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
       </div>
       {open && (loading || searched || suggestions.length > 0) && (
         <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl">
-          {loading && <p className="px-3.5 py-3 text-sm font-semibold text-slate-500">Đang tìm địa chỉ...</p>}
-          {!loading && searched && suggestions.length === 0 && <p className="px-3.5 py-3 text-sm font-semibold text-slate-500">Chưa tìm thấy trên OpenStreetMap. Thử nhập thêm phường/quận/thành phố.</p>}
+          {loading && <p className="px-3.5 py-3 text-xs font-semibold text-slate-500">Đang tìm địa chỉ...</p>}
+          {!loading && searched && suggestions.length === 0 && <p className="px-3.5 py-3 text-xs font-semibold text-slate-500">Chưa tìm thấy địa chỉ.</p>}
           {!loading && suggestions.map((item) => (
-            <div key={item.place_id} className="flex items-start gap-2 border-b border-slate-100 p-2.5 last:border-b-0 hover:bg-cyan-50/60">
+            <div key={item.place_id} className="flex items-start gap-2 border-b border-slate-100 p-2.5 last:border-b-0 hover:bg-sky-50/60">
               <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => onSelect(item)} className="min-w-0 flex-1 text-left">
-                <span className="block text-sm font-bold leading-5 text-slate-800 line-clamp-2" title={item.displayName || item.display_name}>{item.displayName || item.display_name}</span>
-                <span className="mt-1 block text-xs font-semibold text-slate-400">{item.lat}, {item.lon}</span>
+                <span className="block text-xs font-bold leading-5 text-slate-800 line-clamp-2" title={item.displayName || item.display_name}>{item.displayName || item.display_name}</span>
               </button>
-              <a href={buildGoogleMapsDirectionsUrl(item.lat, item.lon)} target="_blank" rel="noreferrer" className="rounded-xl border border-cyan-100 bg-white p-2 text-cyan-600 hover:bg-cyan-600 hover:text-white" title="Mở chỉ đường Google Maps" onClick={(e) => e.stopPropagation()}>
-                <ExternalLink className="h-4 w-4" />
-              </a>
             </div>
           ))}
         </div>
@@ -706,11 +764,12 @@ function AddressInput({ label, value, onChange, onBlur, onFocus, error, maxLengt
     </label>
   );
 }
+
 function Select({ label, value, onChange, options, empty, required, disabled, error }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-[13px] font-bold text-slate-700">{label}</span>
-      <select required={required} disabled={disabled} value={value || ''} aria-invalid={Boolean(error)} onChange={(e) => onChange(e.target.value)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:ring-2 outline-none disabled:opacity-60 disabled:cursor-not-allowed transition-colors ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-cyan-400 focus:ring-cyan-100'}`}>
+      <span className="text-xs font-bold text-slate-700">{label}</span>
+      <select required={required} disabled={disabled} value={value || ''} aria-invalid={Boolean(error)} onChange={(e) => onChange(e.target.value)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 outline-none disabled:opacity-60 disabled:cursor-not-allowed transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`}>
         {empty && <option value="">{empty}</option>}
         {options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}
       </select>
@@ -718,6 +777,7 @@ function Select({ label, value, onChange, options, empty, required, disabled, er
     </label>
   );
 }
+
 function FieldError({ message }) {
-  return <p className={`min-h-[1rem] text-xs font-bold leading-4 transition-colors ${message ? 'text-rose-600' : 'text-transparent'}`}>{message || 'Không có lỗi'}</p>;
+  return <p className={`min-h-[14px] text-[11px] font-bold leading-3 transition-colors ${message ? 'text-rose-600' : 'text-transparent'}`}>{message || 'Lỗi'}</p>;
 }
