@@ -16,6 +16,17 @@ import { AuditRecoveryService } from '../../../infrastructure/audit/audit-recove
 import { RecoverAuditBatchDto } from '../dto/recover-audit-batch.dto';
 import { EntityRecoveryService } from '../../../infrastructure/audit/entity-recovery.service';
 import { PreviewRecoverAuditEntitiesDto, RecoverAuditEntitiesDto } from '../dto/recover-audit-entities.dto';
+import type { AuditBatch, BlockchainLogger, Prisma } from '@prisma/client';
+
+const UNFINALIZED_AUDIT_BATCH_STATUSES = new Set([
+  'PENDING',
+  'PREPARING',
+  'ARTIFACT_READY',
+  'ON_CHAIN_CONFIRMED',
+]);
+
+type AuditBatchMembership = Pick<AuditBatch, 'batchId' | 'fromSeq' | 'toSeq' | 'status'>;
+type AuditBatchRows = Map<number, BlockchainLogger[]>;
 
 /**
  * Admin-only audit + integrity API. Surfaces the tamper-evidence machinery so it can be
@@ -213,9 +224,9 @@ export class AuditController {
       this.prisma.auditBatch.count(),
     ]);
 
-    const batchIds = items.map((item) => item.batchId);
-    const contentByBatch = await this.buildBatchContentSummaries(batchIds);
-    const integrityByBatch = await this.buildBatchIntegritySummaries(batchIds);
+    const rowsByBatch = await this.loadBatchRows(items);
+    const contentByBatch = await this.buildBatchContentSummaries(rowsByBatch);
+    const integrityByBatch = this.buildBatchIntegritySummaries(rowsByBatch);
 
     return {
       items: items.map(({ artifactUri, ...item }) => ({
@@ -246,10 +257,8 @@ export class AuditController {
     const batch = await this.prisma.auditBatch.findUnique({ where: { batchId } });
     if (!batch) throw new NotFoundException('Không tìm thấy lô audit.');
 
-    const rows = await this.prisma.blockchainLogger.findMany({
-      where: { batchId },
-      orderBy: { seq: 'asc' },
-    });
+    const rowsByBatch = await this.loadBatchRows([batch]);
+    const rows = rowsByBatch.get(batchId) ?? [];
 
     const actorIds = [...new Set(rows.map((r) => r.actorId).filter((id): id is string => Boolean(id)))];
     const actors = actorIds.length
@@ -271,7 +280,7 @@ export class AuditController {
       this.presentAuditRow(row, row.actorId ? actorMap.get(row.actorId) : null, user, false, false, subjectMap.get(this.subjectKey(row)) ?? null),
     );
     const integrity = this.summarizeIntegrityFromPresented(logs);
-    const contentSummary = (await this.buildBatchContentSummaries([batchId])).get(batchId) ?? [];
+    const contentSummary = (await this.buildBatchContentSummaries(rowsByBatch)).get(batchId) ?? [];
 
     const { artifactUri, ...safeBatch } = batch as typeof batch & { artifactUri?: string | null };
     return {
@@ -391,25 +400,44 @@ export class AuditController {
   }
 
 
-  private async buildBatchIntegritySummaries(batchIds: number[]) {
+  private async loadBatchRows(batches: AuditBatchMembership[]): Promise<AuditBatchRows> {
+    const byBatch: AuditBatchRows = new Map(batches.map((batch) => [batch.batchId, []]));
+    if (!batches.length) return byBatch;
+
+    const unfinalized = batches.filter(
+      (batch) => UNFINALIZED_AUDIT_BATCH_STATUSES.has(batch.status)
+        && batch.fromSeq != null
+        && batch.toSeq != null,
+    );
+    const filters: Prisma.BlockchainLoggerWhereInput[] = [
+      { batchId: { in: batches.map((batch) => batch.batchId) } },
+      ...unfinalized.map((batch) => ({
+        batchId: null,
+        seq: { gte: batch.fromSeq!, lte: batch.toSeq! },
+      })),
+    ];
+    const rows = await this.prisma.blockchainLogger.findMany({
+      where: { OR: filters },
+      orderBy: { seq: 'asc' },
+    });
+
+    for (const row of rows) {
+      const rangeBatchId = row.batchId == null && row.seq != null
+        ? unfinalized.find((batch) => row.seq! >= batch.fromSeq! && row.seq! <= batch.toSeq!)?.batchId
+        : undefined;
+      const batchId = row.batchId ?? rangeBatchId;
+      if (batchId == null || !byBatch.has(batchId)) continue;
+      byBatch.get(batchId)!.push(row);
+    }
+
+    return byBatch;
+  }
+
+  private buildBatchIntegritySummaries(byBatch: AuditBatchRows) {
     const map = new Map<
       number,
       { status: 'VERIFIED' | 'TAMPERED' | 'PENDING'; verified: number; tampered: number; pending: number; total: number }
     >();
-    if (!batchIds.length) return map;
-
-    const rows = await this.prisma.blockchainLogger.findMany({
-      where: { batchId: { in: batchIds } },
-      orderBy: { seq: 'asc' },
-    });
-
-    const byBatch = new Map<number, typeof rows>();
-    for (const row of rows) {
-      if (row.batchId == null) continue;
-      const list = byBatch.get(row.batchId) ?? [];
-      list.push(row);
-      byBatch.set(row.batchId, list);
-    }
 
     for (const [batchId, batchRows] of byBatch.entries()) {
       let verified = 0;
@@ -500,24 +528,9 @@ export class AuditController {
   }
 
   /** Compact "what's inside this batch" for the admin recovery UI. */
-  private async buildBatchContentSummaries(batchIds: number[]) {
+  private async buildBatchContentSummaries(byBatch: AuditBatchRows) {
     const map = new Map<number, Array<{ entity: string; count: number; samples: string[] }>>();
-    if (!batchIds.length) return map;
-
-    const rows = await this.prisma.blockchainLogger.findMany({
-      where: { batchId: { in: batchIds } },
-      select: { batchId: true, entity: true, entityId: true, action: true, seq: true },
-      orderBy: { seq: 'asc' },
-      take: 2000,
-    });
-
-    const byBatch = new Map<number, typeof rows>();
-    for (const row of rows) {
-      if (row.batchId == null) continue;
-      const list = byBatch.get(row.batchId) ?? [];
-      list.push(row);
-      byBatch.set(row.batchId, list);
-    }
+    if (!byBatch.size) return map;
 
     await Promise.all(
       [...byBatch.entries()].map(async ([batchId, batchRows]) => {
