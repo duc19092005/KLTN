@@ -26,7 +26,7 @@ function makeAudit(storedHash: string) {
   return {
     hashSnapshot: jest.fn().mockReturnValue({ salt: 'salt-1', hash: storedHash }),
     recompute: jest.fn().mockReturnValue(storedHash),
-    record: jest.fn().mockResolvedValue({}),
+    recordV2: jest.fn().mockResolvedValue({}),
   };
 }
 
@@ -142,9 +142,9 @@ describe('BlockchainAiModelIntegrityAnchor', () => {
       where: { id: model.id },
       data: { hash256: model.hash256, dataSalt: 'salt-1' },
     });
-    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
+    expect(audit.recordV2).toHaveBeenCalledWith(expect.objectContaining({
       action: 'DELETE',
       after: expect.objectContaining({ isDeleted: true }),
-    }));
+    }), undefined);
   });
 });

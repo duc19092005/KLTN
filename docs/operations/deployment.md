@@ -1,6 +1,6 @@
 # Deployment Guide - KLTN Hospital System
 
-This guide deploys the NestJS backend, React/Vite frontend, PostgreSQL, Kafka, and Nginx reverse proxy on an Ubuntu VPS using GitHub Actions, GHCR, Docker, and Docker Compose.
+This guide deploys the NestJS backend, React/Vite frontend, PostgreSQL, and Nginx reverse proxy on an Ubuntu VPS using GitHub Actions, GHCR, Docker, and Docker Compose.
 
 ## 1. Production architecture
 
@@ -12,14 +12,16 @@ nginx:80
   └─ /api  -> backend:3001
 
 backend -> postgres:5432
-backend -> kafka:9092
 ```
+
+PostgreSQL also stores the durable audit queue (`BlockchainLogger.batchId IS NULL`) and
+incomplete `AuditBatch` checkpoints, allowing the anchoring worker to resume after restart.
 
 This project is currently designed for a personal machine used as the server.
 GitHub Actions joins your Tailscale tailnet before SSH, so `VPS_HOST` can be the
 Tailscale IP, for example `100.89.226.81`.
 
-PostgreSQL and Kafka use named Docker volumes. Do not run `docker compose down -v` in production.
+PostgreSQL uses a named Docker volume. Do not run `docker compose down -v` in production.
 
 ## 2. Create deploy user
 
@@ -127,7 +129,6 @@ Important rules:
 - Do not commit real `.env` files.
 - Root `.env` must contain `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `BACKEND_IMAGE`, and `FRONTEND_IMAGE`.
 - `apps/hospital-api/.env` must contain `DATABASE_URL` pointing to `postgres:5432`.
-- `apps/hospital-api/.env` should use `KAFKA_ENABLED=true` and `KAFKA_BROKERS=kafka:9092`.
 - `apps/hospital-web/.env` values are public because `VITE_*` variables are built into the browser bundle.
 
 ## 6. GitHub Secrets
@@ -176,7 +177,7 @@ After HTTPS is configured:
 sudo ufw allow 443/tcp
 ```
 
-Do not expose PostgreSQL `5432` or Kafka ports to the Internet.
+Do not expose PostgreSQL `5432` to the Internet.
 
 ## 8. GHCR login on server
 
@@ -215,7 +216,6 @@ docker compose -f infrastructure/compose/compose.prod.yml ps
 curl -f http://localhost/health
 curl -f http://localhost/api/health
 docker compose -f infrastructure/compose/compose.prod.yml logs --tail=100 backend
-docker compose -f infrastructure/compose/compose.prod.yml logs --tail=100 kafka
 ```
 
 ## 11. Database migrations

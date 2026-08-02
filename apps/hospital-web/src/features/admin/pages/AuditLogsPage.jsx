@@ -668,10 +668,21 @@ function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason,
                   <td className="max-w-sm px-4 py-4 text-slate-600">
                     <p className="font-semibold">{fields.length ? fields.join(', ') : 'Không công khai chi tiết dữ liệu'}</p>
                     <p className="mt-1 text-[10px] text-slate-400">{item.message}</p>
+                    {(item.blockers || []).length > 0 && (
+                      <p className="mt-1 text-[10px] font-semibold text-amber-700">
+                        Trở ngại: {item.blockers.join(', ')}
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-4">
                     <span className={`inline-flex rounded-lg border px-2.5 py-1 text-[10px] font-bold ${item.recoverable ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
-                      {item.recoverable ? 'Có thể khôi phục' : 'Cần xử lý audit/PITR'}
+                      {item.recoveryMode === 'DEPENDENCY_CHAIN'
+                        ? 'Khôi phục chuỗi phụ thuộc'
+                        : item.recoveryMode === 'AUDIT_BATCH_FIRST'
+                          ? 'Khôi phục audit batch trước'
+                          : item.recoveryMode === 'PITR_REQUIRED'
+                            ? 'Cần backup/PITR thủ công'
+                            : item.recoverable ? 'Có thể khôi phục' : 'Không thể khôi phục tự động'}
                     </span>
                   </td>
                 </tr>

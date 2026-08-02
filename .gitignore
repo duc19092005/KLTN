@@ -22,6 +22,7 @@ pnpm-debug.log*
 # Database backups
 backups/
 *.sql
+!apps/hospital-api/prisma/migrations/**/migration.sql
 *.sql.gz
 
 # OS / Editor

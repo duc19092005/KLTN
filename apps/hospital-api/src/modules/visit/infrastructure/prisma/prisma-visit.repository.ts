@@ -24,7 +24,17 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
   async findById(id: string): Promise<VisitEntity | null> {
     return this.prisma.visit.findUnique({
       where: { id },
-      select: { id: true, patientId: true, departmentId: true, staffId: true, status: true },
+      select: {
+        id: true,
+        visitCode: true,
+        patientId: true,
+        departmentId: true,
+        staffId: true,
+        status: true,
+        source: true,
+        checkInAt: true,
+        completedAt: true,
+      },
     });
   }
 

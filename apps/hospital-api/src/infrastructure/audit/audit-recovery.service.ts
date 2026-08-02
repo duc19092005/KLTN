@@ -151,13 +151,6 @@ export class AuditRecoveryService {
         });
 
         await tx.$executeRaw`SELECT set_config('app.audit_recovery_authorized', 'true', true)`;
-        const recoveredLogIds = bundle.logs.map((row) => row.id);
-        // Kafka receipts/outbox rows are delivery metadata, not part of the anchored audit
-        // content. They reference BlockchainLogger with NoAction and must be removed before
-        // replacing the damaged rows. Recovered rows are already anchored, so they must not be
-        // republished to Kafka.
-        await tx.auditKafkaReceipt.deleteMany({ where: { auditLogId: { in: recoveredLogIds } } });
-        await tx.auditOutbox.deleteMany({ where: { auditLogId: { in: recoveredLogIds } } });
         await tx.blockchainLogger.deleteMany({
           where: { seq: { gte: bundle.batch.fromSeq, lte: bundle.batch.toSeq } },
         });

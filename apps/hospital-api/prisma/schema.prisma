@@ -647,7 +647,7 @@ model AiQuality {
 /// (exactly one FK is set per row, the rest are null).
 model BlockchainLogger {
   id      String  @id @default(uuid())
-  eventId String? @unique // idempotency key shared with the Kafka audit journal
+  eventId String? @unique // stable correlation/idempotency identifier retained in recovery artifacts
 
   // Who performed the change, what action, and on which logical entity
   actorId  String?
@@ -712,10 +712,8 @@ model BlockchainLogger {
   medicalConclusionId String?
   medicalConclusion   MedicalConclusion? @relation(fields: [medicalConclusionId], references: [id])
 
-  aiQualityId   String?
-  aiQuality     AiQuality?          @relation(fields: [aiQualityId], references: [id])
-  outbox        AuditOutbox?        @relation("AuditOutboxAuditLog")
-  kafkaReceipts AuditKafkaReceipt[] @relation("AuditKafkaReceiptAuditLog")
+  aiQualityId String?
+  aiQuality   AiQuality? @relation(fields: [aiQualityId], references: [id])
 
   createdAt DateTime @default(now())
 
@@ -766,39 +764,6 @@ model AuditBatch {
   @@index([status])
   @@index([algorithmVersion])
   @@index([createdAt])
-}
-
-/// Transactional hand-off from PostgreSQL to Kafka. The audit row and this record are created
-/// atomically, so a process crash cannot create a business change without a durable audit event.
-model AuditOutbox {
-  id          String           @id @default(uuid())
-  eventId     String           @unique
-  auditLogId  String           @unique
-  auditLog    BlockchainLogger @relation("AuditOutboxAuditLog", fields: [auditLogId], references: [id], onDelete: NoAction)
-  topic       String
-  payload     Json
-  status      String           @default("PENDING") // PENDING | PUBLISHED | FAILED
-  attempts    Int              @default(0)
-  lastError   String?
-  publishedAt DateTime?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-
-  @@index([status, createdAt])
-}
-
-/// Idempotency receipt maintained by the Kafka consumer. Replaying a retained topic is safe.
-model AuditKafkaReceipt {
-  id          String           @id @default(uuid())
-  eventId     String           @unique
-  auditLogId  String
-  auditLog    BlockchainLogger @relation("AuditKafkaReceiptAuditLog", fields: [auditLogId], references: [id], onDelete: NoAction)
-  topic       String
-  partition   Int
-  offset      String
-  processedAt DateTime         @default(now())
-
-  @@index([auditLogId])
 }
 
 /// Operational evidence for face-gated recovery. No artifact plaintext is stored here.

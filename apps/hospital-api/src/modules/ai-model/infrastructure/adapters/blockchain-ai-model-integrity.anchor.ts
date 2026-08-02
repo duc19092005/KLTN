@@ -35,19 +35,21 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
     const client = tx ?? this.prisma;
     await client.aiModelRegistry.update({ where: { id: model.id }, data: { hash256: dataHash, dataSalt } });
 
-    const auditRecord = {
+    await this.audit.recordV2({
       entity: 'AiModelRegistry',
       entityId: model.id,
       action,
       actorId,
-      dataHash,
-      dataSalt,
-      before: before ?? null,
+      before: this.toAuditSnapshot(before),
       after: snapshot,
       onChainStatus: 'PENDING',
-    };
-    if (tx) await this.audit.record(auditRecord, tx);
-    else await this.audit.record(auditRecord);
+    }, tx);
+  }
+
+  private toAuditSnapshot(value: unknown): Record<string, unknown> | null {
+    if (value == null) return null;
+    if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+    return { value };
   }
 
   async evaluate(model: any, skipChainCheck = false): Promise<IntegrityEvaluation> {

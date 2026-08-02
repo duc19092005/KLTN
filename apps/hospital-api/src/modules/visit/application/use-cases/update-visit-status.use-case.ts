@@ -4,6 +4,7 @@ import { AuthUser } from '../../../../common/types/auth-user.type';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
 import { VisitTransitionPolicy } from '../policies/visit-transition.policy';
 import { VISIT_REPOSITORY, VisitRepositoryPort } from '../ports/visit.repository.port';
+import { buildVisitSnapshot } from '../../domain/visit-snapshot';
 
 /**
  * Direct status transition workflow for PATCH /visits/:id/status.
@@ -42,7 +43,7 @@ export class UpdateVisitStatusUseCase {
 
     this.transitionPolicy.assertTransitionAllowed(visit.status, status);
 
-    const previousStatus = visit.status;
+    const previousSnapshot = buildVisitSnapshot(visit);
     const completedAt =
       status === VisitStatus.COMPLETED || status === VisitStatus.CANCELLED ? new Date() : undefined;
     const result = await this.repo.updateStatus(
@@ -56,9 +57,9 @@ export class UpdateVisitStatusUseCase {
           entityId: id,
           action: 'UPDATE',
           actorId: user?.sub ?? null,
-          before: { status: previousStatus },
-          after: { status, completedAt: completedAt ?? null, staffId: updatedVisit.staffId },
-          metadata: { schema: 'KLTN_VISIT_STATUS_AUDIT_V2', field: 'status', from: previousStatus, to: status },
+          before: previousSnapshot,
+          after: buildVisitSnapshot(updatedVisit),
+          metadata: { schema: 'KLTN_VISIT_STATUS_AUDIT_V3', field: 'status', from: visit.status, to: status },
         }, tx);
       },
     );

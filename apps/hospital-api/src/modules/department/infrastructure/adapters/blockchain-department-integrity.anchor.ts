@@ -36,17 +36,21 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
     const client = tx ?? this.prisma;
     await client.department.update({ where: { id: department.id }, data: { hash256: dataHash, dataSalt } });
 
-    await this.audit.record({
+    await this.audit.recordV2({
       entity: 'Department',
       entityId: department.id,
       action,
       actorId,
-      dataHash,
-      dataSalt,
-      before: before ?? null,
+      before: this.toAuditSnapshot(before),
       after: snapshot,
       onChainStatus: 'PENDING',
     }, tx);
+  }
+
+  private toAuditSnapshot(value: unknown): Record<string, unknown> | null {
+    if (value == null) return null;
+    if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+    return { value };
   }
 
   async evaluate(dept: any, skipChainCheck = false): Promise<DepartmentIntegrityEvaluation> {
@@ -56,15 +60,12 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
     const dbMatches = recomputed !== null && recomputed === dbHash;
     const currentAfterHash = computeAfterHashV2('Department', dept.id, snapshot);
 
-    // Latest anchored log (batchId set ⇒ already in a Merkle batch on-chain).
     const latestAnchored = await this.prisma.blockchainLogger.findFirst({
       where: { entity: 'Department', entityId: dept.id, batchId: { not: null } },
       orderBy: { seq: 'desc' },
       select: { seq: true, afterHash: true, batchId: true },
     });
 
-    // Latest log entry overall (regardless of anchor status). Used to detect the
-    // window between a write and the next Merkle batch (anchored every 5 min).
     const latestAny = await this.prisma.blockchainLogger.findFirst({
       where: { entity: 'Department', entityId: dept.id },
       orderBy: { seq: 'desc' },
@@ -78,23 +79,17 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
       } else {
         try {
           const proof = await this.auditAnchor.getInclusionProof(latestAnchored.seq);
-          if (proof && proof.verified) {
-            chainMatches = latestAnchored.afterHash === currentAfterHash;
-          }
+          if (proof?.verified) chainMatches = latestAnchored.afterHash === currentAfterHash;
         } catch {
-          // Proof verification failed; chainMatches stays false
+          // Proof verification failed; chainMatches stays false.
         }
       }
     }
 
     let status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR';
     if (!latestAny) {
-      // No log at all → never been anchored.
       status = 'UNANCHORED';
     } else if (!latestAnchored || (latestAny.seq !== latestAnchored.seq && latestAny.afterHash === currentAfterHash)) {
-      // There is a newer log than the last anchored one (or no anchored log yet),
-      // and that newest log's afterHash matches the current DB snapshot → write happened
-      // and is just waiting for the next Merkle batch. Not tampering.
       status = dbMatches ? 'PENDING_ANCHOR' : 'TAMPERED';
     } else if (dbMatches && chainMatches) {
       status = 'VERIFIED';
@@ -109,7 +104,7 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
         `• Hash CSDL: ${dbHash}\n` +
         `• Hash Audit đã neo: ${latestAnchored?.afterHash}\n` +
         `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}\n` +
-        `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`
+        `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`,
       );
     }
 

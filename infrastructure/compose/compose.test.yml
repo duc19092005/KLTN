@@ -18,27 +18,6 @@ services:
       retries: 20
     restart: unless-stopped
 
-  kafka-test:
-    image: bitnamilegacy/kafka:3.7
-    environment:
-      KAFKA_CFG_NODE_ID: 1
-      KAFKA_CFG_PROCESS_ROLES: broker,controller
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka-test:9093
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CFG_LISTENERS: INTERNAL://:9092,CONTROLLER://:9093,EXTERNAL://:9095
-      KAFKA_CFG_ADVERTISED_LISTENERS: INTERNAL://kafka-test:9092,EXTERNAL://localhost:9095
-      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "false"
-      KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      ALLOW_PLAINTEXT_LISTENER: "yes"
-    ports:
-      - "9095:9095"
-    volumes:
-      - kafka_test_data:/bitnami/kafka
-    restart: unless-stopped
 
   ipfs-test:
     image: ipfs/kubo:v0.29.0
@@ -76,5 +55,4 @@ services:
 
 volumes:
   postgres_test_data:
-  kafka_test_data:
   ipfs_test_data:

@@ -3,7 +3,6 @@
 Suite này chạy trên hạ tầng test tách biệt:
 
 - PostgreSQL `kltn_test` tại cổng `5434`.
-- Kafka local tại cổng `9095`.
 - IPFS Kubo local tại API `5002`, gateway `8082`.
 - Hardhat local tại cổng `8545`.
 
