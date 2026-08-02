@@ -24,26 +24,32 @@ describe('S3MedicalResultStorageAdapter', () => {
     return { adapter: new S3MedicalResultStorageAdapter(s3 as any), s3 };
   }
 
-  it('uploads allowed result files and returns S3 metadata', async () => {
+  it('[TC7.15] uploads valid PDF/JPEG/PNG/WEBP result files and returns private S3 metadata without public URLs', async () => {
     const { adapter, s3 } = makeAdapter();
-
-    const [stored] = await adapter.uploadResultFiles('order-1', [
+    const files = [
       { buffer: Buffer.from('pdf'), originalname: 'file.pdf', mimetype: 'application/pdf', size: 1234 },
-    ]);
-
-    expect(s3.uploadObject).toHaveBeenCalledWith(expect.objectContaining({
-      keyPrefix: 'medical-results/order/order-1',
-      originalName: 'file.pdf',
-      mimeType: 'application/pdf',
+      { buffer: Buffer.from('jpg'), originalname: 'image.jpg', mimetype: 'image/jpeg', size: 20 },
+      { buffer: Buffer.from('png'), originalname: 'image.png', mimetype: 'image/png', size: 21 },
+      { buffer: Buffer.from('webp'), originalname: 'image.webp', mimetype: 'image/webp', size: 22 },
+    ];
+    s3.uploadObject.mockImplementation(async (input: { originalName: string; mimeType: string; size: number }) => ({
+      storageProvider: 'S3', bucket: 'private-bucket',
+      objectKey: `medical-results/order/order-1/${input.originalName}`,
+      fileName: `medical-results/order/order-1/${input.originalName}`,
+      originalName: input.originalName, mimeType: input.mimeType, size: input.size,
+      sha256: 'sha-256', etag: '"etag"',
     }));
-    expect(stored).toMatchObject({
-      storageProvider: 'S3',
-      bucket: 'private-bucket',
-      objectKey: 'medical-results/order/order-1/file.pdf',
-      sha256: 'sha-256',
-      etag: '"etag"',
-      url: null,
-    });
+
+    const stored = await adapter.uploadResultFiles('order-1', files);
+
+    expect(s3.uploadObject).toHaveBeenCalledTimes(4);
+    expect(s3.uploadObject).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      keyPrefix: 'medical-results/order/order-1', originalName: 'file.pdf', mimeType: 'application/pdf',
+    }));
+    expect(stored).toEqual(files.map((file) => expect.objectContaining({
+      storageProvider: 'S3', bucket: 'private-bucket', originalName: file.originalname,
+      mimeType: file.mimetype, objectKey: expect.stringContaining(file.originalname), url: null,
+    })));
   });
 
   it('rejects unsupported MIME types before uploading', async () => {

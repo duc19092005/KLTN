@@ -5,6 +5,8 @@ import {
   OperationalStatus,
   Prisma,
   UserStatus,
+  VisitSource,
+  VisitStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildPatientSnapshot } from '../../modules/patient/domain/patient-snapshot';
@@ -14,6 +16,7 @@ import { buildUnifiedDoctorSnapshot } from '../../modules/doctor/domain/doctor-s
 import { buildAiModelSnapshot } from '../../modules/ai-model/domain/ai-model-snapshot';
 import { buildMedicalConclusionSnapshot } from '../../modules/clinical-decision/domain/medical-conclusion-snapshot';
 import { buildAiDiagnosisSnapshot } from '../../modules/clinical-decision/domain/ai-diagnosis-snapshot';
+import { buildVisitSnapshot } from '../../modules/visit/domain/visit-snapshot';
 import { AuditAnchorService } from './audit-anchor.service';
 import { AuditLoggerService } from './audit-logger.service';
 import {
@@ -29,6 +32,7 @@ export const RECOVERABLE_AUDIT_ENTITIES = [
   'StaffProfile',
   'DoctorProfile',
   'AiModelRegistry',
+  'Visit',
   'MedicalConclusion',
   'AiDiagnosis',
 ] as const;
@@ -53,6 +57,9 @@ export interface EntityIntegrityWarning {
   batchId: number | null;
   anchoredAt: Date | null;
   fieldsChanged: string[];
+  blockers: string[];
+  dependencies: Array<{ entity: string; entityId: string }>;
+  recoveryMode: 'DIRECT_ENTITY' | 'DEPENDENCY_CHAIN' | 'AUDIT_BATCH_FIRST' | 'PITR_REQUIRED';
   sensitiveDataHidden: true;
   message: string;
 }
@@ -63,6 +70,7 @@ const REQUIRED_SNAPSHOT_FIELDS: Record<RecoverableAuditEntity, readonly string[]
   StaffProfile: ['employeeCode', 'fullName', 'phone', 'gender', 'citizenId', 'birthDate', 'address', 'avatarUrl', 'departmentId', 'position', 'status'],
   DoctorProfile: ['employeeCode', 'fullName', 'phone', 'gender', 'citizenId', 'birthDate', 'address', 'avatarUrl', 'departmentId', 'position', 'status', 'staffProfileId', 'specialty', 'licenseNumber', 'qualification', 'yearsExperience'],
   AiModelRegistry: ['modelName', 'modelVersion', 'recommendedSpecialty', 'type', 'provider', 'apiEndpoint', 'ipHashPlain', 'description', 'status', 'createdBy'],
+  Visit: ['visitCode', 'patientId', 'departmentId', 'staffId', 'status', 'source', 'checkInAt', 'completedAt'],
   MedicalConclusion: ['visitId', 'patientCode', 'doctorId', 'aiDiagnosisId', 'finalDiagnosis', 'treatmentPlan', 'prescription', 'followUpNote', 'doctorNote'],
   AiDiagnosis: ['aiModelId', 'patientId', 'visitId', 'prompt', 'result', 'confidence', 'status', 'reviewedByDoctorId', 'doctorFeedback'],
 };
@@ -72,6 +80,7 @@ const SENSITIVE_FIELDS: Partial<Record<RecoverableAuditEntity, ReadonlySet<strin
   StaffProfile: new Set(['fullName', 'phone', 'gender', 'citizenId', 'birthDate', 'address', 'avatarUrl']),
   DoctorProfile: new Set(['fullName', 'phone', 'gender', 'citizenId', 'birthDate', 'address', 'avatarUrl']),
   AiModelRegistry: new Set(['apiEndpoint', 'ipHashPlain']),
+  Visit: new Set([]),
   MedicalConclusion: new Set(['patientCode', 'finalDiagnosis', 'treatmentPlan', 'prescription', 'followUpNote', 'doctorNote']),
   AiDiagnosis: new Set(['prompt', 'result', 'doctorFeedback']),
 };
@@ -110,7 +119,9 @@ export class EntityRecoveryService {
         sourceSeq: warning?.latestTrustedSeq ?? null,
         sourceBatchId: warning?.batchId ?? null,
         source: warning?.recoverable ? 'ANCHORED_AUDIT' : null,
-        blockers: warning && !warning.recoverable ? [warning.status] : [],
+        blockers: warning && !warning.recoverable ? warning.blockers : [],
+        dependencies: warning?.dependencies ?? [],
+        recoveryMode: warning?.recoveryMode ?? 'DIRECT_ENTITY',
         sensitiveDataHidden: true,
       });
     }
@@ -166,6 +177,9 @@ export class EntityRecoveryService {
       batchId: warning.batchId,
       latestTrustedSeq: warning.latestTrustedSeq,
       fieldsChanged: warning.fieldsChanged,
+      blockers: warning.blockers,
+      dependencies: warning.dependencies,
+      recoveryMode: warning.recoveryMode,
       recoveryRequired: warning.recoverable,
     });
   }
@@ -280,6 +294,7 @@ export class EntityRecoveryService {
         status: 'AUDIT_UNTRUSTED',
         recoverable: false,
         fieldsChanged: this.safeFieldNames(entity, verification.suspiciousFields),
+        blockers: ['AUDIT_ROW_INTEGRITY_FAILED'], dependencies: [], recoveryMode: 'AUDIT_BATCH_FIRST',
         message: 'Audit nguồn có dấu hiệu sai lệch. Hãy phục hồi audit batch từ IPFS trước.',
       };
     }
@@ -290,6 +305,7 @@ export class EntityRecoveryService {
         status: 'SNAPSHOT_INCOMPLETE',
         recoverable: false,
         fieldsChanged: [],
+        blockers: ['SNAPSHOT_INCOMPLETE'], dependencies: [], recoveryMode: 'PITR_REQUIRED',
         message: 'Audit nguồn cũ không chứa đủ trường để phục hồi entity an toàn.',
       };
     }
@@ -306,9 +322,14 @@ export class EntityRecoveryService {
         latestTrustedSeq: preview?.sourceSeq ?? base.latestTrustedSeq,
         batchId: preview?.sourceBatchId ?? base.batchId,
         fieldsChanged: [],
+        blockers: preview?.blockers ?? ['ENTITY_RECREATION_UNAVAILABLE'],
+        dependencies: preview?.dependencies ?? [],
+        recoveryMode: preview?.recoveryMode ?? 'PITR_REQUIRED',
         message: preview?.recoverable
-          ? 'Bản ghi gốc không còn tồn tại nhưng có snapshot IPFS đã xác minh để tạo lại.'
-          : 'Bản ghi gốc không còn tồn tại và chưa đủ điều kiện khôi phục an toàn từ IPFS.',
+          ? preview.recoveryMode === 'DEPENDENCY_CHAIN'
+            ? 'Bản ghi gốc và entity cha không còn tồn tại, nhưng có đủ snapshot IPFS đã xác minh để khôi phục theo chuỗi khóa ngoại.'
+            : 'Bản ghi gốc không còn tồn tại nhưng có snapshot IPFS đã xác minh để tạo lại.'
+          : `Không thể khôi phục tự động: ${(preview?.blockers ?? ['không có snapshot tin cậy']).join(', ')}.`,
       };
     }
 
@@ -325,6 +346,7 @@ export class EntityRecoveryService {
         status: 'AUDIT_UNTRUSTED',
         recoverable: false,
         fieldsChanged: this.safeFieldNames(entity, comparison.suspiciousFields),
+        blockers: ['LATEST_AUDIT_NOT_ANCHORED'], dependencies: [], recoveryMode: 'AUDIT_BATCH_FIRST',
         message: 'Dữ liệu lệch với audit mới nhất nhưng audit này chưa được neo. Mọi sửa/xóa bị chặn cho đến khi xác minh và neo batch.',
       };
     }
@@ -336,6 +358,7 @@ export class EntityRecoveryService {
         status: 'AUDIT_UNTRUSTED',
         recoverable: false,
         fieldsChanged: this.safeFieldNames(entity, comparison.suspiciousFields),
+        blockers: ['BLOCKCHAIN_PROOF_FAILED'], dependencies: [], recoveryMode: 'AUDIT_BATCH_FIRST',
         message: 'Dữ liệu lệch nhưng audit nguồn chưa xác minh được với blockchain. Hãy kiểm tra batch trước.',
       };
     }
@@ -345,6 +368,7 @@ export class EntityRecoveryService {
       status: 'TAMPERED',
       recoverable: true,
       fieldsChanged: this.safeFieldNames(entity, comparison.suspiciousFields),
+      blockers: [], dependencies: [], recoveryMode: 'DIRECT_ENTITY',
       message: 'Dữ liệu hiện tại không khớp bản audit đã được blockchain xác nhận. Mọi sửa/xóa đã bị chặn.',
     };
   }
@@ -392,6 +416,10 @@ export class EntityRecoveryService {
     if (entity === 'AiModelRegistry') {
       const row = await client.aiModelRegistry.findUnique({ where: { id: entityId } });
       return row ? buildAiModelSnapshot(row) : null;
+    }
+    if (entity === 'Visit') {
+      const row = await client.visit.findUnique({ where: { id: entityId } });
+      return row ? buildVisitSnapshot(row) : null;
     }
     if (entity === 'AiDiagnosis') {
       const row = await client.aiDiagnosis.findUnique({ where: { id: entityId } });
@@ -461,6 +489,20 @@ export class EntityRecoveryService {
       } });
       return;
     }
+    if (entity === 'Visit') {
+      const patientId = this.string(snapshot, 'patientId');
+      const departmentId = this.string(snapshot, 'departmentId');
+      const staffId = this.nullableString(snapshot, 'staffId');
+      await this.requireRelation(client.patient.findUnique({ where: { id: patientId }, select: { id: true } }), 'bệnh nhân');
+      await this.requireRelation(client.department.findUnique({ where: { id: departmentId }, select: { id: true } }), 'phòng ban');
+      if (staffId) await this.requireRelation(client.staffProfile.findUnique({ where: { id: staffId }, select: { id: true } }), 'nhân sự phụ trách');
+      await client.visit.update({ where: { id: entityId }, data: {
+        visitCode: this.string(snapshot, 'visitCode'), patientId, departmentId, staffId,
+        status: this.enumValue(snapshot, 'status', VisitStatus), source: this.enumValue(snapshot, 'source', VisitSource),
+        checkInAt: this.date(snapshot, 'checkInAt'), completedAt: this.nullableDate(snapshot, 'completedAt'),
+      } });
+      return;
+    }
     if (entity === 'AiDiagnosis') {
       const aiModelId = this.string(snapshot, 'aiModelId');
       const patientId = this.nullableString(snapshot, 'patientId');
@@ -500,6 +542,7 @@ export class EntityRecoveryService {
     if (entity === 'StaffProfile') return client.staffProfile.update({ where: { id: entityId }, data });
     if (entity === 'DoctorProfile') return client.doctorProfile.update({ where: { id: entityId }, data });
     if (entity === 'AiModelRegistry') return client.aiModelRegistry.update({ where: { id: entityId }, data });
+    if (entity === 'Visit') return Promise.resolve(null);
     if (entity === 'AiDiagnosis') return Promise.resolve(null);
     return client.medicalConclusion.update({ where: { id: entityId }, data });
   }
@@ -585,6 +628,11 @@ export class EntityRecoveryService {
     const date = typeof value === 'string' || value instanceof Date ? new Date(value) : null;
     if (!date || Number.isNaN(date.getTime())) throw new ConflictException(`Snapshot có ngày không hợp lệ: ${field}.`);
     return date;
+  }
+
+  private nullableDate(snapshot: Snapshot, field: string): Date | null {
+    if (snapshot[field] == null) return null;
+    return this.date(snapshot, field);
   }
 
   private enumValue<T extends Record<string, string>>(snapshot: Snapshot, field: string, values: T): T[keyof T] {

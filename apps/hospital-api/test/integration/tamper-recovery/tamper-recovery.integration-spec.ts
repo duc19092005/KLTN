@@ -9,7 +9,6 @@ import { AuditRecoveryCryptoService } from '../../../src/infrastructure/audit/au
 import { EntityRecoveryService } from '../../../src/infrastructure/audit/entity-recovery.service';
 import { EntityRecreationService } from '../../../src/infrastructure/audit/entity-recreation.service';
 import { IpfsArtifactService } from '../../../src/infrastructure/audit/ipfs-artifact.service';
-import { AuditKafkaService } from '../../../src/infrastructure/audit/audit-kafka.service';
 import { buildPatientSnapshot } from '../../../src/modules/patient/domain/patient-snapshot';
 import { buildAiDiagnosisSnapshot } from '../../../src/modules/clinical-decision/domain/ai-diagnosis-snapshot';
 import { buildStaffSnapshot } from '../../../src/modules/staff/domain/staff-snapshot';
@@ -53,8 +52,6 @@ describeIntegration('Audit tamper and recovery integration', () => {
       TRUNCATE TABLE
         "AuditRecoveryStageRow",
         "AuditRecovery",
-        "AuditKafkaReceipt",
-        "AuditOutbox",
         "BlockchainLogger",
         "AuditBatch",
         "Patient",
@@ -438,53 +435,6 @@ describeIntegration('Audit tamper and recovery integration', () => {
     expect(await prisma.auditRecovery.count({ where: { batchId: anchored.batchId } })).toBe(1);
   });
 
-  it('publishes the transactional outbox to real Kafka and projects duplicate events idempotently', async () => {
-    const fixture = await seedTrustedPatientChange();
-    const outbox = await prisma.auditOutbox.findFirstOrThrow({ orderBy: { createdAt: 'desc' } });
-    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
-    const previous = {
-      enabled: process.env.KAFKA_ENABLED,
-      group: process.env.KAFKA_AUDIT_GROUP_ID,
-      tierA: process.env.KAFKA_AUDIT_TIER_A_TOPIC,
-      tierB: process.env.KAFKA_AUDIT_TIER_B_TOPIC,
-    };
-    process.env.KAFKA_ENABLED = 'true';
-    process.env.KAFKA_AUDIT_GROUP_ID = `kltn-audit-integration-${suffix}`;
-    process.env.KAFKA_AUDIT_TIER_A_TOPIC = `kltn.audit.integration.a.${suffix}`;
-    process.env.KAFKA_AUDIT_TIER_B_TOPIC = outbox.topic = `kltn.audit.integration.b.${suffix}`;
-    await prisma.auditOutbox.update({ where: { id: outbox.id }, data: { topic: outbox.topic } });
-
-    const firstRun = new AuditKafkaService(prisma);
-    try {
-      await firstRun.onApplicationBootstrap();
-      await waitForOutboxStatus(outbox.id, 'PUBLISHED');
-      await waitForKafkaReceipt(outbox.eventId);
-      expect(await prisma.auditKafkaReceipt.count({ where: { eventId: outbox.eventId } })).toBe(1);
-    } finally {
-      await firstRun.onModuleDestroy();
-    }
-
-    await prisma.auditOutbox.update({
-      where: { id: outbox.id },
-      data: { status: 'PENDING', publishedAt: null, lastError: null },
-    });
-    process.env.KAFKA_AUDIT_GROUP_ID = `kltn-audit-integration-restart-${suffix}`;
-    const restarted = new AuditKafkaService(prisma);
-    try {
-      await restarted.onApplicationBootstrap();
-      await waitForOutboxStatus(outbox.id, 'PUBLISHED');
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      expect(await prisma.auditKafkaReceipt.count({ where: { eventId: outbox.eventId } })).toBe(1);
-      expect(await prisma.blockchainLogger.count({ where: { eventId: outbox.eventId } })).toBe(1);
-      expect(await prisma.blockchainLogger.findFirstOrThrow({ where: { patientId: fixture.patientId } })).toBeDefined();
-    } finally {
-      await restarted.onModuleDestroy();
-      restoreEnv('KAFKA_ENABLED', previous.enabled);
-      restoreEnv('KAFKA_AUDIT_GROUP_ID', previous.group);
-      restoreEnv('KAFKA_AUDIT_TIER_A_TOPIC', previous.tierA);
-      restoreEnv('KAFKA_AUDIT_TIER_B_TOPIC', previous.tierB);
-    }
-  });
 
   it('resumes a durable pending batch after server restart and blockchain network recovery', async () => {
     const fixture = await seedTrustedPatientChange();
@@ -593,8 +543,6 @@ describeIntegration('Audit tamper and recovery integration', () => {
   async function deleteAuditContent(id: string) {
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT set_config('app.audit_recovery_authorized', 'true', true)`;
-      await tx.auditOutbox.deleteMany({ where: { auditLogId: id } });
-      await tx.auditKafkaReceipt.deleteMany({ where: { auditLogId: id } });
       await tx.blockchainLogger.delete({ where: { id } });
     });
   }
@@ -606,13 +554,6 @@ describeIntegration('Audit tamper and recovery integration', () => {
     }))?.status === status, `audit recovery status ${status}`);
   }
 
-  async function waitForOutboxStatus(id: string, status: string) {
-    await waitUntil(async () => (await prisma.auditOutbox.findUnique({ where: { id } }))?.status === status, `outbox status ${status}`);
-  }
-
-  async function waitForKafkaReceipt(eventId: string) {
-    await waitUntil(async () => Boolean(await prisma.auditKafkaReceipt.findUnique({ where: { eventId } })), 'Kafka receipt');
-  }
 
   async function waitUntil(predicate: () => Promise<boolean>, label: string) {
     for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -622,10 +563,6 @@ describeIntegration('Audit tamper and recovery integration', () => {
     throw new Error(`Timed out waiting for ${label}.`);
   }
 
-  function restoreEnv(name: string, value: string | undefined) {
-    if (value === undefined) delete process.env[name];
-    else process.env[name] = value;
-  }
 
   async function waitForAppendOnlyTrigger() {
     for (let attempt = 0; attempt < 20; attempt += 1) {

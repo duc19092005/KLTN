@@ -22,9 +22,6 @@ function createPrismaMock() {
       }),
       findMany: jest.fn(async () => rows),
     },
-    auditOutbox: {
-      create: jest.fn(async ({ data }: { data: any }) => data),
-    },
   };
   return {
     rows,

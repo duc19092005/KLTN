@@ -33,10 +33,14 @@ export type VisitListFilter = {
 /** Minimal visit shape used for policy/ownership checks (no relations). */
 export type VisitEntity = {
   id: string;
+  visitCode: string;
   patientId: string;
   departmentId: string;
   staffId: string | null;
   status: VisitStatus;
+  source: Prisma.VisitGetPayload<Record<string, never>>['source'];
+  checkInAt: Date;
+  completedAt: Date | null;
 };
 
 export type VisitDoctorStaff = {
@@ -52,6 +56,9 @@ export type VisitCreatedRecord = {
   departmentId: string;
   staffId: string | null;
   status: VisitStatus;
+  source: Prisma.VisitGetPayload<Record<string, never>>['source'];
+  checkInAt: Date;
+  completedAt: Date | null;
 };
 
 export type PatientCreatedRecord = {

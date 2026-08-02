@@ -6,6 +6,7 @@ import { NotificationService } from '../../../notification/services/notification
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
 import { buildPatientSnapshot } from '../../../patient/domain/patient-snapshot';
 import { AuthUser } from '../../../../common/types/auth-user.type';
+import { buildVisitSnapshot } from '../../domain/visit-snapshot';
 
 /**
  * Intake workflow: reception selects an active examination department, then the
@@ -82,14 +83,8 @@ export class CreateVisitUseCase {
           action: 'CREATE',
           actorId: user?.sub ?? null,
           before: null,
-          after: {
-            visitCode: visit.visitCode,
-            patientId: visit.patientId,
-            departmentId: visit.departmentId,
-            staffId: visit.staffId,
-            status: visit.status,
-          },
-          metadata: { schema: 'KLTN_VISIT_CREATE_AUDIT_V2' },
+          after: buildVisitSnapshot(visit),
+          metadata: { schema: 'KLTN_VISIT_CREATE_AUDIT_V3' },
         }, tx);
       },
       async (patient, tx) => {

@@ -11,13 +11,16 @@
     "prisma:migrate": "npx prisma migrate dev",
     "prisma:push": "npx prisma db push",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "local:admin-session": "node scripts/create-local-admin-browser-session.js",
     "mail:test": "ts-node scripts/test-smtp.ts",
     "audit:v2:reset:dev": "ts-node src/scripts/reset-audit-v2-dev.ts",
+    "local:prepare-tamper-demo": "ts-node src/scripts/prepare-local-tamper-recovery-demo.ts",
     "test": "jest --config ./test/jest-unit.json",
     "test:unit": "jest --config ./test/jest-unit.json",
     "test:integration": "jest --config ./test/jest-integration.json",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "test:tamper-recovery": "node scripts/run-tamper-recovery-e2e.js"
+    "test:tamper-recovery": "node scripts/run-tamper-recovery-e2e.js",
+    "test:functional": "node scripts/run-functional-tests.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1072.0",
@@ -37,7 +40,6 @@
     "crypto-js": "^4.2.0",
     "dotenv": "^16.4.5",
     "ethers": "^6.11.0",
-    "kafkajs": "^2.2.4",
     "multer": "^2.1.1",
     "nodemailer": "^9.0.3",
     "passport": "^0.7.0",

@@ -85,6 +85,13 @@ const cases: Array<{ entity: RecreatableAuditEntity; snapshot: Snapshot }> = [
     },
   },
   {
+    entity: 'Visit',
+    snapshot: {
+      visitCode: 'LK-0001', patientId: IDS.patient, departmentId: IDS.department, staffId: IDS.staff,
+      status: 'IN_PROGRESS', source: 'WALK_IN', checkInAt: '2026-07-20T02:00:00.000Z', completedAt: null,
+    },
+  },
+  {
     entity: 'AiDiagnosis',
     snapshot: {
       aiModelId: IDS.model, patientId: IDS.patient, visitId: IDS.visit, prompt: 'clinical prompt', result: '{"diagnosis":"trusted"}',
@@ -163,6 +170,11 @@ function makeStore(entity: RecreatableAuditEntity, snapshot: Snapshot) {
   const seed = (model: string, id: string, value: any) => records[model].set(id, { id, ...value });
   if (entity === 'DoctorProfile') seed('department', IDS.department, { departmentCode: 'PB-01' });
   if (entity === 'AiModelRegistry') seed('user', IDS.user, { role: 'ADMIN', status: 'ACTIVE' });
+  if (entity === 'Visit') {
+    seed('patient', IDS.patient, { patientCode: 'BN-0001' });
+    seed('department', IDS.department, { departmentCode: 'PB-01' });
+    seed('staffProfile', IDS.staff, { employeeCode: 'NV-0001' });
+  }
   if (entity === 'AiDiagnosis') {
     seed('aiModelRegistry', IDS.model, { modelId: 'model-1' });
     seed('patient', IDS.patient, { patientCode: 'BN-0001' });
@@ -200,7 +212,13 @@ function makeStore(entity: RecreatableAuditEntity, snapshot: Snapshot) {
         const [field, value] = Object.entries(where)[0] as [string, unknown];
         return hydrate(model, [...records[model].values()].find((item) => item[field] === value) ?? null);
       }),
-      findFirst: jest.fn(async () => null),
+      findFirst: jest.fn(async ({ where = {} }: any = {}) => {
+        const matches = (item: any, filter: Record<string, any>) => Object.entries(filter).every(([field, value]) => {
+          if (field === 'OR') return (value as Array<Record<string, any>>).some((candidate) => matches(item, candidate));
+          return item[field] === value;
+        });
+        return hydrate(model, [...records[model].values()].find((item) => matches(item, where)) ?? null);
+      }),
       create: jest.fn(async ({ data }: any) => {
         records[model].set(data.id, { ...data });
         return hydrate(model, records[model].get(data.id));
@@ -273,7 +291,51 @@ describe('EntityRecreationService', () => {
     }), prisma);
   });
 
-  it('restores every AI diagnosis foreign key and rejects a visit/patient mismatch', async () => {
+  it('[TC5.09] recreates an AI model from a verified encrypted audit snapshot with its original identity and inactive state', async () => {
+    const modelCase = cases.find((item) => item.entity === 'AiModelRegistry')!;
+    const { service, prisma, records, audit } = makeStore('AiModelRegistry', modelCase.snapshot);
+
+    await expect(service.recreate(
+      { entity: 'AiModelRegistry', entityId: IDS.entity },
+      'admin-1',
+      'Khôi phục AI model từ audit đã neo',
+    )).resolves.toMatchObject({ status: 'RECREATED', source: 'IPFS_BLOCKCHAIN_VERIFIED', batchId: 4 });
+    expect(prisma.aiModelRegistry.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      id: IDS.entity, modelId: 'model-business-id', createdBy: IDS.user,
+      ipHashEncrypted: 'encrypted-ip-hash', status: 'INACTIVE', isActiveOnChain: true,
+    }) });
+    expect(records.aiModelRegistry.has(IDS.entity)).toBe(true);
+    expect(audit.recordV2).toHaveBeenCalledWith(expect.objectContaining({
+      entity: 'AiModelRegistry', entityId: IDS.entity, action: 'AUDIT_ENTITY_RECREATED_FROM_IPFS',
+    }), prisma);
+  });
+
+  it('[TC5.10] blocks AI model recreation when the snapshot creator no longer exists', async () => {
+    const modelCase = cases.find((item) => item.entity === 'AiModelRegistry')!;
+    const { service, records, prisma } = makeStore('AiModelRegistry', modelCase.snapshot);
+    records.user.clear();
+
+    await expect(service.previewOne({ entity: 'AiModelRegistry', entityId: IDS.entity })).resolves.toMatchObject({
+      recoverable: false,
+      blockers: expect.arrayContaining(['MISSING_AI_MODEL_CREATOR']),
+    });
+    expect(prisma.aiModelRegistry.create).not.toHaveBeenCalled();
+  });
+
+  it('[TC5.11] blocks AI model recreation when its source modelId is already owned by another record', async () => {
+    const modelCase = cases.find((item) => item.entity === 'AiModelRegistry')!;
+    const { service, records, prisma } = makeStore('AiModelRegistry', modelCase.snapshot);
+    records.aiModelRegistry.set(IDS.model, { id: IDS.model, modelId: 'model-business-id' });
+
+    await expect(service.previewOne({ entity: 'AiModelRegistry', entityId: IDS.entity })).resolves.toMatchObject({
+      recoverable: false,
+      blockers: expect.arrayContaining(['AI_MODEL_UNIQUE_CONFLICT']),
+    });
+    expect(prisma.aiModelRegistry.create).not.toHaveBeenCalled();
+    expect(records.aiModelRegistry.get(IDS.model)).toMatchObject({ modelId: 'model-business-id' });
+  });
+
+  it('[TC6.20] restores all valid AI diagnosis foreign keys and blocks a Visit/Patient mismatch', async () => {
     const diagnosisCase = cases.find((item) => item.entity === 'AiDiagnosis')!;
     const valid = makeStore('AiDiagnosis', diagnosisCase.snapshot);
     await valid.service.recreate({ entity: 'AiDiagnosis', entityId: IDS.entity }, 'admin-1', 'Khôi phục chẩn đoán AI');
@@ -288,9 +350,9 @@ describe('EntityRecreationService', () => {
     expect(mismatch.prisma.aiDiagnosis.create).not.toHaveBeenCalled();
   });
 
-  it('uses the encrypted before snapshot from a permanent-deletion audit row', async () => {
+  it('[TC2.12] recreates a permanently deleted Department from a verified encrypted audit snapshot as inactive', async () => {
     const departmentCase = cases.find((item) => item.entity === 'Department')!;
-    const { service, batchRecovery, prisma } = makeStore('Department', departmentCase.snapshot);
+    const { service, batchRecovery, prisma, records, audit } = makeStore('Department', departmentCase.snapshot);
     const deletionRow = buildPermanentDeletionRow(IDS.entity, departmentCase.snapshot);
     batchRecovery.loadVerifiedBundle.mockResolvedValueOnce({
       batchId: 4, artifactHash: `0x${'c'.repeat(64)}`, artifactUri: 'ipfs://verified-delete',
@@ -301,15 +363,91 @@ describe('EntityRecreationService', () => {
       { entity: 'Department', entityId: IDS.entity },
       'admin-1',
       'Khôi phục sau xóa vĩnh viễn',
-    )).resolves.toMatchObject({ status: 'RECREATED', sourceSeq: 11 });
+    )).resolves.toMatchObject({ status: 'RECREATED', sourceSeq: 11, source: 'IPFS_BLOCKCHAIN_VERIFIED' });
     expect(prisma.department.create).toHaveBeenCalledWith({ data: expect.objectContaining({
-      id: IDS.entity, departmentCode: 'PB-01', status: 'INACTIVE',
+      id: IDS.entity, departmentCode: 'PB-01', name: 'Khoa Noi', type: 'CLINICAL', status: 'INACTIVE',
     }) });
+    expect(records.department.has(IDS.entity)).toBe(true);
+    expect(audit.recordV2).toHaveBeenCalledWith(expect.objectContaining({
+      entity: 'Department', entityId: IDS.entity, action: 'AUDIT_ENTITY_RECREATED_FROM_IPFS',
+    }), prisma);
   });
 
-  it('reactivates the preserved User tombstone as INACTIVE when recreating StaffProfile', async () => {
+  it('[TC6.21] recreates a deleted MedicalConclusion with its Visit, Doctor, and AI diagnosis relations intact', async () => {
+    const conclusionCase = cases.find((item) => item.entity === 'MedicalConclusion')!;
+    const { service, prisma, records, audit } = makeStore('MedicalConclusion', conclusionCase.snapshot);
+
+    await expect(service.recreate(
+      { entity: 'MedicalConclusion', entityId: IDS.entity },
+      'admin-1',
+      'Khôi phục kết luận y khoa từ audit đã neo',
+    )).resolves.toMatchObject({ status: 'RECREATED', source: 'IPFS_BLOCKCHAIN_VERIFIED', batchId: 4 });
+    expect(prisma.medicalConclusion.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      id: IDS.entity, visitId: IDS.visit, doctorId: IDS.doctor, aiDiagnosisId: IDS.diagnosis,
+      finalDiagnosis: 'Trusted conclusion',
+    }) });
+    expect(records.medicalConclusion.has(IDS.entity)).toBe(true);
+    expect(audit.recordV2).toHaveBeenCalledWith(expect.objectContaining({
+      entity: 'MedicalConclusion', entityId: IDS.entity, action: 'AUDIT_ENTITY_RECREATED_FROM_IPFS',
+    }), prisma);
+  });
+
+  it('[TC6.21A] recreates a deleted MedicalConclusion after first recreating its missing verified Visit dependency', async () => {
+    const conclusionCase = cases.find((item) => item.entity === 'MedicalConclusion')!;
+    const visitCase = cases.find((item) => item.entity === 'Visit')!;
+    const store = makeStore('MedicalConclusion', conclusionCase.snapshot);
+    store.records.visit.clear();
+    store.records.department.set(IDS.department, { id: IDS.department, departmentCode: 'PB-01' });
+    store.records.staffProfile.set(IDS.staff, { id: IDS.staff, employeeCode: 'NV-0001' });
+    const visitRow = buildRow('Visit', IDS.visit, visitCase.snapshot);
+    store.batchRecovery.loadVerifiedBundle.mockResolvedValue({
+      batchId: 4, artifactHash: `0x${'e'.repeat(64)}`, artifactUri: 'ipfs://verified-chain',
+      merkleRoot: 'f'.repeat(64), logs: [store.sourceRow, visitRow],
+    });
+
+    await expect(store.service.previewOne({ entity: 'MedicalConclusion', entityId: IDS.entity })).resolves.toMatchObject({
+      recoverable: true,
+      recoveryMode: 'DEPENDENCY_CHAIN',
+      blockers: [],
+      dependencies: [{ entity: 'Visit', entityId: IDS.visit }],
+    });
+    await expect(store.service.recreate(
+      { entity: 'MedicalConclusion', entityId: IDS.entity },
+      'admin-1',
+      'Khôi phục kết luận cùng lượt khám cha',
+    )).resolves.toMatchObject({ status: 'RECREATED' });
+
+    expect(store.records.visit.get(IDS.visit)).toMatchObject({ visitCode: 'LK-0001', patientId: IDS.patient });
+    expect(store.records.medicalConclusion.get(IDS.entity)).toMatchObject({ visitId: IDS.visit, finalDiagnosis: 'Trusted conclusion' });
+    expect(store.prisma.visit.create).toHaveBeenCalledTimes(1);
+    expect(store.prisma.medicalConclusion.create).toHaveBeenCalledTimes(1);
+    expect(store.audit.recordV2).toHaveBeenCalledTimes(2);
+  });
+
+  it('[TC6.22] blocks MedicalConclusion recreation when the Visit already has another conclusion or AI diagnosis belongs elsewhere', async () => {
+    const conclusionCase = cases.find((item) => item.entity === 'MedicalConclusion')!;
+    const conflict = makeStore('MedicalConclusion', conclusionCase.snapshot);
+    conflict.records.medicalConclusion.set('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', visitId: IDS.visit,
+    });
+    await expect(conflict.service.previewOne({ entity: 'MedicalConclusion', entityId: IDS.entity })).resolves.toMatchObject({
+      recoverable: false,
+      blockers: expect.arrayContaining(['VISIT_ALREADY_HAS_CONCLUSION']),
+    });
+    expect(conflict.prisma.medicalConclusion.create).not.toHaveBeenCalled();
+
+    const mismatch = makeStore('MedicalConclusion', conclusionCase.snapshot);
+    mismatch.records.aiDiagnosis.set(IDS.diagnosis, { id: IDS.diagnosis, visitId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' });
+    await expect(mismatch.service.previewOne({ entity: 'MedicalConclusion', entityId: IDS.entity })).resolves.toMatchObject({
+      recoverable: false,
+      blockers: expect.arrayContaining(['DIAGNOSIS_VISIT_MISMATCH']),
+    });
+    expect(mismatch.prisma.medicalConclusion.create).not.toHaveBeenCalled();
+  });
+
+  it('[TC3.15] recreates StaffProfile onto its original User tombstone without replacing the password hash', async () => {
     const staffCase = cases.find((item) => item.entity === 'StaffProfile')!;
-    const { service, records, prisma } = makeStore('StaffProfile', staffCase.snapshot);
+    const { service, records, prisma, audit } = makeStore('StaffProfile', staffCase.snapshot);
     records.user.set(IDS.user, { ...recoveryUser('RECEPTIONIST'), id: IDS.user, status: 'DELETE' });
 
     await service.recreate(
@@ -322,8 +460,79 @@ describe('EntityRecreationService', () => {
       where: { id: IDS.user },
       data: expect.objectContaining({ status: 'INACTIVE', deletedAt: null, deletedBy: null }),
     });
-    expect(records.user.get(IDS.user).status).toBe('INACTIVE');
-    expect(records.staffProfile.has(IDS.entity)).toBe(true);
+    expect(records.user).toHaveProperty('size', 1);
+    expect(records.user.get(IDS.user)).toMatchObject({ status: 'INACTIVE', passwordHash: '$argon2id$trusted-hash' });
+    expect(records.staffProfile.get(IDS.entity)).toMatchObject({ userId: IDS.user, employeeCode: 'NV-0001' });
+    expect(audit.recordV2).toHaveBeenCalledWith(expect.objectContaining({ action: 'AUDIT_ENTITY_RECREATED_FROM_IPFS' }), prisma);
+  });
+
+  it('[TC3.16] blocks StaffProfile recreation when its employee code or citizen ID is owned by another profile', async () => {
+    const staffCase = cases.find((item) => item.entity === 'StaffProfile')!;
+    const { service, records, prisma } = makeStore('StaffProfile', staffCase.snapshot);
+    records.staffProfile.set(IDS.staff, {
+      id: IDS.staff, userId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      employeeCode: 'NV-0001', citizenId: '101122334455',
+    });
+
+    await expect(service.previewOne({ entity: 'StaffProfile', entityId: IDS.entity })).resolves.toMatchObject({
+      recoverable: false,
+      blockers: expect.arrayContaining(['STAFF_UNIQUE_CONFLICT']),
+    });
+    expect(prisma.staffProfile.create).not.toHaveBeenCalled();
+    expect(records.staffProfile.get(IDS.staff)).toMatchObject({ employeeCode: 'NV-0001' });
+  });
+
+  it('[TC4.10] recreates Doctor and Staff profiles from an anchored snapshot and reactivates the original User tombstone', async () => {
+    const doctorCase = cases.find((item) => item.entity === 'DoctorProfile')!;
+    const { service, records, prisma } = makeStore('DoctorProfile', doctorCase.snapshot);
+    records.user.set(IDS.user, { ...recoveryUser('DOCTOR'), id: IDS.user, status: 'DELETE' });
+
+    await service.recreate({ entity: 'DoctorProfile', entityId: IDS.entity }, 'admin-1', 'Khôi phục bác sĩ');
+
+    expect(records.user.get(IDS.user)).toMatchObject({ status: 'INACTIVE', passwordHash: '$argon2id$trusted-hash' });
+    expect(records.staffProfile.get(IDS.staff)).toMatchObject({ userId: IDS.user, departmentId: IDS.department });
+    expect(records.doctorProfile.get(IDS.entity)).toMatchObject({
+      staffProfileId: IDS.staff, specialty: 'GENERAL_INTERNAL_MEDICINE', licenseNumber: 'GPH-001',
+    });
+    expect(prisma.doctorProfile.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('[TC4.11] blocks Doctor recreation when the source license belongs to another Doctor', async () => {
+    const doctorCase = cases.find((item) => item.entity === 'DoctorProfile')!;
+    const { service, records, prisma } = makeStore('DoctorProfile', doctorCase.snapshot);
+    records.doctorProfile.set(IDS.doctor, { id: IDS.doctor, staffProfileId: 'other-staff', licenseNumber: 'GPH-001' });
+
+    await expect(service.previewOne({ entity: 'DoctorProfile', entityId: IDS.entity })).resolves.toMatchObject({
+      recoverable: false, blockers: expect.arrayContaining(['DOCTOR_UNIQUE_CONFLICT']),
+    });
+    expect(prisma.doctorProfile.create).not.toHaveBeenCalled();
+  });
+
+  it('[TC4.12] blocks Doctor recreation when the source Department no longer exists', async () => {
+    const doctorCase = cases.find((item) => item.entity === 'DoctorProfile')!;
+    const { service, records, prisma } = makeStore('DoctorProfile', doctorCase.snapshot);
+    records.department.clear();
+
+    await expect(service.previewOne({ entity: 'DoctorProfile', entityId: IDS.entity })).resolves.toMatchObject({
+      recoverable: false, blockers: expect.arrayContaining(['MISSING_DEPARTMENT']),
+    });
+    expect(prisma.doctorProfile.create).not.toHaveBeenCalled();
+  });
+
+  it('[TC4.13] blocks Doctor recreation when the User tombstone is already linked to another StaffProfile', async () => {
+    const doctorCase = cases.find((item) => item.entity === 'DoctorProfile')!;
+    const { service, records, prisma } = makeStore('DoctorProfile', doctorCase.snapshot);
+    records.user.set(IDS.user, { ...recoveryUser('DOCTOR'), id: IDS.user, status: 'INACTIVE' });
+    records.staffProfile.set('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', userId: IDS.user,
+      employeeCode: 'BS-OTHER', citizenId: '999999999999',
+    });
+
+    await expect(service.previewOne({ entity: 'DoctorProfile', entityId: IDS.entity })).resolves.toMatchObject({
+      recoverable: false, blockers: expect.arrayContaining(['USER_ALREADY_HAS_STAFF_PROFILE']),
+    });
+    expect(prisma.doctorProfile.create).not.toHaveBeenCalled();
+    expect(records.staffProfile.get('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')).toMatchObject({ userId: IDS.user });
   });
 
   it('rejects a diagnosis when any required relation is missing', async () => {
@@ -336,7 +545,7 @@ describe('EntityRecreationService', () => {
 
     const preview = await service.previewOne({ entity: 'AiDiagnosis', entityId: IDS.entity });
     expect(preview.blockers).toEqual(expect.arrayContaining([
-      'MISSING_AI_MODEL', 'MISSING_PATIENT', 'MISSING_VISIT', 'MISSING_REVIEWING_DOCTOR',
+      'MISSING_AI_MODEL', 'MISSING_PATIENT', 'MISSING_VISIT_NOT_RECOVERABLE', 'MISSING_REVIEWING_DOCTOR',
     ]));
     expect(preview.recoverable).toBe(false);
   });

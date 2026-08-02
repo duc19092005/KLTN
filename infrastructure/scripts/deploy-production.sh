@@ -125,9 +125,9 @@ export BACKEND_IMAGE FRONTEND_IMAGE
 export APP_VERSION="${APP_VERSION:-$(printf '%s' "$BACKEND_IMAGE" | awk -F: '{print $NF}')}"
 
 log "Pulling new images"
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" pull backend frontend nginx postgres kafka
-log "Starting database and Kafka dependencies"
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d postgres kafka
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" pull backend frontend nginx postgres
+log "Starting database dependency"
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d postgres
 COMPOSE_DEPLOY=(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE")
 
 log "Running Prisma production migrations"

@@ -7,6 +7,8 @@ import {
   Prisma,
   UserRole,
   UserStatus,
+  VisitSource,
+  VisitStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLoggerService } from './audit-logger.service';
@@ -21,6 +23,7 @@ import { buildUnifiedDoctorSnapshot } from '../../modules/doctor/domain/doctor-s
 import { buildAiModelSnapshot } from '../../modules/ai-model/domain/ai-model-snapshot';
 import { buildMedicalConclusionSnapshot } from '../../modules/clinical-decision/domain/medical-conclusion-snapshot';
 import { buildAiDiagnosisSnapshot } from '../../modules/clinical-decision/domain/ai-diagnosis-snapshot';
+import { buildVisitSnapshot } from '../../modules/visit/domain/visit-snapshot';
 
 export const RECREATABLE_AUDIT_ENTITIES = [
   'Patient',
@@ -28,6 +31,7 @@ export const RECREATABLE_AUDIT_ENTITIES = [
   'StaffProfile',
   'DoctorProfile',
   'AiModelRegistry',
+  'Visit',
   'MedicalConclusion',
   'AiDiagnosis',
 ] as const;
@@ -55,6 +59,8 @@ export interface EntityRecreationPreview {
   sourceBatchId: number | null;
   source: 'IPFS_BLOCKCHAIN_VERIFIED' | null;
   blockers: string[];
+  dependencies: EntityRecreationTarget[];
+  recoveryMode: 'DIRECT_ENTITY' | 'DEPENDENCY_CHAIN' | 'PITR_REQUIRED';
   sensitiveDataHidden: true;
 }
 
@@ -64,6 +70,7 @@ const REQUIRED_FIELDS: Record<RecreatableAuditEntity, readonly string[]> = {
   StaffProfile: ['employeeCode', 'fullName', 'phone', 'gender', 'citizenId', 'birthDate', 'address', 'avatarUrl', 'departmentId', 'position', 'status'],
   DoctorProfile: ['employeeCode', 'fullName', 'phone', 'gender', 'citizenId', 'birthDate', 'address', 'avatarUrl', 'departmentId', 'position', 'status', 'staffProfileId', 'specialty', 'licenseNumber', 'qualification', 'yearsExperience'],
   AiModelRegistry: ['modelName', 'modelVersion', 'recommendedSpecialty', 'type', 'provider', 'apiEndpoint', 'ipHashPlain', 'description', 'status', 'createdBy'],
+  Visit: ['visitCode', 'patientId', 'departmentId', 'staffId', 'status', 'source', 'checkInAt', 'completedAt'],
   MedicalConclusion: ['visitId', 'patientCode', 'doctorId', 'aiDiagnosisId', 'finalDiagnosis', 'treatmentPlan', 'prescription', 'followUpNote', 'doctorNote'],
   AiDiagnosis: ['aiModelId', 'patientId', 'visitId', 'prompt', 'result', 'confidence', 'status', 'reviewedByDoctorId', 'doctorFeedback'],
 };
@@ -92,7 +99,8 @@ export class EntityRecreationService {
     if (await this.exists(this.prisma, target)) {
       return {
         ...target, state: 'EXISTS', operation: 'NONE', recoverable: false,
-        sourceSeq: null, sourceBatchId: null, source: null, blockers: ['ENTITY_ALREADY_EXISTS'], sensitiveDataHidden: true,
+        sourceSeq: null, sourceBatchId: null, source: null,
+        blockers: ['ENTITY_ALREADY_EXISTS'], dependencies: [], recoveryMode: 'DIRECT_ENTITY', sensitiveDataHidden: true,
       };
     }
 
@@ -100,22 +108,25 @@ export class EntityRecreationService {
       const source = await this.resolveTrustedSource(target, cache);
       const snapshot = this.normalizeForRecreation(target.entity, source.snapshot);
       const blockers = await this.inspectBlockers(this.prisma, target, snapshot);
+      const dependencyResult = await this.resolveRecoverableDependencies(target, snapshot, blockers, cache);
       return {
         ...target,
         state: 'MISSING',
         operation: 'RECREATE',
-        recoverable: blockers.length === 0,
+        recoverable: dependencyResult.blockers.length === 0,
         sourceSeq: source.sourceSeq,
         sourceBatchId: source.sourceBatchId,
         source: 'IPFS_BLOCKCHAIN_VERIFIED',
-        blockers,
+        blockers: dependencyResult.blockers,
+        dependencies: dependencyResult.dependencies,
+        recoveryMode: dependencyResult.dependencies.length ? 'DEPENDENCY_CHAIN' : 'DIRECT_ENTITY',
         sensitiveDataHidden: true,
       };
     } catch (error) {
       return {
         ...target, state: 'MISSING', operation: 'RECREATE', recoverable: false,
         sourceSeq: null, sourceBatchId: null, source: null,
-        blockers: [this.safeErrorMessage(error)], sensitiveDataHidden: true,
+        blockers: [this.safeErrorMessage(error)], dependencies: [], recoveryMode: 'PITR_REQUIRED', sensitiveDataHidden: true,
       };
     }
   }
@@ -126,10 +137,31 @@ export class EntityRecreationService {
     reason: string,
     cache: EntityRecreationBundleCache = new Map(),
   ) {
+    return this.recreateWithDependencies(target, actorId, reason, cache, new Set());
+  }
+
+  private async recreateWithDependencies(
+    target: EntityRecreationTarget,
+    actorId: string,
+    reason: string,
+    cache: EntityRecreationBundleCache,
+    ancestry: Set<string>,
+  ) {
+    const key = `${target.entity}:${target.entityId}`;
+    if (ancestry.has(key)) throw new ConflictException('Phát hiện vòng lặp khóa ngoại trong chuỗi phục hồi.');
+    const nextAncestry = new Set(ancestry).add(key);
     const source = await this.resolveTrustedSource(target, cache);
     const snapshot = this.normalizeForRecreation(target.entity, source.snapshot);
     const blockers = await this.inspectBlockers(this.prisma, target, snapshot);
-    if (blockers.length) throw new ConflictException(`Không thể khôi phục entity: ${blockers.join(', ')}.`);
+    const dependencyResult = await this.resolveRecoverableDependencies(target, snapshot, blockers, cache);
+    if (dependencyResult.blockers.length) {
+      throw new ConflictException(`Không thể khôi phục entity: ${dependencyResult.blockers.join(', ')}.`);
+    }
+    for (const dependency of dependencyResult.dependencies) {
+      if (!(await this.exists(this.prisma, dependency))) {
+        await this.recreateWithDependencies(dependency, actorId, `${reason} [dependency for ${key}]`, cache, nextAncestry);
+      }
+    }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`audit-entity-recreate:${target.entity}:${target.entityId}`}))`;
@@ -232,6 +264,31 @@ export class EntityRecreationService {
     return snapshot;
   }
 
+  private async resolveRecoverableDependencies(
+    target: EntityRecreationTarget,
+    snapshot: Snapshot,
+    blockers: string[],
+    cache: EntityRecreationBundleCache,
+  ): Promise<{ blockers: string[]; dependencies: EntityRecreationTarget[] }> {
+    if (!blockers.includes('MISSING_VISIT') || (target.entity !== 'MedicalConclusion' && target.entity !== 'AiDiagnosis')) {
+      return { blockers, dependencies: [] };
+    }
+    const visitId = this.nullableString(snapshot, 'visitId');
+    if (!visitId) return { blockers, dependencies: [] };
+    const dependency: EntityRecreationTarget = { entity: 'Visit', entityId: visitId };
+    const preview = await this.previewOne(dependency, cache);
+    if (!preview.recoverable) {
+      return {
+        blockers: blockers.map((blocker) => blocker === 'MISSING_VISIT' ? 'MISSING_VISIT_NOT_RECOVERABLE' : blocker),
+        dependencies: [],
+      };
+    }
+    return {
+      blockers: blockers.filter((blocker) => blocker !== 'MISSING_VISIT'),
+      dependencies: [dependency],
+    };
+  }
+
   private async inspectBlockers(client: DbClient, target: EntityRecreationTarget, snapshot: Snapshot): Promise<string[]> {
     const blockers: string[] = [];
     const add = (value: string) => { if (!blockers.includes(value)) blockers.push(value); };
@@ -296,6 +353,17 @@ export class EntityRecreationService {
       }
     }
 
+    if (target.entity === 'Visit') {
+      const duplicate = await client.visit.findUnique({ where: { visitCode: this.string(snapshot, 'visitCode') }, select: { id: true } });
+      if (duplicate && duplicate.id !== target.entityId) add('VISIT_CODE_UNIQUE_CONFLICT');
+      const patientId = this.string(snapshot, 'patientId');
+      if (!(await client.patient.findUnique({ where: { id: patientId }, select: { id: true } }))) add('MISSING_PATIENT');
+      const departmentId = this.string(snapshot, 'departmentId');
+      if (!(await client.department.findUnique({ where: { id: departmentId }, select: { id: true } }))) add('MISSING_DEPARTMENT');
+      const staffId = this.nullableString(snapshot, 'staffId');
+      if (staffId && !(await client.staffProfile.findUnique({ where: { id: staffId }, select: { id: true } }))) add('MISSING_VISIT_STAFF');
+    }
+
     if (target.entity === 'AiDiagnosis') {
       const aiModelId = this.string(snapshot, 'aiModelId');
       if (!(await client.aiModelRegistry.findUnique({ where: { id: aiModelId }, select: { id: true } }))) add('MISSING_AI_MODEL');
@@ -357,7 +425,7 @@ export class EntityRecreationService {
 
   private async createSnapshot(client: Prisma.TransactionClient, target: EntityRecreationTarget, snapshot: Snapshot) {
     const business = this.businessSnapshot(snapshot);
-    const integrity = target.entity === 'AiDiagnosis' ? null : this.audit.hashSnapshot(business);
+    const integrity = target.entity === 'AiDiagnosis' || target.entity === 'Visit' ? null : this.audit.hashSnapshot(business);
 
     if (target.entity === 'Patient') {
       await client.patient.create({ data: {
@@ -417,6 +485,20 @@ export class EntityRecreationService {
         createdBy: this.string(snapshot, 'createdBy'), type: this.nullableString(snapshot, 'type'),
         status: this.enumValue(snapshot, 'status', OperationalStatus), isDeleted: false,
         hash256: integrity!.hash, dataSalt: integrity!.salt, deletedAt: null, deletedBy: null, restoredAt: new Date(),
+      } });
+      return;
+    }
+    if (target.entity === 'Visit') {
+      await client.visit.create({ data: {
+        id: target.entityId,
+        visitCode: this.string(snapshot, 'visitCode'),
+        patientId: this.string(snapshot, 'patientId'),
+        departmentId: this.string(snapshot, 'departmentId'),
+        staffId: this.nullableString(snapshot, 'staffId'),
+        status: this.enumValue(snapshot, 'status', VisitStatus),
+        source: this.enumValue(snapshot, 'source', VisitSource),
+        checkInAt: this.date(snapshot, 'checkInAt'),
+        completedAt: this.nullableDate(snapshot, 'completedAt'),
       } });
       return;
     }
@@ -524,6 +606,10 @@ export class EntityRecreationService {
       const row = await client.aiModelRegistry.findUnique({ where: { id: target.entityId } });
       return row ? buildAiModelSnapshot(row) : null;
     }
+    if (target.entity === 'Visit') {
+      const row = await client.visit.findUnique({ where: { id: target.entityId } });
+      return row ? buildVisitSnapshot(row) : null;
+    }
     if (target.entity === 'AiDiagnosis') {
       const row = await client.aiDiagnosis.findUnique({ where: { id: target.entityId } });
       return row ? buildAiDiagnosisSnapshot(row) as Snapshot : null;
@@ -538,6 +624,7 @@ export class EntityRecreationService {
     if (target.entity === 'StaffProfile') return client.staffProfile.findUnique({ where: { id: target.entityId }, select: { id: true } });
     if (target.entity === 'DoctorProfile') return client.doctorProfile.findUnique({ where: { id: target.entityId }, select: { id: true } });
     if (target.entity === 'AiModelRegistry') return client.aiModelRegistry.findUnique({ where: { id: target.entityId }, select: { id: true } });
+    if (target.entity === 'Visit') return client.visit.findUnique({ where: { id: target.entityId }, select: { id: true } });
     if (target.entity === 'AiDiagnosis') return client.aiDiagnosis.findUnique({ where: { id: target.entityId }, select: { id: true } });
     return client.medicalConclusion.findUnique({ where: { id: target.entityId }, select: { id: true } });
   }

@@ -225,11 +225,9 @@ export class AuditLoggerService {
     };
     if (fkField) data[fkField] = params.entityId;
 
-    const row = await client.blockchainLogger.create({
+    return client.blockchainLogger.create({
       data: data as Prisma.BlockchainLoggerUncheckedCreateInput,
     });
-    await this.enqueueKafkaOutbox(client, row);
-    return row;
   }
 
   private async appendRecordV2(
@@ -331,34 +329,8 @@ export class AuditLoggerService {
     };
     if (fkField) data[fkField] = params.entityId;
 
-    const row = await client.blockchainLogger.create({
+    return client.blockchainLogger.create({
       data: data as Prisma.BlockchainLoggerUncheckedCreateInput,
-    });
-    await this.enqueueKafkaOutbox(client, row);
-    return row;
-  }
-
-  private async enqueueKafkaOutbox(
-    client: Prisma.TransactionClient,
-    row: BlockchainLogger,
-  ): Promise<void> {
-    if (!row.eventId) throw new Error('New audit rows must have an eventId.');
-    const tier = this.auditTier(row.entity, row.action);
-    const topic = tier === 'A'
-      ? (process.env.KAFKA_AUDIT_TIER_A_TOPIC ?? 'audit.events.tier-a')
-      : (process.env.KAFKA_AUDIT_TIER_B_TOPIC ?? 'audit.events.tier-b');
-    const payload = {
-      ...row,
-      createdAt: row.createdAt.toISOString(),
-      tier,
-    };
-    await client.auditOutbox.create({
-      data: {
-        eventId: row.eventId,
-        auditLogId: row.id,
-        topic,
-        payload: payload as unknown as Prisma.InputJsonValue,
-      },
     });
   }
 
@@ -374,7 +346,7 @@ export class AuditLoggerService {
     try {
       await this.anchor.anchorNow();
     } catch {
-      // The durable DB/outbox record remains pending and the 30-second batch worker retries it.
+      // The durable audit row remains pending and the periodic batch worker retries it.
     }
   }
 

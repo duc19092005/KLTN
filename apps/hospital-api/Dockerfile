@@ -12,6 +12,9 @@ RUN npx prisma generate
 COPY . .
 RUN npm run build
 
+FROM builder AS development
+RUN apk add --no-cache openssl libc6-compat postgresql16-client
+
 FROM node:22-alpine AS prod-deps
 ENV PRISMA_CLI_BINARY_TARGETS=linux-musl-openssl-3.0.x
 WORKDIR /app

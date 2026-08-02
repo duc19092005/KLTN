@@ -6,7 +6,6 @@ import { AuditRecoveryCryptoService } from './audit-recovery-crypto.service';
 import { IpfsArtifactService } from './ipfs-artifact.service';
 import { AuditArtifactService } from './audit-artifact.service';
 import { AuditRecoveryService } from './audit-recovery.service';
-import { AuditKafkaService } from './audit-kafka.service';
 import { EntityRecoveryService } from './entity-recovery.service';
 import { EntityRecreationService } from './entity-recreation.service';
 
@@ -28,7 +27,6 @@ import { EntityRecreationService } from './entity-recreation.service';
     IpfsArtifactService,
     AuditArtifactService,
     AuditRecoveryService,
-    AuditKafkaService,
     EntityRecoveryService,
     EntityRecreationService,
   ],

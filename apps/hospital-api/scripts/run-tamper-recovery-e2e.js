@@ -28,7 +28,7 @@ const run = (args) => {
   if (result.status !== 0) process.exit(result.status || 1);
 };
 
-run(['prisma', 'db', 'push', '--skip-generate']);
+run(['prisma', 'db', 'push', '--skip-generate', '--accept-data-loss']);
 run([
   'jest',
   '--config',
