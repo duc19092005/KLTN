@@ -1,0 +1,71 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: admin-auth-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local-only}
+      POSTGRES_DB: ${POSTGRES_DB:-zkp_identity}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+
+  backend:
+    build:
+      context: ../../apps/hospital-api
+      target: development
+    container_name: admin-auth-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+      - "127.0.0.1:43173:43173"
+    # Backend owns its runtime env. Do not load root, hospital-web, or audit-contracts env here.
+    env_file:
+      - ../../apps/hospital-api/.env
+    # Docker-only overrides. Secrets and app config stay in apps/hospital-api/.env.
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-change-me-local-only}@db:5432/${POSTGRES_DB:-zkp_identity}?schema=public
+      FRONTEND_ORIGIN: http://localhost:5173,http://localhost:8081
+      NODE_ENV: development
+      PORT: 3001
+    volumes:
+      - ../../apps/hospital-api:/app
+      - /app/node_modules
+    command: sh -c "until nc -z db 5432; do echo 'Waiting for PostgreSQL...'; sleep 2; done; sleep 6; npx prisma generate; npx prisma db push; npm run start:dev"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../../apps/hospital-web
+      target: builder
+      args:
+        VITE_API_URL: http://localhost:3001/api
+    container_name: admin-auth-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    env_file:
+      - ../../apps/hospital-web/.env
+    environment:
+      VITE_API_URL: http://localhost:3001/api
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ../../apps/hospital-web:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

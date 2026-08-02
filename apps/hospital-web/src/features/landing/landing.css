@@ -1,0 +1,101 @@
+/**
+ * Landing Editorial — Bright White Theme & Smooth Scroll Engine
+ */
+
+html {
+  scroll-behavior: smooth !important;
+}
+
+.landing-editorial {
+  --le-surface: #ffffff;
+  --le-surface-soft: #f8fafc;
+  --le-white: #ffffff;
+  --le-primary: #0284c7;
+  --le-primary-dark: #0369a1;
+  --le-navy: #0f172a;
+  --le-on-surface: #0f172a;
+  --le-on-surface-variant: #475569;
+  --le-outline: #e2e8f0;
+  --le-accent-green: #059669;
+
+  --le-serif: "Noto Serif", "Times New Roman", serif;
+  --le-sans: "Be Vietnam Pro", Inter, system-ui, sans-serif;
+
+  font-family: var(--le-sans);
+  color: var(--le-on-surface);
+  background: var(--le-surface);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.landing-editorial .le-display {
+  font-family: var(--le-serif);
+  letter-spacing: -0.015em;
+  font-weight: 600;
+}
+
+.landing-editorial .material-symbols-outlined {
+  font-family: "Material Symbols Outlined", sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  display: inline-block;
+  vertical-align: middle;
+  -webkit-font-smoothing: antialiased;
+}
+
+.landing-editorial [id] {
+  scroll-margin-top: 6rem;
+}
+
+/* Bright Soft Shadows */
+.landing-editorial .card-bright {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.landing-editorial .card-bright:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 20px 40px -15px rgba(2, 132, 199, 0.12);
+  transform: translateY(-2px);
+}
+
+/* Smooth Reveal Animations */
+.landing-editorial .reveal {
+  opacity: 0;
+  transition:
+    opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.landing-editorial .reveal-up {
+  transform: translate3d(0, 24px, 0);
+}
+
+.landing-editorial .reveal-left {
+  transform: translate3d(-24px, 0, 0);
+}
+
+.landing-editorial .reveal-scale {
+  transform: scale(0.97);
+}
+
+.landing-editorial .reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+  .landing-editorial .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}

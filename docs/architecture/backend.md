@@ -286,7 +286,7 @@ Dùng prompt này khi muốn agent khác làm trực tiếp trong codebase. Prom
 ```text
 @AGENTS.md
 @docs/architecture/backend.md
-@backend/prisma/schema.prisma
+@apps/hospital-api/prisma/schema.prisma
 
 Bạn là coding agent chịu trách nhiệm refactor backend NestJS của KLTN Hospital Management System sang Clean Architecture. Hãy làm trực tiếp trên source code backend, đúng theo file blueprint `docs/architecture/backend.md`.
 
@@ -296,8 +296,8 @@ Mục tiêu:
 - Không dừng ở đề xuất. Tiếp tục implement, build, sửa lỗi compile, chạy test phù hợp và ghi rõ mục tiêu đã hoàn thành.
 
 Phạm vi bắt buộc:
-- Chỉ làm trong `backend/`.
-- Không sửa `frontend/`, `blockchain/` hoặc Prisma schema/migration nếu không có lỗi compile bắt buộc.
+- Chỉ làm trong `apps/hospital-api/`.
+- Không sửa `apps/hospital-web/`, `apps/audit-contracts/` hoặc Prisma schema/migration nếu không có lỗi compile bắt buộc.
 - Không đổi logic nghiệp vụ chính, route path, HTTP method, DTO contract, response shape, role guard, state machine, audit/blockchain behavior.
 - Không đưa PII, diagnosis content, file, PDF, image, medical text lên blockchain.
 - Không bỏ transaction ở workflow nhiều bước.
@@ -367,13 +367,13 @@ Nếu muốn tránh agent ôm quá rộng, dùng prompt ngắn này để bắt 
 ```text
 @AGENTS.md
 @docs/architecture/backend.md
-@backend/src/modules/visit/visit.module.ts
-@backend/src/modules/visit/controllers/visit.controller.ts
-@backend/src/modules/visit/services/visit.service.ts
-@backend/src/modules/visit/dto/visit.dto.ts
-@backend/prisma/schema.prisma
+@apps/hospital-api/src/modules/visit/visit.module.ts
+@apps/hospital-api/src/modules/visit/controllers/visit.controller.ts
+@apps/hospital-api/src/modules/visit/services/visit.service.ts
+@apps/hospital-api/src/modules/visit/dto/visit.dto.ts
+@apps/hospital-api/prisma/schema.prisma
 
-Hãy refactor riêng `backend/src/modules/visit` theo blueprint Clean Architecture đã tag. Giữ nguyên API contract và behavior hiện tại.
+Hãy refactor riêng `apps/hospital-api/src/modules/visit` theo blueprint Clean Architecture đã tag. Giữ nguyên API contract và behavior hiện tại.
 
 Việc cần làm:
 - Tạo `VisitService` thành facade.

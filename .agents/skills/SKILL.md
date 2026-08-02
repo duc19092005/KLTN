@@ -11,7 +11,7 @@ source: local
 This is the skill configuration for the **KLTN Hospital Management System** (Khóa Luận Tốt Nghiệp). Use this document to understand the project architecture and route tasks to the correct specialized skills.
 
 > **Documentation layout (read in this order):**
-> 1. [AGENTS.md](file:///home/congthang/Desktop/KhoaLuanV2/KLTN/AGENTS.md) — canonical source for project overview, architecture decisions, coding conventions, and the **Core Domain Model** (from `schema.prisma`).
+> 1. [AGENTS.md](../../docs/agents/AGENTS.md) — canonical source for project overview, architecture decisions, coding conventions, and the **Core Domain Model** (from `schema.prisma`).
 > 2. `hospital-management-system` skill — strict **business rules, domain invariants, blockchain/AI rules, anti-patterns, and the code review checklist**.
 > 3. This router (`SKILL.md`) — maps task types to the right specialized skills.
 >
@@ -60,7 +60,7 @@ A full-stack hospital management platform featuring:
 ## Tech Stack & Skill Mapping
 
 ### Backend — NestJS + Prisma + PostgreSQL
-**Directory:** `backend/`
+**Directory:** `apps/hospital-api/`
 **Skills to use:**
 - `@nestjs-expert` — Module architecture, DI patterns, guards, interceptors, pipes
 - `@typescript-pro` — TypeScript type safety, generics, decorators
@@ -70,7 +70,7 @@ A full-stack hospital management platform featuring:
 - `@api-design-principles` — RESTful API design, DTOs, validation
 
 **Key patterns in this project:**
-- Prisma ORM with PostgreSQL (canonical schema: `backend/prisma/schema.prisma`)
+- Prisma ORM with PostgreSQL (canonical schema: `apps/hospital-api/prisma/schema.prisma`)
 - JWT + Passport authentication with role-based guards (`ADMIN`, `RECEPTIONIST`, `DOCTOR`, `LAB_MANAGER`)
 - State machine for visit lifecycle: `WAITING → IN_PROGRESS → WAITING_TEST_RESULT → WAITING_CONCLUSION → COMPLETED` (+ `CANCELLED`)
 - Modular architecture: each domain has its own module (patient, visit, department, staff, etc.)
@@ -81,7 +81,7 @@ A full-stack hospital management platform featuring:
 ---
 
 ### Frontend — React (Vite) + React Router
-**Directory:** `frontend/`
+**Directory:** `apps/hospital-web/`
 **Skills to use:**
 - `@react-best-practices` — Component patterns, performance optimization
 - `@react-patterns` — State management, hooks, component composition
@@ -99,7 +99,7 @@ A full-stack hospital management platform featuring:
 ---
 
 ### Blockchain — Solidity + Hardhat + Ethers.js
-**Directory:** `blockchain/`
+**Directory:** `apps/audit-contracts/`
 **Skills to use:**
 - `@blockchain-developer` — Smart contract development, security, testing
 - `@solidity-security` — Contract vulnerability assessment, access control
@@ -114,7 +114,7 @@ A full-stack hospital management platform featuring:
 ---
 
 ### Audit / IPFS / Kafka Recovery
-**Directory:** `backend/src/infrastructure/audit/`
+**Directory:** `apps/hospital-api/src/infrastructure/audit/`
 **Skills to use:**
 - `@hospital-management-system` — audit invariants and recovery rules
 - `@security-audit` — tamper/recovery threat model
@@ -140,7 +140,7 @@ A full-stack hospital management platform featuring:
 ---
 
 ### AI/ML — Python + TensorFlow + InsightFace
-**Directory:** `backend/src/` (Python scripts/services)
+**Directory:** `apps/hospital-api/src/` (Python scripts/services)
 **Skills to use:**
 - `@python-pro` — Python best practices, async patterns
 - `@hospital-management-system` — Biometric domain rules (enrollment, on-chain face-hash anchoring, anti-replay, matching threshold)
@@ -155,7 +155,7 @@ A full-stack hospital management platform featuring:
 ---
 
 ### DevOps & Infrastructure
-**File:** `docker-compose.yml`
+**File:** `infrastructure/compose/compose.yml`
 **Skills to use:**
 - `@docker-expert` — Container configuration, multi-service orchestration
 - `@deployment-procedures` — Deployment workflows
@@ -201,7 +201,7 @@ A full-stack hospital management platform featuring:
 - **Frontend features:** kebab-case directories under `features/`
 - **API routes:** kebab-case, plural nouns (e.g., `/api/patients`, `/api/visits`)
 - **Database tables:** mapped from Prisma models (use `@@map`/`@map` if a different table name is needed)
-- **Audit algorithm docs:** `docs/algothirm/README.md` documents the current hash/encryption formulas and recovery flow.
+- **Audit algorithm docs:** `docs/architecture/audit-algorithm.md` documents the current hash/encryption formulas and recovery flow.
 
 ### Code Style
 - Backend: ESLint + Prettier (NestJS defaults)
@@ -212,26 +212,21 @@ A full-stack hospital management platform featuring:
 ### File Organization
 ```
 KLTN/
-├── backend/           # NestJS API server
-│   └── src/
-│       ├── modules/   # Feature modules (patient, visit, staff, etc.)
-│       ├── infrastructure/  # Cross-cutting concerns (audit, blockchain, etc.)
-│       └── common/    # Shared utilities, decorators, guards
-├── frontend/          # React SPA
-│   └── src/
-│       ├── features/  # Feature-based pages (admin, receptionist, doctor)
-│       ├── components/ # Shared UI components
-│       └── services/  # API service layer
-├── blockchain/        # Solidity smart contracts
-│   ├── contracts/     # Smart contract source files
-│   ├── scripts/       # Deployment scripts
-│   └── test/          # Contract tests
-└── docker-compose.yml # Multi-service orchestration
+├── apps/
+│   ├── hospital-api/       # NestJS API + Prisma
+│   ├── hospital-web/       # React + Vite SPA
+│   ├── hospital-mobile/    # Expo React Native app
+│   └── audit-contracts/    # Solidity + Hardhat contracts
+├── infrastructure/
+│   ├── compose/            # Dev, production, and test stacks
+│   ├── nginx/              # Reverse proxy configuration
+│   └── scripts/            # Deploy, backup, restore, and test helpers
+├── docs/                   # Central documentation
+└── README.md               # Project entry point
 ```
-
 ## Mobile NFC Addendum
 
-**Directory:** `mobile/`
+**Directory:** `apps/hospital-mobile/`
 
 Use this routing for NFC mobile work:
 
@@ -244,7 +239,7 @@ Key mobile patterns:
 - One Expo React Native codebase with two app surfaces: `src/apps/receptionist-scanner/` and `src/apps/patient-portal/`.
 - Shared NFC parsing and API client live under `src/shared/`.
 - Blank cards use NDEF Text JSON with `type: "KLTN_CCCD"` and `version: 1`.
-- Mobile env uses `EXPO_PUBLIC_BACKEND_URL`; never commit `mobile/.env`.
+- Mobile env uses `EXPO_PUBLIC_BACKEND_URL`; never commit `apps/hospital-mobile/.env`.
 - Real NFC scans require a native dev build/prebuild because `react-native-nfc-manager` is not an Expo Go-only flow.
 
 ## When to Use This Skill

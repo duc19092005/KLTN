@@ -1,0 +1,120 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kltn-postgres
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - kltn_postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    logging: &default-logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+
+  backend:
+    image: ${BACKEND_IMAGE:-kltn-backend:prod}
+    build:
+      context: ../../apps/hospital-api
+      target: production
+    container_name: kltn-backend
+    restart: unless-stopped
+    env_file:
+      - ../../apps/hospital-api/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      APP_VERSION: ${APP_VERSION:-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+    command: sh -c "npx prisma migrate deploy && npm run start:prod"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - internal
+      - public
+    expose:
+      - "3001"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3001/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging: *default-logging
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-kltn-frontend:prod}
+    build:
+      context: ../../apps/hospital-web
+      target: production
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    container_name: kltn-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging: *default-logging
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: kltn-nginx
+    restart: unless-stopped
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      # Enable after TLS certificates are mounted/configured.
+      # - "443:443"
+    volumes:
+      - ../nginx/conf.d:/etc/nginx/conf.d:ro
+    networks:
+      - internal
+      - public
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging: *default-logging
+
+networks:
+  public:
+    name: kltn_public
+  internal:
+    name: kltn_internal
+    internal: true
+
+volumes:
+  kltn_postgres_data:
+    name: kltn_postgres_data

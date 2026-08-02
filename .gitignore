@@ -3,7 +3,7 @@
 .env.*
 !.env.example
 !.env.production.example
-!backend/.env.test
+!apps/hospital-api/.env.test
 
 # Dependencies
 node_modules/
@@ -22,6 +22,7 @@ pnpm-debug.log*
 # Database backups
 backups/
 *.sql
+!apps/hospital-api/prisma/migrations/**/migration.sql
 *.sql.gz
 
 # OS / Editor
@@ -38,9 +39,9 @@ backups/
 .temp/
 
 # Hardhat generated files
-blockchain/cache/
-blockchain/artifacts/
-blockchain/typechain/
-blockchain/typechain-types/
-blockchain/ignition/deployments/chain-31337/
+apps/audit-contracts/cache/
+apps/audit-contracts/artifacts/
+apps/audit-contracts/typechain/
+apps/audit-contracts/typechain-types/
+apps/audit-contracts/ignition/deployments/chain-31337/
 

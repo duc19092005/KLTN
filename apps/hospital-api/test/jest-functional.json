@@ -1,0 +1,11 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "..",
+  "testEnvironment": "node",
+  "testMatch": ["<rootDir>/test/functional/**/*.functional-spec.ts"],
+  "setupFiles": ["<rootDir>/test/functional/setup-functional.ts"],
+  "testTimeout": 60000,
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  }
+}
