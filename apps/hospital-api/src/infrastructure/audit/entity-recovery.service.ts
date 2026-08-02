@@ -299,17 +299,6 @@ export class EntityRecoveryService {
       };
     }
 
-    if (!this.hasCompleteSnapshot(entity, verification.decryptedAfter)) {
-      return {
-        ...base,
-        status: 'SNAPSHOT_INCOMPLETE',
-        recoverable: false,
-        fieldsChanged: [],
-        blockers: ['SNAPSHOT_INCOMPLETE'], dependencies: [], recoveryMode: 'PITR_REQUIRED',
-        message: 'Audit nguồn cũ không chứa đủ trường để phục hồi entity an toàn.',
-      };
-    }
-
     const liveSnapshot = await this.loadLiveSnapshot(this.prisma, entity, row.entityId);
     if (!liveSnapshot) {
       const preview = this.recreation
@@ -330,6 +319,39 @@ export class EntityRecoveryService {
             ? 'Bản ghi gốc và entity cha không còn tồn tại, nhưng có đủ snapshot IPFS đã xác minh để khôi phục theo chuỗi khóa ngoại.'
             : 'Bản ghi gốc không còn tồn tại nhưng có snapshot IPFS đã xác minh để tạo lại.'
           : `Không thể khôi phục tự động: ${(preview?.blockers ?? ['không có snapshot tin cậy']).join(', ')}.`,
+      };
+    }
+
+    if (!this.hasCompleteSnapshot(entity, verification.decryptedAfter)) {
+      const partialComparison = this.compareCommittedSnapshotFields(
+        entity,
+        verification.decryptedAfter,
+        liveSnapshot,
+      );
+      if (partialComparison.ok) return null;
+
+      if (row.onChainStatus !== 'ANCHORED' || row.batchId == null) {
+        return {
+          ...base,
+          status: 'AUDIT_UNTRUSTED',
+          recoverable: false,
+          fieldsChanged: this.safeFieldNames(entity, partialComparison.suspiciousFields),
+          blockers: ['LATEST_AUDIT_NOT_ANCHORED', 'SNAPSHOT_INCOMPLETE'], dependencies: [], recoveryMode: 'PITR_REQUIRED',
+          message: 'Các trường được audit ghi nhận đang lệch, nhưng snapshot nguồn cũ chưa đầy đủ và chưa được neo.',
+        };
+      }
+
+      const proof = row.seq == null ? null : await this.anchor.getInclusionProof(row.seq);
+      return {
+        ...base,
+        status: proof?.verified ? 'TAMPERED' : 'AUDIT_UNTRUSTED',
+        recoverable: false,
+        fieldsChanged: this.safeFieldNames(entity, partialComparison.suspiciousFields),
+        blockers: proof?.verified ? ['SNAPSHOT_INCOMPLETE'] : ['BLOCKCHAIN_PROOF_FAILED', 'SNAPSHOT_INCOMPLETE'],
+        dependencies: [], recoveryMode: 'PITR_REQUIRED',
+        message: proof?.verified
+          ? 'Dữ liệu hiện tại lệch ở các trường đã được audit cũ xác nhận, nhưng snapshot không đủ để khôi phục tự động.'
+          : 'Dữ liệu lệch và audit nguồn cũ chưa xác minh được với blockchain.',
       };
     }
 
@@ -582,6 +604,25 @@ export class EntityRecoveryService {
 
   private snapshotsEqual(left: Snapshot, right: Snapshot): boolean {
     return canonicalize(left) === canonicalize(right);
+  }
+
+  private compareCommittedSnapshotFields(
+    entity: RecoverableAuditEntity,
+    source: unknown,
+    live: Snapshot,
+  ): { ok: boolean; suspiciousFields: string[] } {
+    if (!source || typeof source !== 'object' || Array.isArray(source)) {
+      return { ok: false, suspiciousFields: [] };
+    }
+
+    const snapshot = source as Snapshot;
+    const committedFields = REQUIRED_SNAPSHOT_FIELDS[entity].filter((field) =>
+      Object.prototype.hasOwnProperty.call(snapshot, field),
+    );
+    const suspiciousFields = committedFields.filter(
+      (field) => canonicalize(snapshot[field]) !== canonicalize(live[field]),
+    );
+    return { ok: suspiciousFields.length === 0, suspiciousFields };
   }
 
   private safeFieldNames(entity: RecoverableAuditEntity, fields: string[]): string[] {

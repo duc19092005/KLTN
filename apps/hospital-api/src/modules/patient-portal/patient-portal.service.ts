@@ -6,6 +6,7 @@ import { S3MedicalResultStorageAdapter } from '../medical-order/infrastructure/a
 import { AuditLoggerService } from '../../infrastructure/audit/audit-logger.service';
 import { AuthUser } from '../../common/types/auth-user.type';
 import { getMedicalSpecialtyLabel, getMedicalSpecialtyOptions } from '../doctor/medical-specialty';
+import { buildVisitSnapshot } from '../visit/domain/visit-snapshot';
 import { CheckInAppointmentDto, CreateAppointmentDto, CreatePatientProfileFromPortalDto } from './patient-booking.dto';
 
 const QR_PREFIX = 'KLTN_APPOINTMENT_CHECKIN:';
@@ -567,15 +568,8 @@ export class PatientPortalService {
           entityId: visit.id,
           action: 'CREATE',
           actorId: user.sub,
-          after: {
-            visitCode: visit.visitCode,
-            patientId: visit.patientId,
-            departmentId: visit.departmentId,
-            staffId: visit.staffId,
-            status: visit.status,
-            source: visit.source,
-          },
-          metadata: { schema: 'KLTN_VISIT_FROM_APPOINTMENT_AUDIT_V1' },
+          after: buildVisitSnapshot(visit),
+          metadata: { schema: 'KLTN_VISIT_FROM_APPOINTMENT_AUDIT_V2' },
         },
         tx,
       );
