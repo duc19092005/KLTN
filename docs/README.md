@@ -1,33 +1,39 @@
-# Tai lieu KLTN Hospital Management System
+# Tài Liệu Hệ Thống Quản Lý Bệnh Viện KLTN (Hospital Management System)
 
-Tai lieu duoc tap trung theo trach nhiem. Source code nam trong `apps/`; cau hinh van hanh nam trong `infrastructure/`.
+Tài liệu dự án được sắp xếp tập trung theo ứng dụng và chuyên mục chức năng. Mã nguồn nằm trong thư mục `apps/`; cấu hình vận hành hạ tầng nằm trong `infrastructure/`.
 
-## Ung dung
+---
 
-| Ung dung | Tai lieu |
+## Danh Mục Ứng Dụng (Applications)
+
+| Ứng dụng | Tài liệu hướng dẫn |
 |---|---|
-| Hospital API | [Huong dan](applications/hospital-api/README.md) · [Roles and permissions](applications/hospital-api/roles-and-permissions.md) |
-| Hospital Web | [Huong dan](applications/hospital-web/README.md) |
-| Hospital Mobile | [Huong dan](applications/hospital-mobile/README.md) |
-| Audit Contracts | [Huong dan](applications/audit-contracts/README.md) |
+| **Hospital API** | [Hướng dẫn vận hành Backend](applications/hospital-api/README.md) · [Phân quyền Roles & Permissions](applications/hospital-api/roles-and-permissions.md) |
+| **Hospital Web** | [Hướng dẫn ứng dụng Web](applications/hospital-web/README.md) |
+| **Hospital Mobile** | [Hướng dẫn ứng dụng Mobile Bệnh nhân](applications/hospital-mobile/README.md) |
+| **Audit Contracts** | [Hướng dẫn Smart Contracts Blockchain](applications/audit-contracts/README.md) |
 
-## Chu de
+---
 
-| Nhom | Noi dung |
+## Danh Mục Chủ Đề (Topics)
+
+| Nhóm tài liệu | Nội dung chi tiết |
 |---|---|
-| [Architecture](architecture/) | Backend architecture, file structure, frontend rules va audit algorithm |
-| [Domain](domain/) | Bieu mau, quy dinh va use case nghiep vu benh vien |
-| [Operations](operations/) | Deployment, backup/restore va audit runbook |
-| [Security](security/) | Audit logging, tamper evidence va anchoring policy |
-| [Testing](testing/) | Unit/integration guide, tamper recovery va bao cao kiem thu |
-| [Thesis](thesis/) | Noi dung khoa luan va huong phat trien |
-| [Agent guides](agents/) | Quy tac danh cho coding agents |
-| [Translations](translations/) | Ban dich va tom tat tieng Anh/Nga |
+| **[Architecture](architecture/)** | Kiến trúc Backend, cấu trúc tệp tin, quy tắc UI Frontend và thuật toán Audit Merkle Tree. |
+| **[Domain](domain/)** | Biểu mẫu y tế, quy định pháp lý và quy trình use case nghiệp vụ bệnh viện. |
+| **[Operations](operations/)** | Quy trình triển khai (Deployment), sao lưu khôi phục và Runbook kiểm toán vận hành. |
+| **[Security](security/)** | Nhật ký kiểm toán (Audit Logging), phát hiện sai lệch (Tamper Evidence) và chính sách neo dữ liệu (Anchoring Policy). |
+| **[Testing](testing/)** | Hướng dẫn kiểm thử tự động, khôi phục dữ liệu sai lệch và báo cáo kết quả kiểm thử. |
+| **[Thesis](thesis/)** | Nội dung báo cáo khóa luận tốt nghiệp và hướng phát triển tương lai. |
+| **[Agent guides](agents/)** | Quy tắc và nguyên tắc phát triển dành cho các AI Coding Agents. |
+| **[Translations](translations/)** | Bản dịch và tóm tắt tổng quan bằng tiếng Anh (English) và tiếng Nga (Russian). |
 
-## Diem vao
+---
 
-- [README du an](../README.md)
-- [English project overview](translations/README.en.md)
-- [Russian project overview](translations/README.ru.md)
-- [Audit algorithm](architecture/audit-algorithm.md)
-- [Production deployment](operations/deployment.md)
+## Điểm Truy Cập Nhanh (Quick Links)
+
+- [Tài liệu chính dự án (README.md)](../README.md)
+- [Tổng quan dự án tiếng Anh (English overview)](translations/README.en.md)
+- [Tổng quan dự án tiếng Nga (Russian overview)](translations/README.ru.md)
+- [Thuật toán kiểm toán Merkle (Audit Algorithm)](architecture/audit-algorithm.md)
+- [Quy trình triển khai Production](operations/deployment.md)

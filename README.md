@@ -1,35 +1,41 @@
-# KLTN Hospital Management System
+# Hệ Thống Quản Lý Bệnh Viện KLTN (Hospital Management System)
 
-He thong quan ly benh vien full-stack voi NestJS, React, PostgreSQL, AI ho tro chan doan, xac thuc sinh trac hoc va blockchain audit trail.
+Hệ thống quản lý bệnh viện full-stack xây dựng trên NestJS, React, PostgreSQL, hỗ trợ chẩn đoán hình ảnh và tư vấn Y tế bằng AI, xác thực sinh trắc học khuôn mặt và chuỗi bằng chứng kiểm toán (Audit Trail) bảo mật trên Blockchain.
 
-Blockchain chi dung de neo hash/Merkle root phuc vu kiem chung toan ven. Tuyet doi khong dua PII, noi dung benh an, PDF, X-Ray, anh y te, S3 object key hay file len chain.
+> [!IMPORTANT]
+> Blockchain trong dự án này chỉ dùng để neo hash / Merkle root phục vụ kiểm chứng tính toàn vẹn dữ liệu. Tuyệt đối không đưa thông tin định danh bệnh nhân (PII), nội dung bệnh án, file PDF, X-Ray, ảnh y tế, S3 object key hay file tĩnh lên Blockchain.
 
-## Cau Truc Monorepo
+---
+
+## Cấu Trúc Monorepo
 
 ```text
 KLTN/
-|-- apps/
-|   |-- hospital-api/       NestJS + Prisma + PostgreSQL
-|   |-- hospital-web/       React + Vite + Tailwind CSS
-|   |-- hospital-mobile/    Expo React Native patient portal
-|   `-- audit-contracts/    Solidity + Hardhat contracts
-|-- infrastructure/
-|   |-- compose/            Development, production and test stacks
-|   |-- nginx/              Reverse proxy configuration
-|   `-- scripts/            Deploy, backup, restore and test helpers
-|-- docs/                   Central project documentation
-|-- .env.example            Compose environment template
-`-- README.md               Project entry point
+├── apps/
+│   ├── hospital-api/       Backend NestJS + Prisma ORM + PostgreSQL
+│   ├── hospital-web/       Frontend React + Vite + Tailwind CSS
+│   ├── hospital-mobile/    Ứng dụng bệnh nhân Expo React Native
+│   └── audit-contracts/    Smart Contracts Solidity + Hardhat
+├── infrastructure/
+│   ├── compose/            Cấu hình Docker Compose (Dev, Prod, Test)
+│   ├── nginx/              Cấu hình Reverse Proxy Nginx
+│   └── scripts/            Script triển khai, sao lưu, khôi phục và kiểm thử
+├── docs/                   Tài liệu trung tâm của dự án
+├── .env.example            Mẫu biến môi trường Docker Compose
+└── README.md               Tệp tài liệu chính dự án
 ```
 
-## Environment Model
-Root `.env` khong con la env tong de Docker Compose bom vao moi service.
+---
 
-- `apps/hospital-api/.env`: backend runtime, database, JWT, encryption, audit crypto, S3, Cloudinary avatar, backend blockchain RPC/contract/relayer runtime.
-- `apps/hospital-web/.env`: public `VITE_*` config cho frontend.
-- `apps/audit-contracts/.env`: deploy/governance config cho Hardhat scripts.
+## Mô Hình Biến Môi Trường (Environment Model)
 
-Setup co ban:
+Tệp `.env` tại thư mục gốc không còn là tập hợp biến dùng chung cho tất cả các dịch vụ Docker Compose. Mỗi ứng dụng quản lý cấu hình riêng:
+
+- `apps/hospital-api/.env`: Backend runtime, Database, JWT secret, thuật toán mã hóa, Audit Crypto, S3, Cloudinary avatar, RPC/Contract/Relayer Blockchain runtime.
+- `apps/hospital-web/.env`: Cấu hình công khai `VITE_*` dành cho frontend.
+- `apps/audit-contracts/.env`: Cấu hình triển khai và quản trị (deploy & governance) cho các script Hardhat.
+
+Khởi tạo cấu hình ban đầu:
 
 ```bash
 cp apps/hospital-api/.env.example apps/hospital-api/.env
@@ -38,47 +44,55 @@ cd apps/audit-contracts
 cp .env.example .env
 ```
 
-Khong commit file `.env` that.
+> [!WARNING]
+> Không bao giờ commit các tệp `.env` chứa bí mật thực tế lên Git repository.
 
-## Blockchain Flow
+---
 
-Co 3 vai tro tach biet:
+## Luồng Hoạt Động Blockchain (Blockchain Flow)
 
-| Vai tro | Nam o dau | Lam gi |
+Hệ thống phân định 3 vai trò rõ ràng trên Blockchain:
+
+| Vai trò | Vị trí lưu trữ | Chức năng & Nhiệm vụ |
 |---|---|---|
-| Owner / root governance | `BLOCKCHAIN_OWNER_PRIVATE_KEY` trong `apps/audit-contracts/.env` cho deploy/governance; production nen la cold wallet/multisig | Authorize/revoke Admin wallets, add/remove relayers, transfer ownership |
-| Relayer / backend writer | `BLOCKCHAIN_RELAYER_PRIVATE_KEY` trong `apps/hospital-api/.env` hoac secret manager backend | Ky giao dich tu dong: `AuditAnchor.commitRoot`, `FaceRegistry.setFaceHash`, `recordAction` |
+| **Owner / Root Governance** | `BLOCKCHAIN_OWNER_PRIVATE_KEY` trong `apps/audit-contracts/.env` (Production nên dùng ví lạnh / Multisig) | Cấp quyền hoặc thu hồi ví Admin, thêm/xóa ví Relayer, chuyển quyền sở hữu hợp đồng. |
+| **Relayer / Backend Writer** | `BLOCKCHAIN_RELAYER_PRIVATE_KEY` trong `apps/hospital-api/.env` hoặc Secret Manager | Tự động ký và gửi giao dịch: `AuditAnchor.commitRoot`, `FaceRegistry.setFaceHash`, `recordAction`. |
+| **Admin Wallet** | Ví cá nhân của Quản trị viên (MetaMask) | Ký các thử thách xác thực (Challenge) để chứng minh danh tính khi khôi phục hoặc thay đổi nhạy cảm. |
 
-Backend khong dung vi Admin de tra gas cho audit transaction. Admin ky challenge de chung minh danh tinh; backend relayer moi la vi gui giao dich van hanh len chain.
+Backend không sử dụng ví Admin để trả phí gas cho các giao dịch audit thường nhật. Admin chỉ ký thử thách xác thực; ví Relayer của backend mới là bên gửi giao dịch vận hành lên chuỗi.
 
-`IdentityRegistry` la nguon quyen trung tam:
+Hợp đồng `IdentityRegistry` đóng vai trò là nguồn xác thực quyền lực trung tâm:
 
 ```text
 IdentityRegistry.owner()
-|-- quan tri Admin wallets
-|-- quan tri backend relayers
-|-- transferOwnership
+├── Quản trị danh sách ví Admin
+├── Quản trị danh sách ví Relayer backend
+└── Chuyển quyền sở hữu (transferOwnership)
 
 IdentityRegistry.isRelayerOrOwner(address)
-|-- cho phep FaceRegistry ghi face hash
-|-- cho phep AuditAnchor commit Merkle root
-|-- cho phep recordAction
+├── Cho phép FaceRegistry ghi hash khuôn mặt
+├── Cho phép AuditAnchor commit Merkle root
+└── Cho phép ghi nhận hành động recordAction
 ```
 
-`FaceRegistry` va `AuditAnchor` khong giu danh sach relayer rieng. Khi rotate relayer chi can cap nhat `IdentityRegistry`.
+`FaceRegistry` và `AuditAnchor` không duy trì danh sách Relayer riêng mà truy vấn trực tiếp từ `IdentityRegistry`. Do đó, khi cần xoay vòng (rotate) Relayer chỉ cần cập nhật tại một nơi duy nhất.
 
-## Neu Mat Key
+---
 
-| Su co | Hau qua | Xu ly |
+## Quy Trình Xử Lý Khi Mất Khóa Khóa Bí Mật (Key Recovery)
+
+| Sự cố | Hậu quả | Phương án xử lý |
 |---|---|---|
-| Mat `BLOCKCHAIN_RELAYER_PRIVATE_KEY` | Khong ghi audit root/face hash moi; log co the don `UNANCHORED`/failed | Owner goi `removeRelayer(old)` va `addRelayer(new)`, sau do backend doi relayer key |
-| Relayer bi lo | Ke xau co the gui giao dich operational trong quyen relayer | Owner revoke relayer cu, add relayer moi, audit lai batch trong khoang nghi ngo |
-| Mat Admin wallet | Admin do khong login/step-up/recovery duoc | Owner revoke vi cu, authorize vi moi |
-| Mat Owner key don le | Governance ket; khong rotate relayer/admin duoc | Neu contract khong co recovery thi khong cuu duoc. Production phai dung multisig/cold wallet |
+| **Mất `BLOCKCHAIN_RELAYER_PRIVATE_KEY`** | Không thể ghi Merkle root hoặc hash mới; nhật ký có thể bị dồn ở trạng thái `UNANCHORED` | Owner gọi `removeRelayer(old)` và `addRelayer(new)`, sau đó thay khóa relayer mới ở backend. |
+| **Lộ `BLOCKCHAIN_RELAYER_PRIVATE_KEY`** | Kẻ xấu có thể gửi giao dịch vận hành trong phạm vi quyền Relayer | Owner lập tức thu hồi Relayer cũ, cấp quyền Relayer mới và kiểm toán lại các lô dữ liệu nghi ngờ. |
+| **Mất ví Admin** | Admin đó không thể đăng nhập, thực hiện xác thực nâng cao (step-up) hoặc khôi phục dữ liệu | Owner thu hồi ví cũ và cấp quyền cho ví Admin mới. |
+| **Mất khóa Owner duy nhất** | Toàn bộ quản trị bị khóa; không thể thêm/xóa Relayer hay Admin mới | Nếu hợp đồng không có cơ chế khôi phục đa chữ ký, dữ liệu không thể cứu. **Môi trường Production bắt buộc dùng Multisig / Ví lạnh.** |
 
-## Chay Blockchain Local
+---
 
-Terminal 1:
+## Chạy Blockchain Trên Môi Trường Local
+
+**Terminal 1 (Khởi tạo Hardhat Node):**
 
 ```bash
 cd apps/audit-contracts
@@ -86,80 +100,83 @@ npm install
 npm run node
 ```
 
-Terminal 2:
+**Terminal 2 (Deploy Smart Contracts):**
 
 ```bash
 cd apps/audit-contracts
 npm run deploy:local
 ```
 
-Sau khi deploy, copy dung phan script in ra vao tung file: `apps/audit-contracts/.env`, `apps/hospital-api/.env`, `apps/hospital-web/.env`.
+Sau khi deploy thành công, sao chép chính xác địa chỉ hợp đồng và thông số được in ra terminal vào tệp `.env` tương ứng của từng ứng dụng (`apps/audit-contracts/.env`, `apps/hospital-api/.env`, `apps/hospital-web/.env`).
 
-Lenh huu ich:
+Các lệnh hữu ích:
 
 ```bash
 cd apps/audit-contracts
-npm run compile
-npm test
-npm run deploy:custom
-npm run deploy:audit:local
+npm run compile           # Biên dịch hợp đồng
+npm test                  # Chạy kiểm thử tự động
+npm run deploy:custom     # Deploy lên mạng tùy chỉnh
+npm run deploy:audit:local # Deploy nhanh bộ hợp đồng audit
 ```
 
-## Chay Bang Docker Compose
+---
 
-Docker Compose khong chay blockchain container nua. Truoc khi `docker compose up`, hay chay Hardhat node o `apps/audit-contracts/` nhu phan tren.
+## Chạy Bằng Docker Compose
+
+Dịch vụ Docker Compose không còn tự động khởi chạy container blockchain riêng. Trước khi thực hiện `docker compose up`, hãy khởi chạy node Hardhat tại `apps/audit-contracts/` theo hướng dẫn trên.
 
 ```bash
 docker compose -f infrastructure/compose/compose.yml up -d
 ```
 
-Mac dinh:
+Các đường dẫn dịch vụ mặc định:
 
+- **Backend API:** `http://localhost:3001/api`
+- **Frontend Web:** `http://localhost:5173`
+- **PostgreSQL:** `localhost:5432`
+- **Hardhat Node:** `http://localhost:8545`
+
+---
+
+## Lưu Trữ Tệp Y Tế & Quyền Truy Cập (File Storage)
+
+Tệp kết quả cận lâm sàng được lưu trữ tại private bucket của AWS S3:
+- Báo cáo PDF, ảnh X-Ray / MRI / CT / Siêu âm, điện tâm đồ (ECG), tệp đính kèm xét nghiệm.
+- Ảnh phân tích AI: Backend tải ảnh riêng tư từ S3, chuyển đổi mã hóa base64 và gửi an toàn sang nhà cung cấp AI.
+
+Ảnh đại diện (avatar) của bác sĩ và nhân viên không lưu ở S3 private mà sử dụng URL tĩnh / public trên Cloudinary để Frontend hiển thị trực tiếp.
+
+Database PostgreSQL quản lý metadata và quyền truy cập (`storageProvider`, `bucket`, `objectKey`, `sha256`, `etag`). S3 chỉ giữ dữ liệu thô. Blockchain chỉ lưu vết Audit hash / Merkle root đã làm sạch định danh.
+
+Đường dẫn tải tệp y tế:
 ```text
-Backend:  http://localhost:3001/api
-Frontend: http://localhost:5173
-Postgres: localhost:5432
-Hardhat:  http://localhost:8545
+GET /api/medical-orders/results/files/:fileId/download
 ```
+Backend kiểm tra phân quyền RBAC thành công mới tạo Pre-signed URL có thời hạn ngắn để ứng dụng tải tệp.
 
-Trong compose, backend chi doc `apps/hospital-api/.env`; frontend chi doc `apps/hospital-web/.env`; compose khong doc `apps/audit-contracts/.env`.
+---
 
-## Luu Tru File Y Te
+## Cổng Thông Tin Bệnh Nhân Trên Mobile
 
-Medical result upload moi dung AWS S3 private bucket:
+Ứng dụng `apps/hospital-mobile/` chứa cổng thông tin bệnh nhân xây dựng bằng Expo React Native. Bệnh nhân có thể đăng nhập bằng số điện thoại OTP hoặc mật khẩu lần đầu, chọn hồ sơ liên kết và tra cứu lịch sử khám chữa bệnh minh bạch.
 
-- PDF report, X-Ray/MRI/CT/Ultrasound image, ECG, lab attachments.
-- AI image attachments: backend tai anh private tu S3, convert base64 va gui sang AI provider.
+Xem chi tiết tại: [docs/applications/hospital-mobile/README.md](docs/applications/hospital-mobile/README.md).
 
-Staff/doctor avatar khong di qua S3 private. Avatar dung Cloudinary public/static URL de frontend render truc tiep.
+---
 
-PostgreSQL giu metadata/quyen truy cap (`storageProvider`, `bucket`, `objectKey`, `sha256`, `etag`). S3 chi giu blob. Blockchain chi anchor audit hash/Merkle root da sanitize.
+## Tài Liệu Tham Khảo Liên Quan
 
-Download file y te di qua:
+- [AGENTS.md](./docs/agents/AGENTS.md) - Hướng dẫn quy tắc cho AI coding agents
+- [Hướng dẫn Hợp đồng Smart Contracts](docs/applications/audit-contracts/README.md)
+- [Quy trình Kiểm toán Audit Logging](docs/security/audit-logging.md)
+- [Chính sách Phân tầng Dữ liệu & Anchoring](docs/security/tiers-and-anchoring.md)
 
-```text
-/api/medical-orders/results/files/:fileId/download
-```
+---
 
-Backend kiem tra RBAC roi moi tra pre-signed URL ngan han. File Cloudinary medical cu khong migrate trong phase nay; neu DB con `url` legacy va URL con song thi endpoint van mo duoc.
+## Quy Ước Phát Triển (Development Standards)
 
-## Patient Mobile
-
-`apps/hospital-mobile/` contains the Expo React Native patient portal. Patients sign in with phone OTP or their first-login password, can resend OTP after a 60-second cooldown, choose linked profiles, and view their linked medical visit history transparently.
-
-See [apps/hospital-mobile/README.md](docs/applications/hospital-mobile/README.md).
-
-## Tai Lieu Lien Quan
-
-- [AGENTS.md](./docs/agents/AGENTS.md)
-- [apps/audit-contracts/README.md](docs/applications/audit-contracts/README.md)
-- [docs/security/audit-logging.md](docs/security/audit-logging.md)
-- [docs/security/tiers-and-anchoring.md](docs/security/tiers-and-anchoring.md)
-
-## Quy Uoc Phat Trien
-
-- Backend dung feature-based modules, DTO validation bang `class-validator`, business logic nam o service/use case.
-- Multi-step workflow phai dung transaction.
-- Entity quan trong phai ghi audit va anchor hash/root.
-- Blockchain khong luu PII, file y te, noi dung chan doan hoac du lieu lon.
-- `.env` khong duoc commit; cap nhat `.env.example` khi them bien moi.
+- Backend phát triển theo kiến trúc mô-đun chức năng (feature-based modules), kiểm tra DTO bằng `class-validator`, logic nghiệp vụ nằm ở Service / Use Case.
+- Các quy trình đa bước (Multi-step workflow) bắt buộc phải bọc trong Database Transaction.
+- Tất cả thay đổi đối với Entity quan trọng phải ghi log Audit và tạo Hash / Merkle root neo lên Blockchain.
+- Blockchain không chứa PII, nội dung bệnh án hay tệp dữ liệu lớn.
+- Tệp `.env` không được commit lên repo; luôn cập nhật tệp mẫu `.env.example` khi thêm biến mới.
