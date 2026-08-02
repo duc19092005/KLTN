@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
@@ -501,8 +502,10 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
     if (fieldErrors[field]) setFieldErrors((current) => ({ ...current, [field]: getFieldError(field, value) }));
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+  if (typeof document === 'undefined' || !document.body) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fadeIn">
       <form onSubmit={handleSubmit} noValidate className="w-full max-w-[1280px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
         <div className="flex justify-between gap-4">
           <div>
@@ -548,10 +551,13 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
 
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
           <button type="button" onClick={onClose} className="flex-1 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50">Hủy</button>
-          <button disabled={saving} className="flex-1 rounded-2xl bg-sky-600 px-5 py-3 text-xs font-bold text-white shadow-sm transition-all hover:bg-sky-700 disabled:opacity-60">{saving ? 'Đang lưu...' : editing ? 'Lưu thay đổi' : 'Thêm mô hình AI'}</button>
+          <button disabled={saving} className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-sky-600 px-5 py-3 text-xs font-bold text-white shadow-sm hover:bg-sky-700 disabled:opacity-70">
+            {saving && <LoadingIndicator size="sm" tone="white" />}{editing ? 'Lưu thay đổi' : 'Thêm mô hình'}
+          </button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -565,13 +571,13 @@ function ModelPicker({ form, updateForm, errors = {}, validateField = () => true
 }
 
 function Field({ label, value, onChange, onBlur, error, required = false, placeholder = '', maxLength }) {
-  return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}{required && <span className="text-rose-500"> *</span>}</span><input required={required} value={value || ''} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} placeholder={placeholder} maxLength={maxLength} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 outline-none transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`} /><FieldError message={error} /></label>;
+  return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}{required && <span className="text-rose-500"> *</span>}</span><input required={required} value={value || ''} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} placeholder={placeholder} maxLength={maxLength} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:ring-2 outline-none transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`} /><FieldError message={error} /></label>;
 }
 function SelectField({ label, value, onChange, onBlur, options, empty, required, error }) {
   return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}{required && <span className="text-rose-500"> *</span>}</span><select required={required} value={value || ''} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} aria-invalid={Boolean(error)} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 outline-none transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`}>{empty && <option value="">{empty}</option>}{options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select><FieldError message={error} /></label>;
 }
 function TextAreaField({ label, value, onChange, onBlur, error, required = false, optional = false, rows = 2, maxLength, className = '', inputType }) {
-  const fieldClass = `w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 outline-none transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`;
+  const fieldClass = `w-full resize-none px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:ring-2 outline-none transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`;
   return (
     <label className={`block space-y-1.5 ${className}`}>
       <span className="text-xs font-bold text-slate-700">

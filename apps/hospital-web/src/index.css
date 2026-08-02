@@ -31,7 +31,6 @@ html {
   min-width: 320px;
   min-height: 100%;
   background: var(--color-background);
-  scrollbar-gutter: stable;
   font-family: 'Be Vietnam Pro', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
@@ -47,7 +46,6 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  scrollbar-gutter: stable;
 }
 
 body.modal-scroll-locked {
@@ -60,6 +58,10 @@ textarea,
 select {
   font: inherit;
   font-family: 'Be Vietnam Pro', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+textarea {
+  resize: none;
 }
 
 button {
@@ -80,6 +82,10 @@ pre,
 ::selection {
   background: rgba(8, 145, 178, 0.18);
   color: #083344;
+}
+
+*:focus {
+  outline: none;
 }
 
 *:focus-visible {
@@ -190,6 +196,14 @@ main textarea {
   background-color: #f8fafc !important;
   color: #0f172a !important;
   box-shadow: none !important;
+}
+
+input::placeholder,
+textarea::placeholder,
+select::placeholder {
+  color: #94a3b8 !important;
+  opacity: 1 !important;
+  font-weight: 400 !important;
 }
 
 main input:not([type='checkbox']):not([type='radio']):not([type='file']):focus,

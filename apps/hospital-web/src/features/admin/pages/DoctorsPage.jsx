@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
@@ -588,8 +589,10 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
     onSubmit(event);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+  if (typeof document === 'undefined' || !document.body) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fadeIn">
       <form onSubmit={handleSubmit} className="w-full max-w-[1280px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
         <div className="flex justify-between gap-4">
           <div>
@@ -643,7 +646,8 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
           {isCreate ? 'Tạo bác sĩ' : 'Lưu thay đổi'}
         </button>
       </form>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -660,14 +664,15 @@ function Pagination({ pagination, onPageChange }) {
     </div>
   );
 }
-
-function Info({ label, value }) { return <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</p><p className="text-xs font-bold text-slate-800">{value}</p></div>; }
+function Info({ label, value, mono }) { return <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</p><p className={`text-xs text-slate-800 ${mono ? 'font-mono' : 'font-bold'}`}>{value}</p></div>; }
+function Empty({ title, desc }) { return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><strong className="text-sm font-bold text-slate-800">{title}</strong><p className="mt-1 text-xs text-slate-400">{desc}</p></div>; }
 function SmallButton({ children, onClick, disabled, danger }) { return <button type="button" disabled={disabled} onClick={onClick} className={`rounded-xl border px-3 py-2 text-xs font-bold transition-all disabled:opacity-50 ${danger ? 'border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-sky-50 hover:text-sky-600 hover:border-sky-200'}`}>{children}</button>; }
+function FieldError({ message }) { return <p className={`min-h-[14px] text-[11px] font-bold leading-3 ${message ? 'text-rose-600' : 'text-transparent'}`}>{message || 'Lỗi'}</p>; }
 
-function Input({ label, value, onChange, onBlur, error, required, placeholder, type = 'text', disabled, maxLength, inputMode, pattern }) {
+function Input({ label, value, onChange, onBlur, error, required = false, placeholder, type = 'text', inputMode, maxLength, pattern, disabled = false }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-xs font-bold text-slate-700">{label}</span>
+      <span className="text-xs font-bold text-slate-700">{label}{required && <span className="text-rose-500"> *</span>}</span>
       <input
         type={type}
         required={required}
@@ -681,7 +686,7 @@ function Input({ label, value, onChange, onBlur, error, required, placeholder, t
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
         placeholder={placeholder}
-        className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 outline-none disabled:opacity-60 disabled:cursor-not-allowed transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`}
+        className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:ring-2 outline-none disabled:opacity-60 disabled:cursor-not-allowed transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`}
       />
       <FieldError message={error} />
     </label>
@@ -776,8 +781,4 @@ function Select({ label, value, onChange, options, empty, required, disabled, er
       <FieldError message={error} />
     </label>
   );
-}
-
-function FieldError({ message }) {
-  return <p className={`min-h-[14px] text-[11px] font-bold leading-3 transition-colors ${message ? 'text-rose-600' : 'text-transparent'}`}>{message || 'Lỗi'}</p>;
 }
