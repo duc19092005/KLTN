@@ -1,29 +1,35 @@
-**🌐 Language:** [🇻🇳 Tiếng Việt](README.md) · [🇬🇧 English](README.en.md) · [🇷🇺 Русский](README.ru.md)
+**🌐 Ngôn ngữ / Language:** [🇻🇳 Tiếng Việt](README.md) · [🇬🇧 English](README.en.md) · [🇷🇺 Русский](README.ru.md)
 
-# KLTN Hospital Management System - Backend
+# Máy Chủ API Quản Lý Bệnh Viện KLTN (Hospital API Backend)
 
-A NestJS-based enterprise healthcare platform backend providing APIs for patient management, biometric authentication, PostgreSQL database interactions, and blockchain audit anchoring.
+Hệ thống Backend enterprise dành cho ngành Y tế phát triển trên NestJS, cung cấp RESTful APIs quản lý bệnh nhân, xác thực sinh trắc học, giao tiếp database PostgreSQL và neo vết kiểm toán (Audit Trail) trên Blockchain.
 
-## Setup Instructions
+---
+
+## Hướng Dẫn Cài Đặt & Khởi Chạy
 
 ```bash
-# 1. Install dependencies
+# 1. Cài đặt các thư viện phụ thuộc
 npm install
 
-# 2. Configure environment variables
-# Copy .env.example to .env and fill in the required values (Database URL, Blockchain RPC, Cloudinary, etc.)
+# 2. Cấu hình biến môi trường
+# Sao chép .env.example thành .env và điền đầy đủ các thông số (Database URL, Blockchain RPC, Cloudinary, AWS S3, v.v.)
 cp .env.example .env
 
-# 3. Generate Prisma client
+# 3. Khởi tạo Prisma Client
 npm run prisma:generate
 
-# 4. Apply database migrations
+# 4. Thực thi Database Migration
 npx prisma migrate deploy
-# or use `npx prisma db push` for local development
+# Hoặc dùng `npx prisma db push` cho môi trường phát triển local
 
-# 5. Start development server
+# 5. Khởi chạy máy chủ phát triển Backend
 npm run start:dev
 ```
 
-## Documentation
-- **Audit Logging:** For detailed information on the blockchain audit and Merkle tree anchoring implementation, see [AUDIT_LOGGING.md](../../security/audit-logging.md).
+---
+
+## Tài Liệu Hướng Dẫn Chi Tiết
+
+- **Quy trình Phân quyền:** [Roles & Permissions](roles-and-permissions.md)
+- **Quy trình Kiểm toán & Blockchain:** Để tìm hiểu chi tiết về thuật toán mã hóa Merkle tree và cơ chế neo dữ liệu lên Smart Contract, xem thêm tại [AUDIT_LOGGING.md](../../security/audit-logging.md).

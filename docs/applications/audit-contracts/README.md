@@ -1,87 +1,93 @@
-# KLTN Blockchain Deployment Guide
+# Hướng Dẫn Triển Khai Blockchain & Smart Contracts KLTN
 
-Smart contracts cho audit trail va integrity verification cua KLTN Hospital Management System.
+Bộ Hợp đồng thông minh (Smart Contracts) phục vụ lưu vết kiểm toán (Audit Trail) và xác thực tính toàn vẹn dữ liệu cho Hệ thống Quản lý Bệnh viện KLTN.
 
-Blockchain trong project nay chi dung de neo hash, Merkle root, timestamp va metadata ky thuat. Khong bao gio dua PII, thong tin benh an, PDF, X-Ray, anh y te, S3 object key, raw file hay noi dung chan doan len chain.
+> [!IMPORTANT]
+> Blockchain trong dự án này **chỉ dùng để neo hash, Merkle root, dấu thời gian (timestamp) và metadata kỹ thuật**. Tuyệt đối không đưa thông tin định danh bệnh nhân (PII), thông tin bệnh án, tệp PDF, ảnh X-Ray, ảnh y tế, S3 object key, tệp thô hay nội dung chẩn đoán lên chuỗi.
 
-## Contract Set
+---
 
-| Contract | Vai tro | Ai duoc ghi |
+## Bộ Hợp Đồng Thông Minh (Contract Set)
+
+| Hợp đồng | Vai trò & Chức năng | Quyền ghi dữ liệu |
 |---|---|---|
-| `IdentityRegistry` | Root governance: quan ly Admin wallets va backend relayers | `owner` |
-| `FaceRegistry` | Luu face hash integrity marker | `IdentityRegistry.owner()` hoac relayer da duoc authorize |
-| `AuditAnchor` | Neo Merkle root cua audit batch | `IdentityRegistry.owner()` hoac relayer da duoc authorize |
+| `IdentityRegistry` | **Root Governance:** Quản lý danh sách ví Admin và ví Relayer backend | `owner` |
+| `FaceRegistry` | Lưu vết dấu hash khuôn mặt sinh trắc học | `IdentityRegistry.owner()` hoặc Relayer đã được ủy quyền |
+| `AuditAnchor` | Neo Merkle root của lô kiểm toán (Audit batch) | `IdentityRegistry.owner()` hoặc Relayer đã được ủy quyền |
 
-`FaceRegistry` va `AuditAnchor` khong giu danh sach relayer rieng. Hai contract nay hoi quyen tu `IdentityRegistry`, nen rotate relayer/admin chi can thao tac tai mot noi.
+`FaceRegistry` và `AuditAnchor` không duy trì danh sách Relayer riêng. Hai hợp đồng này truy vấn quyền hạn trực tiếp từ `IdentityRegistry`, do đó việc xoay vòng (rotate) Relayer / Admin chỉ cần thao tác tại một nơi duy nhất.
 
-## Key Model
+---
 
-| Key | Dung de lam gi | Local dev | Production |
+## Mô Hình Quản Lý Khóa (Key Model)
+
+| Loại Khóa | Mục đích sử dụng | Môi trường Local Dev | Môi trường Production |
 |---|---|---|---|
-| `PRIVATE_KEY` | Deployer key cho Hardhat `custom` network | Co the la Hardhat account #0 | Chi dung tren may deploy/CI secret, khong dua vao backend |
-| `BLOCKCHAIN_OWNER_PRIVATE_KEY` | Root governance key: add/remove relayer, authorize/revoke Admin wallet, transfer ownership | Co the de trong `apps/audit-contracts/.env` cho nhanh | Khong nen nam tren backend; nen la cold wallet/multisig |
-| `BLOCKCHAIN_RELAYER_PRIVATE_KEY` | Hot wallet backend dung de ghi `commitRoot`, `setFaceHash`, `recordAction` | Nam trong `apps/hospital-api/.env` neu backend local can ghi chain | Nam trong secret manager/backend runtime; phai rotate/revoke duoc |
-| Admin wallet | Human wallet de login, step-up, emergency restore | MetaMask/dev wallet | Hardware wallet hoac wallet quan tri duoc governance authorize |
+| `PRIVATE_KEY` | Khóa Deployer cho mạng Hardhat `custom` | Có thể là tài khoản mặc định Hardhat #0 | Chỉ dùng trên máy deploy / CI secret; không đưa vào backend runtime. |
+| `BLOCKCHAIN_OWNER_PRIVATE_KEY` | Khóa quản trị cao nhất (Owner): Thêm/xóa relayer, ủy quyền/thu hồi ví Admin, chuyển quyền sở hữu | Lưu trong `apps/audit-contracts/.env` để thao tác nhanh | **Tuyệt đối không lưu trên backend**; phải dùng Ví lạnh (Cold wallet) hoặc Ví đa chữ ký (Multisig). |
+| `BLOCKCHAIN_RELAYER_PRIVATE_KEY` | Ví Hot wallet backend dùng để ký tự động `commitRoot`, `setFaceHash`, `recordAction` | Đặt tại `apps/hospital-api/.env` | Lưu trong Secret Manager / môi trường Backend runtime; có thể thu hồi & thay thế linh hoạt. |
+| **Admin Wallet** | Ví cá nhân Admin để đăng nhập, xác thực nâng cao, khôi phục sự cố | Ví MetaMask dev | Hardware wallet hoặc ví quản trị được Governance ủy quyền. |
 
-Thuc te van hanh:
+Thực tế vận hành:
+- Ví Admin cá nhân không trả phí gas cho các giao dịch audit hàng ngày.
+- Ví Relayer của backend mới là bên ký và trả gas cho các giao dịch vận hành.
+- Owner chỉ sử dụng khi thay đổi quản trị: thêm/xóa Relayer, thêm/xóa ví Admin, chuyển quyền sở hữu hợp đồng.
 
-- Admin wallet khong tra gas cho audit transaction hang ngay.
-- Backend relayer moi la signer cho cac giao dich operational.
-- Owner chi nen dung khi governance thay doi: them/xoa relayer, them/xoa Admin wallet, transfer ownership.
+---
 
-## Environment Files
+## Cấu Trúc File Môi Trường (Environment Files)
 
-Project da tach env theo tung folder:
+Dự án đã phân tách biến môi trường theo từng thư mục ứng dụng:
 
 ```text
-KLTN/apps/hospital-api/.env      # backend runtime: DB, auth, S3, audit, blockchain RPC/relayer runtime
-KLTN/apps/hospital-web/.env     # frontend public VITE_* config
-KLTN/apps/audit-contracts/.env   # blockchain deploy/governance config
+KLTN/apps/hospital-api/.env       # Backend runtime: DB, Auth, S3, Audit, Blockchain RPC/Relayer
+KLTN/apps/hospital-web/.env       # Frontend công khai VITE_* config
+KLTN/apps/audit-contracts/.env    # Blockchain deploy & governance config
 ```
 
-Root `.env` khong con la env tong cho app. Moi service doc env trong folder cua no.
-
-Tao env blockchain:
+Khởi tạo biến môi trường cho hợp đồng:
 
 ```bash
 cd apps/audit-contracts
 cp .env.example .env
 ```
 
-Bien quan trong trong `apps/audit-contracts/.env` chi danh cho deploy/governance:
+Các biến quan trọng trong `apps/audit-contracts/.env` chỉ dành cho triển khai và quản trị:
 
 ```env
-# Deploy target
+# Địa chỉ mạng triển khai
 NETWORK_RPC_URL=https://your-production-rpc.example
 PRIVATE_KEY=0x...
 
-# Governance / deploy
+# Quản trị (Governance)
 BLOCKCHAIN_OWNER_ADDRESS=0x...
 BLOCKCHAIN_OWNER_PRIVATE_KEY=0x...
 BLOCKCHAIN_RELAYER_ADDRESS=0x...
 ```
 
-## Case 1: Deploy Local Development
+---
 
-Dung case nay khi chay do an tren may local voi Hardhat node mien phi gas.
+## Kịch Bản 1: Triển Khai Môi Trường Local Development
 
-### Local Architecture
+Sử dụng kịch bản này khi chạy đồ án trên máy cá nhân với node Hardhat miễn phí gas.
+
+### Kiến Trúc Môi Trường Local
 
 ```text
-Browser / Frontend
-  |-- http://localhost:5173
-Backend
-  |-- native run: http://127.0.0.1:8545
-  |-- Docker run: http://host.docker.internal:8545
-Hardhat node
-  |-- runs from KLTN/blockchain
-PostgreSQL
-  |-- Docker service db
+Trình duyệt / Frontend
+  └── http://localhost:5173
+Backend API
+  ├── Chạy trực tiếp: http://127.0.0.1:8545
+  └── Chạy qua Docker: http://host.docker.internal:8545
+Node Hardhat Local
+  └── Chạy từ thư mục apps/audit-contracts
+Database PostgreSQL
+  └── Dịch vụ Docker PostgreSQL
 ```
 
-`infrastructure/compose/compose.yml` khong chay blockchain container nua. Blockchain node phai duoc chay rieng tu thu muc `apps/audit-contracts/`.
+`infrastructure/compose/compose.yml` không khởi chạy container blockchain tự động. Node Blockchain phải được khởi chạy riêng từ thư mục `apps/audit-contracts/`.
 
-### 1. Install
+### 1. Cài Đặt Thư Viện
 
 ```bash
 cd apps/audit-contracts
@@ -89,20 +95,20 @@ npm install
 cp .env.example .env
 ```
 
-### 2. Start Local Hardhat Node
+### 2. Khởi Chạy Node Hardhat Local
 
-Mo terminal 1:
+Mở **Terminal 1**:
 
 ```bash
 cd apps/audit-contracts
 npm run node
 ```
 
-Lenh nay bind Hardhat node ra `0.0.0.0:8545`, giup backend Docker co the goi qua `host.docker.internal:8545`.
+Lệnh này mở cổng Hardhat node tại `0.0.0.0:8545`, giúp ứng dụng Backend trong Docker truy cập được qua `host.docker.internal:8545`.
 
-### 3. Deploy Contracts
+### 3. Deploy Hợp Đồng Smart Contracts
 
-Mo terminal 2:
+Mở **Terminal 2**:
 
 ```bash
 cd apps/audit-contracts
@@ -111,16 +117,15 @@ npm test
 npm run deploy:local
 ```
 
-Script `deploy:local` se:
+Script `deploy:local` sẽ tự động:
+1. Triển khai `IdentityRegistry`.
+2. Triển khai `FaceRegistry` liên kết với địa chỉ `IdentityRegistry`.
+3. Triển khai `AuditAnchor` liên kết với địa chỉ `IdentityRegistry`.
+4. Đăng ký backend relayer từ `BLOCKCHAIN_RELAYER_ADDRESS`.
+5. Chuyển quyền sở hữu (Ownership) sang `BLOCKCHAIN_OWNER_ADDRESS` nếu Owner khác Deployer.
+6. In ra thông số cấu hình để sao chép vào các file `.env`.
 
-1. Deploy `IdentityRegistry`.
-2. Deploy `FaceRegistry` voi dia chi `IdentityRegistry`.
-3. Deploy `AuditAnchor` voi dia chi `IdentityRegistry`.
-4. Add backend relayer tu `BLOCKCHAIN_RELAYER_ADDRESS` hoac relayer private key.
-5. Transfer ownership sang `BLOCKCHAIN_OWNER_ADDRESS` neu owner khac deployer.
-6. In ra cac bien can copy lai theo dung folder env.
-
-Sau deploy, copy deploy/governance output vao `apps/audit-contracts/.env`:
+Sau khi deploy, sao chép kết quả vào `apps/audit-contracts/.env`:
 
 ```env
 NETWORK_RPC_URL=http://127.0.0.1:8545
@@ -128,7 +133,7 @@ BLOCKCHAIN_OWNER_ADDRESS=0x...
 BLOCKCHAIN_RELAYER_ADDRESS=0x...
 ```
 
-Copy backend runtime output vao `apps/hospital-api/.env`:
+Sao chép thông số sang `apps/hospital-api/.env`:
 
 ```env
 BLOCKCHAIN_RPC_URL=http://127.0.0.1:8545
@@ -139,395 +144,64 @@ BLOCKCHAIN_RELAYER_ADDRESS=0x...
 BLOCKCHAIN_RELAYER_PRIVATE_KEY=0x...
 ```
 
-Frontend khong can blockchain env. FE chi ky message bang MetaMask; backend moi verify authorization voi contract.
+Lưu ý: Node Hardhat local sẽ xóa sạch trạng thái khi bị tắt hoặc khởi động lại. Nếu khởi động lại node, bạn phải chạy lại lệnh deploy và cập nhật địa chỉ hợp đồng mới vào `apps/hospital-api/.env`.
 
-Luu y: Hardhat local chain mat state khi terminal node bi tat/reset. Neu reset node, phai deploy lai va cap nhat address moi trong `apps/hospital-api/.env`.
+---
 
-### 4. Run App With Docker Compose
+## Kịch Bản 2: Triển Khai Môi Trường Production / Mạng Thật
 
-Tu root repo:
+Sử dụng kịch bản này khi triển khai lên mạng Testnet (Sepolia/Holesky), L2 (Base/Arbitrum), hoặc mạng EVM riêng của bệnh viện.
 
-```bash
-docker compose -f infrastructure/compose/compose.yml up -d
-```
+Khuyến nghị Production:
+- Nên dùng L2 / mạng EVM riêng để tối ưu chi phí gas.
+- Owner phải là ví lạnh / Multisig.
+- Backend chỉ giữ khóa Hot wallet Relayer và có thể thu hồi / thay thế khi cần.
 
-Compose se chay:
-
-```text
-db
-backend
-frontend
-```
-
-Compose khong chay blockchain. Backend container chi doc `./apps/hospital-api/.env`. Neu backend can goi blockchain, dat RPC va contract address trong `apps/hospital-api/.env`:
-
-```env
-BLOCKCHAIN_RPC_URL=https://your-production-rpc.example
-```
-
-Frontend container chi doc `./apps/hospital-web/.env`. Hien tai frontend chi can API URL:
-
-```env
-VITE_API_URL=http://localhost:3001/api
-```
-
-### 5. Run App Natively
-
-Neu khong dung Docker cho API/web:
-
-```bash
-# terminal 1
-cd apps/audit-contracts
-npm run node
-
-# terminal 2
-cd apps/audit-contracts
-npm run deploy:local
-
-# terminal 3
-cd apps/hospital-api
-npm install
-npm run start:dev
-
-# terminal 4
-cd apps/hospital-web
-npm install
-npm run dev
-```
-
-Backend native chi load `apps/hospital-api/.env`. Frontend native chi doc `apps/hospital-web/.env`. Blockchain scripts chi doc `apps/audit-contracts/.env`.
-
-### 6. Local Verification
-
-Chay nhanh:
-
-```bash
-cd apps/audit-contracts
-npm test
-npm run compile
-```
-
-Kiem tra app:
-
-- Backend khong log warning `IDENTITY_REGISTRY_ADDRESS not set`.
-- Backend khong log warning `AUDIT_ANCHOR_ADDRESS not set`.
-- Backend khong log warning `BLOCKCHAIN_RELAYER_PRIVATE_KEY not set`.
-- Admin login wallet/step-up con verify duoc voi `IdentityRegistry`.
-- Tao audit event hoac bam anchor manual de thay transaction vao Hardhat node.
-- `AuditBatch` chuyen sang `ANCHORED` khi commit thanh cong.
-
-## Case 2: Deploy Production / Real Network
-
-Dung case nay khi deploy len testnet, private EVM chain, L2, hoac production network that.
-
-Khuyen nghi production cua project nay:
-
-- Dung L2/testnet/private EVM thay vi Ethereum mainnet neu chi can audit anchor.
-- Owner nen la multisig/cold wallet, khong phai private key nam tren backend.
-- Backend chi giu relayer hot key va relayer phai revoke/rotate duoc.
-- RPC phai on dinh: dedicated RPC provider, private RPC, hoac self-hosted node.
-- Secret production nam trong secret manager, khong commit `.env`.
-
-### Production Architecture
-
-```text
-Admin wallet / multisig
-  |-- governance only
-
-Backend
-  |-- reads BLOCKCHAIN_RELAYER_PRIVATE_KEY from secret manager
-  |-- sends AuditAnchor.commitRoot() / FaceRegistry.setFaceHash()
-
-RPC Provider / Node
-  |-- NETWORK_RPC_URL / BLOCKCHAIN_RPC_URL
-
-Contracts
-  |-- IdentityRegistry
-  |-- FaceRegistry
-  |-- AuditAnchor
-```
-
-### 1. Choose Network
-
-Chon mot trong cac loai network:
-
-| Network type | Khi nao dung | Ghi chu |
-|---|---|---|
-| Hardhat local | Dev/demo | Mat state khi reset |
-| Testnet Sepolia/Holesky | Staging/demo public | Can faucet ETH |
-| L2 Base/Arbitrum/Polygon | Production chi phi thap | Phu hop audit batch |
-| Private EVM | Noi bo benh vien/doanh nghiep | Can tu van hanh node/RPC |
-| Ethereum mainnet | Can public settlement cao nhat | Dat, khong can thiet cho da so audit batch |
-
-Can xac dinh:
-
-- RPC URL.
-- Chain ID.
-- Deployer wallet co native gas token.
-- Owner address sau deploy.
-- Backend relayer address sau deploy.
-
-### 2. Prepare Production Wallets
-
-Toi thieu can 3 wallet/role:
-
-```text
-DEPLOYER
-  - chi dung de deploy contract
-  - co gas token
-  - co the trung owner luc dau, nhung nen chuyen ownership sau deploy
-
-OWNER
-  - governance key
-  - production nen la multisig/cold wallet
-  - co quyen add/remove relayer va authorize/revoke Admin wallet
-
-RELAYER
-  - backend hot wallet
-  - co gas token de gui operational tx
-  - bi lo/mat thi owner revoke va add relayer moi
-```
-
-Khong nen:
-
-- Dung Admin wallet lam backend relayer.
-- De owner private key tren backend production.
-- Dung cung mot key cho owner va relayer o production.
-
-### 3. Prepare `apps/audit-contracts/.env`
-
-Production deploy example:
-
-```env
-# RPC deploy target
-NETWORK_RPC_URL=https://your-rpc-provider.example
-
-# Deployer private key. Dung o may deploy/CI secret, khong dua vao backend.
-PRIVATE_KEY=0xDEPLOYER_PRIVATE_KEY
-
-# Governance
-BLOCKCHAIN_OWNER_ADDRESS=0xMULTISIG_OR_COLD_WALLET
-
-# Backend relayer
-BLOCKCHAIN_RELAYER_ADDRESS=0xBACKEND_RELAYER_ADDRESS
-
-# Optional: chi dung neu owner can auto accept ownership va key co san tren may deploy.
-# Production thuong khong nen de dong nay tren backend.
-# BLOCKCHAIN_OWNER_PRIVATE_KEY=0xOWNER_PRIVATE_KEY
-```
-
-Sau deploy, cap nhat contract addresses vao `apps/hospital-api/.env`:
-
-```env
-IDENTITY_REGISTRY_ADDRESS=0x...
-FACE_REGISTRY_ADDRESS=0x...
-AUDIT_ANCHOR_ADDRESS=0x...
-```
-
-### 4. Compile And Test
+### Các Bước Triển Khai Mạng Thật:
 
 ```bash
 cd apps/audit-contracts
 npm install
 npm run compile
 npm test
-```
-
-Khong deploy production neu test contract fail.
-
-### 5. Deploy To Production Network
-
-```bash
-cd apps/audit-contracts
 npm run deploy:custom
 ```
 
-Hardhat `custom` network lay:
+Sau khi hoàn tất deploy:
+1. Kiểm tra trạng thái chuyển giao quyền sở hữu `IdentityRegistry.owner() == BLOCKCHAIN_OWNER_ADDRESS`.
+2. Đảm bảo ví Relayer đã có đủ số dư native token để chi trả phí gas.
+3. Cập nhật các biến địa chỉ hợp đồng vào môi trường Production của Backend.
 
-- RPC tu `NETWORK_RPC_URL`.
-- Deployer key tu `PRIVATE_KEY`.
-- Neu `PRIVATE_KEY` thieu, fallback sang `BLOCKCHAIN_OWNER_PRIVATE_KEY`, roi fallback Hardhat dev key. Production phai dat `PRIVATE_KEY` ro rang de tranh deploy sai signer.
+---
 
-Sau deploy, script in output theo tung folder env. Copy deploy/governance values vao `apps/audit-contracts/.env`:
-
-```env
-NETWORK_RPC_URL=https://...
-BLOCKCHAIN_OWNER_ADDRESS=0x...
-BLOCKCHAIN_RELAYER_ADDRESS=0x...
-```
-
-Copy runtime backend values vao `apps/hospital-api/.env`:
-
-```env
-BLOCKCHAIN_RPC_URL=https://...
-IDENTITY_REGISTRY_ADDRESS=0x...
-FACE_REGISTRY_ADDRESS=0x...
-AUDIT_ANCHOR_ADDRESS=0x...
-BLOCKCHAIN_RELAYER_ADDRESS=0x...
-BLOCKCHAIN_RELAYER_PRIVATE_KEY=0x...
-```
-
-Frontend khong can copy blockchain values; frontend wallet flow chi ky challenge, backend verify contract authorization.
-
-### 6. Accept Ownership If Needed
-
-Neu `BLOCKCHAIN_OWNER_ADDRESS` khac deployer, script se goi `transferOwnership(owner)`.
-
-Co 2 truong hop:
-
-1. Owner key co trong env va match `BLOCKCHAIN_OWNER_ADDRESS`: script tu goi `acceptOwnership()`.
-2. Owner la multisig/cold wallet: ownership dang pending, owner phai tu goi `acceptOwnership()` tren `IdentityRegistry`.
-
-Production nen dung truong hop 2.
-
-Can verify:
-
-```text
-IdentityRegistry.owner() == BLOCKCHAIN_OWNER_ADDRESS
-IdentityRegistry.pendingOwner() == 0x0000000000000000000000000000000000000000
-IdentityRegistry.isRelayer(BLOCKCHAIN_RELAYER_ADDRESS) == true
-```
-
-Neu owner chua accept, governance chua hoan tat. Khong coi deploy la xong.
-
-### 7. Fund The Relayer
-
-Backend relayer can native token de tra gas.
-
-Checklist:
-
-- Relayer address co du gas.
-- RPC URL dung network voi contract.
-- Backend secret manager co `BLOCKCHAIN_RELAYER_PRIVATE_KEY`.
-- Backend runtime co `AUDIT_ANCHOR_ADDRESS`, `FACE_REGISTRY_ADDRESS`, `IDENTITY_REGISTRY_ADDRESS`.
-
-Neu relayer het gas, app van ghi DB/audit off-chain nhung giao dich anchor se fail/don hang doi.
-
-### 8. Deploy Backend And Frontend
-
-Backend production env can co:
-
-```env
-BLOCKCHAIN_RPC_URL=https://your-rpc-provider.example
-IDENTITY_REGISTRY_ADDRESS=0x...
-FACE_REGISTRY_ADDRESS=0x...
-AUDIT_ANCHOR_ADDRESS=0x...
-BLOCKCHAIN_RELAYER_ADDRESS=0x...
-BLOCKCHAIN_RELAYER_PRIVATE_KEY=0x...
-```
-
-Owner key khong nen nam trong backend production.
-
-Frontend build/runtime env can co:
-
-```env
-VITE_API_URL=https://your-backend.example/api
-```
-
-### 9. Production Verification
-
-Sau khi API/web len production:
-
-1. Check backend startup logs:
-   - Khong warning thieu `IDENTITY_REGISTRY_ADDRESS`.
-   - Khong warning thieu `FACE_REGISTRY_ADDRESS`.
-   - Khong warning thieu `AUDIT_ANCHOR_ADDRESS`.
-   - Khong warning thieu `BLOCKCHAIN_RELAYER_PRIVATE_KEY`.
-2. Verify contract owner:
-   - `IdentityRegistry.owner()` la owner/multisig.
-3. Verify relayer:
-   - `IdentityRegistry.isRelayerOrOwner(relayer)` tra true.
-4. Tao mot audit event khong chua PII trong staging/controlled flow.
-5. Trigger anchor batch.
-6. Verify transaction thanh cong tren explorer/RPC.
-7. Verify DB:
-   - `AuditBatch.status = ANCHORED`.
-   - `BlockchainLogger` co `txHash`, `blockNumber`, `batchId`.
-8. Verify frontend wallet flow:
-   - Admin wallet duoc authorize.
-   - Login/step-up recover dung address.
-
-### 10. Production Rollback
-
-Neu backend deploy loi:
-
-- Rollback backend image/code.
-- Khong sua truc tiep `BlockchainLogger` hoac `AuditBatch`.
-- Giu contract address neu contract deploy dung.
-
-Neu deploy sai contract/network:
-
-1. Stop audit anchoring jobs/backend workers.
-2. Sua `BLOCKCHAIN_RPC_URL`, `IDENTITY_REGISTRY_ADDRESS`, `FACE_REGISTRY_ADDRESS`, `AUDIT_ANCHOR_ADDRESS`.
-3. Restart backend.
-4. Cho service recover pending batches theo logic binh thuong.
-5. Khong ghi de root da anchor; deploy sai thi treat nhu incident/config error.
-
-Neu relayer bi lo:
-
-1. Owner goi `removeRelayer(oldRelayer)` tren `IdentityRegistry`.
-2. Tao relayer moi.
-3. Fund relayer moi.
-4. Owner goi `addRelayer(newRelayer)`.
-5. Doi `BLOCKCHAIN_RELAYER_PRIVATE_KEY` backend.
-6. Restart backend va verify anchor.
-
-Neu owner key mat:
-
-- Neu owner la single EOA va contract khong co recovery: governance bi ket.
-- Production phai tranh bang multisig/cold wallet co quy trinh backup.
-
-## Deploy Only Audit Contracts
-
-Dung khi da co `IdentityRegistry` va chi muon deploy lai `FaceRegistry`/`AuditAnchor`:
+## Các Lệnh Thường Dùng (Common Commands)
 
 ```bash
-cd apps/audit-contracts
-npm run deploy:audit:local
-# hoac
-npm run deploy:audit:custom
+npm run compile           # Biên dịch hợp đồng Solidity
+npm test                  # Chạy toàn bộ unit tests
+npm run node              # Mở Hardhat node local
+npm run deploy:local      # Deploy bộ hợp đồng lên Hardhat local
+npm run deploy:custom     # Deploy lên mạng tùy chỉnh (Production/Testnet)
+npm run deploy:audit:local # Triển khai lại hợp đồng audit local
 ```
 
-Yeu cau `IDENTITY_REGISTRY_ADDRESS` dung network hien tai.
+---
 
-Sau deploy, copy:
+## Xử Lý Lỗi Thường Gặp (Troubleshooting)
 
-```env
-FACE_REGISTRY_ADDRESS=0x...
-AUDIT_ANCHOR_ADDRESS=0x...
-```
-
-Khong dung lenh nay neu ban can tao moi toan bo governance model.
-
-## Common Commands
-
-```bash
-npm run compile
-npm test
-npm run node
-npm run deploy:local
-npm run deploy:custom
-npm run deploy:audit:local
-npm run deploy:audit:custom
-```
-
-## Troubleshooting
-
-| Trieu chung | Nguyen nhan thuong gap | Cach xu ly |
+| Triệu chứng | Nguyên nhân thường gặp | Cách xử lý |
 |---|---|---|
-| Backend log `IDENTITY_REGISTRY_ADDRESS not set` | Thieu backend runtime config | Kiem tra `apps/hospital-api/.env` |
-| Backend log `AUDIT_ANCHOR_ADDRESS not set` | Chua deploy/copy address | Chay deploy va cap nhat `apps/hospital-api/.env` |
-| Transaction fail `not authorized` | Relayer chua duoc add vao `IdentityRegistry` | Owner goi `addRelayer(relayer)` |
-| Transaction fail do gas | Relayer het native token | Nap gas cho relayer |
-| Frontend khong goi duoc API | `VITE_API_URL` sai/chua rebuild | Cap nhat `apps/hospital-web/.env` va rebuild frontend |
-| Docker backend khong connect Hardhat | Hardhat node chua chay tren host hoac port 8545 bi chan | Chay `npm run node`, kiem tra port 8545 |
-| Reset Hardhat node xong app fail | Local chain mat state/address cu | Deploy lai va update `apps/hospital-api/.env` |
+| Backend báo lỗi `IDENTITY_REGISTRY_ADDRESS not set` | Thiếu cấu hình địa chỉ hợp đồng backend | Kiểm tra và cập nhật `apps/hospital-api/.env` |
+| Giao dịch thất bại `not authorized` | Ví Relayer chưa được thêm vào `IdentityRegistry` | Dùng ví Owner gọi `addRelayer(relayer)` |
+| Giao dịch thất bại do Gas | Ví Relayer hết native token | Nạp thêm native token / ETH gas cho ví Relayer |
+| Reset Hardhat node xong app lỗi | Mạng local bị mất trạng thái và địa chỉ cũ | Chạy lại lệnh deploy và cập nhật địa chỉ mới vào `.env` |
 
-## Security Rules
+---
 
-- Khong commit `.env`.
-- Khong dua PII/file y te/on-chain data lon len blockchain.
-- Production khong de owner private key tren backend.
-- Relayer la hot key, phai monitor va rotate duoc.
-- Audit root da anchor la immutable evidence; neu config sai, sua config va ghi incident, khong rewrite lich su.
-- Moi deploy production phai luu lai: network, chain ID, contract addresses, deployer, owner, relayer, tx hash, block number, thoi diem deploy.
+## Quy Tắc Bảo Mật (Security Rules)
+
+- Không bao giờ commit tệp `.env` lên phiên bản Git.
+- Không lưu dữ liệu định danh bệnh nhân (PII), tệp y tế hay nội dung bệnh án lên Blockchain.
+- Không lưu private key của Owner trên server backend Production.
+- Khóa Relayer là hot key, phải thiết lập giám sát số dư và có quy trình xoay vòng khóa khi lộ.
+- Dữ liệu Merkle Root sau khi neo là bằng chứng bất biến (Immutable Evidence); tuyệt đối không sửa đổi lịch sử.
