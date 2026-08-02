@@ -537,7 +537,7 @@ export default function DoctorQueuePage() {
                       onChange={(e) => setRatingFeedback(e.target.value)}
                       placeholder="VD: Mô hình bỏ sót bóng mờ ở đáy phổi trái..."
                       rows={3}
-                      className="w-full rounded-xl border border-slate-200 p-3 text-xs outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition-all font-medium"
+                      className="w-full resize-none rounded-xl border border-slate-200 p-3 text-xs outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition-all font-medium"
                     />
                   </div>
                   <div className="flex gap-2">
@@ -1388,7 +1388,7 @@ function ConclusionPanel({ form, setForm, onSubmit, busy, completed, activeVisit
             rows={2}
             value={form.finalDiagnosis}
             onChange={(e) => updateForm({ finalDiagnosis: e.target.value })}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-xs font-semibold outline-none focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 transition-all"
+            className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-xs font-semibold outline-none focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 transition-all"
             placeholder="VD: Viêm loét dạ dày tá tràng K27..."
             disabled={completed}
           />
@@ -1401,7 +1401,7 @@ function ConclusionPanel({ form, setForm, onSubmit, busy, completed, activeVisit
               rows={3}
               value={form.treatmentPlan}
               onChange={(e) => updateForm({ treatmentPlan: e.target.value })}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-xs font-semibold outline-none focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 transition-all"
+              className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-xs font-semibold outline-none focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 transition-all"
               placeholder="VD: Điều trị nội khoa ngoại trú, ăn uống kiêng cữ..."
               disabled={completed}
             />
@@ -1412,7 +1412,7 @@ function ConclusionPanel({ form, setForm, onSubmit, busy, completed, activeVisit
               rows={3}
               value={form.prescription}
               onChange={(e) => updateForm({ prescription: e.target.value })}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-xs font-semibold outline-none focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 transition-all"
+              className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-xs font-semibold outline-none focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 transition-all"
               placeholder="VD: 1. Omeprazol 20mg x 14 viên (Sáng 1 viên)..."
               disabled={completed}
             />

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
@@ -383,7 +384,7 @@ export default function AuditLogsPage() {
       onNavigate={(id) => navigateAdmin(navigate, id)}
       onLogout={logout}
     >
-      <div className="mx-auto max-w-[1600px] space-y-6 pb-10">
+      <div className="mx-auto max-w-7xl space-y-6 pb-10">
         <Hero onRefresh={refreshAll} onAnchor={handleAnchorNow} loading={loading} anchoring={anchoring} totalBatches={stats.batches} />
 
         <ChainBanner chain={chain} loading={false} />
@@ -838,10 +839,12 @@ function LogDetailModal({ summaryLog, onClose, onProof, onRecoverBatch, onOpenBa
     loadDetail();
   }, [summaryLog?.seq]);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm" onClick={onClose}>
+  if (typeof document === 'undefined' || !document.body) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm outline-none animate-fadeIn" onClick={onClose}>
       <div
-        className="relative flex flex-col w-full max-w-[1120px] max-h-[85vh] bg-white rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden text-slate-800"
+        className="relative flex flex-col w-full max-w-4xl max-h-[90vh] bg-white rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden text-slate-800 outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between border-b border-slate-100 p-6">
@@ -994,7 +997,8 @@ function LogDetailModal({ summaryLog, onClose, onProof, onRecoverBatch, onOpenBa
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1025,9 +1029,11 @@ function DetailField({ label, value, mono = false, highlight = false }) {
 
 function RecoveryReasonModal({ batch, reason, setReason, onClose, onContinue }) {
   const valid = reason.trim().length >= 10;
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200/80" onClick={(event) => event.stopPropagation()}>
+  if (typeof document === 'undefined' || !document.body) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm outline-none animate-fadeIn" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200/80 outline-none" onClick={(event) => event.stopPropagation()}>
         <div className="border-b border-slate-100 p-6">
           <h3 className="text-xl font-bold text-slate-900">Khôi phục audit batch #{batch.batchId}</h3>
           <p className="mt-1 text-xs font-semibold text-slate-400">Thao tác sẽ tải artifact IPFS, đối chiếu blockchain và phục hồi khi mọi hash khớp.</p>
@@ -1040,7 +1046,7 @@ function RecoveryReasonModal({ batch, reason, setReason, onClose, onContinue }) 
             onChange={(event) => setReason(event.target.value)}
             maxLength={500}
             rows={4}
-            className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold outline-none focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100"
+            className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100"
             placeholder="Mô tả sự cố hoặc dấu hiệu sai lệch của batch..."
           />
           <p className="text-[11px] font-semibold text-slate-400">Tối thiểu 10 ký tự.</p>
@@ -1057,7 +1063,8 @@ function RecoveryReasonModal({ batch, reason, setReason, onClose, onContinue }) 
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1162,6 +1169,15 @@ function BatchDetailDrawer({ loading, detail, recoveringBatchId, onClose, onReco
   const [entityFilter, setEntityFilter] = useState('');
   const [integrityFilter, setIntegrityFilter] = useState('');
   const [seqQuery, setSeqQuery] = useState('');
+  const integrityCounts = useMemo(() => {
+    const logs = detail?.logs || [];
+    return logs.reduce((acc, log) => {
+      const status = log.blockchainStatus || log.verification?.status;
+      if (status === 'VERIFIED') acc.verified++;
+      if (status === 'TAMPERED') acc.tampered++;
+      return acc;
+    }, { verified: 0, tampered: 0 });
+  }, [detail?.logs]);
 
   useEffect(() => {
     setEntityFilter('');
@@ -1186,7 +1202,8 @@ function BatchDetailDrawer({ loading, detail, recoveringBatchId, onClose, onReco
     return logs.filter((log) => {
       if (entityFilter && log.entity !== entityFilter) return false;
       const integrity = log.blockchainStatus || log.verification?.status || 'PENDING';
-      if (integrityFilter && integrity !== integrityFilter) return false;
+      if (integrityFilter === 'OK' && integrity !== 'VERIFIED') return false;
+      if (integrityFilter === 'TAMPERED' && integrity !== 'TAMPERED') return false;
       if (q) {
         const hay = [
           String(log.seq ?? ''),
@@ -1203,10 +1220,12 @@ function BatchDetailDrawer({ loading, detail, recoveringBatchId, onClose, onReco
     });
   }, [detail?.logs, entityFilter, integrityFilter, seqQuery]);
 
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40 backdrop-blur-sm" onClick={onClose}>
+  if (typeof document === 'undefined' || !document.body) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex justify-end bg-black/50 backdrop-blur-sm outline-none border-none animate-fadeIn" onClick={onClose}>
       <div
-        className="flex h-full w-full max-w-3xl flex-col bg-white shadow-2xl"
+        className="flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl border-none outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 p-6">
@@ -1283,18 +1302,32 @@ function BatchDetailDrawer({ loading, detail, recoveringBatchId, onClose, onReco
                       <FilterChip
                         key={entity}
                         active={entityFilter === entity}
-                        onClick={() => setEntityFilter(entity)}
+                        onClick={() => setEntityFilter((current) => (current === entity ? '' : entity))}
                       >
                         {ENTITY_LABELS[entity] || entity} ({count})
                       </FilterChip>
                     ))}
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <FilterChip active={!integrityFilter} onClick={() => setIntegrityFilter('')}>Mọi trạng thái</FilterChip>
-                    <FilterChip active={integrityFilter === 'VERIFIED'} onClick={() => setIntegrityFilter('VERIFIED')}>Toàn vẹn</FilterChip>
-                    <FilterChip active={integrityFilter === 'TAMPERED'} onClick={() => setIntegrityFilter('TAMPERED')}>Nghi sửa</FilterChip>
-                    <FilterChip active={integrityFilter === 'PENDING'} onClick={() => setIntegrityFilter('PENDING')}>Thiếu field</FilterChip>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setIntegrityFilter((c) => (c === 'OK' ? '' : 'OK'))}
+                      className={`rounded-xl border px-3 py-1.5 text-left text-xs font-bold transition-all ${
+                        integrityFilter === 'OK' ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-600'
+                      }`}
+                    >
+                      Xác minh ({integrityCounts.verified})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIntegrityFilter((c) => (c === 'TAMPERED' ? '' : 'TAMPERED'))}
+                      className={`rounded-xl border px-3 py-1.5 text-left text-xs font-bold transition-all ${
+                        integrityFilter === 'TAMPERED' ? 'border-rose-300 bg-rose-50 text-rose-800' : 'border-slate-200 bg-white text-slate-600'
+                      }`}
+                    >
+                      Nghi sai lệch ({integrityCounts.tampered})
+                    </button>
                   </div>
 
                   <div className="relative">
@@ -1303,44 +1336,47 @@ function BatchDetailDrawer({ loading, detail, recoveringBatchId, onClose, onReco
                       type="text"
                       value={seqQuery}
                       onChange={(e) => setSeqQuery(e.target.value)}
-                      placeholder="Lọc SEQ / action / tên đối tượng trong lô..."
+                      placeholder="Tìm SEQ, mã, tên đối tượng..."
                       className="w-full rounded-xl border border-slate-200/80 bg-white py-2 pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                     />
                   </div>
                 </div>
-                <div className="divide-y divide-slate-100">
+
+                <div className="max-h-[380px] sm:max-h-[440px] overflow-y-auto divide-y divide-slate-100">
                   {filteredLogs.map((log) => (
-                    <div key={log.id} className="grid gap-3 p-4 sm:grid-cols-[72px_1fr_auto] sm:items-center hover:bg-slate-50/80 transition-all">
-                      <div>
-                        <p className="text-[10px] font-extrabold uppercase text-slate-400">SEQ</p>
-                        <p className="text-lg font-bold text-slate-900">{log.seq}</p>
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
+                    <article key={log.id} className="p-4 space-y-2 hover:bg-slate-50/70 transition-all">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-black text-slate-900">SEQ {log.seq}</span>
                           <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${ACTION_TONE[log.action] || 'border-slate-200 text-slate-600'}`}>
                             {ACTION_LABEL[log.action] || log.action}
                           </span>
                           <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-600">
                             {ENTITY_LABELS[log.entity] || log.entity}
                           </span>
-                          <VerificationBadge status={log.blockchainStatus || log.verification?.status} title={log.verification?.reason} />
                         </div>
-                        <p className="mt-1 truncate text-sm font-bold text-slate-900">{subjectTitle(log)}</p>
-                        <p className="truncate text-xs font-medium text-slate-400">
-                          {subjectSubtitle(log)} · {formatTime(log.createdAt)}
-                        </p>
+                        <VerificationBadge status={log.blockchainStatus} />
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => onOpenSeq(log)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-sky-600 hover:bg-sky-50">
-                          Chi tiết SEQ
-                        </button>
-                        {log.onChainStatus === 'ANCHORED' && (
-                          <button type="button" onClick={() => onProof(log.seq)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">
-                            Chứng chỉ
+
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">{subjectTitle(log)}</p>
+                        <p className="text-[11px] font-semibold text-slate-400">{subjectSubtitle(log)}</p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                        <p className="text-[10px] font-medium text-slate-400">{formatTime(log.createdAt)}</p>
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => onOpenSeq(log)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-sky-600 hover:bg-sky-50">
+                            Chi tiết SEQ
                           </button>
-                        )}
+                          {log.onChainStatus === 'ANCHORED' && (
+                            <button type="button" onClick={() => onProof(log.seq)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">
+                              Xem Bằng chứng
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    </article>
                   ))}
                   {!detail.logs?.length && (
                     <p className="p-6 text-xs font-bold text-slate-400">Lô không có SEQ (dữ liệu lệch).</p>
@@ -1354,7 +1390,8 @@ function BatchDetailDrawer({ loading, detail, recoveringBatchId, onClose, onReco
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1379,10 +1416,10 @@ function BatchContentSummary({ summary, fromSeq, toSeq, activeEntity = '', onSel
             key={item.entity}
             type={clickable ? 'button' : undefined}
             onClick={clickable ? () => onSelectEntity(item.entity) : undefined}
-            className={`w-full rounded-xl border px-3 py-2 text-left transition-all ${
+            className={`w-full rounded-xl border px-3 py-2 text-left transition-all outline-none ${
               active
                 ? 'border-sky-300 bg-sky-50 ring-2 ring-sky-100'
-                : 'border-slate-100 bg-slate-50 hover:border-sky-200 hover:bg-sky-50/50'
+                : 'border-slate-200/80 bg-slate-50 hover:border-sky-200 hover:bg-sky-50/50'
             } ${clickable ? 'cursor-pointer' : ''}`}
           >
             <div className="flex items-center justify-between gap-2">
@@ -1458,10 +1495,12 @@ function Empty({ title, desc }) {
 }
 
 function ProofModal({ proof, onClose }) {
-  return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm" onClick={onClose}>
+  if (typeof document === 'undefined' || !document.body) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fadeIn" onClick={onClose}>
       <div
-        className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white text-slate-800 shadow-2xl"
+        className="flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white text-slate-800 shadow-2xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between border-b border-slate-100 p-6">

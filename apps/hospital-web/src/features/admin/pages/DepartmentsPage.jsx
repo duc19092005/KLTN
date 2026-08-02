@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
@@ -707,8 +708,10 @@ function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing, stru
     onSubmit(event);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+  if (typeof document === 'undefined' || !document.body) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fadeIn">
       <form onSubmit={handleSubmit} noValidate className="w-full max-w-xl rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
         <div className="flex items-start justify-between">
           <div>
@@ -784,7 +787,8 @@ function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing, stru
         <Textarea label="Mô tả nhiệm vụ" value={form.description} onChange={(v) => setForm({ ...form, description: v.slice(0, MAX_DEPARTMENT_DESCRIPTION_LENGTH) })} onBlur={() => validateField('description')} error={fieldErrors.description} placeholder="Mô tả chức năng phòng ban" maxLength={MAX_DEPARTMENT_DESCRIPTION_LENGTH} />
         <button disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-sky-700 disabled:opacity-70">{busy && <LoadingIndicator size="sm" tone="white" />}{editing ? 'Lưu thay đổi' : 'Tạo phòng ban'}</button>
       </form>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -795,7 +799,7 @@ function Input({ label, value, onChange, onBlur, error, required, placeholder, t
   return (
     <label className="block space-y-1.5">
       <span className="text-xs font-bold text-slate-700">{label}</span>
-      <input type={type} required={required} disabled={disabled} value={value || ''} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder} min={min} max={max} minLength={minLength} maxLength={maxLength} pattern={pattern} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 outline-none disabled:cursor-not-allowed disabled:opacity-60 transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`} />
+      <input type={type} required={required} disabled={disabled} value={value || ''} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder} min={min} max={max} minLength={minLength} maxLength={maxLength} pattern={pattern} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:ring-2 outline-none disabled:cursor-not-allowed disabled:opacity-60 transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`} />
       <p className={`min-h-[14px] text-[11px] font-bold leading-3 ${error ? 'text-rose-600' : 'text-transparent'}`}>{error || 'Lỗi'}</p>
     </label>
   );
@@ -804,7 +808,7 @@ function Textarea({ label, value, onChange, onBlur, error, placeholder, maxLengt
   return (
     <label className="block space-y-1.5">
       <span className="text-xs font-bold text-slate-700">{label}</span>
-      <textarea value={value || ''} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder} maxLength={maxLength} rows={3} className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 outline-none transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`} />
+      <textarea value={value || ''} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder} maxLength={maxLength} rows={3} className={`w-full resize-none px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:ring-2 outline-none transition-all ${error ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-sky-400 focus:ring-sky-100'}`} />
       <p className={`min-h-[14px] text-[11px] font-bold leading-3 ${error ? 'text-rose-600' : 'text-transparent'}`}>{error || 'Lỗi'}</p>
     </label>
   );
