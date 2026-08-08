@@ -49,10 +49,11 @@ export class RateAiModelUseCase {
       },
     });
 
-    // 4. Compute tamper-evidence hash
+    // 4. Compute tamper-evidence hash — snapshot MUST include every business field (logs = entity)
     const snapshot = {
       doctorId: aiQuality.doctorId,
       aiModelId: aiQuality.aiModelId,
+      aiDiagnosisId: aiQuality.aiDiagnosisId,
       doctorConclusionAboutModel: aiQuality.doctorConclusionAboutModel,
       trustablePercent: aiQuality.trustablePercent,
     };

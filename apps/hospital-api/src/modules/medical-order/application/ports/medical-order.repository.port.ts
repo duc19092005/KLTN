@@ -59,6 +59,7 @@ export type CreatedOrderRecord = {
   orderType: string;
   priority: string;
   status: MedicalOrderStatus;
+  clinicalNote: string | null;
 };
 
 export type OrderCreatedHook = (order: CreatedOrderRecord, tx: Prisma.TransactionClient) => Promise<void>;

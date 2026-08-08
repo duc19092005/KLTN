@@ -1,6 +1,8 @@
 import { ConflictException, Injectable, Optional } from '@nestjs/common';
 import {
+  AppointmentStatus,
   DepartmentType,
+  MedicalOrderStatus,
   MedicalSpecialty,
   OperationalStatus,
   Prisma,
@@ -17,6 +19,10 @@ import { buildAiModelSnapshot } from '../../modules/ai-model/domain/ai-model-sna
 import { buildMedicalConclusionSnapshot } from '../../modules/clinical-decision/domain/medical-conclusion-snapshot';
 import { buildAiDiagnosisSnapshot } from '../../modules/clinical-decision/domain/ai-diagnosis-snapshot';
 import { buildVisitSnapshot } from '../../modules/visit/domain/visit-snapshot';
+import { buildMedicalOrderSnapshot } from '../../modules/medical-order/domain/medical-order-snapshot';
+import { buildMedicalResultSnapshot } from '../../modules/medical-order/domain/medical-result-snapshot';
+import { buildAppointmentSnapshot } from '../../modules/patient-portal/domain/appointment-snapshot';
+import { buildAiQualitySnapshot } from '../../modules/ai-model/domain/ai-quality-snapshot';
 import { AuditAnchorService } from './audit-anchor.service';
 import { AuditLoggerService } from './audit-logger.service';
 import {
@@ -35,6 +41,10 @@ export const RECOVERABLE_AUDIT_ENTITIES = [
   'Visit',
   'MedicalConclusion',
   'AiDiagnosis',
+  'MedicalOrder',
+  'MedicalResult',
+  'Appointment',
+  'AiQuality',
 ] as const;
 
 export type RecoverableAuditEntity = (typeof RECOVERABLE_AUDIT_ENTITIES)[number];
@@ -73,6 +83,10 @@ const REQUIRED_SNAPSHOT_FIELDS: Record<RecoverableAuditEntity, readonly string[]
   Visit: ['visitCode', 'patientId', 'departmentId', 'staffId', 'status', 'source', 'checkInAt', 'completedAt'],
   MedicalConclusion: ['visitId', 'patientCode', 'doctorId', 'aiDiagnosisId', 'finalDiagnosis', 'treatmentPlan', 'prescription', 'followUpNote', 'doctorNote'],
   AiDiagnosis: ['aiModelId', 'patientId', 'visitId', 'prompt', 'result', 'confidence', 'status', 'reviewedByDoctorId', 'doctorFeedback'],
+  MedicalOrder: ['orderId', 'orderCode', 'visitId', 'patientId', 'doctorId', 'targetDepartmentId', 'orderType', 'priority', 'status', 'clinicalNote'],
+  MedicalResult: ['resultId', 'resultCode', 'orderId', 'visitId', 'performedById', 'fileCount', 'mimeTypes', 'fileSizes', 'files', 'status', 'note', 'returnedAt', 'createdAt'],
+  Appointment: ['appointmentCode', 'patientId', 'departmentId', 'doctorId', 'scheduledAt', 'status', 'doctorStaffId'],
+  AiQuality: ['doctorId', 'aiModelId', 'aiDiagnosisId', 'doctorConclusionAboutModel', 'trustablePercent'],
 };
 
 const SENSITIVE_FIELDS: Partial<Record<RecoverableAuditEntity, ReadonlySet<string>>> = {
@@ -83,6 +97,10 @@ const SENSITIVE_FIELDS: Partial<Record<RecoverableAuditEntity, ReadonlySet<strin
   Visit: new Set([]),
   MedicalConclusion: new Set(['patientCode', 'finalDiagnosis', 'treatmentPlan', 'prescription', 'followUpNote', 'doctorNote']),
   AiDiagnosis: new Set(['prompt', 'result', 'doctorFeedback']),
+  MedicalOrder: new Set(['clinicalNote']),
+  MedicalResult: new Set(['note', 'files']),
+  Appointment: new Set(['scheduledAt']),
+  AiQuality: new Set(['doctorConclusionAboutModel']),
 };
 
 @Injectable()
@@ -222,7 +240,7 @@ export class EntityRecoveryService {
       return this.recreation.recreate(target, actorId, reason, recreationCache);
     }
 
-    const row = await this.findLatestAnchoredRow(target.entity, target.entityId);
+    const row = await this.findLatestCompleteAnchoredRow(target.entity, target.entityId);
     if (!row || row.seq == null || row.batchId == null) {
       throw new ConflictException('Không có audit đã neo để làm nguồn khôi phục.');
     }
@@ -330,6 +348,37 @@ export class EntityRecoveryService {
       );
       if (partialComparison.ok) return null;
 
+      // Fallback: bản ghi mới nhất có thể là UPDATE thiếu trường (snapshot cũ hạn chế).
+      // Scan các dòng ANCHORED cũ hơn để tìm snapshot đầy đủ làm nguồn so sánh.
+      const completeRow = await this.findLatestCompleteAnchoredRow(entity, row.entityId);
+      if (completeRow && completeRow.seq !== row.seq) {
+        const completeVerification = verifyAuditRow(completeRow);
+        if (completeVerification.ok) {
+          const completeSnapshot = completeVerification.decryptedAfter as Snapshot;
+          const effectiveSnapshot = this.effectiveRecoverySnapshot(entity, completeSnapshot, liveSnapshot);
+          const comparison = this.snapshotsEqual(effectiveSnapshot, liveSnapshot)
+            ? { ok: true, suspiciousFields: [] as string[] }
+            : compareLiveSnapshotToAuditAfter(completeRow, liveSnapshot);
+          if (comparison.ok) return null;
+
+          const proof = completeRow.seq == null ? null : await this.anchor.getInclusionProof(completeRow.seq);
+          return {
+            ...base,
+            status: proof?.verified ? 'TAMPERED' : 'AUDIT_UNTRUSTED',
+            recoverable: Boolean(proof?.verified),
+            latestTrustedSeq: completeRow.seq,
+            batchId: completeRow.batchId,
+            anchoredAt: completeRow.createdAt,
+            fieldsChanged: this.safeFieldNames(entity, comparison.suspiciousFields),
+            blockers: proof?.verified ? [] : ['BLOCKCHAIN_PROOF_FAILED'],
+            dependencies: [], recoveryMode: proof?.verified ? 'DIRECT_ENTITY' : 'AUDIT_BATCH_FIRST',
+            message: proof?.verified
+              ? 'Dữ liệu hiện tại lệch với snapshot audit đầy đủ gần nhất (bản ghi mới nhất thiếu trường do snapshot cũ hạn chế).'
+              : 'Dữ liệu lệch và audit nguồn đầy đủ gần nhất chưa xác minh được với blockchain.',
+          };
+        }
+      }
+
       if (row.onChainStatus !== 'ANCHORED' || row.batchId == null) {
         return {
           ...base,
@@ -408,6 +457,26 @@ export class EntityRecoveryService {
     });
   }
 
+  private async findLatestCompleteAnchoredRow(entity: RecoverableAuditEntity, entityId: string) {
+    const rows = await this.prisma.blockchainLogger.findMany({
+      where: {
+        entity,
+        entityId,
+        seq: { not: null },
+        batchId: { not: null },
+        onChainStatus: 'ANCHORED',
+      },
+      orderBy: { seq: 'desc' },
+      take: 50,
+    });
+    for (const row of rows) {
+      const verification = verifyAuditRow(row);
+      if (!verification.ok) continue;
+      if (this.hasCompleteSnapshot(entity, verification.decryptedAfter)) return row;
+    }
+    return null;
+  }
+
   private findLatestRow(entity: RecoverableAuditEntity, entityId: string) {
     return this.prisma.blockchainLogger.findFirst({
       where: { entity, entityId, seq: { not: null } },
@@ -446,6 +515,29 @@ export class EntityRecoveryService {
     if (entity === 'AiDiagnosis') {
       const row = await client.aiDiagnosis.findUnique({ where: { id: entityId } });
       return row ? (buildAiDiagnosisSnapshot(row) as Snapshot) : null;
+    }
+    if (entity === 'MedicalOrder') {
+      const row = await client.medicalOrder.findUnique({ where: { id: entityId } });
+      return row ? (buildMedicalOrderSnapshot(row) as Snapshot) : null;
+    }
+    if (entity === 'MedicalResult') {
+      const row = await client.medicalResult.findUnique({
+        where: { id: entityId },
+        include: { files: true, order: { select: { visitId: true } } },
+      });
+      if (!row) return null;
+      return buildMedicalResultSnapshot({ ...row, visitId: row.order?.visitId ?? null });
+    }
+    if (entity === 'Appointment') {
+      const row = await client.appointment.findUnique({
+        where: { id: entityId },
+        include: { doctor: { select: { staffProfileId: true } } },
+      });
+      return row ? (buildAppointmentSnapshot(row) as Snapshot) : null;
+    }
+    if (entity === 'AiQuality') {
+      const row = await client.aiQuality.findUnique({ where: { id: entityId } });
+      return row ? (buildAiQualitySnapshot(row) as Snapshot) : null;
     }
     const row = await client.medicalConclusion.findUnique({
       where: { id: entityId },
@@ -543,6 +635,73 @@ export class EntityRecoveryService {
       return;
     }
 
+    if (entity === 'MedicalOrder') {
+      const visitId = this.string(snapshot, 'visitId');
+      const patientId = this.string(snapshot, 'patientId');
+      const doctorId = this.string(snapshot, 'doctorId');
+      const targetDepartmentId = this.nullableString(snapshot, 'targetDepartmentId');
+      await this.requireRelation(client.visit.findUnique({ where: { id: visitId }, select: { id: true } }), 'lượt khám');
+      await this.requireRelation(client.patient.findUnique({ where: { id: patientId }, select: { id: true } }), 'bệnh nhân');
+      await this.requireRelation(client.doctorProfile.findUnique({ where: { id: doctorId }, select: { id: true } }), 'bác sĩ');
+      if (targetDepartmentId) await this.requireRelation(client.department.findUnique({ where: { id: targetDepartmentId }, select: { id: true } }), 'phòng ban đích');
+      await client.medicalOrder.update({ where: { id: entityId }, data: {
+        orderCode: this.string(snapshot, 'orderCode'), visitId, patientId, doctorId, targetDepartmentId,
+        orderType: this.string(snapshot, 'orderType'), priority: this.string(snapshot, 'priority'),
+        status: this.enumValue(snapshot, 'status', MedicalOrderStatus),
+        clinicalNote: this.nullableString(snapshot, 'clinicalNote'),
+      } });
+      return;
+    }
+    if (entity === 'MedicalResult') {
+      const orderId = this.string(snapshot, 'orderId');
+      const performedById = this.nullableString(snapshot, 'performedById');
+      await this.requireRelation(client.medicalOrder.findUnique({ where: { id: orderId }, select: { id: true } }), 'chỉ định');
+      if (performedById) await this.requireRelation(client.user.findUnique({ where: { id: performedById }, select: { id: true } }), 'người thực hiện');
+      await client.medicalResult.update({ where: { id: entityId }, data: {
+        resultCode: this.string(snapshot, 'resultCode'), orderId, performedById,
+        note: this.nullableString(snapshot, 'note'),
+        returnedAt: this.nullableDate(snapshot, 'returnedAt') ?? new Date(),
+      } });
+      // Files của kết quả xét nghiệm cực kỳ nhạy cảm — phải khớp 100% snapshot.
+      const files = this.resultFiles(snapshot);
+      await client.medicalResultFile.deleteMany({ where: { resultId: entityId } });
+      if (files.length > 0) {
+        await client.medicalResultFile.createMany({ data: files.map((file) => ({ ...file, resultId: entityId })) });
+      }
+      return;
+    }
+    if (entity === 'Appointment') {
+      const patientId = this.string(snapshot, 'patientId');
+      const departmentId = this.string(snapshot, 'departmentId');
+      const doctorId = this.nullableString(snapshot, 'doctorId');
+      await this.requireRelation(client.patient.findUnique({ where: { id: patientId }, select: { id: true } }), 'bệnh nhân');
+      await this.requireRelation(client.department.findUnique({ where: { id: departmentId }, select: { id: true } }), 'phòng ban');
+      if (doctorId) await this.requireRelation(client.doctorProfile.findUnique({ where: { id: doctorId }, select: { id: true } }), 'bác sĩ');
+      // qrTokenHash không nằm trong snapshot (tạo mới khi recreate); khi restore giữ nguyên hash đang khớp blockchain.
+      const current = await client.appointment.findUniqueOrThrow({ where: { id: entityId }, select: { qrTokenHash: true, qrExpiresAt: true } });
+      await client.appointment.update({ where: { id: entityId }, data: {
+        appointmentCode: this.string(snapshot, 'appointmentCode'), patientId, departmentId, doctorId,
+        scheduledAt: this.date(snapshot, 'scheduledAt'),
+        status: this.enumValue(snapshot, 'status', AppointmentStatus),
+        qrTokenHash: current.qrTokenHash, qrExpiresAt: current.qrExpiresAt,
+      } });
+      return;
+    }
+    if (entity === 'AiQuality') {
+      const doctorId = this.string(snapshot, 'doctorId');
+      const aiModelId = this.string(snapshot, 'aiModelId');
+      const aiDiagnosisId = this.nullableString(snapshot, 'aiDiagnosisId');
+      await this.requireRelation(client.doctorProfile.findUnique({ where: { id: doctorId }, select: { id: true } }), 'bác sĩ');
+      await this.requireRelation(client.aiModelRegistry.findUnique({ where: { id: aiModelId }, select: { id: true } }), 'mô hình AI');
+      if (aiDiagnosisId) await this.requireRelation(client.aiDiagnosis.findUnique({ where: { id: aiDiagnosisId }, select: { id: true } }), 'chẩn đoán AI');
+      await client.aiQuality.update({ where: { id: entityId }, data: {
+        doctorId, aiModelId, aiDiagnosisId,
+        doctorConclusionAboutModel: this.string(snapshot, 'doctorConclusionAboutModel'),
+        trustablePercent: this.number(snapshot, 'trustablePercent'),
+      } });
+      return;
+    }
+
     const visitId = this.string(snapshot, 'visitId');
     const doctorId = this.string(snapshot, 'doctorId');
     const aiDiagnosisId = this.nullableString(snapshot, 'aiDiagnosisId');
@@ -566,6 +725,10 @@ export class EntityRecoveryService {
     if (entity === 'AiModelRegistry') return client.aiModelRegistry.update({ where: { id: entityId }, data });
     if (entity === 'Visit') return Promise.resolve(null);
     if (entity === 'AiDiagnosis') return Promise.resolve(null);
+    if (entity === 'MedicalOrder') return Promise.resolve(null);
+    if (entity === 'MedicalResult') return Promise.resolve(null);
+    if (entity === 'Appointment') return Promise.resolve(null);
+    if (entity === 'AiQuality') return client.aiQuality.update({ where: { id: entityId }, data });
     return client.medicalConclusion.update({ where: { id: entityId }, data });
   }
 
@@ -656,6 +819,49 @@ export class EntityRecoveryService {
     if (value == null) return null;
     if (typeof value !== 'number' || !Number.isFinite(value)) throw new ConflictException(`Snapshot có số không hợp lệ: ${field}.`);
     return value;
+  }
+
+  private number(snapshot: Snapshot, field: string): number {
+    const value = snapshot[field];
+    if (typeof value !== 'number' || !Number.isFinite(value)) throw new ConflictException(`Snapshot có số không hợp lệ: ${field}.`);
+    return value;
+  }
+
+  private resultFiles(snapshot: Snapshot): Array<{
+    fileName: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    url: string | null;
+    storageProvider: string;
+    bucket: string | null;
+    objectKey: string | null;
+    sha256: string | null;
+    etag: string | null;
+  }> {
+    const files = snapshot.files;
+    if (!Array.isArray(files)) throw new ConflictException('Snapshot thiếu danh sách files của kết quả xét nghiệm.');
+    return files.map((file, index) => {
+      if (!file || typeof file !== 'object' || Array.isArray(file)) throw new ConflictException(`File kết quả #${index + 1} không hợp lệ.`);
+      const entry = file as Record<string, unknown>;
+      const fileName = typeof entry.fileName === 'string' && entry.fileName ? entry.fileName : `file-${index + 1}`;
+      const originalName = typeof entry.originalName === 'string' && entry.originalName ? entry.originalName : fileName;
+      const mimeType = typeof entry.mimeType === 'string' && entry.mimeType ? entry.mimeType : 'application/octet-stream';
+      const size = typeof entry.size === 'number' && Number.isFinite(entry.size) ? entry.size : 0;
+      const storageProvider = typeof entry.storageProvider === 'string' && entry.storageProvider ? entry.storageProvider : 'CLOUDINARY';
+      return {
+        fileName,
+        originalName,
+        mimeType,
+        size,
+        url: typeof entry.url === 'string' ? entry.url : null,
+        storageProvider,
+        bucket: typeof entry.bucket === 'string' ? entry.bucket : null,
+        objectKey: typeof entry.objectKey === 'string' ? entry.objectKey : null,
+        sha256: typeof entry.sha256 === 'string' ? entry.sha256 : null,
+        etag: typeof entry.etag === 'string' ? entry.etag : null,
+      };
+    });
   }
 
   private boolean(snapshot: Snapshot, field: string): boolean {

@@ -1,7 +1,9 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import {
+  AppointmentStatus,
   DepartmentType,
   LabSpecialty,
+  MedicalOrderStatus,
   MedicalSpecialty,
   OperationalStatus,
   Prisma,
@@ -10,6 +12,7 @@ import {
   VisitSource,
   VisitStatus,
 } from '@prisma/client';
+import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLoggerService } from './audit-logger.service';
 import { AuditRecoveryService, VerifiedAuditRecoveryBundle } from './audit-recovery.service';
@@ -24,6 +27,12 @@ import { buildAiModelSnapshot } from '../../modules/ai-model/domain/ai-model-sna
 import { buildMedicalConclusionSnapshot } from '../../modules/clinical-decision/domain/medical-conclusion-snapshot';
 import { buildAiDiagnosisSnapshot } from '../../modules/clinical-decision/domain/ai-diagnosis-snapshot';
 import { buildVisitSnapshot } from '../../modules/visit/domain/visit-snapshot';
+import { buildMedicalOrderSnapshot } from '../../modules/medical-order/domain/medical-order-snapshot';
+import { buildMedicalResultSnapshot } from '../../modules/medical-order/domain/medical-result-snapshot';
+import { buildAppointmentSnapshot } from '../../modules/patient-portal/domain/appointment-snapshot';
+import { buildAiQualitySnapshot } from '../../modules/ai-model/domain/ai-quality-snapshot';
+
+const QR_SECRET = process.env.APPOINTMENT_QR_SECRET || process.env.JWT_SECRET || 'dev-appointment-qr-secret';
 
 export const RECREATABLE_AUDIT_ENTITIES = [
   'Patient',
@@ -34,6 +43,10 @@ export const RECREATABLE_AUDIT_ENTITIES = [
   'Visit',
   'MedicalConclusion',
   'AiDiagnosis',
+  'MedicalOrder',
+  'MedicalResult',
+  'Appointment',
+  'AiQuality',
 ] as const;
 
 export type RecreatableAuditEntity = (typeof RECREATABLE_AUDIT_ENTITIES)[number];
@@ -73,6 +86,10 @@ const REQUIRED_FIELDS: Record<RecreatableAuditEntity, readonly string[]> = {
   Visit: ['visitCode', 'patientId', 'departmentId', 'staffId', 'status', 'source', 'checkInAt', 'completedAt'],
   MedicalConclusion: ['visitId', 'patientCode', 'doctorId', 'aiDiagnosisId', 'finalDiagnosis', 'treatmentPlan', 'prescription', 'followUpNote', 'doctorNote'],
   AiDiagnosis: ['aiModelId', 'patientId', 'visitId', 'prompt', 'result', 'confidence', 'status', 'reviewedByDoctorId', 'doctorFeedback'],
+  MedicalOrder: ['orderId', 'orderCode', 'visitId', 'patientId', 'doctorId', 'targetDepartmentId', 'orderType', 'priority', 'status', 'clinicalNote'],
+  MedicalResult: ['resultId', 'resultCode', 'orderId', 'visitId', 'performedById', 'files', 'fileCount', 'mimeTypes', 'fileSizes', 'status', 'note', 'returnedAt', 'createdAt'],
+  Appointment: ['appointmentCode', 'patientId', 'departmentId', 'doctorId', 'scheduledAt', 'status', 'doctorStaffId'],
+  AiQuality: ['doctorId', 'aiModelId', 'aiDiagnosisId', 'doctorConclusionAboutModel', 'trustablePercent'],
 };
 
 @Injectable()
@@ -400,6 +417,48 @@ export class EntityRecreationService {
       }
     }
 
+    if (target.entity === 'MedicalOrder') {
+      const duplicate = await client.medicalOrder.findUnique({ where: { orderCode: this.string(snapshot, 'orderCode') }, select: { id: true } });
+      if (duplicate && duplicate.id !== target.entityId) add('ORDER_CODE_UNIQUE_CONFLICT');
+      const visitId = this.string(snapshot, 'visitId');
+      const visit = await client.visit.findUnique({ where: { id: visitId }, select: { id: true, patientId: true } });
+      if (!visit) add('MISSING_VISIT');
+      else if (this.nullableString(snapshot, 'patientId') && visit.patientId !== this.nullableString(snapshot, 'patientId')) add('ORDER_VISIT_PATIENT_MISMATCH');
+      const doctorId = this.string(snapshot, 'doctorId');
+      if (!(await client.doctorProfile.findUnique({ where: { id: doctorId }, select: { id: true } }))) add('MISSING_DOCTOR');
+      const targetDepartmentId = this.nullableString(snapshot, 'targetDepartmentId');
+      if (targetDepartmentId && !(await client.department.findUnique({ where: { id: targetDepartmentId }, select: { id: true } }))) add('MISSING_TARGET_DEPARTMENT');
+    }
+
+    if (target.entity === 'MedicalResult') {
+      const duplicate = await client.medicalResult.findUnique({ where: { resultCode: this.string(snapshot, 'resultCode') }, select: { id: true } });
+      if (duplicate && duplicate.id !== target.entityId) add('RESULT_CODE_UNIQUE_CONFLICT');
+      const orderId = this.string(snapshot, 'orderId');
+      if (!(await client.medicalOrder.findUnique({ where: { id: orderId }, select: { id: true } }))) add('MISSING_MEDICAL_ORDER');
+      const performedById = this.nullableString(snapshot, 'performedById');
+      if (performedById && !(await client.user.findUnique({ where: { id: performedById }, select: { id: true } }))) add('MISSING_PERFORMED_BY');
+    }
+
+    if (target.entity === 'Appointment') {
+      const duplicate = await client.appointment.findUnique({ where: { appointmentCode: this.string(snapshot, 'appointmentCode') }, select: { id: true } });
+      if (duplicate && duplicate.id !== target.entityId) add('APPOINTMENT_CODE_UNIQUE_CONFLICT');
+      const patientId = this.string(snapshot, 'patientId');
+      if (!(await client.patient.findUnique({ where: { id: patientId }, select: { id: true } }))) add('MISSING_PATIENT');
+      const departmentId = this.string(snapshot, 'departmentId');
+      if (!(await client.department.findUnique({ where: { id: departmentId }, select: { id: true } }))) add('MISSING_DEPARTMENT');
+      const doctorId = this.nullableString(snapshot, 'doctorId');
+      if (doctorId && !(await client.doctorProfile.findUnique({ where: { id: doctorId }, select: { id: true } }))) add('MISSING_DOCTOR');
+    }
+
+    if (target.entity === 'AiQuality') {
+      const doctorId = this.string(snapshot, 'doctorId');
+      if (!(await client.doctorProfile.findUnique({ where: { id: doctorId }, select: { id: true } }))) add('MISSING_DOCTOR');
+      const aiModelId = this.string(snapshot, 'aiModelId');
+      if (!(await client.aiModelRegistry.findUnique({ where: { id: aiModelId }, select: { id: true } }))) add('MISSING_AI_MODEL');
+      const aiDiagnosisId = this.nullableString(snapshot, 'aiDiagnosisId');
+      if (aiDiagnosisId && !(await client.aiDiagnosis.findUnique({ where: { id: aiDiagnosisId }, select: { id: true } }))) add('MISSING_AI_DIAGNOSIS');
+    }
+
     return blockers;
   }
 
@@ -512,6 +571,57 @@ export class EntityRecreationService {
       } });
       return;
     }
+    if (target.entity === 'MedicalOrder') {
+      await client.medicalOrder.create({ data: {
+        id: target.entityId, orderCode: this.string(snapshot, 'orderCode'), visitId: this.string(snapshot, 'visitId'),
+        patientId: this.string(snapshot, 'patientId'), doctorId: this.string(snapshot, 'doctorId'),
+        targetDepartmentId: this.nullableString(snapshot, 'targetDepartmentId'),
+        orderType: this.string(snapshot, 'orderType'), priority: this.nullableString(snapshot, 'priority') ?? 'NORMAL',
+        clinicalNote: this.nullableString(snapshot, 'clinicalNote'),
+        status: this.enumValue(snapshot, 'status', MedicalOrderStatus),
+      } });
+      return;
+    }
+    if (target.entity === 'MedicalResult') {
+      const result = await client.medicalResult.create({ data: {
+        id: target.entityId, resultCode: this.string(snapshot, 'resultCode'), orderId: this.string(snapshot, 'orderId'),
+        performedById: this.nullableString(snapshot, 'performedById'),
+        note: this.nullableString(snapshot, 'note'),
+        returnedAt: this.nullableDate(snapshot, 'returnedAt') ?? new Date(),
+        createdAt: this.nullableDate(snapshot, 'createdAt') ?? new Date(),
+      } });
+      const files = this.resultFiles(snapshot);
+      if (files.length > 0) {
+        await client.medicalResultFile.createMany({ data: files.map((file) => ({ ...file, resultId: result.id })) });
+      }
+      return;
+    }
+    if (target.entity === 'Appointment') {
+      const rawQrToken = crypto.randomBytes(32).toString('base64url');
+      const qrTokenHash = crypto.createHmac('sha256', QR_SECRET).update(rawQrToken).digest('hex');
+      const scheduledAt = this.date(snapshot, 'scheduledAt');
+      await client.appointment.create({ data: {
+        id: target.entityId, appointmentCode: this.string(snapshot, 'appointmentCode'),
+        patientId: this.string(snapshot, 'patientId'), departmentId: this.string(snapshot, 'departmentId'),
+        doctorId: this.nullableString(snapshot, 'doctorId'), scheduledAt,
+        status: this.enumValue(snapshot, 'status', AppointmentStatus),
+        qrTokenHash, qrExpiresAt: new Date(scheduledAt.getTime() + 24 * 60 * 60 * 1000),
+        checkedInAt: null, visitId: null, cancelledAt: null, cancelReason: null, createdByUserId: null,
+      } });
+      return;
+    }
+    if (target.entity === 'AiQuality') {
+      const business = this.businessSnapshot(snapshot);
+      const integrity = this.audit.hashSnapshot(business);
+      await client.aiQuality.create({ data: {
+        id: target.entityId, doctorId: this.string(snapshot, 'doctorId'), aiModelId: this.string(snapshot, 'aiModelId'),
+        aiDiagnosisId: this.nullableString(snapshot, 'aiDiagnosisId'),
+        doctorConclusionAboutModel: this.string(snapshot, 'doctorConclusionAboutModel'),
+        trustablePercent: this.number(snapshot, 'trustablePercent'),
+        hash256: integrity.hash, dataSalt: integrity.salt,
+      } });
+      return;
+    }
     await client.medicalConclusion.create({ data: {
       id: target.entityId, visitId: this.string(snapshot, 'visitId'), doctorId: this.string(snapshot, 'doctorId'),
       aiDiagnosisId: this.nullableString(snapshot, 'aiDiagnosisId'), finalDiagnosis: this.string(snapshot, 'finalDiagnosis'),
@@ -614,6 +724,29 @@ export class EntityRecreationService {
       const row = await client.aiDiagnosis.findUnique({ where: { id: target.entityId } });
       return row ? buildAiDiagnosisSnapshot(row) as Snapshot : null;
     }
+    if (target.entity === 'MedicalOrder') {
+      const row = await client.medicalOrder.findUnique({ where: { id: target.entityId } });
+      return row ? buildMedicalOrderSnapshot(row) as Snapshot : null;
+    }
+    if (target.entity === 'MedicalResult') {
+      const row = await client.medicalResult.findUnique({
+        where: { id: target.entityId },
+        include: { files: true, order: { select: { visitId: true } } },
+      });
+      if (!row) return null;
+      return buildMedicalResultSnapshot({ ...row, visitId: row.order?.visitId ?? null }) as Snapshot;
+    }
+    if (target.entity === 'Appointment') {
+      const row = await client.appointment.findUnique({
+        where: { id: target.entityId },
+        include: { doctor: { select: { staffProfileId: true } } },
+      });
+      return row ? buildAppointmentSnapshot(row) as Snapshot : null;
+    }
+    if (target.entity === 'AiQuality') {
+      const row = await client.aiQuality.findUnique({ where: { id: target.entityId } });
+      return row ? buildAiQualitySnapshot(row) as Snapshot : null;
+    }
     const row = await client.medicalConclusion.findUnique({ where: { id: target.entityId }, include: { visit: { include: { patient: true } } } });
     return row ? buildMedicalConclusionSnapshot(row) as Snapshot : null;
   }
@@ -626,6 +759,10 @@ export class EntityRecreationService {
     if (target.entity === 'AiModelRegistry') return client.aiModelRegistry.findUnique({ where: { id: target.entityId }, select: { id: true } });
     if (target.entity === 'Visit') return client.visit.findUnique({ where: { id: target.entityId }, select: { id: true } });
     if (target.entity === 'AiDiagnosis') return client.aiDiagnosis.findUnique({ where: { id: target.entityId }, select: { id: true } });
+    if (target.entity === 'MedicalOrder') return client.medicalOrder.findUnique({ where: { id: target.entityId }, select: { id: true } });
+    if (target.entity === 'MedicalResult') return client.medicalResult.findUnique({ where: { id: target.entityId }, select: { id: true } });
+    if (target.entity === 'Appointment') return client.appointment.findUnique({ where: { id: target.entityId }, select: { id: true } });
+    if (target.entity === 'AiQuality') return client.aiQuality.findUnique({ where: { id: target.entityId }, select: { id: true } });
     return client.medicalConclusion.findUnique({ where: { id: target.entityId }, select: { id: true } });
   }
 
@@ -681,6 +818,49 @@ export class EntityRecreationService {
     if (value == null) return null;
     if (typeof value !== 'number' || !Number.isFinite(value)) throw new ConflictException(`Snapshot có số không hợp lệ: ${field}.`);
     return value;
+  }
+
+  private number(snapshot: Snapshot, field: string): number {
+    const value = snapshot[field];
+    if (typeof value !== 'number' || !Number.isFinite(value)) throw new ConflictException(`Snapshot có số không hợp lệ: ${field}.`);
+    return value;
+  }
+
+  private resultFiles(snapshot: Snapshot): Array<{
+    fileName: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    url: string | null;
+    storageProvider: string;
+    bucket: string | null;
+    objectKey: string | null;
+    sha256: string | null;
+    etag: string | null;
+  }> {
+    const files = snapshot.files;
+    if (!Array.isArray(files)) return [];
+    return files.map((file, index) => {
+      if (!file || typeof file !== 'object' || Array.isArray(file)) throw new ConflictException(`File kết quả #${index + 1} không hợp lệ.`);
+      const entry = file as Record<string, unknown>;
+      const fileName = typeof entry.fileName === 'string' && entry.fileName ? entry.fileName : `file-${index + 1}`;
+      const originalName = typeof entry.originalName === 'string' && entry.originalName ? entry.originalName : fileName;
+      const mimeType = typeof entry.mimeType === 'string' && entry.mimeType ? entry.mimeType : 'application/octet-stream';
+      const size = typeof entry.size === 'number' && Number.isFinite(entry.size) ? entry.size : 0;
+      const storageProvider = typeof entry.storageProvider === 'string' && entry.storageProvider ? entry.storageProvider : 'CLOUDINARY';
+      return {
+        fileName,
+        originalName,
+        mimeType,
+        size,
+        url: typeof entry.url === 'string' ? entry.url : null,
+        storageProvider,
+        bucket: typeof entry.bucket === 'string' ? entry.bucket : null,
+        objectKey: typeof entry.objectKey === 'string' ? entry.objectKey : null,
+        sha256: typeof entry.sha256 === 'string' ? entry.sha256 : null,
+        etag: typeof entry.etag === 'string' ? entry.etag : null,
+      };
+    });
   }
 
   private optionalNumber(snapshot: Snapshot, field: string, fallback: number): number {

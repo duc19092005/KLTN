@@ -1,5 +1,18 @@
 import { MedicalOrderStatus } from '@prisma/client';
 
+export type MedicalResultFileAudit = {
+  fileName: string | null;
+  originalName: string | null;
+  mimeType: string | null;
+  size: number | null;
+  url: string | null;
+  storageProvider: string | null;
+  bucket: string | null;
+  objectKey: string | null;
+  sha256: string | null;
+  etag: string | null;
+};
+
 export type MedicalResultAuditSnapshot = {
   resultId: string;
   resultCode: string;
@@ -9,7 +22,11 @@ export type MedicalResultAuditSnapshot = {
   fileCount: number;
   mimeTypes: string[];
   fileSizes: number[];
+  /** Full per-file metadata. Sensitive — medical result files are private. */
+  files: MedicalResultFileAudit[];
   status: MedicalOrderStatus;
+  note: string | null;
+  returnedAt: string | null;
   createdAt: string | null;
 };
 
@@ -24,14 +41,28 @@ export type VisitStatusAuditSnapshot = {
   status: string;
 };
 
+type ResultFileLike = {
+  fileName?: string | null;
+  originalName?: string | null;
+  mimeType?: string | null;
+  size?: number | null;
+  url?: string | null;
+  storageProvider?: string | null;
+  bucket?: string | null;
+  objectKey?: string | null;
+  sha256?: string | null;
+  etag?: string | null;
+};
+
 type ResultLike = {
   id: string;
   resultCode: string;
   orderId: string;
   performedById: string;
+  note?: string | null;
   returnedAt?: Date | string | null;
   createdAt?: Date | string | null;
-  files?: Array<{ mimeType?: string | null; size?: number | null }>;
+  files?: ResultFileLike[];
 };
 
 export function buildMedicalResultAuditSnapshot(
@@ -39,7 +70,18 @@ export function buildMedicalResultAuditSnapshot(
   visitId: string,
   orderStatus: MedicalOrderStatus,
 ): MedicalResultAuditSnapshot {
-  const files = result.files ?? [];
+  const files = (result.files ?? []).map((file) => ({
+    fileName: file.fileName ?? null,
+    originalName: file.originalName ?? null,
+    mimeType: file.mimeType ?? null,
+    size: file.size ?? null,
+    url: file.url ?? null,
+    storageProvider: file.storageProvider ?? null,
+    bucket: file.bucket ?? null,
+    objectKey: file.objectKey ?? null,
+    sha256: file.sha256 ?? null,
+    etag: file.etag ?? null,
+  }));
   return {
     resultId: result.id,
     resultCode: result.resultCode,
@@ -49,8 +91,11 @@ export function buildMedicalResultAuditSnapshot(
     fileCount: files.length,
     mimeTypes: files.map((file) => file.mimeType ?? 'unknown'),
     fileSizes: files.map((file) => file.size ?? 0),
+    files,
     status: orderStatus,
-    createdAt: toIsoString(result.returnedAt ?? result.createdAt ?? null),
+    note: result.note ?? null,
+    returnedAt: toIsoString(result.returnedAt ?? null),
+    createdAt: toIsoString(result.createdAt ?? null),
   };
 }
 
