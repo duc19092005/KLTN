@@ -458,6 +458,30 @@ describe('S10 Workflow audit trail — mỗi giai đoạn phải ghi log đúng 
       .expect(201);
     const order = unwrap<Created>(orderResp.body);
 
+    // KTV "Tiếp nhận phiếu" (PATCH status ORDERED → IN_PROGRESS) — đúng flow UI/UX.
+    // Mọi thay đổi DB phải được ghi audit trong cùng transaction.
+    await request(functional.app.getHttpServer())
+      .patch(`/api/medical-orders/${order.id}/status`)
+      .set(bearer(actors.labToken))
+      .send({ status: MedicalOrderStatus.IN_PROGRESS })
+      .expect(200);
+
+    // Audit MedicalOrder UPDATE cho transition "Tiếp nhận phiếu" phải tồn tại và đủ trường
+    const acceptUpdateRow = await functional.prisma.blockchainLogger.findFirst({
+      where: {
+        entity: 'MedicalOrder',
+        entityId: order.id,
+        action: 'UPDATE',
+        metadata: { path: ['schema'], equals: 'KLTN_MEDICAL_ORDER_STATUS_AUDIT_V2' },
+      },
+      orderBy: { seq: 'desc' },
+    });
+    expect(acceptUpdateRow).not.toBeNull();
+    expectAuditRowComplete(acceptUpdateRow as Record<string, unknown>);
+    // after snapshot phải chứa đủ trường REQUIRED_SNAPSHOT_FIELDS.MedicalOrder
+    const acceptAfter = (acceptUpdateRow as Record<string, unknown>).afterJson as Record<string, unknown>;
+    expect(acceptAfter).toMatchObject({ status: MedicalOrderStatus.IN_PROGRESS });
+
     // KTV trả kết quả
     await request(functional.app.getHttpServer())
       .post(`/api/medical-orders/${order.id}/results`)
@@ -706,6 +730,13 @@ describe('S10 Workflow audit trail — mỗi giai đoạn phải ghi log đúng 
       .send({ visitId: visit.id, targetDepartmentId: actors.labDept.id, orderType: 'Xet nghiem mau tong quat', priority: 'URGENT' })
       .expect(201);
     const order = unwrap<Created>(orderResp.body);
+
+    // KTV "Tiếp nhận phiếu" (PATCH status ORDERED → IN_PROGRESS) — đúng flow UI/UX
+    await request(functional.app.getHttpServer())
+      .patch(`/api/medical-orders/${order.id}/status`)
+      .set(bearer(actors.labToken))
+      .send({ status: MedicalOrderStatus.IN_PROGRESS })
+      .expect(200);
 
     await request(functional.app.getHttpServer())
       .post(`/api/medical-orders/${order.id}/results`)

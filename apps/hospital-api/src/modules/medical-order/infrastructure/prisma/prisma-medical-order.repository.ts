@@ -8,6 +8,7 @@ import {
   MedicalOrderRepositoryPort,
   OrderCreatedHook,
   OrderListFilter,
+  OrderStatusUpdatedHook,
   OrderVisitInfo,
   ResultFileWithOrder,
   StaffIdentity,
@@ -129,11 +130,15 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
     return order;
   }
 
-  async updateStatus(id: string, status: MedicalOrderStatus, completedAt?: Date): Promise<unknown> {
-    return this.prisma.medicalOrder.update({
-      where: { id },
-      data: { status, completedAt },
-      include: this.includeRelations(),
+  async updateStatus(id: string, status: MedicalOrderStatus, completedAt?: Date, afterWrite?: OrderStatusUpdatedHook): Promise<unknown> {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.medicalOrder.update({
+        where: { id },
+        data: { status, completedAt },
+        include: this.includeRelations(),
+      });
+      if (afterWrite) await afterWrite(order, tx);
+      return order;
     });
   }
 

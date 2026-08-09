@@ -4,9 +4,9 @@ import { AuthUser } from '../../../../common/types/auth-user.type';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
 import { CreateMedicalResultDto } from '../../dto/medical-order.dto';
 import {
-  buildMedicalOrderStatusAuditSnapshot,
   buildMedicalResultAuditSnapshot,
 } from '../../domain/medical-result-audit-snapshot';
+import { buildMedicalOrderSnapshot } from '../../domain/medical-order-snapshot';
 import { MedicalOrderAccessPolicy } from '../policies/medical-order-access.policy';
 import { MEDICAL_ORDER_REPOSITORY, MedicalOrderRepositoryPort } from '../ports/medical-order.repository.port';
 import { NotificationService } from '../../../notification/services/notification.service';
@@ -91,7 +91,7 @@ export class CreateMedicalResultUseCase {
           tx,
         );
 
-        const orderSnapshot = buildMedicalOrderStatusAuditSnapshot(orderId, order.visitId, MedicalOrderStatus.RESULT_READY);
+        const orderSnapshot = buildMedicalOrderSnapshot(updatedOrder as Parameters<typeof buildMedicalOrderSnapshot>[0]);
         await this.audit.recordV2(
           {
             entity: 'MedicalOrder',
