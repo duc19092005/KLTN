@@ -10,6 +10,8 @@ import {
   MedicalConclusionIntegrityAnchorPort,
 } from '../ports/medical-conclusion-integrity-anchor.port';
 import { buildMedicalConclusionSnapshot } from '../../domain/medical-conclusion-snapshot';
+import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { buildVisitSnapshot } from '../../../visit/domain/visit-snapshot';
 
 /**
  * Doctor finalizes a visit with a MedicalConclusion. Behavior copied verbatim
@@ -26,6 +28,7 @@ export class CreateMedicalConclusionUseCase {
     @Inject(CLINICAL_DECISION_REPOSITORY) private readonly repo: ClinicalDecisionRepositoryPort,
     @Inject(MEDICAL_CONCLUSION_INTEGRITY_ANCHOR) private readonly integrity: MedicalConclusionIntegrityAnchorPort,
     private readonly policy: ClinicalDecisionPolicy,
+    private readonly audit: AuditLoggerService,
   ) {}
 
   async execute(dto: CreateMedicalConclusionDto, doctorUserId: string) {
@@ -49,8 +52,9 @@ export class CreateMedicalConclusionUseCase {
     }
 
     const existing = await this.repo.findConclusionByVisitId(dto.visitId);
-    const before = existing ? buildMedicalConclusionSnapshot(existing) : null;
-    const action = existing ? 'UPDATE' : 'CREATE';
+    if (existing) {
+      throw new BadRequestException('Lượt khám này đã có kết luận y khoa, không thể kết luận lại.');
+    }
 
     const conclusion = await this.repo.upsertConclusionAndCompleteVisit(
       {
@@ -64,8 +68,24 @@ export class CreateMedicalConclusionUseCase {
         followUpNote: dto.followUpNote?.trim() || null,
         doctorNote: dto.doctorNote?.trim() || null,
       },
-      async (savedConclusion, tx) => {
-        await this.integrity.anchorChange(savedConclusion, action, doctorUserId, before, tx);
+      async (savedConclusion, visitAfter, tx) => {
+        await this.integrity.anchorChange(savedConclusion, 'CREATE', doctorUserId, null, tx);
+
+        if (visitAfter) {
+          await this.audit.recordV2(
+            {
+              entity: 'Visit',
+              entityId: visitAfter.id,
+              action: 'UPDATE',
+              actorId: doctorUserId,
+              before: { visitId: visitAfter.id, status: visit!.status },
+              after: buildVisitSnapshot(visitAfter),
+              metadata: { schema: 'KLTN_VISIT_STATUS_AUDIT_V2' },
+              onChainStatus: 'PENDING',
+            },
+            tx,
+          );
+        }
       },
     );
 

@@ -1,9 +1,10 @@
-  import { Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { AiModelRegistry, MedicalOrderStatus, Prisma, VisitStatus } from '@prisma/client';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import {
   ClinicalDecisionRepositoryPort,
   ClinicalDoctor,
+  ClinicalVisitAuditSnapshot,
   ClinicalVisitInfo,
   CreateAiDiagnosisData,
   UpsertConclusionData,
@@ -135,7 +136,11 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
 
   async upsertConclusionAndCompleteVisit(
     data: UpsertConclusionData,
-    afterWrite?: (conclusion: unknown, tx: Prisma.TransactionClient) => Promise<void>,
+    afterWrite?: (
+      conclusion: unknown,
+      visitAfter: ClinicalVisitAuditSnapshot | null,
+      tx: Prisma.TransactionClient,
+    ) => Promise<void>,
   ): Promise<unknown> {
     return this.prisma.$transaction(async (tx) => {
       const conclusion = await tx.medicalConclusion.upsert({
@@ -162,19 +167,35 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
         include: { aiDiagnosis: { include: { aiModel: true } }, doctor: { include: { staffProfile: true } }, visit: { include: { patient: { select: { patientCode: true } } } } },
       });
 
-      await tx.visit.update({
+      const visitAfter = await tx.visit.update({
         where: { id: data.visitId },
         data: {
           status: VisitStatus.COMPLETED,
           completedAt: new Date(),
           ...(data.staffId ? { staffId: data.staffId } : {}),
         },
+        select: this.visitAuditSelect(),
       });
 
-      await afterWrite?.(conclusion, tx);
+      await afterWrite?.(conclusion, visitAfter, tx);
 
       return conclusion;
     });
+  }
+
+  /** Full Visit fields required by the audit snapshot (REQUIRED_SNAPSHOT_FIELDS.Visit). */
+  private visitAuditSelect() {
+    return {
+      id: true,
+      visitCode: true,
+      patientId: true,
+      departmentId: true,
+      staffId: true,
+      status: true,
+      source: true,
+      checkInAt: true,
+      completedAt: true,
+    } as const;
   }
 
   private visitDecisionInclude() {

@@ -85,15 +85,16 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
             include: this.includeRelations(),
           });
 
-          await tx.visit.update({
+          const visitAfter = await tx.visit.update({
             where: { id: command.visitId },
             data: {
               status: VisitStatus.WAITING_TEST_RESULT,
               ...(command.staffId ? { staffId: command.staffId } : {}),
             },
+            select: this.visitAuditSelect(),
           });
 
-          if (onCreated) await onCreated(order, tx);
+          if (onCreated) await onCreated(order, visitAfter, tx);
 
           return order;
         });
@@ -175,17 +176,37 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
 
       let visitTransition: CreateResultTransactionPayload['visitTransition'] = null;
       if (await this.areAllNonCancelledOrdersReady(tx, visitId)) {
-        await tx.visit.update({
+        const beforeVisit = await tx.visit.findUniqueOrThrow({
+          where: { id: visitId },
+          select: { status: true },
+        });
+        const visitAfter = await tx.visit.update({
           where: { id: visitId },
           data: { status: VisitStatus.WAITING_CONCLUSION },
+          select: this.visitAuditSelect(),
         });
-        visitTransition = { visitId, status: VisitStatus.WAITING_CONCLUSION };
+        visitTransition = { visit: visitAfter, previousStatus: beforeVisit.status };
       }
 
       await afterWrite?.({ result, order: updatedOrder, visitTransition }, tx);
 
       return { result, order: updatedOrder };
     });
+  }
+
+  /** Full Visit fields required by the audit snapshot (REQUIRED_SNAPSHOT_FIELDS.Visit). */
+  private visitAuditSelect() {
+    return {
+      id: true,
+      visitCode: true,
+      patientId: true,
+      departmentId: true,
+      staffId: true,
+      status: true,
+      source: true,
+      checkInAt: true,
+      completedAt: true,
+    } as const;
   }
 
   async findResultFileWithOrder(fileId: string): Promise<ResultFileWithOrder> {

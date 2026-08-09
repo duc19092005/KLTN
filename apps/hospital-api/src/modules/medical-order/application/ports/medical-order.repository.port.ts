@@ -62,7 +62,28 @@ export type CreatedOrderRecord = {
   clinicalNote: string | null;
 };
 
-export type OrderCreatedHook = (order: CreatedOrderRecord, tx: Prisma.TransactionClient) => Promise<void>;
+/**
+ * Full Visit fields required by EntityRecoveryService for the `Visit` entity
+ * (REQUIRED_SNAPSHOT_FIELDS.Visit). This is the canonical shape consumed by
+ * `buildVisitSnapshot`.
+ */
+export type VisitAuditSnapshotData = {
+  id: string;
+  visitCode: string;
+  patientId: string;
+  departmentId: string;
+  staffId: string | null;
+  status: string;
+  source: string;
+  checkInAt: Date | string;
+  completedAt: Date | string | null;
+};
+
+export type OrderCreatedHook = (
+  order: CreatedOrderRecord,
+  visitAfter: VisitAuditSnapshotData,
+  tx: Prisma.TransactionClient,
+) => Promise<void>;
 
 export type CreateResultCommand = {
   orderId: string;
@@ -96,12 +117,10 @@ export type OrderDepartmentInfo = {
   canReceiveOrders: boolean;
 };
 
-
-
 export type CreateResultTransactionPayload = {
   result: unknown;
   order: unknown;
-  visitTransition: { visitId: string; status: string } | null;
+  visitTransition: { visit: VisitAuditSnapshotData; previousStatus: string } | null;
 };
 
 /**

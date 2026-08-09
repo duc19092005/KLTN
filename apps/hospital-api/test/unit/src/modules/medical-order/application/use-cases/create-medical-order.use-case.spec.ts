@@ -21,7 +21,21 @@ describe('CreateMedicalOrderUseCase audit transaction', () => {
       findDoctorStaffByUserId: jest.fn().mockResolvedValue({ doctorId: 'doctor-1', staffId: 'staff-1', departmentId: 'exam-1' }),
       findOrderDepartment: jest.fn().mockResolvedValue({ id: 'lab-1', type: 'LABORATORY', status: 'ACTIVE', canReceiveOrders: true }),
       createOrderWithVisitTransition: jest.fn().mockImplementation(async (_command, onCreated) => {
-        await onCreated(order, tx);
+        const visitTransition = {
+          visit: {
+            id: 'visit-1',
+            visitCode: 'V-00001',
+            patientId: 'patient-1',
+            departmentId: 'exam-1',
+            staffId: 'staff-1',
+            status: 'WAITING_TEST_RESULT',
+            source: 'DIRECT',
+            checkInAt: new Date().toISOString(),
+            completedAt: null,
+          },
+          previousStatus: 'IN_PROGRESS',
+        };
+        await onCreated(order, visitTransition, tx);
         return order;
       }),
     };

@@ -681,8 +681,9 @@ export default function PatientVerificationPage() {
 
       {/* QR Scanner Modal: upload an image or scan via camera */}
       {qrModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 backdrop-blur-sm p-4 animate-fade-in-up">
-          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in-up">
+          <div className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" />
+          <div className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Cổng kiểm chứng</p>

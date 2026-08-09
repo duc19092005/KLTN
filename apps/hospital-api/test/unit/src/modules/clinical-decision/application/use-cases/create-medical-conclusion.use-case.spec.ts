@@ -24,12 +24,16 @@ describe('CreateMedicalConclusionUseCase integration rules', () => {
       anchorChange: jest.fn().mockResolvedValue(undefined),
       triggerImmediateAnchor: jest.fn().mockResolvedValue(undefined),
     };
+    const audit = {
+      recordV2: jest.fn().mockResolvedValue({}),
+    };
     const useCase = new CreateMedicalConclusionUseCase(
       repo as any,
       integrity as any,
       new ClinicalDecisionPolicy(),
+      audit as any,
     );
-    return { useCase, repo, integrity };
+    return { useCase, repo, integrity, audit };
   }
 
   it('blocks final conclusion when one of two medical orders is still pending', async () => {

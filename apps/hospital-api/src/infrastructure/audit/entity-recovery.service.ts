@@ -211,6 +211,7 @@ export class EntityRecoveryService {
       try {
         results.push(await this.recoverOne(target, actorId, reason, recreationCache));
       } catch (error) {
+        console.error('RECOVERY ERROR:', error);
         results.push({
           ...target,
           status: 'FAILED',

@@ -15,6 +15,7 @@
     "mail:test": "ts-node scripts/test-smtp.ts",
     "audit:v2:reset:dev": "ts-node src/scripts/reset-audit-v2-dev.ts",
     "local:prepare-tamper-demo": "ts-node src/scripts/prepare-local-tamper-recovery-demo.ts",
+    "audit:re-anchor-visit": "ts-node src/scripts/re-anchor-visit-audit.ts",
     "test": "jest --config ./test/jest-unit.json",
     "test:unit": "jest --config ./test/jest-unit.json",
     "test:integration": "jest --config ./test/jest-integration.json",
