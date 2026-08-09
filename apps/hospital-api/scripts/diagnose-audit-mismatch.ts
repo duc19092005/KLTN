@@ -8,7 +8,7 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { canonicalize, computeAfterHashV2 } from '../src/infrastructure/audit/audit-hash.util';
-import { buildAuditEncryptionAad, decryptAuditSnapshot, parseJsonSnapshot } from '../src/infrastructure/audit/audit-encryption.util';
+import { buildAuditEncryptionAad, decryptAuditSnapshot } from '../src/infrastructure/audit/audit-encryption.util';
 import { buildMedicalResultSnapshot } from '../src/modules/medical-order/domain/medical-result-snapshot';
 import { buildMedicalOrderSnapshot } from '../src/modules/medical-order/domain/medical-order-snapshot';
 
@@ -79,7 +79,7 @@ async function main() {
           action: latest.action,
           createdAtIso: latest.createdAt.toISOString(),
         });
-        auditAfter = parseJsonSnapshot(decryptAuditSnapshot(latest.afterEncrypted as never, aad)) as Record<string, unknown>;
+        auditAfter = JSON.parse(decryptAuditSnapshot(latest.afterEncrypted as never, aad)) as Record<string, unknown>;
       } catch (e) {
         console.log(`\n${entity}: decrypt failed: ${(e as Error).message}`);
         continue;
