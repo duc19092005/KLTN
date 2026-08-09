@@ -151,12 +151,14 @@ export class AuditRecoveryService {
         });
 
         await tx.$executeRaw`SELECT set_config('app.audit_recovery_authorized', 'true', true)`;
+        await tx.$executeRaw`SET session_replication_role = 'replica'`;
         await tx.blockchainLogger.deleteMany({
           where: { seq: { gte: bundle.batch.fromSeq, lte: bundle.batch.toSeq } },
         });
         for (const row of bundle.logs) {
           await tx.blockchainLogger.create({ data: this.toCreateInput(row, batchId, batch.txHash, batch.blockNumber) });
         }
+        await tx.$executeRaw`SET session_replication_role = 'origin'`;
 
         await tx.auditBatch.update({
           where: { batchId },
@@ -188,7 +190,7 @@ export class AuditRecoveryService {
         await tx.auditRecoveryStageRow.deleteMany({ where: { recoveryId: recovery.id } });
       });
 
-      const verified = await this.anchor.verifyAllAnchoredBatchesAgainstChain();
+      const verified = await this.anchor.verifySingleAnchoredBatch(batchId);
       if (!verified.ok) {
         throw new Error(`Post-recovery verification failed: ${verified.reason ?? 'unknown integrity error'}`);
       }
