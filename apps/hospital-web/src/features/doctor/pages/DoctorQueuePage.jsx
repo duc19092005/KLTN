@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Download, FileText, Printer, Stethoscope, Search, RefreshCw, CheckCircle2, Clock, Activity, AlertCircle, Sparkles, User, Building2, ChevronRight, X, UserCheck, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
@@ -350,6 +351,12 @@ export default function DoctorQueuePage() {
       toast.success('Đã đóng hồ sơ bệnh án và hoàn tất lượt khám của bệnh nhân.');
       setShowWorkflowModal(false);
 
+      // Always reload visits and decision state immediately so status updates back cleanly
+      await Promise.all([
+        loadVisits(),
+        loadDecision(activeVisit.id),
+      ]);
+
       const activeDiag = decision?.aiDiagnoses?.find((d) => d.id === selectedAiId);
       if (activeDiag?.aiModel) {
         setRatingModelId(activeDiag.aiModel.id);
@@ -359,12 +366,13 @@ export default function DoctorQueuePage() {
         setRatingSelected(null);
         setRatingFeedback('');
         setPauseCountdown(false);
-      } else {
-        await loadVisits();
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Không lưu được kết luận cuối');
-      await loadVisits();
+      await Promise.all([
+        loadVisits(),
+        loadDecision(activeVisit.id),
+      ]);
     } finally {
       setBusy(false);
     }
@@ -482,7 +490,7 @@ export default function DoctorQueuePage() {
         )}
 
         {/* AI RATING POPUP */}
-        {showRatingPopup && (
+        {showRatingPopup && createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs animate-fadeIn p-4">
             <div className="w-full max-w-md rounded-3xl border border-slate-200/80 bg-white p-6 shadow-2xl space-y-6">
               <div className="flex items-center justify-between">
@@ -579,7 +587,8 @@ export default function DoctorQueuePage() {
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </DashboardLayout>
@@ -822,7 +831,7 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
 
   const currentStep = steps.find((item) => item.step === activeStep) || steps[0];
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 animate-fadeIn antialiased">
       <div className="flex max-h-[92vh] w-full max-w-[1320px] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
         {/* MODAL HEADER */}

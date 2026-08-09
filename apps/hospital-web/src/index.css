@@ -287,8 +287,7 @@ main button[disabled] {
 }
 
 .animate-tab-smooth {
-  animation: tabSmoothEnter 320ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: transform, opacity, filter;
+  animation: tabSmoothEnter 320ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .animate-fadeIn { animation: fadeIn 180ms ease-out; }

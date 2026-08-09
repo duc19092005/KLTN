@@ -32,6 +32,14 @@ export class RateAiModelUseCase {
     if (!diagnosis || diagnosis.aiModelId !== aiModelId || diagnosis.reviewedByDoctorId !== doctorId || !diagnosis.visitId) {
       throw new BadRequestException('Chỉ được đánh giá kết quả AI mà bác sĩ đã sử dụng và xác nhận trong lượt khám của mình.');
     }
+
+    const conclusionRecord = await this.prisma.medicalConclusion.findUnique({
+      where: { visitId: diagnosis.visitId },
+    });
+    if (!conclusionRecord) {
+      throw new BadRequestException('Chỉ được đánh giá mô hình AI sau khi bác sĩ đã hoàn tất kết luận y tế cho ca khám.');
+    }
+
     const existingRating = await this.prisma.aiQuality.findUnique({ where: { aiDiagnosisId } });
     if (existingRating) throw new BadRequestException('Kết quả AI này đã được đánh giá.');
 

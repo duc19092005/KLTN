@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { visitService } from '../apis/visitService';
 import { VISIT_STATUS, getVisitStatus } from '../constants/visitStatus';
@@ -291,7 +292,7 @@ function VisitDetailModal({ visit, busyId, onCancel, onClose }) {
     return () => { document.body.style.overflow = previousOverflow; };
   }, []);
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 antialiased">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={onClose} />
       <div className="relative flex max-h-[90vh] w-full max-w-[1000px] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl animate-fadeIn">
@@ -352,7 +353,8 @@ function VisitDetailModal({ visit, busyId, onCancel, onClose }) {
           </footer>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
