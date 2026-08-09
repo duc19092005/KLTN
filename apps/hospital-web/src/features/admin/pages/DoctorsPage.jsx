@@ -272,7 +272,7 @@ export default function DoctorsPage() {
         close(); await load(nextPage);
       } else {
         await doctorService.createFull(buildFullDoctorPayload(form));
-        toast.success('Tạo bác sĩ mới thành công! Mật khẩu mặc định là: 123456');
+        toast.success('Tạo bác sĩ mới thành công! Thông tin tài khoản đã được gửi đến email của bác sĩ.');
         close(); await load(1);
       }
     } catch (err) { toast.error(getError(err)); }

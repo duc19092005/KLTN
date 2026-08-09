@@ -1,12 +1,45 @@
 {
-  "generatedAt": "2026-08-01T12:15:49.317Z",
+  "generatedAt": "2026-08-02T08:01:54.468Z",
   "environment": "local-test",
-  "testCommand": "npm run test:functional + targeted functional Jest + deterministic unit/device/provider simulations + isolated tamper-recovery integration",
+  "testCommand": "npm run test:functional",
   "expectedCaseCount": 125,
-  "declaredCaseCount": 125,
-  "declaredUniqueCaseCount": 125,
+  "declaredCaseCount": 93,
+  "declaredUniqueCaseCount": 93,
   "duplicateIds": [],
-  "pendingIds": [],
+  "pendingIds": [
+    "TC1.03",
+    "TC1.04",
+    "TC1.05",
+    "TC2.12",
+    "TC3.09",
+    "TC3.10",
+    "TC3.15",
+    "TC3.16",
+    "TC4.10",
+    "TC4.11",
+    "TC4.12",
+    "TC4.13",
+    "TC5.09",
+    "TC5.10",
+    "TC5.11",
+    "TC6.07",
+    "TC6.08",
+    "TC6.09",
+    "TC6.10",
+    "TC6.11",
+    "TC6.12",
+    "TC6.13",
+    "TC6.14",
+    "TC6.15",
+    "TC6.16",
+    "TC6.17",
+    "TC6.18",
+    "TC6.19",
+    "TC6.20",
+    "TC6.21",
+    "TC6.22",
+    "TC7.15"
+  ],
   "cases": [
     {
       "id": "TC1.01",
@@ -20,18 +53,18 @@
     },
     {
       "id": "TC1.03",
-      "status": "PASSED",
-      "execution": "unit-jest/device-simulated"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC1.04",
-      "status": "PASSED",
-      "execution": "unit-jest/device-simulated"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC1.05",
-      "status": "PASSED",
-      "execution": "unit-jest/device-simulated"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC1.06",
@@ -125,8 +158,8 @@
     },
     {
       "id": "TC2.12",
-      "status": "PASSED",
-      "execution": "unit-jest/verified-audit-snapshot"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC3.01",
@@ -170,13 +203,13 @@
     },
     {
       "id": "TC3.09",
-      "status": "PASSED",
-      "execution": "unit-jest/storage-adapter"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC3.10",
-      "status": "PASSED",
-      "execution": "unit-jest/storage-adapter"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC3.11",
@@ -200,13 +233,13 @@
     },
     {
       "id": "TC3.15",
-      "status": "PASSED",
-      "execution": "unit-jest/verified-audit-snapshot"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC3.16",
-      "status": "PASSED",
-      "execution": "unit-jest/verified-audit-snapshot"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC4.01",
@@ -255,23 +288,23 @@
     },
     {
       "id": "TC4.10",
-      "status": "PASSED",
-      "execution": "unit-jest/verified-audit-snapshot"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC4.11",
-      "status": "PASSED",
-      "execution": "unit-jest/verified-audit-snapshot"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC4.12",
-      "status": "PASSED",
-      "execution": "unit-jest/verified-audit-snapshot"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC4.13",
-      "status": "PASSED",
-      "execution": "unit-jest/verified-audit-snapshot"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC5.01",
@@ -281,7 +314,7 @@
     {
       "id": "TC5.02",
       "status": "PASSED",
-      "execution": "functional-jest/prisma-unique"
+      "execution": "functional-jest"
     },
     {
       "id": "TC5.03",
@@ -315,18 +348,18 @@
     },
     {
       "id": "TC5.09",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC5.10",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC5.11",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC5.12",
@@ -356,7 +389,7 @@
     {
       "id": "TC6.05",
       "status": "PASSED",
-      "execution": "unit-jest/regression"
+      "execution": "functional-jest"
     },
     {
       "id": "TC6.06",
@@ -365,83 +398,83 @@
     },
     {
       "id": "TC6.07",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC6.08",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC6.09",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC6.10",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC6.11",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC6.12",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC6.13",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC6.14",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC6.15",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC6.16",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC6.17",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC6.18",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC6.19",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC6.20",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC6.21",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC6.22",
-      "status": "PASSED",
-      "execution": "functional-jest"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC7.01",
@@ -515,8 +548,8 @@
     },
     {
       "id": "TC7.15",
-      "status": "PASSED",
-      "execution": "unit-jest/storage-adapter"
+      "status": "PENDING",
+      "execution": null
     },
     {
       "id": "TC7.16",
@@ -581,12 +614,12 @@
     {
       "id": "TC9.01",
       "status": "PASSED",
-      "execution": "functional-jest/provider-simulated"
+      "execution": "functional-jest"
     },
     {
       "id": "TC9.02",
       "status": "PASSED",
-      "execution": "functional-jest/provider-simulated"
+      "execution": "functional-jest"
     },
     {
       "id": "TC9.03",
@@ -633,13 +666,5 @@
       "status": "PASSED",
       "execution": "functional-jest"
     }
-  ],
-  "executionSummary": {
-    "passed": 124,
-    "failed": 1,
-    "pending": 0,
-    "failedIds": [
-      "TC8.07"
-    ]
-  }
+  ]
 }

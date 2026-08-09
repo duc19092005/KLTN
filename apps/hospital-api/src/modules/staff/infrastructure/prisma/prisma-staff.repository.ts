@@ -57,9 +57,15 @@ export class PrismaStaffRepository implements StaffRepositoryPort {
 
   async generateEmployeeCode(role: UserRole): Promise<string> {
     const prefix = role === UserRole.DOCTOR ? 'BS' : 'NV';
-    const latest = await this.prisma.staffProfile.findFirst({ where: { employeeCode: { startsWith: `${prefix}-` } }, orderBy: { employeeCode: 'desc' }, select: { employeeCode: true } });
-    const lastNumber = Number(latest?.employeeCode?.replace(`${prefix}-`, '') || '0');
-    return `${prefix}-${String(lastNumber + 1).padStart(4, '0')}`;
+    const list = await this.prisma.staffProfile.findMany({
+      where: { employeeCode: { startsWith: `${prefix}-` } },
+      select: { employeeCode: true },
+    });
+    const maxNum = list.reduce((max, item) => {
+      const num = parseInt(item.employeeCode.replace(`${prefix}-`, ''), 10);
+      return !isNaN(num) && num > max ? num : max;
+    }, 0);
+    return `${prefix}-${String(maxNum + 1).padStart(4, '0')}`;
   }
 
   async createStaffUser(
