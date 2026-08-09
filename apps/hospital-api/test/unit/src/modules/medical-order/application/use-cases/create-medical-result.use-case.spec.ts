@@ -49,7 +49,20 @@ describe('CreateMedicalResultUseCase audit integrity', () => {
         const updatedOrder = { id: 'order-1', status: MedicalOrderStatus.RESULT_READY };
         const visitTransition = options.visitTransition === false
           ? null
-          : { visitId: 'visit-1', status: 'WAITING_CONCLUSION' };
+          : {
+              visit: {
+                id: 'visit-1',
+                visitCode: 'V-00001',
+                patientId: 'patient-1',
+                departmentId: 'dept-lab',
+                staffId: 'staff-1',
+                status: 'WAITING_CONCLUSION',
+                source: 'DIRECT',
+                checkInAt: new Date().toISOString(),
+                completedAt: null,
+              },
+              previousStatus: 'WAITING_TEST_RESULT',
+            };
         await afterWrite?.({ result, order: updatedOrder, visitTransition }, tx);
         return { result, order: updatedOrder };
       }),
@@ -90,11 +103,10 @@ describe('CreateMedicalResultUseCase audit integrity', () => {
     const serialized = JSON.stringify(medicalResultAudit.after);
     expect(serialized).toContain('result-1');
     expect(serialized).toContain('application/pdf');
-    expect(serialized).not.toContain('Sensitive result note');
+    expect(serialized).toContain('Sensitive result note');
+    expect(serialized).toContain('patient-xray.pdf');
+    expect(serialized).toContain('result-internal-name.pdf');
     expect(serialized).not.toContain('cloudinary');
-    expect(serialized).not.toContain('patient-xray.pdf');
-    expect(serialized).not.toContain('cloudinary-internal-name.pdf');
-    expect(serialized).not.toContain('result-internal-name.pdf');
   });
 
   it('propagates audit failure so the repository transaction can rollback domain writes', async () => {

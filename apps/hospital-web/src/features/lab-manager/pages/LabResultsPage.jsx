@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
@@ -218,7 +219,7 @@ function ResultModal({ result, onOpenFile, onClose }) {
   }, []);
 
   const files = result.files || [];
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 antialiased">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={onClose} />
       <div className="relative flex max-h-[90vh] w-full max-w-[1100px] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl animate-fadeIn">
@@ -243,29 +244,38 @@ function ResultModal({ result, onOpenFile, onClose }) {
         </div>
 
         {/* MODAL BODY */}
-        <div className="grid flex-1 gap-6 overflow-y-auto bg-slate-50/50 p-6 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="grid flex-1 gap-6 overflow-y-auto p-6 lg:grid-cols-[0.9fr_1.1fr]">
           <section className="space-y-3">
-            <InfoCard label="Bệnh nhân" value={`${result.order?.patient?.fullName || 'Chưa có tên'} • Mã BN: ${result.order?.patient?.patientCode || 'N/A'}`} />
-            <InfoCard label="Phiếu chỉ định" value={result.order?.orderCode || 'Chưa có mã phiếu'} />
-            <InfoCard label="Nhận xét / Kết luận kỹ thuật viên" value={result.note || 'Không có nhận xét'} />
+            <InfoCard label="Mã chỉ định" value={result.order?.orderCode || 'N/A'} />
+            <InfoCard label="Bệnh nhân" value={`${result.order?.patient?.fullName || 'N/A'} • Mã BN: ${result.order?.patient?.patientCode || 'N/A'}`} />
+            <InfoCard label="Mã lượt khám" value={result.order?.visit?.visitCode || 'N/A'} />
+            <InfoCard label="Bác sĩ chỉ định" value={result.order?.doctor?.staffProfile?.fullName || 'N/A'} />
+            <InfoCard label="Người thực hiện kết quả" value={result.performedBy?.fullName || result.performedBy?.user?.username || 'N/A'} />
+            <InfoCard
+              label="Thời gian hoàn tất"
+              value={result.returnedAt ? new Date(result.returnedAt).toLocaleString('vi-VN') : 'N/A'}
+            />
           </section>
 
-          <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm space-y-4">
+          <section className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-5 space-y-4">
             <div>
-              <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600">Tệp đính kèm</p>
-              <h3 className="text-base font-bold text-slate-900">Danh sách tệp kết quả ({files.length})</h3>
+              <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600">Nội dung kết quả</p>
+              <h3 className="mt-0.5 text-base font-bold text-slate-900">Nhận xét & Tệp đính kèm</h3>
             </div>
 
-            {files.length ? (
+            <InfoCard label="Ghi chú kết quả" value={result.note || 'Không có ghi chú thêm'} />
+
+            {files.length > 0 ? (
               <div className="space-y-2">
-                {files.map((file, index) => (
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Danh sách tệp đính kèm ({files.length}):</p>
+                {files.map((file) => (
                   <button
-                    key={file.id || `${file.originalName}-${index}`}
+                    key={file.id}
                     type="button"
-                    onClick={() => onOpenFile(file.id)}
-                    className="flex w-full items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 text-left text-xs font-bold text-slate-800 border border-slate-200/80 hover:bg-emerald-50 hover:border-emerald-200 transition-all shadow-xs"
+                    onClick={() => onOpenFile(file.url)}
+                    className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white p-3 text-xs font-semibold text-slate-800 shadow-xs hover:border-emerald-300 hover:bg-emerald-50/40 transition-colors"
                   >
-                    <span className="min-w-0 truncate">{file.originalName || file.fileName || 'Tệp kết quả'}</span>
+                    <span className="truncate">{file.originalName || file.fileName}</span>
                     <span className="shrink-0 text-slate-400 font-medium flex items-center gap-1.5">
                       <Download className="w-3.5 h-3.5 text-emerald-600" />
                       {formatFileSize(file.size)}
@@ -279,7 +289,8 @@ function ResultModal({ result, onOpenFile, onClose }) {
           </section>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

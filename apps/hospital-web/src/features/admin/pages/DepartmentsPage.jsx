@@ -437,8 +437,9 @@ function DepartmentDetail({ department, staffs, onGoStaff, onClose }) {
   if (!department) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm" onClick={onClose}>
-      <aside className="flex max-h-[92vh] w-full max-w-[1280px] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose} />
+      <aside className="relative z-10 flex max-h-[92vh] w-full max-w-[1280px] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="shrink-0 border-b border-slate-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <p className="text-[11px] font-extrabold uppercase tracking-wider text-sky-600">Chi tiết phòng ban</p>
@@ -617,8 +618,9 @@ function DepartmentHistory({ departmentId }) {
 
 function DeleteDepartmentModal({ department, busy, onCancel, onConfirm }) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm" onClick={busy ? undefined : onCancel}>
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={busy ? undefined : onCancel} />
+      <div className="relative z-10 w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="border-b border-slate-100 p-6">
           <p className="text-xs font-bold uppercase tracking-wider text-rose-600">Cảnh báo xóa</p>
           <h3 className="mt-1 text-xl font-bold text-slate-900">Xóa phòng ban?</h3>
@@ -711,8 +713,9 @@ function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing, stru
   if (typeof document === 'undefined' || !document.body) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fadeIn">
-      <form onSubmit={handleSubmit} noValidate className="w-full max-w-xl rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fadeIn">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <form onSubmit={handleSubmit} noValidate className="relative z-10 w-full max-w-xl rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
         <div className="flex items-start justify-between">
           <div>
             <h3 className="text-2xl font-bold text-slate-900">{editing ? 'Cập nhật phòng ban' : 'Tạo phòng ban'}</h3>

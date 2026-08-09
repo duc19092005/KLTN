@@ -6,11 +6,11 @@ import { CreateMedicalResultDto } from '../../dto/medical-order.dto';
 import {
   buildMedicalOrderStatusAuditSnapshot,
   buildMedicalResultAuditSnapshot,
-  buildVisitStatusAuditSnapshot,
 } from '../../domain/medical-result-audit-snapshot';
 import { MedicalOrderAccessPolicy } from '../policies/medical-order-access.policy';
 import { MEDICAL_ORDER_REPOSITORY, MedicalOrderRepositoryPort } from '../ports/medical-order.repository.port';
 import { NotificationService } from '../../../notification/services/notification.service';
+import { buildVisitSnapshot } from '../../../visit/domain/visit-snapshot';
 
 /**
  * LAB_MANAGER returns a result for an order in their department during an
@@ -107,15 +107,14 @@ export class CreateMedicalResultUseCase {
         );
 
         if (visitTransition) {
-          const visitSnapshot = buildVisitStatusAuditSnapshot(visitTransition.visitId, visitTransition.status);
           await this.audit.recordV2(
             {
               entity: 'Visit',
-              entityId: visitTransition.visitId,
+              entityId: visitTransition.visit.id,
               action: 'UPDATE',
               actorId: user.sub,
-              before: { visitId: visitTransition.visitId, status: order.status },
-              after: visitSnapshot,
+              before: { visitId: visitTransition.visit.id, status: visitTransition.previousStatus },
+              after: buildVisitSnapshot(visitTransition.visit),
               metadata: { schema: 'KLTN_VISIT_STATUS_AUDIT_V2' },
               onChainStatus: 'PENDING',
             },

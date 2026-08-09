@@ -592,8 +592,9 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
   if (typeof document === 'undefined' || !document.body) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fadeIn">
-      <form onSubmit={handleSubmit} className="w-full max-w-[1280px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fadeIn">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <form onSubmit={handleSubmit} className="relative z-10 w-full max-w-[1280px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
         <div className="flex justify-between gap-4">
           <div>
             <h3 className="text-2xl font-bold text-slate-900">{isCreate ? 'Thêm bác sĩ' : 'Cập nhật bác sĩ'}</h3>

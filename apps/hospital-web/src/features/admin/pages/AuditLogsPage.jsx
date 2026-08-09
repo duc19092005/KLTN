@@ -842,9 +842,10 @@ function LogDetailModal({ summaryLog, onClose, onProof, onRecoverBatch, onOpenBa
   if (typeof document === 'undefined' || !document.body) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm outline-none animate-fadeIn" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 outline-none animate-fadeIn">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div
-        className="relative flex flex-col w-full max-w-4xl max-h-[90vh] bg-white rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden text-slate-800 outline-none"
+        className="relative z-10 flex flex-col w-full max-w-4xl max-h-[90vh] bg-white rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden text-slate-800 outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between border-b border-slate-100 p-6">
@@ -1032,8 +1033,9 @@ function RecoveryReasonModal({ batch, reason, setReason, onClose, onContinue }) 
   if (typeof document === 'undefined' || !document.body) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm outline-none animate-fadeIn" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200/80 outline-none" onClick={(event) => event.stopPropagation()}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 outline-none animate-fadeIn">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200/80 outline-none" onClick={(event) => event.stopPropagation()}>
         <div className="border-b border-slate-100 p-6">
           <h3 className="text-xl font-bold text-slate-900">Khôi phục audit batch #{batch.batchId}</h3>
           <p className="mt-1 text-xs font-semibold text-slate-400">Thao tác sẽ tải artifact IPFS, đối chiếu blockchain và phục hồi khi mọi hash khớp.</p>
@@ -1223,9 +1225,10 @@ function BatchDetailDrawer({ loading, detail, recoveringBatchId, onClose, onReco
   if (typeof document === 'undefined' || !document.body) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex justify-end bg-black/50 backdrop-blur-sm outline-none border-none animate-fadeIn" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex justify-end outline-none border-none animate-fadeIn">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div
-        className="flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl border-none outline-none"
+        className="relative z-10 flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl border-none outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 p-6">
@@ -1498,9 +1501,10 @@ function ProofModal({ proof, onClose }) {
   if (typeof document === 'undefined' || !document.body) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fadeIn" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fadeIn">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div
-        className="flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white text-slate-800 shadow-2xl outline-none"
+        className="relative z-10 flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white text-slate-800 shadow-2xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between border-b border-slate-100 p-6">

@@ -36,4 +36,5 @@ Tài liệu dự án được sắp xếp tập trung theo ứng dụng và chuy
 - [Tổng quan dự án tiếng Anh (English overview)](translations/README.en.md)
 - [Tổng quan dự án tiếng Nga (Russian overview)](translations/README.ru.md)
 - [Thuật toán kiểm toán Merkle (Audit Algorithm)](architecture/audit-algorithm.md)
+- [ERD & từ điển dữ liệu PostgreSQL](erd/README.md)
 - [Quy trình triển khai Production](operations/deployment.md)

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Download, FileText, Printer, Stethoscope, Search, RefreshCw, CheckCircle2, Clock, Activity, AlertCircle, Sparkles, User, Building2, ChevronRight, X, UserCheck, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
@@ -346,27 +347,53 @@ export default function DoctorQueuePage() {
     if (!activeVisit) return;
     setBusy(true);
     try {
-      await clinicalDecisionService.createConclusion({ ...conclusionForm, visitId: activeVisit.id, aiDiagnosisId: selectedAiId || undefined });
+      const res = await clinicalDecisionService.createConclusion({ ...conclusionForm, visitId: activeVisit.id, aiDiagnosisId: selectedAiId || undefined });
       toast.success('Đã đóng hồ sơ bệnh án và hoàn tất lượt khám của bệnh nhân.');
       setShowWorkflowModal(false);
 
-      const activeDiag = decision?.aiDiagnoses?.find((d) => d.id === selectedAiId);
-      if (activeDiag?.aiModel) {
-        setRatingModelId(activeDiag.aiModel.id);
-        setRatingModelName(activeDiag.aiModel.modelName || activeDiag.aiModel.name || 'Mô hình AI');
+      // Resolve the AI diagnosis used for this conclusion. createConclusion
+      // returns conclusion.aiDiagnosis (single); getVisitResults returns an
+      // aiDiagnoses array. Prefer the selected one, fall back to latest.
+      const concluded = res?.data || (await loadDecisionData(activeVisit.id)) || {};
+      const usedDiagnosis =
+        concluded?.aiDiagnosis ||
+        concluded?.aiDiagnoses?.find((d) => d.id === selectedAiId) ||
+        concluded?.aiDiagnoses?.[0];
+      const usedModel = usedDiagnosis?.aiModel;
+
+      // Always reload visits and decision state immediately so status updates back cleanly
+      await Promise.all([
+        loadVisits(),
+        loadDecision(activeVisit.id),
+      ]);
+
+      if (usedModel) {
+        setRatingModelId(usedModel.id);
+        setRatingModelName(usedModel.modelName || usedModel.name || 'Mô hình AI');
         setShowRatingPopup(true);
         setCountdown(10);
         setRatingSelected(null);
         setRatingFeedback('');
         setPauseCountdown(false);
-      } else {
-        await loadVisits();
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Không lưu được kết luận cuối');
-      await loadVisits();
+      await Promise.all([
+        loadVisits(),
+        loadDecision(activeVisit.id),
+      ]);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const loadDecisionData = async (visitId) => {
+    if (!visitId) return null;
+    try {
+      const res = await clinicalDecisionService.getVisitResults(visitId);
+      return res.data;
+    } catch {
+      return null;
     }
   };
 
@@ -482,9 +509,10 @@ export default function DoctorQueuePage() {
         )}
 
         {/* AI RATING POPUP */}
-        {showRatingPopup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs animate-fadeIn p-4">
-            <div className="w-full max-w-md rounded-3xl border border-slate-200/80 bg-white p-6 shadow-2xl space-y-6">
+        {showRatingPopup && createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs animate-fadeIn" />
+            <div className="relative z-10 w-full max-w-md rounded-3xl border border-slate-200/80 bg-white p-6 shadow-2xl space-y-6">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] uppercase tracking-widest font-black text-sky-600 bg-sky-50 px-2.5 py-1 rounded-md border border-sky-100">
                   Đánh giá Mô hình AI
@@ -579,7 +607,8 @@ export default function DoctorQueuePage() {
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </DashboardLayout>
@@ -822,9 +851,10 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
 
   const currentStep = steps.find((item) => item.step === activeStep) || steps[0];
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 animate-fadeIn antialiased">
-      <div className="flex max-h-[92vh] w-full max-w-[1320px] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 antialiased">
+      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs animate-fadeIn" />
+      <div className="relative z-10 flex max-h-[92vh] w-full max-w-[1320px] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
         {/* MODAL HEADER */}
         <div className="shrink-0 border-b border-slate-100 px-6 py-5 bg-white">
           <div className="flex items-center justify-between gap-4">

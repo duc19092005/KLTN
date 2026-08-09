@@ -32,6 +32,14 @@ export class RateAiModelUseCase {
     if (!diagnosis || diagnosis.aiModelId !== aiModelId || diagnosis.reviewedByDoctorId !== doctorId || !diagnosis.visitId) {
       throw new BadRequestException('Chỉ được đánh giá kết quả AI mà bác sĩ đã sử dụng và xác nhận trong lượt khám của mình.');
     }
+
+    const conclusionRecord = await this.prisma.medicalConclusion.findUnique({
+      where: { visitId: diagnosis.visitId },
+    });
+    if (!conclusionRecord) {
+      throw new BadRequestException('Chỉ được đánh giá mô hình AI sau khi bác sĩ đã hoàn tất kết luận y tế cho ca khám.');
+    }
+
     const existingRating = await this.prisma.aiQuality.findUnique({ where: { aiDiagnosisId } });
     if (existingRating) throw new BadRequestException('Kết quả AI này đã được đánh giá.');
 
@@ -49,10 +57,11 @@ export class RateAiModelUseCase {
       },
     });
 
-    // 4. Compute tamper-evidence hash
+    // 4. Compute tamper-evidence hash — snapshot MUST include every business field (logs = entity)
     const snapshot = {
       doctorId: aiQuality.doctorId,
       aiModelId: aiQuality.aiModelId,
+      aiDiagnosisId: aiQuality.aiDiagnosisId,
       doctorConclusionAboutModel: aiQuality.doctorConclusionAboutModel,
       trustablePercent: aiQuality.trustablePercent,
     };

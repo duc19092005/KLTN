@@ -5,6 +5,7 @@ import { MEDICAL_ORDER_REPOSITORY, MedicalOrderRepositoryPort } from '../ports/m
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { NotificationService } from '../../../notification/services/notification.service';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { buildVisitSnapshot } from '../../../visit/domain/visit-snapshot';
 
 /**
  * Doctor creates a lab/imaging order for a visit in their examination
@@ -57,7 +58,7 @@ export class CreateMedicalOrderUseCase {
         priority: dto.priority?.trim() || 'NORMAL',
         clinicalNote: dto.clinicalNote?.trim() || undefined,
       },
-      async (order, tx) => {
+      async (order, visitAfter, tx) => {
         await this.audit.recordV2({
           entity: 'MedicalOrder',
           entityId: order.id,
@@ -68,13 +69,26 @@ export class CreateMedicalOrderUseCase {
             orderId: order.id,
             orderCode: order.orderCode,
             visitId: order.visitId,
+            patientId: order.patientId,
             doctorId: order.doctorId,
             targetDepartmentId: order.targetDepartmentId,
             orderType: order.orderType,
             priority: order.priority,
             status: order.status,
+            clinicalNote: order.clinicalNote ?? null,
           },
           metadata: { schema: 'KLTN_MEDICAL_ORDER_CREATE_AUDIT_V2' },
+          onChainStatus: 'PENDING',
+        }, tx);
+
+        await this.audit.recordV2({
+          entity: 'Visit',
+          entityId: visitAfter.id,
+          action: 'UPDATE',
+          actorId: doctorUserId,
+          before: { visitId: visitAfter.id, status: visit.status },
+          after: buildVisitSnapshot(visitAfter),
+          metadata: { schema: 'KLTN_VISIT_STATUS_AUDIT_V2' },
           onChainStatus: 'PENDING',
         }, tx);
       },
