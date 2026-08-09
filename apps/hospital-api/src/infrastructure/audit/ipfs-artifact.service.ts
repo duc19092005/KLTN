@@ -50,22 +50,26 @@ export class IpfsArtifactService {
     const maxBytes = Number(process.env.AUDIT_RECOVERY_MAX_ARTIFACT_BYTES ?? 25 * 1024 * 1024);
 
     let response: Response;
-    if (provider === 'pinata') {
-      const gateway = this.pinataGatewayUrl();
-      response = await fetch(`${gateway}/ipfs/${encodeURIComponent(cid)}`, {
-        headers: this.authHeadersFromValue(process.env.IPFS_GATEWAY_AUTHORIZATION || process.env.PINATA_GATEWAY_AUTHORIZATION),
-      });
-    } else {
-      const gateway = process.env.IPFS_GATEWAY_URL?.trim().replace(/\/$/, '');
-      const apiUrl = this.requiredApiUrl('IPFS_API_URL');
-      response = gateway
-        ? await fetch(`${gateway}/ipfs/${encodeURIComponent(cid)}`, {
-            headers: this.authHeadersFromValue(process.env.IPFS_GATEWAY_AUTHORIZATION),
-          })
-        : await fetch(`${apiUrl}/api/v0/cat?arg=${encodeURIComponent(cid)}`, {
-            method: 'POST',
-            headers: this.authHeadersFromValue(process.env.IPFS_API_AUTHORIZATION),
-          });
+    try {
+      if (provider === 'pinata') {
+        const gateway = this.pinataGatewayUrl();
+        response = await fetch(`${gateway}/ipfs/${encodeURIComponent(cid)}`, {
+          headers: this.authHeadersFromValue(process.env.IPFS_GATEWAY_AUTHORIZATION || process.env.PINATA_GATEWAY_AUTHORIZATION),
+        });
+      } else {
+        const gateway = process.env.IPFS_GATEWAY_URL?.trim().replace(/\/$/, '');
+        const apiUrl = this.requiredApiUrl('IPFS_API_URL');
+        response = gateway
+          ? await fetch(`${gateway}/ipfs/${encodeURIComponent(cid)}`, {
+              headers: this.authHeadersFromValue(process.env.IPFS_GATEWAY_AUTHORIZATION),
+            })
+          : await fetch(`${apiUrl}/api/v0/cat?arg=${encodeURIComponent(cid)}`, {
+              method: 'POST',
+              headers: this.authHeadersFromValue(process.env.IPFS_API_AUTHORIZATION),
+            });
+      }
+    } catch (error) {
+      throw new Error(`Không thể kết nối tới IPFS node/gateway để tải bản sao lưu (lỗi kết nối mạng: ${error instanceof Error ? error.message : String(error)}). Vui lòng kiểm tra dịch vụ IPFS.`);
     }
 
     if (!response.ok) throw new Error(`IPFS download failed with HTTP ${response.status}.`);
