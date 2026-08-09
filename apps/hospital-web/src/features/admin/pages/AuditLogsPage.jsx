@@ -87,7 +87,7 @@ function canRecoverBatch(batch) {
   if (!batch) return false;
   if (batch.status !== 'ANCHORED' || !batch.artifactAvailable) return false;
   const integrity = batch.integrity || {};
-  return integrity.status === 'TAMPERED' || Number(integrity.tampered) > 0;
+  return integrity.status === 'TAMPERED' || integrity.status === 'PENDING' || Number(integrity.tampered) > 0 || Number(integrity.pending) > 0;
 }
 
 function recoverBatchDisabledReason(batch) {
@@ -95,8 +95,7 @@ function recoverBatchDisabledReason(batch) {
   if (batch.status !== 'ANCHORED') return 'Chỉ khôi phục lô đã neo on-chain.';
   if (!batch.artifactAvailable) return 'Lô không có artifact IPFS để khôi phục.';
   const integrity = batch.integrity || {};
-  if (integrity.status === 'TAMPERED' || Number(integrity.tampered) > 0) return '';
-  if (integrity.status === 'PENDING') return 'Lô thiếu field hash — không mở khôi phục (chưa kết luận bị sửa).';
+  if (integrity.status === 'TAMPERED' || integrity.status === 'PENDING' || Number(integrity.tampered) > 0 || Number(integrity.pending) > 0) return '';
   return 'Lô đang toàn vẹn — không cần khôi phục.';
 }
 
