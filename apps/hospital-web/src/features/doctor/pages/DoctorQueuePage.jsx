@@ -946,7 +946,8 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1299,8 +1300,7 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
       ) : (
         <Empty title="Chưa có bản phân tích AI" desc="Chọn mô hình AI và bấm 'Chạy mô hình AI' để tạo phân tích đầu tiên." />
       )}
-    </div>,
-    document.body
+    </div>
   );
 }
 
