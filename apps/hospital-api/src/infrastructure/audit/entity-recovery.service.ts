@@ -170,12 +170,11 @@ export class EntityRecoveryService {
       if (!latest.has(key)) latest.set(key, row);
     }
 
-    const warnings: EntityIntegrityWarning[] = [];
     const recreationCache = this.recreation?.createBundleCache();
-    for (const row of latest.values()) {
-      const warning = await this.evaluateRow(row, recreationCache);
-      if (warning) warnings.push(warning);
-    }
+    const evaluated = await Promise.all(
+      Array.from(latest.values()).map((row) => this.evaluateRow(row, recreationCache)),
+    );
+    const warnings = evaluated.filter((warning): warning is EntityIntegrityWarning => warning !== null);
 
     return { items: warnings, total: warnings.length };
   }

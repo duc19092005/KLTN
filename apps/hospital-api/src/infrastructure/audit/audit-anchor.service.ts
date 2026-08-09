@@ -39,6 +39,7 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
   private readonly maxLeaves = Number(process.env.AUDIT_BATCH_MAX_LEAVES ?? 500);
   private readonly merkleAlgorithm = MERKLE_SHA256_BYTES32_V2;
   private readonly contractVersion = 'AUDIT_ANCHOR_CHECKPOINT_V2';
+  private readonly onChainRootCache = new Map<number, string>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -653,7 +654,13 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
     const algorithm = batch?.algorithmVersion ?? MERKLE_SHA256_STRING_V1;
     const proof = buildMerkleProofForAlgorithm(entryHashes, index, algorithm);
     const merkleRoot = computeMerkleRootForAlgorithm(entryHashes, algorithm);
-    const onChainRoot = await this.blockchain.getAuditRoot(log.batchId);
+    let onChainRoot = this.onChainRootCache.get(log.batchId) ?? null;
+    if (!onChainRoot) {
+      onChainRoot = await this.blockchain.getAuditRoot(log.batchId);
+      if (onChainRoot) {
+        this.onChainRootCache.set(log.batchId, onChainRoot);
+      }
+    }
     const verified =
       verifyMerkleProofForAlgorithm(log.entryHash, proof, merkleRoot, algorithm) &&
       onChainRoot != null &&
