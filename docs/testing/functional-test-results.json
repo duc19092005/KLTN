@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-09T07:25:30.963Z",
+  "generatedAt": "2026-08-09T09:11:05.452Z",
   "environment": "local-test",
   "testCommand": "npm run test:functional",
   "expectedCaseCount": 125,
