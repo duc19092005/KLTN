@@ -524,10 +524,10 @@ export class EntityRecoveryService {
     if (entity === 'MedicalResult') {
       const row = await client.medicalResult.findUnique({
         where: { id: entityId },
-        include: { files: true, order: { select: { visitId: true } } },
+        include: { files: true, order: { select: { visitId: true, status: true } } },
       });
       if (!row) return null;
-      return buildMedicalResultSnapshot({ ...row, visitId: row.order?.visitId ?? null });
+      return buildMedicalResultSnapshot(row);
     }
     if (entity === 'Appointment') {
       const row = await client.appointment.findUnique({

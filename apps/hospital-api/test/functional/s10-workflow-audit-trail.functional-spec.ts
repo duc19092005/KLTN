@@ -803,6 +803,15 @@ describe('S10 Workflow audit trail — mỗi giai đoạn phải ghi log đúng 
     expect(anchoredRows.length).toBeGreaterThan(0);
     expect(anchoredRows.every((row) => row.onChainStatus === 'ANCHORED')).toBe(true);
 
+    // BẮT BUỘC: Gọi HTTP GET /api/audit/recovery/entities/warnings kiểm tra API báo KHÔNG CÓ LỖI / TAMPERED
+    const warningsResp = await request(functional.app.getHttpServer())
+      .get('/api/audit/recovery/entities/warnings')
+      .set(bearer(adminToken))
+      .expect(200);
+    const warnings = unwrap<{ items: Array<{ entity: string; entityId: string; status: string }> }>(warningsResp.body);
+    const workflowWarnings = warnings.items.filter((item) => workflowEntityIds.includes(item.entityId));
+    expect(workflowWarnings).toHaveLength(0);
+
     // Không được có bản ghi khôi phục nào được tạo ra (dữ liệu hoàn toàn toàn vẹn)
     await expect(functional.prisma.auditRecovery.count()).resolves.toBe(0);
   });
