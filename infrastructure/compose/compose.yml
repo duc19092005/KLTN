@@ -18,6 +18,20 @@ services:
       retries: 20
 
 
+  redis:
+    image: redis:7-alpine
+    container_name: admin-auth-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build:
       context: ../../apps/hospital-api
@@ -33,6 +47,8 @@ services:
     # Docker-only overrides. Secrets and app config stay in apps/hospital-api/.env.
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-change-me-local-only}@db:5432/${POSTGRES_DB:-zkp_identity}?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       FRONTEND_ORIGIN: http://localhost:5173,http://localhost:8081
       NODE_ENV: development
       PORT: 3001
@@ -42,6 +58,8 @@ services:
     command: sh -c "until nc -z db 5432; do echo 'Waiting for PostgreSQL...'; sleep 2; done; sleep 6; npx prisma generate; npx prisma db push; npm run start:dev"
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   frontend:
@@ -69,3 +87,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:

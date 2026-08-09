@@ -57,7 +57,6 @@ describeIntegration('Audit tamper and recovery integration', () => {
   beforeEach(async () => {
     await prisma.$executeRawUnsafe(`
       TRUNCATE TABLE
-        "AuditRecoveryStageRow",
         "AuditRecovery",
         "BlockchainLogger",
         "AuditBatch",

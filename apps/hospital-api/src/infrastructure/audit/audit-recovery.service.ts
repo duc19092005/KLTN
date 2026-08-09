@@ -141,15 +141,6 @@ export class AuditRecoveryService {
       }
 
       await this.prisma.$transaction(async (tx) => {
-        await tx.auditRecoveryStageRow.createMany({
-          data: bundle.logs.map((row) => ({
-            recoveryId: recovery.id,
-            seq: row.seq,
-            entryHash: row.entryHash,
-            payload: row as unknown as Prisma.InputJsonValue,
-          })),
-        });
-
         await tx.$executeRaw`SELECT set_config('app.audit_recovery_authorized', 'true', true)`;
         await tx.blockchainLogger.deleteMany({
           where: { seq: { gte: bundle.batch.fromSeq, lte: bundle.batch.toSeq } },
@@ -185,7 +176,6 @@ export class AuditRecoveryService {
             completedAt: new Date(),
           },
         });
-        await tx.auditRecoveryStageRow.deleteMany({ where: { recoveryId: recovery.id } });
       });
 
       const verified = await this.anchor.verifyAllAnchoredBatchesAgainstChain();

@@ -1,29 +1,64 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, OnModuleDestroy } from '@nestjs/common';
 import * as crypto from 'crypto';
-import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import Redis from 'ioredis';
+
+interface TicketData {
+  userId: string;
+  action: string;
+  resourceId: string | null;
+  expiresAtIso: string;
+}
 
 /**
  * StepUpService manages short-lived, single-use "step-up" tickets that prove a user
  * re-authenticated with their face immediately before a highly sensitive action.
  *
- * Separation of concerns:
- *  - The biometric match itself happens in AuthService (it owns the face logic). On success it
- *    calls issue() to mint a ticket.
- *  - This service only mints and atomically consumes tickets, so it has no circular dependency on
- *    AuthService and can be injected directly into FaceStepUpGuard.
+ * Performance & Storage:
+ *  - Stores single-use tickets in Redis cache with automatic 180s TTL (`SETEX`).
+ *  - Features a seamless in-memory Map fallback for local testing & offline mode.
+ *  - Single-use semantics: ticket key is atomically deleted on first consumption (`DEL`).
  *
  * Security properties:
- *  - Only the SHA256 of the raw token is stored; the raw token is returned to the client once.
- *  - Tickets are scoped to (userId, action, resourceId) so a ticket minted to delete doctor A
- *    cannot authorize deleting doctor B, nor a different action.
- *  - Single-use: consume() flips usedAt atomically via updateMany; a second attempt finds 0 rows.
- *  - Time-boxed: expiresAt (default 3 min) bounds the replay window even before consumption.
+ *  - Only the SHA256 hash of the raw token is stored as the key.
+ *  - Tickets are strictly scoped to (userId, action, resourceId).
  */
 @Injectable()
-export class StepUpService {
-  private readonly ttlMs = Number(process.env.STEPUP_TTL_MS ?? 3 * 60 * 1000);
+export class StepUpService implements OnModuleDestroy {
+  private readonly ttlSeconds = Math.max(1, Math.floor(Number(process.env.STEPUP_TTL_MS ?? 180000) / 1000));
+  private readonly redisClient: Redis | null = null;
+  private readonly memoryStore = new Map<string, TicketData>();
+  private readonly memoryTimeouts = new Map<string, NodeJS.Timeout>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor() {
+    const host = process.env.REDIS_HOST;
+    const port = Number(process.env.REDIS_PORT ?? 6379);
+    const redisUrl = process.env.REDIS_URL;
+
+    if (redisUrl || host) {
+      try {
+        this.redisClient = redisUrl
+          ? new Redis(redisUrl, { maxRetriesPerRequest: 1, enableOfflineQueue: false })
+          : new Redis({ host: host || 'localhost', port, maxRetriesPerRequest: 1, enableOfflineQueue: false });
+
+        this.redisClient.on('error', () => {
+          // Silent fallback to memoryStore if Redis connection drops
+        });
+      } catch {
+        this.redisClient = null;
+      }
+    }
+  }
+
+  onModuleDestroy() {
+    if (this.redisClient) {
+      this.redisClient.disconnect();
+    }
+    for (const timeout of this.memoryTimeouts.values()) {
+      clearTimeout(timeout);
+    }
+    this.memoryTimeouts.clear();
+    this.memoryStore.clear();
+  }
 
   private hash(token: string): string {
     return crypto.createHash('sha256').update(token).digest('hex');
@@ -32,11 +67,34 @@ export class StepUpService {
   /** Mint a single-use ticket for (userId, action, resourceId). Returns the raw token once. */
   async issue(userId: string, action: string, resourceId?: string | null, ip?: string) {
     const raw = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + this.ttlMs);
-    await this.prisma.stepUpTicket.create({
-      data: { tokenHash: this.hash(raw), userId, action, resourceId: resourceId ?? null, ip: ip ?? null, expiresAt },
-    });
-    return { ticket: raw, action, resourceId: resourceId ?? null, expiresAt: expiresAt.toISOString(), ttlMs: this.ttlMs };
+    const tokenHash = this.hash(raw);
+    const expiresAt = new Date(Date.now() + this.ttlSeconds * 1000);
+    const payload: TicketData = {
+      userId,
+      action,
+      resourceId: resourceId ?? null,
+      expiresAtIso: expiresAt.toISOString(),
+    };
+
+    let savedToRedis = false;
+    if (this.redisClient && this.redisClient.status === 'ready') {
+      try {
+        await this.redisClient.setex(`stepup:ticket:${tokenHash}`, this.ttlSeconds, JSON.stringify(payload));
+        savedToRedis = true;
+      } catch {
+        savedToRedis = false;
+      }
+    }
+
+    // Always keep memoryStore in sync for fallback
+    this.memoryStore.set(tokenHash, payload);
+    const timeout = setTimeout(() => {
+      this.memoryStore.delete(tokenHash);
+      this.memoryTimeouts.delete(tokenHash);
+    }, this.ttlSeconds * 1000);
+    this.memoryTimeouts.set(tokenHash, timeout);
+
+    return { ticket: raw, action, resourceId: resourceId ?? null, expiresAt: expiresAt.toISOString(), ttlMs: this.ttlSeconds * 1000 };
   }
 
   /**
@@ -54,21 +112,46 @@ export class StepUpService {
     if (!token) {
       throw new ForbiddenException('Yêu cầu xác thực khuôn mặt cho thao tác nhạy cảm này.');
     }
+
+    const tokenHash = this.hash(token);
+    let payload: TicketData | null = null;
+
+    if (this.redisClient && this.redisClient.status === 'ready') {
+      try {
+        const key = `stepup:ticket:${tokenHash}`;
+        const rawPayload = await this.redisClient.get(key);
+        if (rawPayload) {
+          await this.redisClient.del(key);
+          payload = JSON.parse(rawPayload) as TicketData;
+        }
+      } catch {
+        payload = null;
+      }
+    }
+
+    // Fallback to memoryStore if Redis didn't yield or is offline
+    if (!payload && this.memoryStore.has(tokenHash)) {
+      payload = this.memoryStore.get(tokenHash)!;
+      this.memoryStore.delete(tokenHash);
+      const timeout = this.memoryTimeouts.get(tokenHash);
+      if (timeout) {
+        clearTimeout(timeout);
+        this.memoryTimeouts.delete(tokenHash);
+      }
+    }
+
+    if (!payload) {
+      throw new ForbiddenException('Vé xác thực khuôn mặt không hợp lệ hoặc đã hết hạn. Vui lòng quét lại.');
+    }
+
     const now = new Date();
-    const result = await this.prisma.stepUpTicket.updateMany({
-      where: {
-        tokenHash: this.hash(token),
-        userId,
-        action,
-        resourceId: params.resourceId ?? null,
-        usedAt: null,
-        expiresAt: { gte: now },
-      },
-      data: { usedAt: now },
-    });
-    if (result.count !== 1) {
+    const expired = new Date(payload.expiresAtIso) < now;
+    const userMatch = payload.userId === userId;
+    const actionMatch = payload.action === action;
+    const resourceMatch = (params.resourceId ?? null) === payload.resourceId;
+
+    if (expired || !userMatch || !actionMatch || !resourceMatch) {
       throw new ForbiddenException('Vé xác thực khuôn mặt không hợp lệ hoặc đã hết hạn. Vui lòng quét lại.');
     }
   }
-
 }

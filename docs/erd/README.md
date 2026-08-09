@@ -499,35 +499,6 @@ Bằng chứng vận hành cho phiên phục hồi có kiểm soát khuôn mặt
 | 10 | `createdAt` | Mốc bắt đầu phục hồi | TIMESTAMP(3) | — | — | |
 | 11 | `completedAt` | Mốc kết thúc phục hồi | TIMESTAMP(3) | — | NULL khi chưa xong | |
 
-### `AuditRecoveryStageRow` — dòng staging phục hồi đã xác thực
-
-Bảng tạm (ephemeral) chứa các dòng đã kiểm chứng trong cùng giao dịch phục hồi, trước khi thay thế vào `BlockchainLogger` — dùng để vượt ràng buộc append-only trigger một cách nguyên tử.
-
-| STT | Thuộc tính | Diễn giải | Kiểu dữ liệu | Chiều dài | Miền giá trị | Ghi chú |
-|---:|---|---|---|---|---|---|
-| 1 | `id` | Định danh dòng staging | TEXT | Không giới hạn | UUID | PK, NN |
-| 2 | `recoveryId` | Phiên phục hồi sở hữu dòng | TEXT | Không giới hạn | FK → AuditRecovery.id, NN | CASCADE |
-| 3 | `seq` | Sequence của log đã kiểm chứng | INTEGER | — | — | UQ ghép (recoveryId, seq) |
-| 4 | `entryHash` | Hash log đã kiểm chứng | TEXT | Không giới hạn | NN | |
-| 5 | `payload` | Snapshot tạm của dòng log | JSON | — | NN | |
-| 6 | `createdAt` | Mốc tạo dòng staging | TIMESTAMP(3) | — | — | |
-
-### `StepUpTicket` — vé xác thực tăng cường (step-up)
-
-Bằng chứng ngắn hạn, dùng một lần rằng người dùng vừa xác thực khuôn mặt ngay trước thao tác nhạy cảm. Chỉ lưu SHA-256 của token thô; token trả client đúng một lần.
-
-| STT | Thuộc tính | Diễn giải | Kiểu dữ liệu | Chiều dài | Miền giá trị | Ghi chú |
-|---:|---|---|---|---|---|---|
-| 1 | `id` | Định danh vé | TEXT | Không giới hạn | UUID | PK, NN |
-| 2 | `tokenHash` | SHA-256 của token thô; token thô không bao giờ lưu DB | TEXT | Không giới hạn | UQ | UQ, bảo mật |
-| 3 | `userId` | Người dùng được cấp vé | TEXT | Không giới hạn | FK → User.id, NN | FK |
-| 4 | `action` | Scope hành động nhạy cảm (RECOVER_AUDIT_BATCH...) | TEXT | Không giới hạn | NN | |
-| 5 | `resourceId` | Gắn vé với một tài nguyên cụ thể | TEXT | Không giới hạn | NULL | |
-| 6 | `ip` | IP nơi cấp vé (vết điều tra) | TEXT | Không giới hạn | NULL | |
-| 7 | `expiresAt` | Hết hạn sau vài phút (mặc định 3 phút) | TIMESTAMP(3) | — | NN | |
-| 8 | `usedAt` | Mốc dùng vé; set khi consume → single-use | TIMESTAMP(3) | — | NULL trước khi dùng | |
-| 9 | `createdAt` | Mốc tạo vé | TIMESTAMP(3) | — | — | |
-
 ---
 
 ## 6. Thông báo
@@ -572,11 +543,11 @@ Các bảng sau **vẫn còn model trong `schema.prisma` và code nhưng đã ng
 | MedicalOrder | visitId, patientId, doctorId, targetDepartmentId | Visit, Patient, DoctorProfile, Department | N–1 | NO ACTION |
 | MedicalResult / MedicalResultFile | orderId / resultId | MedicalOrder / MedicalResult | N–1 | CASCADE chỉ result file |
 | AiDiagnosis / MedicalConclusion / AiQuality | các FK AI/clinical | Model, Patient, Visit, Doctor | N–1; conclusion 1–1 visit; quality 0–1 diagnosis | NO ACTION |
-| BlockchainLogger / AuditRecovery / StageRow | batch/entity/recovery FK | AuditBatch và thực thể audit | N–1 | RESTRICT, SET NULL, CASCADE theo schema |
-| StepUpTicket / Notification | userId | User | N–1 | CASCADE cho notification |
+| BlockchainLogger / AuditRecovery | batch/entity FK | AuditBatch và thực thể audit | N–1 | RESTRICT, SET NULL theo schema |
+| Notification | userId | User | N–1 | CASCADE cho notification |
 
 ## Phạm vi model đã đối chiếu
 
-Tài liệu đã đối chiếu đủ **22/22 model đang dùng** từ Prisma: `User`, `Department`, `StaffProfile`, `DoctorProfile`, `Patient`, `PatientAccess`, `AdminProfile`, `Visit`, `Appointment`, `MedicalOrder`, `MedicalResult`, `MedicalResultFile`, `AiModelRegistry`, `AiDiagnosis`, `MedicalConclusion`, `AiQuality`, `BlockchainLogger`, `AuditBatch`, `AuditRecovery`, `AuditRecoveryStageRow`, `StepUpTicket`, `Notification`.
+Tài liệu đã đối chiếu đủ **20/20 model đang dùng** từ Prisma: `User`, `Department`, `StaffProfile`, `DoctorProfile`, `Patient`, `PatientAccess`, `AdminProfile`, `Visit`, `Appointment`, `MedicalOrder`, `MedicalResult`, `MedicalResultFile`, `AiModelRegistry`, `AiDiagnosis`, `MedicalConclusion`, `AiQuality`, `BlockchainLogger`, `AuditBatch`, `AuditRecovery`, `Notification`.
 
 Đã loại khỏi tài liệu: `AuditLog`, `RefreshToken`, `OtpVerification` (giữ trong code, xem mục "Bảng đã ngừng dùng").
