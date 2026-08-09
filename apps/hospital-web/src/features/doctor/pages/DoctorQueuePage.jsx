@@ -851,6 +851,8 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
 
   const currentStep = steps.find((item) => item.step === activeStep) || steps[0];
 
+  if (typeof document === 'undefined' || !document.body) return null;
+
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 antialiased">
       <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs animate-fadeIn" />
@@ -1297,7 +1299,8 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
       ) : (
         <Empty title="Chưa có bản phân tích AI" desc="Chọn mô hình AI và bấm 'Chạy mô hình AI' để tạo phân tích đầu tiên." />
       )}
-    </div>
+    </div>,
+    document.body
   );
 }
 
