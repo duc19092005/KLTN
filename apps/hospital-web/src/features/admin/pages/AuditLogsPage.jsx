@@ -27,7 +27,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   History,
-  Activity
+  Activity,
+  Zap
 } from 'lucide-react';
 
 const ACTION_TONE = {
@@ -83,19 +84,33 @@ function shortHash(hash) {
   return `${clean.slice(0, 8)}…${clean.slice(-6)}`;
 }
 
-function canRecoverBatch(batch) {
+function canRecoverBatch(batch, chain) {
   if (!batch) return false;
   if (batch.status !== 'ANCHORED' || !batch.artifactAvailable) return false;
   const integrity = batch.integrity || {};
-  return integrity.status === 'TAMPERED' || integrity.status === 'PENDING' || Number(integrity.tampered) > 0 || Number(integrity.pending) > 0;
+  const isTamperedLocally = integrity.status === 'TAMPERED' || integrity.status === 'PENDING' || Number(integrity.tampered) > 0 || Number(integrity.pending) > 0;
+  if (isTamperedLocally) return true;
+  if (chain && !chain.ok && chain.brokenAtSeq != null) {
+    let targetSeq = chain.brokenAtSeq;
+    if (chain.reason) {
+      const match = chain.reason.match(/mong đợi (\d+)/i);
+      if (match && match[1]) targetSeq = parseInt(match[1], 10);
+    }
+    if (batch.fromSeq <= targetSeq && batch.toSeq >= targetSeq) {
+      return true;
+    }
+    if (batch.fromSeq <= chain.brokenAtSeq && batch.toSeq >= Math.max(1, targetSeq - 1)) {
+      return true;
+    }
+  }
+  return false;
 }
 
-function recoverBatchDisabledReason(batch) {
+function recoverBatchDisabledReason(batch, chain) {
   if (!batch) return 'Không có lô.';
   if (batch.status !== 'ANCHORED') return 'Chỉ khôi phục lô đã neo on-chain.';
   if (!batch.artifactAvailable) return 'Lô không có artifact IPFS để khôi phục.';
-  const integrity = batch.integrity || {};
-  if (integrity.status === 'TAMPERED' || integrity.status === 'PENDING' || Number(integrity.tampered) > 0 || Number(integrity.pending) > 0) return '';
+  if (canRecoverBatch(batch, chain)) return '';
   return 'Lô đang toàn vẹn — không cần khôi phục.';
 }
 
@@ -283,10 +298,18 @@ export default function AuditLogsPage() {
     };
   }, [batchesTotal, chain, pendingQueue.total]);
 
+  const [filterOnlyFaulty, setFilterOnlyFaulty] = useState(false);
+  const [quickRecovering, setQuickRecovering] = useState(false);
+  const [multiRecoveryProgress, setMultiRecoveryProgress] = useState(null);
+
   const filteredBatches = useMemo(() => {
-    if (!appliedQ) return batches;
+    let result = batches;
+    if (filterOnlyFaulty) {
+      result = result.filter((b) => canRecoverBatch(b, chain));
+    }
+    if (!appliedQ) return result;
     const q = appliedQ.toLowerCase();
-    return batches.filter((b) => {
+    return result.filter((b) => {
       const summaryText = (b.contentSummary || [])
         .flatMap((item) => [item.entity, ...(item.samples || [])])
         .join(' ')
@@ -295,7 +318,62 @@ export default function AuditLogsPage() {
         || summaryText.includes(q)
         || (b.merkleRoot || '').toLowerCase().includes(q);
     });
-  }, [batches, appliedQ]);
+  }, [batches, appliedQ, filterOnlyFaulty, chain]);
+
+  const handleQuickRecoverBatch = async (brokenSeq) => {
+    if (!brokenSeq) {
+      toast.info('Không có thông tin Sequence bị đứt gãy.');
+      return;
+    }
+    setQuickRecovering(true);
+    try {
+      let startSeq = brokenSeq;
+      let endSeq = brokenSeq;
+      if (chain?.reason) {
+        const match = chain.reason.match(/mong đợi (\d+)/i);
+        if (match && match[1]) {
+          startSeq = parseInt(match[1], 10);
+          endSeq = Math.max(startSeq, brokenSeq - 1);
+        }
+      }
+
+      const res = await auditService.batches({ limit: 200 });
+      const allBatches = res.data?.items || batches || [];
+
+      const affectedBatches = allBatches.filter(
+        (b) => b.fromSeq <= endSeq && b.toSeq >= startSeq
+      ).sort((a, b) => a.batchId - b.batchId);
+
+      if (affectedBatches.length > 0) {
+        const targetIds = affectedBatches.map((b) => b.batchId);
+        const firstBatch = affectedBatches[0];
+        setRecoveryTarget({
+          ...firstBatch,
+          batchIds: targetIds,
+        });
+        setRecoveryReason(
+          `[QUICK MULTI-RECOVER] Tự động khôi phục ${targetIds.length} lô (${targetIds.map((id) => `#${id}`).join(', ')}) do đứt gãy chuỗi Audit tại SEQ ${startSeq} -> ${endSeq}`
+        );
+        toast.info(
+          `Đã phát hiện ${targetIds.length} lô bị ảnh hưởng (${targetIds.map((id) => `#${id}`).join(', ')}). Vui lòng quét khuôn mặt để khôi phục toàn bộ.`
+        );
+      } else {
+        let fallback = allBatches.find((b) => b.fromSeq <= startSeq && b.toSeq >= startSeq)
+          || allBatches.find((b) => b.fromSeq <= brokenSeq && b.toSeq >= brokenSeq);
+        if (fallback) {
+          setRecoveryTarget(fallback);
+          setRecoveryReason(`[QUICK RECOVER] Khôi phục tự động lô #${fallback.batchId} do đứt gãy SEQ ${startSeq}`);
+          toast.info(`Đã xác định lô #${fallback.batchId}. Vui lòng quét khuôn mặt để khôi phục.`);
+        } else {
+          toast.error(`Không thể tự động tìm thấy các lô chứa SEQ ${startSeq} - ${endSeq}.`);
+        }
+      }
+    } catch (err) {
+      toast.error('Lỗi khi tìm kiếm các lô cần khôi phục: ' + (err.message || 'Lỗi hệ thống'));
+    } finally {
+      setQuickRecovering(false);
+    }
+  };
 
   const handleAnchorNow = async () => {
     setAnchoring(true);
@@ -328,11 +406,62 @@ export default function AuditLogsPage() {
   const handleRecoveryTicket = async (ticket) => {
     if (!recoveryTarget) return;
     setRecoveryFaceOpen(false);
-    setRecoveringBatchId(recoveryTarget.batchId);
+
+    const targetIds = Array.isArray(recoveryTarget.batchIds) && recoveryTarget.batchIds.length > 0
+      ? recoveryTarget.batchIds
+      : [recoveryTarget.batchId];
+
+    setMultiRecoveryProgress({
+      total: targetIds.length,
+      completed: 0,
+      percent: 0,
+      currentBatchId: targetIds[0],
+      batchIds: targetIds,
+      statusMap: targetIds.reduce((acc, id) => ({ ...acc, [id]: 'PENDING' }), {}),
+      done: false,
+      successCount: 0,
+    });
+
     try {
-      const res = await auditService.recoverBatch(recoveryTarget.batchId, recoveryReason.trim(), ticket);
-      const data = res.data || {};
-      toast.success(`Đã khôi phục batch #${data.batchId} (${data.restoredCount} audit logs).`);
+      let successCount = 0;
+      for (let i = 0; i < targetIds.length; i++) {
+        const bId = targetIds[i];
+        setRecoveringBatchId(bId);
+
+        setMultiRecoveryProgress((prev) => ({
+          ...prev,
+          currentBatchId: bId,
+          statusMap: { ...prev.statusMap, [bId]: 'RUNNING' },
+          percent: Math.round((i / targetIds.length) * 100),
+        }));
+
+        try {
+          await auditService.recoverBatch(bId, recoveryReason.trim(), ticket);
+          successCount++;
+          setMultiRecoveryProgress((prev) => ({
+            ...prev,
+            completed: i + 1,
+            percent: Math.round(((i + 1) / targetIds.length) * 100),
+            statusMap: { ...prev.statusMap, [bId]: 'SUCCESS' },
+            successCount,
+          }));
+        } catch (err) {
+          console.error(`Lỗi khôi phục lô #${bId}:`, err);
+          setMultiRecoveryProgress((prev) => ({
+            ...prev,
+            completed: i + 1,
+            percent: Math.round(((i + 1) / targetIds.length) * 100),
+            statusMap: { ...prev.statusMap, [bId]: 'FAILED' },
+          }));
+        }
+      }
+
+      setMultiRecoveryProgress((prev) => ({
+        ...prev,
+        percent: 100,
+        done: true,
+      }));
+
       setRecoveryTarget(null);
       setRecoveryReason('');
       await refreshAll();
@@ -386,7 +515,7 @@ export default function AuditLogsPage() {
       <div className="mx-auto max-w-7xl space-y-6 pb-10">
         <Hero onRefresh={refreshAll} onAnchor={handleAnchorNow} loading={loading} anchoring={anchoring} totalBatches={stats.batches} />
 
-        <ChainBanner chain={chain} loading={false} />
+        <ChainBanner chain={chain} loading={false} onQuickRecoverBatch={handleQuickRecoverBatch} quickRecovering={quickRecovering} />
 
         <EntityRecoveryPanel
           warnings={entityWarnings}
@@ -445,31 +574,46 @@ export default function AuditLogsPage() {
               Lọc
             </button>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Sắp xếp</span>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Sắp xếp</span>
+              <button
+                type="button"
+                onClick={() => setBatchSortBy('batchId')}
+                className={`rounded-xl border px-3.5 py-2 text-xs font-bold transition-all ${batchSortBy === 'batchId' ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-slate-200 bg-white text-slate-600'}`}
+              >
+                Theo số lô
+              </button>
+              <button
+                type="button"
+                onClick={() => setBatchSortBy('time')}
+                className={`rounded-xl border px-3.5 py-2 text-xs font-bold transition-all ${batchSortBy === 'time' ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-slate-200 bg-white text-slate-600'}`}
+              >
+                Theo thời gian
+              </button>
+              <button
+                type="button"
+                onClick={() => setBatchSortOrder((v) => (v === 'desc' ? 'asc' : 'desc'))}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-sky-50 hover:text-sky-700 transition-all"
+              >
+                {batchSortOrder === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />}
+                {batchSortBy === 'batchId'
+                  ? (batchSortOrder === 'desc' ? 'Số lô giảm dần' : 'Số lô tăng dần')
+                  : (batchSortOrder === 'desc' ? 'Mới nhất trước' : 'Cũ nhất trước')}
+              </button>
+            </div>
+
             <button
               type="button"
-              onClick={() => setBatchSortBy('batchId')}
-              className={`rounded-xl border px-3.5 py-2 text-xs font-bold transition-all ${batchSortBy === 'batchId' ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-slate-200 bg-white text-slate-600'}`}
+              onClick={() => setFilterOnlyFaulty((prev) => !prev)}
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-bold transition-all ${
+                filterOnlyFaulty
+                  ? 'border-rose-300 bg-rose-50 text-rose-700 ring-2 ring-rose-200/60'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              }`}
             >
-              Theo số lô
-            </button>
-            <button
-              type="button"
-              onClick={() => setBatchSortBy('time')}
-              className={`rounded-xl border px-3.5 py-2 text-xs font-bold transition-all ${batchSortBy === 'time' ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-slate-200 bg-white text-slate-600'}`}
-            >
-              Theo thời gian
-            </button>
-            <button
-              type="button"
-              onClick={() => setBatchSortOrder((v) => (v === 'desc' ? 'asc' : 'desc'))}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-sky-50 hover:text-sky-700 transition-all"
-            >
-              {batchSortOrder === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />}
-              {batchSortBy === 'batchId'
-                ? (batchSortOrder === 'desc' ? 'Số lô giảm dần' : 'Số lô tăng dần')
-                : (batchSortOrder === 'desc' ? 'Mới nhất trước' : 'Cũ nhất trước')}
+              <AlertTriangle className={`h-3.5 w-3.5 ${filterOnlyFaulty ? 'text-rose-600' : 'text-slate-400'}`} />
+              {filterOnlyFaulty ? 'Đang lọc: Chỉ hiện lô cần khôi phục' : 'Lọc lô cần khôi phục'}
             </button>
           </div>
           {appliedQ && (
@@ -492,6 +636,7 @@ export default function AuditLogsPage() {
             sortBy={batchSortBy}
             sortOrder={batchSortOrder}
             recoveringBatchId={recoveringBatchId}
+            chain={chain}
             onOpenDetail={openBatchDetail}
             onRecover={(batch) => { setRecoveryTarget(batch); setRecoveryReason(''); }}
             onPrev={() => setBatchesPage((v) => Math.max(1, v - 1))}
@@ -543,10 +688,21 @@ export default function AuditLogsPage() {
         <FaceStepUpModal
           action="RECOVER_AUDIT_BATCH"
           resourceId={String(recoveryTarget.batchId)}
-          title={`Quét khuôn mặt để khôi phục batch #${recoveryTarget.batchId}`}
+          title={
+            Array.isArray(recoveryTarget.batchIds) && recoveryTarget.batchIds.length > 1
+              ? `Quét khuôn mặt để khôi phục toàn bộ ${recoveryTarget.batchIds.length} lô audit (${recoveryTarget.batchIds.map((id) => `#${id}`).join(', ')})`
+              : `Quét khuôn mặt để khôi phục batch #${recoveryTarget.batchId}`
+          }
           description="Backend sẽ kiểm chứng blockchain và IPFS trước khi thay audit logs. Nội dung bệnh án không được hiển thị."
           onSuccess={handleRecoveryTicket}
           onClose={() => setRecoveryFaceOpen(false)}
+        />
+      )}
+
+      {multiRecoveryProgress && (
+        <MultiBatchRecoveryProgressModal
+          progress={multiRecoveryProgress}
+          onClose={() => setMultiRecoveryProgress(null)}
         />
       )}
     </DashboardLayout>
@@ -708,7 +864,102 @@ function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason,
   );
 }
 
-function ChainBanner({ chain, loading }) {
+function MultiBatchRecoveryProgressModal({ progress, onClose }) {
+  if (!progress) return null;
+  const { total, completed, percent, batchIds, statusMap, done, successCount } = progress;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-fadeIn">
+      <div className="w-full max-w-lg rounded-3xl border border-slate-200/80 bg-white p-6 shadow-2xl space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`p-3 rounded-2xl ${done ? 'bg-emerald-50 text-emerald-600' : 'bg-sky-50 text-sky-600'}`}>
+              {done ? <CheckCircle2 className="h-6 w-6" /> : <RefreshCw className="h-6 w-6 animate-spin" />}
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-slate-900">
+                {done ? 'Đã khôi phục hoàn tất 100%!' : 'Đang khôi phục tự động chuỗi Audit Logs'}
+              </h3>
+              <p className="text-xs font-semibold text-slate-500">
+                {done
+                  ? `Đã khôi phục thành công ${successCount}/${total} lô từ IPFS & Sepolia.`
+                  : `Đang đối chiếu và nạp lại dữ liệu (${completed}/${total} lô)...`}
+              </p>
+            </div>
+          </div>
+          {done && (
+            <button
+              onClick={onClose}
+              className="rounded-xl border border-slate-200 p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs font-bold">
+            <span className="text-slate-500">Tiến trình khôi phục</span>
+            <span className="text-sky-600 text-sm font-extrabold">{percent}%</span>
+          </div>
+          <div className="h-3.5 w-full overflow-hidden rounded-full bg-slate-100 p-0.5 shadow-inner">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 transition-all duration-500 shadow-sm"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="max-h-48 overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50/70 p-3 space-y-2 divide-y divide-slate-100/60">
+          {batchIds.map((bId) => {
+            const st = statusMap[bId] || 'PENDING';
+            return (
+              <div key={bId} className="flex items-center justify-between pt-2 first:pt-0 text-xs">
+                <div className="flex items-center gap-2 font-bold text-slate-700">
+                  <span>Lô #{bId}</span>
+                </div>
+                <div>
+                  {st === 'SUCCESS' && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                      <CheckCircle2 className="h-3 w-3" /> Đã khôi phục
+                    </span>
+                  )}
+                  {st === 'RUNNING' && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[10px] font-bold text-sky-700 border border-sky-200 animate-pulse">
+                      <RefreshCw className="h-3 w-3 animate-spin" /> Đang tải từ IPFS...
+                    </span>
+                  )}
+                  {st === 'FAILED' && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200">
+                      <AlertTriangle className="h-3 w-3" /> Thất bại
+                    </span>
+                  )}
+                  {st === 'PENDING' && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-semibold text-slate-400">
+                      Chờ khôi phục
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {done && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full rounded-2xl bg-sky-600 py-3 text-xs font-extrabold text-white shadow-md hover:bg-sky-700 transition-all"
+          >
+            Hoàn tất & Đóng
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ChainBanner({ chain, loading, onQuickRecoverBatch, quickRecovering }) {
   if (loading || !chain) {
     return (
       <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm flex items-center gap-3">
@@ -720,20 +971,55 @@ function ChainBanner({ chain, loading }) {
   const ok = chain.ok;
   return (
     <section
-      className={`rounded-3xl border p-5 shadow-sm transition-all ${ok ? 'border-emerald-200 bg-emerald-50/50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900 animate-pulse'}`}
+      className={`rounded-3xl border p-5 shadow-sm transition-all ${
+        ok
+          ? 'border-emerald-200 bg-emerald-50/50 text-emerald-900'
+          : 'border-rose-300 bg-gradient-to-r from-rose-50 via-red-50 to-orange-50 text-rose-950 shadow-md ring-2 ring-rose-200/60'
+      }`}
     >
-      <div className="flex items-start gap-3">
-        {ok ? <ShieldCheck className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" /> : <ShieldAlert className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />}
-        <div className="min-w-0">
-          <p className="text-sm font-bold">
-            {ok ? 'Cơ sở dữ liệu audit hoàn toàn mật thiết & toàn vẹn' : 'CẢNH BÁO: Phát hiện bất thường cấu trúc dữ liệu!'}
-          </p>
-          <p className="mt-1 text-xs font-medium opacity-90">
-            {ok
-              ? `Hệ thống đã đối chiếu thành công ${chain.total} bản ghi. Không tìm thấy bất kỳ dấu hiệu sửa đổi, chèn hoặc xóa lén dữ liệu.`
-              : `Lỗi bất đối xứng mã băm được phát hiện tại bản ghi Sequence = ${chain.brokenAtSeq}. Lý do từ hệ thống: ${chain.reason}`}
-          </p>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-start gap-3.5 min-w-0">
+          {ok ? (
+            <ShieldCheck className="h-6 w-6 text-emerald-600 shrink-0 mt-0.5" />
+          ) : (
+            <ShieldAlert className="h-6 w-6 text-rose-600 shrink-0 mt-0.5 animate-bounce" />
+          )}
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-extrabold tracking-tight">
+                {ok ? 'Cơ sở dữ liệu audit hoàn toàn mật thiết & toàn vẹn' : 'CẢNH BÁO: Phát hiện bất thường / đứt gãy cấu trúc dữ liệu!'}
+              </p>
+              {!ok && (
+                <span className="rounded-full bg-rose-600 px-2.5 py-0.5 text-[10px] font-black uppercase text-white tracking-wider animate-pulse">
+                  Cần xử lý ngay
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-xs font-semibold opacity-90 leading-relaxed">
+              {ok
+                ? `Hệ thống đã đối chiếu thành công ${chain.total} bản ghi. Không tìm thấy bất kỳ dấu hiệu sửa đổi, chèn hoặc xóa lén dữ liệu.`
+                : `Lỗi bất đối xứng mã băm được phát hiện tại bản ghi Sequence = ${chain.brokenAtSeq}. Lý do từ hệ thống: ${chain.reason}`}
+            </p>
+          </div>
         </div>
+
+        {!ok && chain.brokenAtSeq != null && (
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => onQuickRecoverBatch?.(chain.brokenAtSeq)}
+              disabled={quickRecovering}
+              className="inline-flex items-center gap-2 rounded-2xl bg-rose-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-md hover:bg-rose-700 hover:shadow-lg transition-all active:scale-95 disabled:opacity-50"
+            >
+              <Zap className={`h-4 w-4 ${quickRecovering ? 'animate-spin' : ''}`} />
+              {quickRecovering
+                ? 'Đang tìm tập hợp lô bị ảnh hưởng...'
+                : chain.reason && chain.reason.includes('mong đợi')
+                ? `⚡ Tự động khôi phục tất cả lô bị lệch`
+                : `⚡ Tự động khôi phục lô bị lệch (SEQ ${chain.brokenAtSeq})`}
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -1069,7 +1355,7 @@ function RecoveryReasonModal({ batch, reason, setReason, onClose, onContinue }) 
   );
 }
 
-function BatchesHomeTable({ batches, page, totalPages, total, sortBy, sortOrder, onPrev, onNext, onRecover, onOpenDetail, recoveringBatchId }) {
+function BatchesHomeTable({ batches, page, totalPages, total, sortBy, sortOrder, onPrev, onNext, onRecover, onOpenDetail, recoveringBatchId, chain }) {
   const sortHint = sortBy === 'time'
     ? (sortOrder === 'desc' ? 'Thời gian: mới → cũ' : 'Thời gian: cũ → mới')
     : (sortOrder === 'desc' ? 'Số lô: lớn → nhỏ' : 'Số lô: nhỏ → lớn');
@@ -1094,18 +1380,35 @@ function BatchesHomeTable({ batches, page, totalPages, total, sortBy, sortOrder,
           <div className="divide-y divide-slate-100">
             {batches.map((b) => {
               const integrity = b.integrity || {};
+              const isRecoverable = canRecoverBatch(b, chain);
+              const isBrokenSeqBatch = chain && !chain.ok && chain.brokenAtSeq != null && (b.fromSeq <= chain.brokenAtSeq + 1 && b.toSeq >= Math.max(1, chain.brokenAtSeq - 1));
+
               return (
-                <article key={b.id} className="grid gap-4 px-6 py-5 transition-all hover:bg-slate-50/80 lg:grid-cols-[96px_1.2fr_0.9fr_120px_auto] lg:items-center">
+                <article
+                  key={b.id}
+                  className={`grid gap-4 px-6 py-5 transition-all lg:grid-cols-[96px_1.2fr_0.9fr_120px_auto] lg:items-center ${
+                    isBrokenSeqBatch
+                      ? 'bg-rose-50/70 border-l-4 border-l-rose-500 shadow-xs ring-1 ring-rose-200/60'
+                      : isRecoverable
+                      ? 'bg-amber-50/40 border-l-4 border-l-amber-400'
+                      : 'hover:bg-slate-50/80'
+                  }`}
+                >
                   <div className="text-center">
                     <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Lô</p>
                     <p className="text-2xl font-extrabold text-slate-900">#{b.batchId}</p>
                     <p className="text-xs font-bold text-sky-600">{b.leafCount ?? 0} SEQ</p>
+                    {isBrokenSeqBatch && (
+                      <span className="mt-1 inline-block rounded-md bg-rose-600 px-1.5 py-0.5 text-[9px] font-black text-white uppercase tracking-wider">
+                        Phát hiện đứt SEQ
+                      </span>
+                    )}
                   </div>
                   <div className="min-w-0">
                     <BatchContentSummary summary={b.contentSummary} fromSeq={b.fromSeq} toSeq={b.toSeq} />
                   </div>
                   <div className="space-y-2">
-                    <BatchIntegrityBadge integrity={integrity} />
+                    <BatchIntegrityBadge integrity={integrity} isBrokenSeqBatch={isBrokenSeqBatch} />
                     <p className="text-xs font-semibold text-slate-500">
                       Neo: {formatTime(b.anchoredAt || b.createdAt)}
                     </p>
@@ -1129,11 +1432,19 @@ function BatchesHomeTable({ batches, page, totalPages, total, sortBy, sortOrder,
                     <button
                       type="button"
                       onClick={() => onRecover(b)}
-                      disabled={!canRecoverBatch(b) || recoveringBatchId === b.batchId}
-                      title={recoverBatchDisabledReason(b) || 'Khôi phục lô khi kiểm tra toàn vẹn không ổn'}
-                      className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40 transition-all"
+                      disabled={!isRecoverable || recoveringBatchId === b.batchId}
+                      title={recoverBatchDisabledReason(b, chain) || 'Khôi phục lô khi kiểm tra toàn vẹn không ổn'}
+                      className={`rounded-xl border px-3.5 py-2 text-xs font-bold transition-all ${
+                        isBrokenSeqBatch || isRecoverable
+                          ? 'border-rose-300 bg-rose-600 text-white hover:bg-rose-700 shadow-sm animate-pulse'
+                          : 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40'
+                      }`}
                     >
-                      {recoveringBatchId === b.batchId ? 'Đang khôi phục...' : 'Khôi phục lô'}
+                      {recoveringBatchId === b.batchId ? (
+                        <span className="flex items-center justify-center gap-1"><RefreshCw className="h-3 w-3 animate-spin" /> Đang khôi phục...</span>
+                      ) : (
+                        <span className="flex items-center justify-center gap-1"><Zap className="h-3 w-3" /> Khôi phục lô</span>
+                      )}
                     </button>
                   </div>
                 </article>
@@ -1147,14 +1458,20 @@ function BatchesHomeTable({ batches, page, totalPages, total, sortBy, sortOrder,
   );
 }
 
-function BatchIntegrityBadge({ integrity }) {
+function BatchIntegrityBadge({ integrity, isBrokenSeqBatch }) {
   const status = integrity?.status || 'PENDING';
-  const label = status === 'VERIFIED' ? 'Lô toàn vẹn' : status === 'TAMPERED' ? 'Lô nghi sửa đổi' : 'Lô thiếu field hash';
-  const tone = status === 'VERIFIED'
+  let label = status === 'VERIFIED' ? 'Lô toàn vẹn' : status === 'TAMPERED' ? 'Lô nghi sửa đổi' : 'Lô thiếu field hash';
+  let tone = status === 'VERIFIED'
     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
     : status === 'TAMPERED'
       ? 'border-rose-200 bg-rose-50 text-rose-700'
       : 'border-amber-200 bg-amber-50 text-amber-700';
+
+  if (isBrokenSeqBatch && status === 'VERIFIED') {
+    label = 'Lô bị đứt gãy SEQ chuỗi';
+    tone = 'border-rose-300 bg-rose-100/90 text-rose-800 font-extrabold';
+  }
+
   return (
     <div className={`rounded-xl border px-3 py-2 ${tone}`}>
       <p className="text-xs font-bold">{label}</p>

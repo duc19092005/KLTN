@@ -752,6 +752,46 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
     return { ok: true, checked: batches.length, failedBatchId: null, reason: null };
   }
 
+  async verifySingleAnchoredBatch(batchId: number): Promise<{ ok: boolean; reason: string | null }> {
+    const batch = await this.prisma.auditBatch.findUnique({
+      where: { batchId },
+      select: { batchId: true, merkleRoot: true, fromSeq: true, toSeq: true, algorithmVersion: true, status: true },
+    });
+    if (!batch || batch.status !== "ANCHORED") {
+      return { ok: false, reason: "Batch " + batchId + " không tồn tại hoặc chưa neo" };
+    }
+    if (batch.fromSeq == null || batch.toSeq == null) {
+      return { ok: false, reason: "Batch " + batchId + " thiếu từ Seq/đến Seq" };
+    }
+
+    const logs = await this.prisma.blockchainLogger.findMany({
+      where: { seq: { gte: batch.fromSeq, lte: batch.toSeq }, entryHash: { not: null } },
+      orderBy: { seq: "asc" },
+      select: { seq: true, entryHash: true },
+    });
+    if (logs.length === 0) {
+      return { ok: false, reason: "Batch " + batchId + " không có log để xác minh" };
+    }
+
+    const recomputedRoot = computeMerkleRootForAlgorithm(
+      logs.map((log) => log.entryHash),
+      batch.algorithmVersion ?? MERKLE_SHA256_STRING_V1,
+    );
+    if (recomputedRoot !== batch.merkleRoot) {
+      return { ok: false, reason: "Batch " + batchId + " root DB không khớp root tính lại" };
+    }
+
+    const onChainRoot = await this.blockchain.getAuditRoot(batchId);
+    if (!onChainRoot) {
+      return { ok: false, reason: "Batch " + batchId + " không tồn tại on-chain" };
+    }
+    if (rootToBytes32(recomputedRoot).toLowerCase() !== onChainRoot.toLowerCase()) {
+      return { ok: false, reason: "Batch " + batchId + " root on-chain không khớp" };
+    }
+
+    return { ok: true, reason: null };
+  }
+
   private async validatePendingChain(pending: any[]): Promise<void> {
     if (pending.length === 0) return;
 
