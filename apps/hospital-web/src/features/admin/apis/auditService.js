@@ -23,4 +23,11 @@ export const auditService = {
   ),
   entityWarnings: (params = {}) => api.get('/audit/recovery/entities/warnings', { params }),
   recoverEntities: (items, reason) => api.post('/audit/recovery/entities', { items, reason }),
+  getDeepScanStatus: () => api.get('/audit/recovery/deep-scan/status'),
+  startDeepScan: (stepUpTicket) => api.post(
+    '/audit/recovery/deep-scan',
+    {},
+    { headers: { 'x-stepup-ticket': stepUpTicket } },
+  ),
 };
+

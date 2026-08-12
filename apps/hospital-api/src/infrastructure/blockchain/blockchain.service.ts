@@ -71,6 +71,7 @@ export class BlockchainService implements OnModuleInit {
     'function commitCheckpoint(uint256 batchId, bytes32 merkleRoot, uint256 leafCount, bytes32 artifactHash, string artifactUri) external',
     'function getRoot(uint256 batchId) external view returns (bytes32)',
     'function getCheckpoint(uint256 batchId) external view returns (bytes32 merkleRoot, bytes32 artifactHash, string artifactUri, uint256 leafCount, uint256 timestamp, bool committed)',
+    'function getCheckpointsRange(uint256 fromBatchId, uint256 toBatchId) external view returns (tuple(uint256 batchId, bytes32 merkleRoot, bytes32 artifactHash, string artifactUri, uint256 leafCount, uint256 timestamp, bool committed)[] items)',
     'function latestBatchId() external view returns (uint256)',
     'function totalBatches() external view returns (uint256)',
     'function owner() external view returns (address)',
@@ -114,99 +115,245 @@ export class BlockchainService implements OnModuleInit {
 
     if (this.contractAddress) {
       this.contract = new ethers.Contract(this.contractAddress, this.abi, this.provider);
-      console.log(`Connected to IdentityRegistry at ${this.contractAddress}`);
-    } else {
-      console.warn('IDENTITY_REGISTRY_ADDRESS not set. Blockchain checks disabled.');
     }
 
     this.faceRegistryAddress = process.env.FACE_REGISTRY_ADDRESS || '';
     if (this.faceRegistryAddress) {
       this.faceRegistry = new ethers.Contract(this.faceRegistryAddress, this.faceRegistryAbi, this.provider);
-      console.log(`Connected to FaceRegistry at ${this.faceRegistryAddress}`);
-    } else {
-      console.warn('FACE_REGISTRY_ADDRESS not set. Face integrity anchoring disabled.');
     }
 
     this.auditAnchorAddress = process.env.AUDIT_ANCHOR_ADDRESS || '';
     if (this.auditAnchorAddress) {
       this.auditAnchor = new ethers.Contract(this.auditAnchorAddress, this.auditAnchorAbi, this.provider);
-      console.log(`Connected to AuditAnchor at ${this.auditAnchorAddress}`);
-    } else {
-      console.warn('AUDIT_ANCHOR_ADDRESS not set. Audit Merkle-root anchoring disabled.');
     }
   }
 
-  private validPrivateKey(value: string | undefined): string | null {
-    if (!value || value === LEGACY_SUPER_ADMIN_PLACEHOLDER) return null;
-    const trimmed = value.trim();
-    if (/^0x[0-9a-fA-F]{64}$/.test(trimmed)) return trimmed;
-    if (/^[0-9a-fA-F]{64}$/.test(trimmed)) return `0x${trimmed}`;
-    return null;
+  private validPrivateKey(raw?: string): string | null {
+    if (!raw) return null;
+    const clean = raw.trim();
+    if (!clean || clean === LEGACY_SUPER_ADMIN_PLACEHOLDER) return null;
+    return clean.startsWith('0x') ? clean : `0x${clean}`;
   }
 
-  // ---- FaceRegistry: face-template integrity anchoring ------------------------
-
-  /** Derive the on-chain key for a user's face record from their UUID. */
-  faceKey(userId: string): string {
-    return ethers.keccak256(ethers.toUtf8Bytes(userId));
+  isReady(): boolean {
+    return Boolean(this.contract && (this.relayerSigner || this.ownerSigner));
   }
 
-  /** Whether the FaceRegistry contract is available for writes. */
+  isGovernanceReady(): boolean {
+    return Boolean(this.contract && this.ownerSigner);
+  }
+
   isFaceRegistryReady(): boolean {
-    return Boolean(this.faceRegistry && this.relayerSigner);
+    return Boolean(this.faceRegistry && (this.relayerSigner || this.ownerSigner));
   }
 
-  /**
-   * Mirror a user's face-template integrity hash on-chain (on enrollment).
-   * @param userId off-chain user UUID
-   * @param valueBytes32 0x-prefixed 32-byte SHA256 hash of the canonical face embedding JSON
-   */
-  async setFaceHash(userId: string, valueBytes32: string) {
+  isAuditAnchorReady(): boolean {
+    return Boolean(this.auditAnchor && (this.relayerSigner || this.ownerSigner));
+  }
+
+  async isAuthorizedAdmin(walletAddress: string): Promise<boolean> {
+    if (!this.contract) return false;
+    try {
+      return await this.contract.isAuthorized(walletAddress);
+    } catch {
+      return false;
+    }
+  }
+
+  async isAuthorized(walletAddress: string): Promise<boolean> {
+    return this.isAuthorizedAdmin(walletAddress);
+  }
+
+  async isRelayer(walletAddress: string): Promise<boolean> {
+    if (!this.contract) return false;
+    try {
+      return await this.contract.isRelayer(walletAddress);
+    } catch {
+      return false;
+    }
+  }
+
+  async isRelayerOrOwner(walletAddress: string): Promise<boolean> {
+    if (!this.contract) return false;
+    try {
+      return await this.contract.isRelayerOrOwner(walletAddress);
+    } catch {
+      return false;
+    }
+  }
+
+  async authorizeAdminOnChain(walletAddress: string): Promise<string> {
+    if (!this.contract) throw new Error('Blockchain contract not initialized.');
+
     return this.enqueueWrite(async () => {
-      if (!this.faceRegistry || !this.relayerSigner) {
-        return { success: false, error: 'FaceRegistry or blockchain relayer key is not configured.' };
-      }
-      try {
-        const key = this.faceKey(userId);
-        const writable = this.faceRegistry.connect(this.relayerSigner) as ethers.Contract;
-        const tx = await writable.setFaceHash(key, valueBytes32);
-        const receipt = await tx.wait();
-        return { success: true, key, txHash: tx.hash, blockNumber: receipt.blockNumber };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to set face hash' };
-      }
+      const isAuth = await this.contract!.isAuthorized(walletAddress);
+      if (isAuth) return 'ALREADY_AUTHORIZED';
+
+      const signer = this.relayerSigner || this.ownerSigner;
+      if (!signer) throw new Error('No operational signer configured for governance call.');
+
+      const signedContract = this.contract!.connect(signer) as ethers.Contract;
+      const tx = await signedContract.getFunction('authorizeAdmin')(walletAddress);
+      const receipt = await tx.wait();
+      return receipt.hash;
     });
   }
 
-  /** Remove a user's face hash on-chain (used on biometric reset). */
-  async removeFaceHash(userId: string) {
+  async authorizeAdmin(walletAddress: string): Promise<string> {
+    return this.authorizeAdminOnChain(walletAddress);
+  }
+
+  async revokeAdminOnChain(walletAddress: string): Promise<string> {
+    if (!this.contract) throw new Error('Blockchain contract not initialized.');
+    if (!this.ownerSigner) throw new Error('REVOKE_REQUIRES_OWNER: Only BLOCKCHAIN_OWNER_PRIVATE_KEY can revoke admins.');
+
     return this.enqueueWrite(async () => {
-      if (!this.faceRegistry || !this.relayerSigner) {
-        return { success: false, error: 'FaceRegistry or blockchain relayer key is not configured.' };
-      }
-      try {
-        const key = this.faceKey(userId);
-        const exists = await this.faceRegistry.hasFaceHash(key);
-        if (!exists) return { success: true, alreadyAbsent: true, key };
-        const writable = this.faceRegistry.connect(this.relayerSigner) as ethers.Contract;
-        const tx = await writable.removeFaceHash(key);
-        const receipt = await tx.wait();
-        return { success: true, key, txHash: tx.hash, blockNumber: receipt.blockNumber };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to remove face hash' };
-      }
+      const isAuth = await this.contract!.isAuthorized(walletAddress);
+      if (!isAuth) return 'ALREADY_REVOKED';
+
+      const signedContract = this.contract!.connect(this.ownerSigner!) as ethers.Contract;
+      const tx = await signedContract.getFunction('revokeAdmin')(walletAddress);
+      const receipt = await tx.wait();
+      return receipt.hash;
     });
   }
 
-  /**
-   * Read the on-chain face hash for a user. Returns null if the registry is unavailable
-   * or no hash is set (so the integrity gate can distinguish "not anchored").
-   */
-  async getFaceHash(userId: string): Promise<string | null> {
+  async rotateAdminOnChain(oldWallet: string, newWallet: string): Promise<string> {
+    if (!this.contract) throw new Error('Blockchain contract not initialized.');
+
+    return this.enqueueWrite(async () => {
+      const isOldAuth = await this.contract!.isAuthorized(oldWallet);
+      if (!isOldAuth) throw new Error(`Old wallet ${oldWallet} is not an authorized admin.`);
+
+      const isNewAuth = await this.contract!.isAuthorized(newWallet);
+      if (isNewAuth && oldWallet.toLowerCase() !== newWallet.toLowerCase()) {
+        throw new Error(`New wallet ${newWallet} is already an authorized admin.`);
+      }
+
+      const signer = this.relayerSigner || this.ownerSigner;
+      if (!signer) throw new Error('No operational signer configured for admin rotation.');
+
+      const signedContract = this.contract!.connect(signer) as ethers.Contract;
+      const tx = await signedContract.getFunction('rotateAdmin')(oldWallet, newWallet);
+      const receipt = await tx.wait();
+      return receipt.hash;
+    });
+  }
+
+  async rotateAdmin(oldWallet: string, newWallet: string): Promise<string> {
+    return this.rotateAdminOnChain(oldWallet, newWallet);
+  }
+
+  async recordActionOnChain(entityId: string, action: string, actorId: string): Promise<string | null> {
+    if (!this.contract) return null;
+    const signer = this.relayerSigner || this.ownerSigner;
+    if (!signer) return null;
+
+    try {
+      const actionHash = computeBackendActionHash({ entityId, action, actorId });
+      return await this.enqueueWrite(async () => {
+        const signedContract = this.contract!.connect(signer) as ethers.Contract;
+        const tx = await signedContract.getFunction('recordAction')(actionHash);
+        const receipt = await tx.wait();
+        return receipt.hash;
+      });
+    } catch (err) {
+      console.error('Failed to record action on-chain:', err);
+      return null;
+    }
+  }
+
+  async addRelayerOnChain(walletAddress: string): Promise<string> {
+    if (!this.contract) throw new Error('Blockchain contract not initialized.');
+    if (!this.ownerSigner) throw new Error('Only BLOCKCHAIN_OWNER_PRIVATE_KEY can authorize relayers.');
+
+    return this.enqueueWrite(async () => {
+      const signedContract = this.contract!.connect(this.ownerSigner!) as ethers.Contract;
+      const tx = await signedContract.getFunction('addRelayer')(walletAddress);
+      const receipt = await tx.wait();
+      return receipt.hash;
+    });
+  }
+
+  async removeRelayerOnChain(walletAddress: string): Promise<string> {
+    if (!this.contract) throw new Error('Blockchain contract not initialized.');
+    if (!this.ownerSigner) throw new Error('Only BLOCKCHAIN_OWNER_PRIVATE_KEY can revoke relayers.');
+
+    return this.enqueueWrite(async () => {
+      const signedContract = this.contract!.connect(this.ownerSigner!) as ethers.Contract;
+      const tx = await signedContract.getFunction('removeRelayer')(walletAddress);
+      const receipt = await tx.wait();
+      return receipt.hash;
+    });
+  }
+
+  async setFaceHashOnChain(userKey: string, faceHashBytes32: string): Promise<string | null> {
+    if (!this.faceRegistry) return null;
+    const signer = this.relayerSigner || this.ownerSigner;
+    if (!signer) return null;
+
+    try {
+      const keyBytes32 = ethers.keccak256(ethers.toUtf8Bytes(userKey));
+      return await this.enqueueWrite(async () => {
+        const signedRegistry = this.faceRegistry!.connect(signer) as ethers.Contract;
+        const tx = await signedRegistry.getFunction('setFaceHash')(keyBytes32, faceHashBytes32);
+        const receipt = await tx.wait();
+        return receipt.hash;
+      });
+    } catch (err) {
+      console.error(`Failed to setFaceHash on-chain for ${userKey}:`, err);
+      return null;
+    }
+  }
+
+  async setFaceHash(userKey: string, faceHashBytes32: string): Promise<string | null> {
+    return this.setFaceHashOnChain(userKey, faceHashBytes32);
+  }
+
+  async setFaceRecoveryOnChain(
+    userKey: string,
+    faceHashBytes32: string,
+    artifactHashBytes32: string,
+    artifactUri: string,
+  ): Promise<{ txHash: string; keyBytes32: string } | null> {
+    if (!this.faceRegistry) return null;
+    const signer = this.relayerSigner || this.ownerSigner;
+    if (!signer) return null;
+
+    try {
+      const keyBytes32 = ethers.keccak256(ethers.toUtf8Bytes(userKey));
+      const txHash = await this.enqueueWrite(async () => {
+        const signedRegistry = this.faceRegistry!.connect(signer) as ethers.Contract;
+        const tx = await signedRegistry.getFunction('setFaceRecovery')(
+          keyBytes32,
+          faceHashBytes32,
+          artifactHashBytes32,
+          artifactUri,
+        );
+        const receipt = await tx.wait();
+        return receipt.hash;
+      });
+      return { txHash, keyBytes32 };
+    } catch (err) {
+      console.error(`Failed to setFaceRecovery on-chain for ${userKey}:`, err);
+      return null;
+    }
+  }
+
+  async setFaceRecovery(
+    userKey: string,
+    faceHashBytes32: string,
+    artifactHashBytes32: string,
+    artifactUri: string,
+  ): Promise<{ txHash: string; keyBytes32: string } | null> {
+    return this.setFaceRecoveryOnChain(userKey, faceHashBytes32, artifactHashBytes32, artifactUri);
+  }
+
+  async getFaceHashFromChain(userKey: string): Promise<string | null> {
     if (!this.faceRegistry) return null;
     try {
-      const key = this.faceKey(userId);
-      const value: string = await this.faceRegistry.getFaceHash(key);
+      const keyBytes32 = ethers.keccak256(ethers.toUtf8Bytes(userKey));
+      const value: string = await this.faceRegistry.getFaceHash(keyBytes32);
       if (!value || value === ethers.ZeroHash) return null;
       return value;
     } catch {
@@ -214,22 +361,28 @@ export class BlockchainService implements OnModuleInit {
     }
   }
 
-  async getFaceRecovery(userId: string): Promise<{
+  async getFaceHash(userKey: string): Promise<string | null> {
+    return this.getFaceHashFromChain(userKey);
+  }
+
+  async getFaceRecoveryFromChain(userKey: string): Promise<{
     faceHash: string;
     artifactHash: string;
     artifactUri: string;
+    isActive: boolean;
     updatedAt: number;
   } | null> {
     if (!this.faceRegistry) return null;
     try {
-      const key = this.faceKey(userId);
+      const keyBytes32 = ethers.keccak256(ethers.toUtf8Bytes(userKey));
       const [faceHash, artifactHash, artifactUri, isActive, updatedAt] =
-        await this.faceRegistry.getFaceRecovery(key);
-      if (!isActive || faceHash === ethers.ZeroHash || artifactHash === ethers.ZeroHash || !artifactUri) return null;
+        await this.faceRegistry.getFaceRecovery(keyBytes32);
+      if (!isActive || !artifactUri || artifactHash === ethers.ZeroHash) return null;
       return {
-        faceHash: String(faceHash).toLowerCase(),
-        artifactHash: String(artifactHash).toLowerCase(),
-        artifactUri: String(artifactUri),
+        faceHash,
+        artifactHash,
+        artifactUri,
+        isActive: Boolean(isActive),
         updatedAt: Number(updatedAt),
       };
     } catch {
@@ -237,251 +390,54 @@ export class BlockchainService implements OnModuleInit {
     }
   }
 
-  // ---- IdentityRegistry: admin authorization ----------------------------------
+  async getFaceRecovery(userKey: string) {
+    return this.getFaceRecoveryFromChain(userKey);
+  }
 
-  async isAuthorized(walletAddress: string): Promise<boolean> {
-    if (!this.contract) return false;
+  async commitAuditCheckpointOnChain(
+    batchId: number,
+    merkleRootBytes32: string,
+    leafCount: number,
+    artifactHashBytes32: string,
+    artifactUri: string,
+  ): Promise<{ success: boolean; txHash: string; blockNumber: number } | null> {
+    if (!this.auditAnchor) return null;
+    const signer = this.relayerSigner || this.ownerSigner;
+    if (!signer) return null;
+
     try {
-      return await this.contract.isAuthorized(ethers.getAddress(walletAddress));
-    } catch {
-      return false;
-    }
-  }
-
-  async isRelayer(walletAddress: string): Promise<boolean> {
-    if (!this.contract) return false;
-    try {
-      return await this.contract.isRelayer(ethers.getAddress(walletAddress));
-    } catch {
-      return false;
-    }
-  }
-
-  private toBlockchainErrorMessage(error: unknown, fallback: string): string {
-    const message = error instanceof Error ? error.message : String(error || '');
-
-    if (message.includes('IdentityRegistry: caller is not owner')) {
-      return 'Ví blockchain của hệ thống không phải chủ sở hữu IdentityRegistry. Vui lòng kiểm tra BLOCKCHAIN_OWNER_PRIVATE_KEY và IDENTITY_REGISTRY_ADDRESS.';
-    }
-
-    if (message.includes('FaceRegistry: caller is not owner')) {
-      return 'Ví blockchain của hệ thống không phải chủ sở hữu FaceRegistry. Vui lòng kiểm tra cấu hình ví owner và địa chỉ contract FaceRegistry.';
-    }
-
-    if (message.includes('AuditAnchor: caller is not owner')) {
-      return 'Ví blockchain của hệ thống không phải chủ sở hữu AuditAnchor. Vui lòng kiểm tra cấu hình ví owner và địa chỉ contract AuditAnchor.';
-    }
-
-    if (message.includes('insufficient funds')) {
-      return 'Ví blockchain của hệ thống không đủ phí gas để ghi dữ liệu lên blockchain.';
-    }
-
-    if (message.includes('could not coalesce error') || message.includes('ECONNREFUSED')) {
-      return 'Không thể kết nối tới blockchain RPC. Vui lòng kiểm tra BLOCKCHAIN_RPC_URL và node blockchain.';
-    }
-
-    return fallback;
-  }
-
-  async addRelayer(walletAddress: string) {
-    return this.enqueueWrite(async () => {
-      if (!this.contract || !this.ownerSigner) {
-        return { success: false, error: 'IdentityRegistry hoặc khóa owner blockchain chưa được cấu hình.' };
-      }
-      try {
-        const normalizedWalletAddress = ethers.getAddress(walletAddress);
-        if (await this.isRelayer(normalizedWalletAddress)) {
-          return { success: true, alreadyAuthorized: true };
-        }
-        const writableContract = this.contract.connect(this.ownerSigner) as ethers.Contract;
-        const tx = await writableContract.addRelayer(normalizedWalletAddress);
-        const receipt = await tx.wait();
-        return { success: true, txHash: tx.hash, blockNumber: receipt.blockNumber };
-      } catch (error) {
-        return { success: false, error: this.toBlockchainErrorMessage(error, 'Không thể cấp quyền relayer trên blockchain.') };
-      }
-    });
-  }
-
-  async removeRelayer(walletAddress: string) {
-    return this.enqueueWrite(async () => {
-      if (!this.contract || !this.ownerSigner) {
-        return { success: false, error: 'IdentityRegistry hoặc khóa owner blockchain chưa được cấu hình.' };
-      }
-      try {
-        const normalizedWalletAddress = ethers.getAddress(walletAddress);
-        if (!(await this.isRelayer(normalizedWalletAddress))) {
-          return { success: true, alreadyRevoked: true };
-        }
-        const writableContract = this.contract.connect(this.ownerSigner) as ethers.Contract;
-        const tx = await writableContract.removeRelayer(normalizedWalletAddress);
-        const receipt = await tx.wait();
-        return { success: true, txHash: tx.hash, blockNumber: receipt.blockNumber };
-      } catch (error) {
-        return { success: false, error: this.toBlockchainErrorMessage(error, 'Không thể thu hồi quyền relayer trên blockchain.') };
-      }
-    });
-  }
-
-  async authorizeAdmin(walletAddress: string) {
-    return this.enqueueWrite(async () => {
-      if (!this.contract || !this.relayerSigner) {
-        return { success: false, error: 'IdentityRegistry hoặc khóa relayer blockchain chưa được cấu hình.' };
-      }
-      try {
-        const normalizedWalletAddress = ethers.getAddress(walletAddress);
-        if (await this.isAuthorized(normalizedWalletAddress)) {
-          return { success: true, alreadyAuthorized: true };
-        }
-        const writableContract = this.contract.connect(this.relayerSigner) as ethers.Contract;
-        const tx = await writableContract.authorizeAdmin(normalizedWalletAddress);
+      return await this.enqueueWrite(async () => {
+        const signedAnchor = this.auditAnchor!.connect(signer) as ethers.Contract;
+        const tx = await signedAnchor.getFunction('commitCheckpoint')(
+          batchId,
+          merkleRootBytes32,
+          leafCount,
+          artifactHashBytes32,
+          artifactUri,
+        );
         const receipt = await tx.wait();
         return {
           success: true,
-          txHash: tx.hash,
-          blockNumber: receipt.blockNumber,
+          txHash: receipt.hash,
+          blockNumber: Number(receipt.blockNumber),
         };
-      } catch (error) {
-        return { success: false, error: this.toBlockchainErrorMessage(error, 'Không thể cấp quyền admin trên blockchain.') };
-      }
-    });
+      });
+    } catch (err) {
+      console.error(`Failed to commitAuditCheckpoint for batch ${batchId}:`, err);
+      return null;
+    }
   }
 
-  async revokeAdmin(walletAddress: string) {
-    return this.enqueueWrite(async () => {
-      if (!this.contract || !this.ownerSigner) {
-        return { success: false, error: 'IdentityRegistry hoặc khóa owner blockchain chưa được cấu hình.' };
-      }
-      try {
-        const normalizedWalletAddress = ethers.getAddress(walletAddress);
-        if (!(await this.isAuthorized(normalizedWalletAddress))) {
-          return { success: true, alreadyRevoked: true };
-        }
-        const writableContract = this.contract.connect(this.ownerSigner) as ethers.Contract;
-        const tx = await writableContract.revokeAdmin(normalizedWalletAddress);
-        const receipt = await tx.wait();
-        return {
-          success: true,
-          txHash: tx.hash,
-          blockNumber: receipt.blockNumber,
-        };
-      } catch (error) {
-        return { success: false, error: this.toBlockchainErrorMessage(error, 'Không thể thu hồi quyền admin trên blockchain.') };
-      }
-    });
-  }
-
-  async rotateAdmin(oldWalletAddress: string, newWalletAddress: string) {
-    return this.enqueueWrite(async () => {
-      if (!this.contract || !this.relayerSigner) {
-        return { success: false, error: 'IdentityRegistry hoặc khóa relayer blockchain chưa được cấu hình.' };
-      }
-      try {
-        const oldWallet = ethers.getAddress(oldWalletAddress);
-        const newWallet = ethers.getAddress(newWalletAddress);
-        const writableContract = this.contract.connect(this.relayerSigner) as ethers.Contract;
-        const tx = await writableContract.rotateAdmin(oldWallet, newWallet);
-        const receipt = await tx.wait();
-        return {
-          success: true,
-          txHash: tx.hash,
-          blockNumber: receipt.blockNumber,
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: this.toBlockchainErrorMessage(error, 'Không thể thay đổi ví admin trên blockchain.'),
-        };
-      }
-    });
-  }
-
-  /** Atomically anchor an Admin face hash and the encrypted IPFS recovery checkpoint. */
-  async setFaceRecovery(userId: string, faceHash: string, artifactHash: string, artifactUri: string) {
-    return this.enqueueWrite(async () => {
-      if (!this.faceRegistry || !this.relayerSigner) {
-        return { success: false, error: 'FaceRegistry or blockchain relayer key is not configured.' };
-      }
-      try {
-        const key = this.faceKey(userId);
-        const writable = this.faceRegistry.connect(this.relayerSigner) as ethers.Contract;
-        const tx = await writable.setFaceRecovery(key, faceHash, artifactHash, artifactUri);
-        const receipt = await tx.wait();
-        return { success: true, key, txHash: tx.hash, blockNumber: receipt.blockNumber };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to set face recovery checkpoint',
-        };
-      }
-    });
-  }
-
-  async recordActionAsSuperAdmin(actionPayload: unknown) {
-    return this.enqueueWrite(async () => {
-      if (!this.contract || !this.relayerSigner) {
-        return { success: false, error: 'IdentityRegistry hoặc khóa relayer blockchain chưa được cấu hình.' };
-      }
-      try {
-        const actionHash = computeBackendActionHash(actionPayload);
-        const writableContract = this.contract.connect(this.relayerSigner) as ethers.Contract;
-        const tx = await writableContract.recordAction(actionHash);
-        const receipt = await tx.wait();
-        if (!receipt || receipt.status !== 1) {
-          return { success: false, error: 'Giao dịch blockchain ghi nhận hành động không thành công hoặc chưa được xác nhận.' };
-        }
-        return {
-          success: true,
-          signer: this.relayerSigner.address,
-          actionHash,
-          txHash: tx.hash,
-          blockNumber: receipt.blockNumber,
-        };
-      } catch (error) {
-        return { success: false, error: this.toBlockchainErrorMessage(error, 'Không thể ghi nhận hành động lên blockchain.') };
-      }
-    });
-  }
-
-  // ---- AuditAnchor: Merkle-root batch anchoring -------------------------------
-
-  /** Whether the AuditAnchor contract is available for writes. */
-  isAuditAnchorReady(): boolean {
-    return Boolean(this.auditAnchor && this.relayerSigner);
-  }
-
-  /**
-   * Commit the Merkle root of a sealed batch of audit logs on-chain. Exactly one transaction
-   * per batch, regardless of how many logs it covers, so gas is flat. batchId must be unique
-   * and monotonic; the contract rejects re-committing an existing batchId.
-   * @param rootBytes32 0x-prefixed 32-byte Merkle root over the batch's entryHashes
-   */
   async commitAuditCheckpoint(
     batchId: number,
-    rootBytes32: string,
+    merkleRootBytes32: string,
     leafCount: number,
-    artifactHash: string,
+    artifactHashBytes32: string,
     artifactUri: string,
-  ) {
-    return this.enqueueWrite(async () => {
-      if (!this.auditAnchor || !this.relayerSigner) {
-        return { success: false, error: 'AuditAnchor or blockchain relayer key is not configured.' };
-      }
-      try {
-        const writable = this.auditAnchor.connect(this.relayerSigner) as ethers.Contract;
-        const tx = await writable.commitCheckpoint(batchId, rootBytes32, leafCount, artifactHash, artifactUri);
-        const receipt = await tx.wait();
-        if (!receipt || receipt.status !== 1) {
-          return { success: false, error: 'Audit root transaction failed or was not confirmed.' };
-        }
-        return { success: true, batchId, txHash: tx.hash, blockNumber: receipt.blockNumber };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to commit audit root' };
-      }
-    });
+  ): Promise<{ success: boolean; txHash: string; blockNumber: number } | null> {
+    return this.commitAuditCheckpointOnChain(batchId, merkleRootBytes32, leafCount, artifactHashBytes32, artifactUri);
   }
 
-  /** Read the committed Merkle root for a batch. Returns null if unavailable or not committed. */
   async getAuditRoot(batchId: number): Promise<string | null> {
     if (!this.auditAnchor) return null;
     try {
@@ -493,7 +449,6 @@ export class BlockchainService implements OnModuleInit {
     }
   }
 
-  /** Read the full on-chain checkpoint, including the immutable IPFS recovery artifact. */
   async getAuditCheckpoint(
     batchId: number,
   ): Promise<{
@@ -520,7 +475,46 @@ export class BlockchainService implements OnModuleInit {
     }
   }
 
-  /** Highest batchId committed on-chain, or null if the registry is unavailable. */
+  async getAuditCheckpointsRange(fromBatchId: number, toBatchId: number): Promise<Array<{
+    batchId: number;
+    root: string;
+    artifactHash: string;
+    artifactUri: string;
+    leafCount: number;
+    timestamp: number;
+    committed: boolean;
+  }>> {
+    if (!this.auditAnchor) return [];
+    try {
+      const items = await this.auditAnchor.getCheckpointsRange(fromBatchId, toBatchId);
+      return (items || []).map((item: any) => ({
+        batchId: Number(item.batchId),
+        root: String(item.merkleRoot),
+        artifactHash: String(item.artifactHash),
+        artifactUri: String(item.artifactUri),
+        leafCount: Number(item.leafCount),
+        timestamp: Number(item.timestamp),
+        committed: Boolean(item.committed),
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  async getAllCheckpoints(): Promise<Array<{
+    batchId: number;
+    root: string;
+    artifactHash: string;
+    artifactUri: string;
+    leafCount: number;
+    timestamp: number;
+    committed: boolean;
+  }>> {
+    const latest = await this.getLatestAuditBatchId();
+    if (!latest || latest <= 0) return [];
+    return this.getAuditCheckpointsRange(1, latest);
+  }
+
   async getLatestAuditBatchId(): Promise<number | null> {
     if (!this.auditAnchor) return null;
     try {
@@ -543,7 +537,6 @@ export class BlockchainService implements OnModuleInit {
     return this.relayerSigner?.address || null;
   }
 
-  /** @deprecated Use getOwnerAddress() and getRelayerAddress() to avoid role confusion. */
   getSuperAdminAddress(): string | null {
     return this.getOwnerAddress();
   }

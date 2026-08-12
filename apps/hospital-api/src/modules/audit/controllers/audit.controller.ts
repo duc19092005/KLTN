@@ -51,6 +51,19 @@ export class AuditController {
     private readonly entityRecovery: EntityRecoveryService,
   ) {}
 
+  @Get('recovery/deep-scan/status')
+  @ApiOperation({ summary: 'Get real-time status & logs of background audit deep-scan and self-healing' })
+  getDeepScanStatus() {
+    return this.recovery.getDeepScanStatus();
+  }
+
+  @Post('recovery/deep-scan')
+  @RequireFaceStepUp('Quét khuôn mặt Admin để cấp quyền thực thi cơ chế tự động đối soát Blockchain & tự sửa chữa Audit Batch')
+  @ApiOperation({ summary: 'Trigger Face-authenticated deep-scan verification and automated batch self-healing' })
+  startDeepScan(@CurrentUser() user: AuthUser) {
+    return this.recovery.startDeepScanAndSelfHeal(user.sub);
+  }
+
   @Get('recovery/entities/warnings')
   @ApiOperation({ summary: 'List business entities whose live data differs from the latest anchored audit snapshot' })
   entityWarnings(@Query('limit') limitRaw?: string) {

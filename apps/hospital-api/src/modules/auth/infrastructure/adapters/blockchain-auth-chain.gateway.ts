@@ -12,7 +12,12 @@ export class BlockchainAuthChainGateway implements AuthChainGatewayPort {
   constructor(private readonly blockchain: BlockchainService) {}
 
   async setFaceHash(userId: string, faceHashBytes32: string): Promise<ChainWriteResult> {
-    return this.blockchain.setFaceHash(userId, faceHashBytes32) as Promise<ChainWriteResult>;
+    try {
+      const txHash = await this.blockchain.setFaceHash(userId, faceHashBytes32);
+      return txHash ? { success: true, txHash } : { success: false, error: 'On-chain write failed.' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'On-chain write failed.' };
+    }
   }
 
   async setFaceRecovery(
@@ -21,12 +26,17 @@ export class BlockchainAuthChainGateway implements AuthChainGatewayPort {
     artifactHashBytes32: string,
     artifactUri: string,
   ): Promise<ChainWriteResult> {
-    return this.blockchain.setFaceRecovery(
-      userId,
-      faceHashBytes32,
-      artifactHashBytes32,
-      artifactUri,
-    ) as Promise<ChainWriteResult>;
+    try {
+      const res = await this.blockchain.setFaceRecovery(
+        userId,
+        faceHashBytes32,
+        artifactHashBytes32,
+        artifactUri,
+      );
+      return res ? { success: true, txHash: res.txHash } : { success: false, error: 'On-chain recovery write failed.' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'On-chain recovery write failed.' };
+    }
   }
 
   async getFaceHash(userId: string): Promise<string | null> {
@@ -38,11 +48,21 @@ export class BlockchainAuthChainGateway implements AuthChainGatewayPort {
   }
 
   async authorizeAdmin(walletAddress: string): Promise<ChainWriteResult> {
-    return this.blockchain.authorizeAdmin(walletAddress) as Promise<ChainWriteResult>;
+    try {
+      const txHash = await this.blockchain.authorizeAdmin(walletAddress);
+      return txHash ? { success: true, txHash } : { success: false, error: 'Authorization failed.' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Authorization failed.' };
+    }
   }
 
   async rotateAdmin(oldWalletAddress: string, newWalletAddress: string): Promise<ChainWriteResult> {
-    return this.blockchain.rotateAdmin(oldWalletAddress, newWalletAddress) as Promise<ChainWriteResult>;
+    try {
+      const txHash = await this.blockchain.rotateAdmin(oldWalletAddress, newWalletAddress);
+      return txHash ? { success: true, txHash } : { success: false, error: 'Rotation failed.' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Rotation failed.' };
+    }
   }
 
   async isAuthorized(walletAddress: string): Promise<boolean> {
