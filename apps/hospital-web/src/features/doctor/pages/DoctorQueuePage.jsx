@@ -865,7 +865,7 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
       title: 'Bệnh án lịch sử',
       desc: 'Đối chiếu chẩn đoán, điều trị và kết quả từ các lần khám trước.',
       status: history.length ? `${history.length} lượt khám trước` : 'Chưa có tiền sử khám',
-      tone: 'indigo',
+      tone: 'sky',
       enabled: true,
     },
   ];
@@ -907,9 +907,7 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
               const isCurrent = activeStep === step.step;
               const isDone = step.step < activeStep || (step.step === 3 && hasConclusion);
               const circleClass = isCurrent
-                ? step.step === 4
-                  ? 'bg-indigo-600 text-white border-indigo-600 ring-4 ring-indigo-100 shadow-sm'
-                  : 'bg-sky-600 text-white border-sky-600 ring-4 ring-sky-100 shadow-sm'
+                ? 'bg-sky-600 text-white border-sky-600 ring-4 ring-sky-100 shadow-sm'
                 : isDone
                 ? 'bg-sky-100 text-sky-700 border-sky-200'
                 : step.enabled
@@ -1002,21 +1000,22 @@ function MedicalHistoryPanel({ history }) {
   );
 
   return (
-    <section aria-labelledby="medical-history-title" className="overflow-hidden rounded-3xl border border-indigo-200/80 bg-white shadow-sm">
-      <div className="relative overflow-hidden border-b border-indigo-100 bg-gradient-to-br from-indigo-950 via-slate-900 to-sky-950 px-6 py-6 text-white">
-        <div className="absolute -right-8 -top-12 h-36 w-36 rounded-full border border-white/10 bg-indigo-400/10" />
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl">
-            <div className="flex items-center gap-2 text-indigo-200">
-              <History className="h-4 w-4" aria-hidden="true" />
-              <span className="text-[10px] font-extrabold uppercase tracking-[0.2em]">Hồ sơ tham khảo lâm sàng</span>
+    <section aria-labelledby="medical-history-title" className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm">
+      <div className="border-b border-slate-100 bg-white px-6 py-5">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex max-w-2xl items-start gap-3.5">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-sky-200 bg-sky-50 text-sky-700">
+              <History className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-[10px] font-extrabold uppercase tracking-widest text-sky-600">Hồ sơ tham khảo lâm sàng</p>
+              <h3 id="medical-history-title" className="mt-0.5 text-lg font-bold text-slate-900">Bệnh án lịch sử</h3>
+              <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                Đối chiếu các lượt khám đã hoàn tất. Thông tin lịch sử hỗ trợ đánh giá, không thay thế kết luận hiện tại.
+              </p>
             </div>
-            <h3 id="medical-history-title" className="mt-2 text-xl font-bold tracking-tight">Bệnh án lịch sử</h3>
-            <p className="mt-1.5 text-xs font-medium leading-5 text-slate-300">
-              Các lượt khám đã hoàn tất được sắp xếp mới nhất trước. Thông tin này hỗ trợ suy luận, không thay thế đánh giá hiện tại.
-            </p>
           </div>
-          <div className="grid grid-cols-4 gap-2 text-center">
+          <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
             <HistoryMetric value={history.length} label="Lượt khám" />
             <HistoryMetric value={diagnosisCount} label="Kết luận" />
             <HistoryMetric value={aiDiagnosisCount} label="Tham vấn AI" />
@@ -1038,7 +1037,7 @@ function MedicalHistoryPanel({ history }) {
             const doctorName = conclusion?.doctor?.staffProfile?.fullName || historicalVisit.staff?.fullName || 'Chưa cập nhật';
             return (
               <li key={historicalVisit.id} className="relative pl-12 pr-5 py-5 [content-visibility:auto]">
-                <span className={`absolute left-5 top-6 grid h-6 w-6 place-items-center rounded-full border text-[10px] font-black ${index === 0 ? 'border-indigo-500 bg-indigo-600 text-white ring-4 ring-indigo-50' : 'border-slate-200 bg-white text-slate-500'}`}>
+                <span className={`absolute left-5 top-6 grid h-6 w-6 place-items-center rounded-full border text-[10px] font-black ${index === 0 ? 'border-sky-500 bg-sky-600 text-white ring-4 ring-sky-50' : 'border-slate-200 bg-white text-slate-500'}`}>
                   {index + 1}
                 </span>
                 {index < history.length - 1 ? <span className="absolute bottom-0 left-8 top-12 w-px bg-slate-200" aria-hidden="true" /> : null}
@@ -1055,10 +1054,13 @@ function MedicalHistoryPanel({ history }) {
                     <div className="flex flex-wrap items-center gap-2">
                       <time className="text-sm font-black text-slate-900" dateTime={historicalVisit.checkInAt}>{formatDate(historicalVisit.checkInAt)}</time>
                       <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-500">{historicalVisit.visitCode}</span>
-                      {index === 0 ? <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700">Gần nhất</span> : null}
+                      {index === 0 ? <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">Gần nhất</span> : null}
                     </div>
-                    <p className="mt-1 truncate text-xs font-bold text-slate-600">{historicalVisit.department?.name || 'Chưa cập nhật khoa'} · BS. {doctorName}</p>
-                    <p className="mt-2 text-sm font-bold leading-5 text-slate-900">{conclusion?.finalDiagnosis || 'Chưa có chẩn đoán được ghi nhận'}</p>
+                    <p className="mt-1 truncate text-xs font-bold text-slate-500">{historicalVisit.department?.name || 'Chưa cập nhật khoa'} · BS. {doctorName}</p>
+                    <span className="mt-2 flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-emerald-700">
+                      <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> Kết luận của bác sĩ
+                    </span>
+                    <p className="mt-1 text-sm font-bold leading-5 text-slate-900">{conclusion?.finalDiagnosis || 'Chưa có chẩn đoán được ghi nhận'}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2 self-stretch sm:self-auto">
                     <span className="rounded-lg border border-sky-100 bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-700">{resultTotal} kết quả</span>
@@ -1091,23 +1093,24 @@ function MedicalHistoryPanel({ history }) {
 
 function HistoryMetric({ value, label }) {
   return (
-    <div className="min-w-20 rounded-2xl border border-white/10 bg-white/10 px-3 py-2 backdrop-blur-sm">
-      <strong className="block text-lg font-black text-white">{value}</strong>
-      <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-200">{label}</span>
+    <div className="min-w-[76px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+      <strong className="block text-base font-black text-slate-900">{value}</strong>
+      <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">{label}</span>
     </div>
   );
 }
 
-function HistoryTextCard({ icon, title, value, tone = 'indigo' }) {
-  const tones = tone === 'emerald'
-    ? 'border-emerald-100 bg-emerald-50/60 text-emerald-700'
-    : 'border-indigo-100 bg-indigo-50/50 text-indigo-700';
+function HistoryTextCard({ icon, title, value, tone = 'sky' }) {
+  const accent = tone === 'emerald'
+    ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+    : 'border-sky-100 bg-sky-50 text-sky-700';
   return (
-    <article className={`rounded-2xl border p-4 ${tones}`}>
-      <h4 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider">
-        {icon}<span>{title}</span>
+    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+      <h4 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-slate-700">
+        <span className={`grid h-7 w-7 place-items-center rounded-lg border ${accent}`}>{icon}</span>
+        <span>{title}</span>
       </h4>
-      <p className="mt-2 whitespace-pre-wrap text-xs font-semibold leading-5 text-slate-700">{value || 'Không ghi nhận'}</p>
+      <p className="mt-2 whitespace-pre-wrap text-xs font-semibold leading-5 text-slate-600">{value || 'Không ghi nhận'}</p>
     </article>
   );
 }
@@ -1116,44 +1119,50 @@ function HistoricalAiDiagnoses({ diagnoses, selectedDiagnosisId }) {
   if (diagnoses.length === 0) return null;
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50/80 via-white to-sky-50/60" aria-label="Chẩn đoán tham vấn AI trước đây">
-      <div className="flex flex-col gap-3 border-b border-violet-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h4 className="flex items-center gap-2 text-xs font-black text-violet-950">
-            <Sparkles className="h-4 w-4 text-violet-600" aria-hidden="true" />
-            Tham vấn AI trước đây
-          </h4>
-          <p className="mt-1 text-[10px] font-semibold text-slate-500">Chỉ dùng để tham khảo; kết luận cuối cùng thuộc về bác sĩ.</p>
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white" aria-label="Chẩn đoán tham vấn AI trước đây">
+      <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/70 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-sky-200 bg-sky-50 text-sky-700">
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div>
+            <h4 className="text-xs font-black text-slate-900">Tham vấn AI trước đây</h4>
+            <p className="mt-0.5 text-[10px] font-semibold text-slate-500">Dữ liệu hỗ trợ tham khảo; kết luận của bác sĩ là quyết định chuyên môn cuối cùng.</p>
+          </div>
         </div>
-        <span className="w-fit rounded-full border border-violet-200 bg-white px-2.5 py-1 text-[10px] font-bold text-violet-700">{diagnoses.length} bản phân tích</span>
+        <span className="w-fit rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-slate-600">{diagnoses.length} bản phân tích</span>
       </div>
 
-      <div className="grid gap-3 p-4 lg:grid-cols-2">
+      <div className="divide-y divide-slate-100">
         {diagnoses.map((diagnosis) => {
           const parsed = normalizeAiAnalysis(diagnosis.result);
           const reviewed = diagnosis.status === 'DOCTOR_REVIEWED' || Boolean(diagnosis.reviewedByDoctor);
           const modelName = parsed.modelName || diagnosis.aiModel?.modelName || 'Mô hình AI';
           const provider = parsed.provider || diagnosis.aiModel?.provider || 'AI';
           return (
-            <article key={diagnosis.id} className="rounded-2xl border border-white bg-white/90 p-4 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
-                <div>
-                  <span className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-500">{provider}</span>
+            <article key={diagnosis.id} className="p-4 transition-colors hover:bg-slate-50/40">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-sky-600">{provider}</span>
                   <h5 className="mt-0.5 text-xs font-black text-slate-900">
                     {modelName}{diagnosis.aiModel?.modelVersion ? ` · ${diagnosis.aiModel.modelVersion}` : ''}
                   </h5>
                   <time className="mt-1 block text-[10px] font-semibold text-slate-400" dateTime={diagnosis.createdAt}>{formatDate(diagnosis.createdAt)} · {formatTime(diagnosis.createdAt)}</time>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {diagnosis.id === selectedDiagnosisId ? <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[10px] font-black text-violet-700">Được dùng khi kết luận</span> : null}
-                  <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-black text-sky-700">Tin cậy {formatConfidence(diagnosis.confidence)}</span>
-                  <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${reviewed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
-                    {reviewed ? 'Đã được bác sĩ xem' : 'Chưa được bác sĩ duyệt'}
+                <div className="flex flex-wrap gap-1.5 sm:justify-end">
+                  {diagnosis.id === selectedDiagnosisId ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-black text-sky-700">
+                      <CheckCircle2 className="h-3 w-3" aria-hidden="true" /> Được đối chiếu khi kết luận
+                    </span>
+                  ) : null}
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-600">Tin cậy {formatConfidence(diagnosis.confidence)}</span>
+                  <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${reviewed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                    {reviewed ? 'Bác sĩ đã xem' : 'Chưa được bác sĩ duyệt'}
                   </span>
                 </div>
               </div>
 
-              <div className="mt-3 space-y-3 text-xs">
+              <div className="mt-4 space-y-3 border-t border-slate-100 pt-3 text-xs">
                 {parsed.summary ? <AiSection title="Tổng quan lâm sàng" value={parsed.summary} /> : null}
                 <ImageFindingsSection value={parsed.imageFindings} />
                 <DiagnosticProbabilitySection value={parsed.diagnosticProbabilities} />
@@ -1164,7 +1173,7 @@ function HistoricalAiDiagnoses({ diagnoses, selectedDiagnosisId }) {
                   {parsed.riskFlags ? <AiSection title="Cảnh báo rủi ro" value={parsed.riskFlags} list /> : null}
                 </div>
                 {!parsed.summary && !parsed.imageFindings?.length && !parsed.diagnosticProbabilities?.length ? (
-                  <p className="rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-500">Không có nội dung phân tích chi tiết.</p>
+                  <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 text-xs font-semibold text-slate-500">Không có nội dung phân tích chi tiết.</p>
                 ) : null}
               </div>
 
