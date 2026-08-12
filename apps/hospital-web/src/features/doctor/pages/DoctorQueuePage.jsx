@@ -358,6 +358,27 @@ export default function DoctorQueuePage() {
     finally { setBusy(false); }
   };
 
+  const reviewAiDiagnosis = async (diagnosisId, doctorFeedback) => {
+    if (!diagnosisId || busy) return false;
+    setBusy(true);
+    try {
+      const res = await clinicalDecisionService.reviewAiDiagnosis(diagnosisId, {
+        doctorFeedback: doctorFeedback.trim() || undefined,
+      });
+      setDecision((current) => current ? {
+        ...current,
+        aiDiagnoses: (current.aiDiagnoses || []).map((diagnosis) => diagnosis.id === diagnosisId ? { ...diagnosis, ...res.data } : diagnosis),
+      } : current);
+      toast.success('Đã xác nhận bác sĩ xem bản phân tích AI.');
+      return true;
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Không thể xác nhận đã xem phân tích AI.');
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submitConclusion = async (event) => {
     event.preventDefault();
     if (!activeVisit) return;
@@ -519,7 +540,7 @@ export default function DoctorQueuePage() {
             onClose={() => setShowWorkflowModal(false)}
             orderProps={{ forms: orderForms, setForms: setOrderForms, departments, existingOrders: decision?.medicalOrders || [], onSubmit: submitOrder, busy }}
             resultProps={{ orders: decision?.medicalOrders || [] }}
-            aiProps={{ diagnoses: decision?.aiDiagnoses || [], aiModels, selectedAiModelId, setSelectedAiModelId, selectedAiId, setSelectedAiId, onGenerate: generateAi, busy }}
+            aiProps={{ diagnoses: decision?.aiDiagnoses || [], aiModels, selectedAiModelId, setSelectedAiModelId, selectedAiId, setSelectedAiId, onGenerate: generateAi, onReview: reviewAiDiagnosis, busy }}
             conclusionProps={{ form: conclusionForm, setForm: setConclusionForm, onSubmit: submitConclusion, busy, completed: Boolean(decision?.finalConclusion), activeVisit, activeConclusion: conclusionForm }}
             history={medicalHistory}
           />
@@ -1157,7 +1178,7 @@ function HistoricalAiDiagnoses({ diagnoses, selectedDiagnosisId }) {
                   ) : null}
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-600">Tin cậy {formatConfidence(diagnosis.confidence)}</span>
                   <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${reviewed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
-                    {reviewed ? 'Bác sĩ đã xem' : 'Chưa được bác sĩ duyệt'}
+                    {reviewed ? 'Bác sĩ đã xác nhận xem' : 'Chưa xác nhận đã xem'}
                   </span>
                 </div>
               </div>
@@ -1459,11 +1480,27 @@ function ResultsPanel({ orders }) {
   );
 }
 
-function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId, selectedAiId, setSelectedAiId, onGenerate, busy }) {
+function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId, selectedAiId, setSelectedAiId, onGenerate, onReview, busy }) {
+  const [reviewFeedback, setReviewFeedback] = useState('');
+  const [reviewing, setReviewing] = useState(false);
   const rankedDiagnoses = useMemo(() => [...diagnoses].sort((a, b) => (Number(b.confidence) || 0) - (Number(a.confidence) || 0)), [diagnoses]);
   const currentDiagnosis = rankedDiagnoses.find((diagnosis) => diagnosis.id === selectedAiId) || rankedDiagnoses[0];
   const parsedResult = normalizeAiAnalysis(currentDiagnosis?.result);
-  const selectedModel = aiModels.find((model) => model.id === selectedAiModelId);
+  const reviewed = currentDiagnosis?.status === 'DOCTOR_REVIEWED' || Boolean(currentDiagnosis?.reviewedByDoctor);
+
+  useEffect(() => {
+    setReviewFeedback(currentDiagnosis?.doctorFeedback || '');
+  }, [currentDiagnosis?.id, currentDiagnosis?.doctorFeedback]);
+
+  const confirmReviewed = async () => {
+    if (!currentDiagnosis || reviewed || reviewing) return;
+    setReviewing(true);
+    try {
+      await onReview(currentDiagnosis.id, reviewFeedback);
+    } finally {
+      setReviewing(false);
+    }
+  };
 
   return (
     <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm space-y-5">
@@ -1512,6 +1549,7 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
               {rankedDiagnoses.map((diagnosis, index) => {
                 const parsed = normalizeAiAnalysis(diagnosis.result);
                 const isSelected = diagnosis.id === currentDiagnosis?.id;
+                const isReviewed = diagnosis.status === 'DOCTOR_REVIEWED' || Boolean(diagnosis.reviewedByDoctor);
                 return (
                   <button
                     key={diagnosis.id}
@@ -1534,6 +1572,10 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
                       <span>Độ tin cậy</span>
                       <span className="text-sky-600">{formatConfidence(diagnosis.confidence)}</span>
                     </div>
+                    <div className={`mt-2 flex items-center gap-1.5 border-t pt-2 text-[10px] font-bold ${isReviewed ? 'border-emerald-100 text-emerald-700' : 'border-amber-100 text-amber-700'}`}>
+                      {isReviewed ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />}
+                      <span>{isReviewed ? 'Đã xác nhận xem' : 'Chưa xác nhận xem'}</span>
+                    </div>
                   </button>
                 );
               })}
@@ -1550,9 +1592,15 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
                   {parsedResult.modelName || currentDiagnosis?.aiModel?.modelName || currentDiagnosis?.aiModel?.name || 'Mô hình AI'}
                 </h4>
               </div>
-              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-                Confidence {formatConfidence(currentDiagnosis?.confidence)}
-              </span>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                  Tin cậy {formatConfidence(currentDiagnosis?.confidence)}
+                </span>
+                <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${reviewed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                  {reviewed ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />}
+                  {reviewed ? 'Đã xác nhận xem' : 'Chưa xác nhận xem'}
+                </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1572,6 +1620,77 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
                 <AiSection title="Cảnh báo rủi ro" value={parsedResult.riskFlags} list />
               </div>
             </div>
+
+            {reviewed ? (
+              <section className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4" aria-label="Trạng thái xem phân tích AI">
+                <div className="flex items-start gap-3">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-emerald-200 bg-white text-emerald-700">
+                    <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <h5 className="text-xs font-black text-emerald-900">Bác sĩ đã xác nhận xem bản phân tích này</h5>
+                    <p className="mt-1 text-[11px] font-semibold leading-4 text-emerald-800/80">
+                      Đây là xác nhận đã tham khảo thông tin AI, không phải phê duyệt AI thành chẩn đoán cuối.
+                    </p>
+                    {currentDiagnosis.doctorFeedback ? (
+                      <div className="mt-3 border-t border-emerald-200 pt-3">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Phản hồi chuyên môn</span>
+                        <p className="mt-1 whitespace-pre-wrap text-xs font-semibold leading-5 text-slate-700">{currentDiagnosis.doctorFeedback}</p>
+                      </div>
+                    ) : null}
+                    {currentDiagnosis.reviewedByDoctor?.staffProfile?.fullName ? (
+                      <p className="mt-2 text-[10px] font-bold text-slate-500">BS. {currentDiagnosis.reviewedByDoctor.staffProfile.fullName}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </section>
+            ) : (
+              <section className="rounded-2xl border border-slate-200 bg-white p-4" aria-labelledby={`ai-review-title-${currentDiagnosis.id}`}>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start gap-3">
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-sky-200 bg-sky-50 text-sky-700">
+                        <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                      <div>
+                        <h5 id={`ai-review-title-${currentDiagnosis.id}`} className="text-xs font-black text-slate-900">Xác nhận bác sĩ đã xem</h5>
+                        <p className="mt-1 text-[11px] font-semibold leading-4 text-slate-500">
+                          Có thể ghi nhận nhận xét chuyên môn trước khi xác nhận. Phản hồi là tùy chọn và được lưu trong hồ sơ kiểm toán.
+                        </p>
+                      </div>
+                    </div>
+                    <label htmlFor={`ai-review-feedback-${currentDiagnosis.id}`} className="mt-3 block text-[10px] font-black uppercase tracking-wider text-slate-600">
+                      Phản hồi chuyên môn <span className="font-semibold normal-case tracking-normal text-slate-400">(không bắt buộc)</span>
+                    </label>
+                    <textarea
+                      id={`ai-review-feedback-${currentDiagnosis.id}`}
+                      value={reviewFeedback}
+                      onChange={(event) => setReviewFeedback(event.target.value)}
+                      maxLength={2000}
+                      rows={3}
+                      disabled={busy}
+                      placeholder="Ví dụ: Phù hợp với triệu chứng và kết quả cận lâm sàng; cần đối chiếu thêm..."
+                      className="mt-1.5 w-full resize-y rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-xs font-semibold leading-5 text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                    <p className="mt-1 text-right text-[10px] font-semibold text-slate-400">{reviewFeedback.length}/2000 ký tự</p>
+                  </div>
+                  <button
+                    id={`confirm-ai-reviewed-${currentDiagnosis.id}`}
+                    type="button"
+                    onClick={confirmReviewed}
+                    disabled={busy || reviewing}
+                    className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 text-xs font-bold text-white shadow-xs transition-colors hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {reviewing ? <LoadingIndicator size="sm" tone="white" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
+                    {reviewing ? 'Đang xác nhận...' : 'Xác nhận đã xem'}
+                  </button>
+                </div>
+                <p className="mt-3 flex items-start gap-1.5 border-t border-slate-100 pt-3 text-[10px] font-semibold leading-4 text-amber-700">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  Thao tác này không tự động chọn kết quả AI làm kết luận. Bác sĩ vẫn phải lập chẩn đoán cuối ở bước 3.
+                </p>
+              </section>
+            )}
           </section>
         </div>
       ) : (
