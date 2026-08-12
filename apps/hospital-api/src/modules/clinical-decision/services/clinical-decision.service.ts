@@ -5,6 +5,7 @@ import { GetVisitResultsUseCase } from '../application/use-cases/get-visit-resul
 import { GenerateAiAnalysisUseCase } from '../application/use-cases/generate-ai-analysis.use-case';
 import { ReviewAiDiagnosisUseCase } from '../application/use-cases/review-ai-diagnosis.use-case';
 import { CreateMedicalConclusionUseCase } from '../application/use-cases/create-medical-conclusion.use-case';
+import { ListPatientMedicalHistoryUseCase } from '../application/use-cases/list-patient-medical-history.use-case';
 
 /**
  * Facade preserving the controller-facing API. Each method delegates to a
@@ -20,10 +21,15 @@ export class ClinicalDecisionService {
     private readonly generateAiAnalysisUseCase: GenerateAiAnalysisUseCase,
     private readonly reviewAiDiagnosisUseCase: ReviewAiDiagnosisUseCase,
     private readonly createConclusionUseCase: CreateMedicalConclusionUseCase,
+    private readonly listPatientMedicalHistoryUseCase: ListPatientMedicalHistoryUseCase,
   ) {}
 
   getVisitResults(visitId: string, doctorUserId: string) {
     return this.getVisitResultsUseCase.execute(visitId, doctorUserId);
+  }
+
+  listPatientMedicalHistory(patientId: string, currentVisitId: string, doctorUserId: string) {
+    return this.listPatientMedicalHistoryUseCase.execute(patientId, currentVisitId, doctorUserId);
   }
 
   generateAiAnalysis(dto: GenerateAiAnalysisDto, doctorUserId: string) {

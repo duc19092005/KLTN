@@ -23,6 +23,16 @@ export class ClinicalDecisionController {
   }
 
   @Roles('DOCTOR')
+  @Get('patients/:patientId/history/visits/:visitId')
+  listPatientMedicalHistory(
+    @Param('patientId') patientId: string,
+    @Param('visitId') visitId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.service.listPatientMedicalHistory(patientId, visitId, user.sub);
+  }
+
+  @Roles('DOCTOR')
   @Post('ai-analysis')
   generateAiAnalysis(@Body() dto: GenerateAiAnalysisDto, @CurrentUser() user: AuthUser) {
     return this.service.generateAiAnalysis(dto, user.sub);

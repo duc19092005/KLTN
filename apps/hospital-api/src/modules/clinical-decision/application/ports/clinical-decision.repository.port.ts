@@ -6,6 +6,7 @@ export const CLINICAL_DECISION_REPOSITORY = Symbol('CLINICAL_DECISION_REPOSITORY
 /** Minimal visit shape for doctor ownership checks. */
 export type ClinicalVisitInfo = {
   id: string;
+  patientId: string;
   departmentId: string;
   staffId: string | null;
   status: string;
@@ -66,6 +67,7 @@ export interface ClinicalDecisionRepositoryPort {
   findDoctorByUserId(userId: string): Promise<ClinicalDoctor | null>;
   findVisitById(visitId: string): Promise<ClinicalVisitInfo | null>;
   findFullVisit(visitId: string): Promise<any>;
+  findPatientMedicalHistory(patientId: string, currentVisitId: string): Promise<unknown[]>;
 
   findAiModelById(id: string): Promise<AiModelRegistry | null>;
   findDefaultAiModelForSpecialty(specialty: string): Promise<AiModelRegistry | null>;

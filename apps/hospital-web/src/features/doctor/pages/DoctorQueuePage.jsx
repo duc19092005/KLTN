@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, FileText, Printer, Stethoscope, Search, RefreshCw, CheckCircle2, Clock, Activity, AlertCircle, Sparkles, User, Building2, ChevronRight, X, UserCheck, ShieldCheck } from 'lucide-react';
+import { Download, FileText, Printer, Stethoscope, Search, RefreshCw, CheckCircle2, Clock, Activity, AlertCircle, Sparkles, User, Building2, ChevronRight, ChevronDown, X, UserCheck, ShieldCheck, History, Pill } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
@@ -152,6 +152,7 @@ export default function DoctorQueuePage() {
   const [visits, setVisits] = useState([]);
   const [activeVisit, setActiveVisit] = useState(null);
   const [decision, setDecision] = useState(null);
+  const [medicalHistory, setMedicalHistory] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [aiModels, setAiModels] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -208,8 +209,21 @@ export default function DoctorQueuePage() {
     if (!visitId) return;
     setDetailLoading(true);
     try {
-      const res = await clinicalDecisionService.getVisitResults(visitId);
+      const patientId = activeVisit?.id === visitId ? activeVisit.patientId : undefined;
+      const [decisionRes, historyResult] = await Promise.all([
+        clinicalDecisionService.getVisitResults(visitId),
+        patientId
+          ? clinicalDecisionService.getPatientMedicalHistory(patientId, visitId).then((res) => ({ res })).catch((error) => ({ error }))
+          : Promise.resolve({ res: { data: [] } }),
+      ]);
+      const res = decisionRes;
       setDecision(res.data);
+      if (historyResult.error) {
+        setMedicalHistory([]);
+        toast.error(historyResult.error.response?.data?.message || 'Không tải được bệnh án lịch sử.');
+      } else {
+        setMedicalHistory(getItems(historyResult.res.data));
+      }
       const latestAi = res.data?.aiDiagnoses?.[0];
       setSelectedAiId(latestAi?.id || '');
 
@@ -229,6 +243,8 @@ export default function DoctorQueuePage() {
       } else setConclusionForm(emptyConclusion);
     } catch (err) {
       setDecision(null);
+      setMedicalHistory([]);
+      toast.error(err.response?.data?.message || 'Không tải được hồ sơ lượt khám.');
     } finally { setDetailLoading(false); }
   };
 
@@ -505,6 +521,7 @@ export default function DoctorQueuePage() {
             resultProps={{ orders: decision?.medicalOrders || [] }}
             aiProps={{ diagnoses: decision?.aiDiagnoses || [], aiModels, selectedAiModelId, setSelectedAiModelId, selectedAiId, setSelectedAiId, onGenerate: generateAi, busy }}
             conclusionProps={{ form: conclusionForm, setForm: setConclusionForm, onSubmit: submitConclusion, busy, completed: Boolean(decision?.finalConclusion), activeVisit, activeConclusion: conclusionForm }}
+            history={medicalHistory}
           />
         )}
 
@@ -805,7 +822,7 @@ function StatusBadge({ status }) {
 /* ==========================================
    MODAL WIZARD STEP-BY-STEP CHUẨN HÓA KHÁM BỆNH
    ========================================== */
-function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, resultProps, aiProps, conclusionProps }) {
+function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, resultProps, aiProps, conclusionProps, history = [] }) {
   const orders = orderProps?.existingOrders || [];
   const readyOrders = orders.filter((order) => order.status === 'RESULT_READY');
   const pendingOrders = orders.filter((order) => ['ORDERED', 'IN_PROGRESS'].includes(order.status));
@@ -842,6 +859,15 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
       tone: 'emerald',
       enabled: canConclude,
     },
+    {
+      step: 4,
+      eyebrow: 'Hồ sơ tham khảo',
+      title: 'Bệnh án lịch sử',
+      desc: 'Đối chiếu chẩn đoán, điều trị và kết quả từ các lần khám trước.',
+      status: history.length ? `${history.length} lượt khám trước` : 'Chưa có tiền sử khám',
+      tone: 'indigo',
+      enabled: true,
+    },
   ];
 
   const goStep = (step) => {
@@ -876,12 +902,14 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
           </div>
 
           {/* STEPPER NAV */}
-          <div className="mt-4 flex items-center justify-center gap-6">
+          <div className="mt-4 flex items-center justify-center gap-3">
             {steps.map((step, index) => {
               const isCurrent = activeStep === step.step;
               const isDone = step.step < activeStep || (step.step === 3 && hasConclusion);
               const circleClass = isCurrent
-                ? 'bg-sky-600 text-white border-sky-600 ring-4 ring-sky-100 shadow-sm'
+                ? step.step === 4
+                  ? 'bg-indigo-600 text-white border-indigo-600 ring-4 ring-indigo-100 shadow-sm'
+                  : 'bg-sky-600 text-white border-sky-600 ring-4 ring-sky-100 shadow-sm'
                 : isDone
                 ? 'bg-sky-100 text-sky-700 border-sky-200'
                 : step.enabled
@@ -890,15 +918,17 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
               return (
                 <React.Fragment key={step.step}>
                   <button
+                    id={`doctor-workflow-step-${step.step}`}
                     type="button"
                     onClick={() => goStep(step.step)}
                     disabled={!step.enabled}
-                    aria-label={`Bước ${step.step}`}
-                    className={`flex h-9 w-9 items-center justify-center rounded-full border text-xs font-bold transition-all ${circleClass}`}
+                    aria-label={step.step === 4 ? 'Mở bệnh án lịch sử' : `Bước ${step.step}`}
+                    aria-current={isCurrent ? 'step' : undefined}
+                    className={`flex h-9 min-w-9 items-center justify-center rounded-full border px-2.5 text-xs font-bold transition-all ${circleClass}`}
                   >
-                    {step.step}
+                    {step.step === 4 ? <History className="h-4 w-4" aria-hidden="true" /> : step.step}
                   </button>
-                  {index < steps.length - 1 && <span className="h-0.5 w-20 bg-slate-200" />}
+                  {index < steps.length - 1 && <span className="h-0.5 w-12 bg-slate-200" />}
                 </React.Fragment>
               );
             })}
@@ -944,10 +974,172 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
               <WorkflowActions secondaryLabel="Xem lại bước 2" onSecondary={() => goStep(2)} />
             </div>
           )}
+
+          {activeStep === 4 && (
+            <div className="animate-fadeIn">
+              <MedicalHistoryPanel history={history} />
+            </div>
+          )}
         </div>
       </div>
     </div>,
     document.body
+  );
+}
+
+function MedicalHistoryPanel({ history }) {
+  const [openVisitId, setOpenVisitId] = useState(history[0]?.id || '');
+
+  useEffect(() => {
+    setOpenVisitId((current) => history.some((visit) => visit.id === current) ? current : history[0]?.id || '');
+  }, [history]);
+
+  const diagnosisCount = history.filter((visit) => visit.finalConclusion?.finalDiagnosis).length;
+  const resultCount = history.reduce(
+    (total, visit) => total + (visit.medicalOrders || []).reduce((orderTotal, order) => orderTotal + (order.results?.length || 0), 0),
+    0
+  );
+
+  return (
+    <section aria-labelledby="medical-history-title" className="overflow-hidden rounded-3xl border border-indigo-200/80 bg-white shadow-sm">
+      <div className="relative overflow-hidden border-b border-indigo-100 bg-gradient-to-br from-indigo-950 via-slate-900 to-sky-950 px-6 py-6 text-white">
+        <div className="absolute -right-8 -top-12 h-36 w-36 rounded-full border border-white/10 bg-indigo-400/10" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2 text-indigo-200">
+              <History className="h-4 w-4" aria-hidden="true" />
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.2em]">Hồ sơ tham khảo lâm sàng</span>
+            </div>
+            <h3 id="medical-history-title" className="mt-2 text-xl font-bold tracking-tight">Bệnh án lịch sử</h3>
+            <p className="mt-1.5 text-xs font-medium leading-5 text-slate-300">
+              Các lượt khám đã hoàn tất được sắp xếp mới nhất trước. Thông tin này hỗ trợ suy luận, không thay thế đánh giá hiện tại.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <HistoryMetric value={history.length} label="Lượt khám" />
+            <HistoryMetric value={diagnosisCount} label="Kết luận" />
+            <HistoryMetric value={resultCount} label="Kết quả" />
+          </div>
+        </div>
+      </div>
+
+      {history.length === 0 ? (
+        <div className="p-8">
+          <Empty title="Chưa có bệnh án lịch sử" desc="Bệnh nhân chưa có lượt khám đã hoàn tất nào trước lần khám hiện tại." />
+        </div>
+      ) : (
+        <ol className="divide-y divide-slate-100" aria-label="Các lượt khám trước">
+          {history.map((historicalVisit, index) => {
+            const expanded = openVisitId === historicalVisit.id;
+            const conclusion = historicalVisit.finalConclusion;
+            const resultTotal = (historicalVisit.medicalOrders || []).reduce((total, order) => total + (order.results?.length || 0), 0);
+            const doctorName = conclusion?.doctor?.staffProfile?.fullName || historicalVisit.staff?.fullName || 'Chưa cập nhật';
+            return (
+              <li key={historicalVisit.id} className="relative pl-12 pr-5 py-5 [content-visibility:auto]">
+                <span className={`absolute left-5 top-6 grid h-6 w-6 place-items-center rounded-full border text-[10px] font-black ${index === 0 ? 'border-indigo-500 bg-indigo-600 text-white ring-4 ring-indigo-50' : 'border-slate-200 bg-white text-slate-500'}`}>
+                  {index + 1}
+                </span>
+                {index < history.length - 1 ? <span className="absolute bottom-0 left-8 top-12 w-px bg-slate-200" aria-hidden="true" /> : null}
+
+                <button
+                  id={`medical-history-visit-${historicalVisit.id}`}
+                  type="button"
+                  onClick={() => setOpenVisitId(expanded ? '' : historicalVisit.id)}
+                  aria-expanded={expanded}
+                  aria-controls={`medical-history-detail-${historicalVisit.id}`}
+                  className="group flex w-full flex-col gap-3 text-left sm:flex-row sm:items-start sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <time className="text-sm font-black text-slate-900" dateTime={historicalVisit.checkInAt}>{formatDate(historicalVisit.checkInAt)}</time>
+                      <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-500">{historicalVisit.visitCode}</span>
+                      {index === 0 ? <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700">Gần nhất</span> : null}
+                    </div>
+                    <p className="mt-1 truncate text-xs font-bold text-slate-600">{historicalVisit.department?.name || 'Chưa cập nhật khoa'} · BS. {doctorName}</p>
+                    <p className="mt-2 text-sm font-bold leading-5 text-slate-900">{conclusion?.finalDiagnosis || 'Chưa có chẩn đoán được ghi nhận'}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2 self-stretch sm:self-auto">
+                    <span className="rounded-lg border border-sky-100 bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-700">{resultTotal} kết quả</span>
+                    <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} aria-hidden="true" />
+                  </div>
+                </button>
+
+                {expanded ? (
+                  <div id={`medical-history-detail-${historicalVisit.id}`} className="mt-4 grid gap-4 border-t border-slate-100 pt-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <HistoryTextCard icon={<Activity className="h-4 w-4" />} title="Hướng điều trị" value={conclusion?.treatmentPlan} />
+                      <HistoryTextCard icon={<Pill className="h-4 w-4" />} title="Toa thuốc" value={conclusion?.prescription} tone="emerald" />
+                      <HistoryTextCard icon={<Clock className="h-4 w-4" />} title="Dặn dò / Tái khám" value={conclusion?.followUpNote} />
+                      <HistoryTextCard icon={<FileText className="h-4 w-4" />} title="Ghi chú bác sĩ" value={conclusion?.doctorNote} />
+                    </div>
+                    <HistoricalOrders orders={historicalVisit.medicalOrders || []} />
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+function HistoryMetric({ value, label }) {
+  return (
+    <div className="min-w-20 rounded-2xl border border-white/10 bg-white/10 px-3 py-2 backdrop-blur-sm">
+      <strong className="block text-lg font-black text-white">{value}</strong>
+      <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-200">{label}</span>
+    </div>
+  );
+}
+
+function HistoryTextCard({ icon, title, value, tone = 'indigo' }) {
+  const tones = tone === 'emerald'
+    ? 'border-emerald-100 bg-emerald-50/60 text-emerald-700'
+    : 'border-indigo-100 bg-indigo-50/50 text-indigo-700';
+  return (
+    <article className={`rounded-2xl border p-4 ${tones}`}>
+      <h4 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider">
+        {icon}<span>{title}</span>
+      </h4>
+      <p className="mt-2 whitespace-pre-wrap text-xs font-semibold leading-5 text-slate-700">{value || 'Không ghi nhận'}</p>
+    </article>
+  );
+}
+
+function HistoricalOrders({ orders }) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4" aria-label="Chỉ định và kết quả cũ">
+      <div className="flex items-center justify-between gap-3">
+        <h4 className="text-xs font-black text-slate-900">Cận lâm sàng đã thực hiện</h4>
+        <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-slate-500 shadow-sm">{orders.length} phiếu</span>
+      </div>
+      {orders.length === 0 ? (
+        <p className="mt-3 text-xs font-medium text-slate-400">Không có chỉ định trong lượt khám này.</p>
+      ) : (
+        <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
+          {orders.map((order) => (
+            <article key={order.id} className="rounded-xl border border-slate-200 bg-white p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <strong className="block text-xs font-bold text-slate-800">{order.orderType}</strong>
+                  <span className="text-[10px] font-semibold text-slate-400">{order.targetDepartment?.name || order.orderCode}</span>
+                </div>
+                <span className="text-[10px] font-bold text-emerald-700">{order.results?.length || 0} KQ</span>
+              </div>
+              {(order.results || []).map((result) => (
+                <div key={result.id} className="mt-2 border-l-2 border-sky-200 pl-3">
+                  <p className="whitespace-pre-wrap text-[11px] font-semibold leading-4 text-slate-600">{result.note || 'Không có ghi chú kết quả.'}</p>
+                  {result.files?.length ? (
+                    <p className="mt-1 text-[10px] font-bold text-sky-700">{result.files.length} tệp kết quả đã lưu trong hồ sơ</p>
+                  ) : null}
+                </div>
+              ))}
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
