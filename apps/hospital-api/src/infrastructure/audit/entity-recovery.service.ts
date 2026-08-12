@@ -28,6 +28,7 @@ import { AuditLoggerService } from './audit-logger.service';
 import {
   compareLiveSnapshotToAuditAfter,
   verifyAuditRow,
+  verifyAuditRowLight,
 } from './audit-verification.util';
 import { canonicalize } from './audit-hash.util';
 import { EntityRecreationBundleCache, EntityRecreationService } from './entity-recreation.service';
@@ -305,13 +306,13 @@ export class EntityRecoveryService {
       sensitiveDataHidden: true as const,
     };
 
-    const verification = verifyAuditRow(row);
-    if (!verification.ok) {
+    const lightVerification = verifyAuditRowLight(row);
+    if (!lightVerification.ok) {
       return {
         ...base,
         status: 'AUDIT_UNTRUSTED',
         recoverable: false,
-        fieldsChanged: this.safeFieldNames(entity, verification.suspiciousFields),
+        fieldsChanged: this.safeFieldNames(entity, lightVerification.suspiciousFields),
         blockers: ['AUDIT_ROW_INTEGRITY_FAILED'], dependencies: [], recoveryMode: 'AUDIT_BATCH_FIRST',
         message: 'Audit nguồn có dấu hiệu sai lệch. Hãy phục hồi audit batch từ IPFS trước.',
       };
@@ -339,6 +340,8 @@ export class EntityRecoveryService {
           : `Không thể khôi phục tự động: ${(preview?.blockers ?? ['không có snapshot tin cậy']).join(', ')}.`,
       };
     }
+
+    const verification = verifyAuditRow(row);
 
     if (!this.hasCompleteSnapshot(entity, verification.decryptedAfter)) {
       const partialComparison = this.compareCommittedSnapshotFields(

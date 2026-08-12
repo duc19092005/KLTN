@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
@@ -31,9 +31,32 @@ export interface DeepScanProgressState {
   } | null;
 }
 
+export interface WatchdogState {
+  enabled: boolean;
+  intervalMinutes: number;
+  chunkSize: number;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  lastScannedBatches: number;
+  lastHealedBatches: number;
+  statusMessage: string;
+}
+
 @Injectable()
-export class AuditRecoveryService {
+export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
   private readonly runningBatches = new Set<number>();
+  private watchdogTimer: NodeJS.Timeout | null = null;
+  private watchdogState: WatchdogState = {
+    enabled: true,
+    intervalMinutes: 20,
+    chunkSize: 15,
+    lastRunAt: null,
+    nextRunAt: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
+    lastScannedBatches: 0,
+    lastHealedBatches: 0,
+    statusMessage: 'Tự động chạy ngầm mỗi 20 phút (phân đoạn 15 lô / lượt).',
+  };
+
   private deepScanState: DeepScanProgressState = {
     active: false,
     progressPercent: 0,
@@ -51,6 +74,125 @@ export class AuditRecoveryService {
     private readonly anchor: AuditAnchorService,
     private readonly audit: AuditLoggerService,
   ) {}
+
+  onModuleInit() {
+    const intervalMs = 20 * 60 * 1000;
+    this.watchdogTimer = setInterval(() => {
+      void this.runWatchdogAutoHealSweep().catch((err) => {
+        console.error('[WATCHDOG AUTO-HEAL ERROR]', err);
+      });
+    }, intervalMs);
+
+    setTimeout(() => {
+      void this.runWatchdogAutoHealSweep().catch(() => {});
+    }, 15000);
+  }
+
+  onModuleDestroy() {
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer);
+    }
+  }
+
+  getWatchdogStatus(): WatchdogState {
+    return this.watchdogState;
+  }
+
+  async runWatchdogAutoHealSweep(): Promise<{ scanned: number; healed: number }> {
+    if (this.deepScanState.active) {
+      return { scanned: 0, healed: 0 };
+    }
+
+    const now = new Date();
+    this.watchdogState.lastRunAt = now.toISOString();
+    this.watchdogState.nextRunAt = new Date(now.getTime() + 20 * 60 * 1000).toISOString();
+
+    let totalScanned = 0;
+    let totalHealed = 0;
+
+    try {
+      const latestOnChain = await this.blockchain.getLatestAuditBatchId();
+      if (!latestOnChain || latestOnChain <= 0) {
+        this.watchdogState.statusMessage = 'Chưa có batch nào trên Blockchain.';
+        return { scanned: 0, healed: 0 };
+      }
+
+      const checkpoints = await this.blockchain.getAuditCheckpointsRange(1, latestOnChain);
+      totalScanned = checkpoints.length;
+      const chunkSize = 15;
+      const targetBatchIds: number[] = [];
+
+      for (let i = 0; i < checkpoints.length; i += chunkSize) {
+        const chunk = checkpoints.slice(i, i + chunkSize);
+        const localBatches = await this.prisma.auditBatch.findMany({
+          where: { batchId: { in: chunk.map((c) => c.batchId) } },
+          select: {
+            batchId: true,
+            merkleRoot: true,
+            status: true,
+            fromSeq: true,
+            toSeq: true,
+            leafCount: true,
+            algorithmVersion: true,
+          },
+        });
+        const localMap = new Map(localBatches.map((b) => [b.batchId, b]));
+
+        for (const cp of chunk) {
+          if (!cp.committed) continue;
+          const local = localMap.get(cp.batchId);
+          if (!local || local.status !== 'ANCHORED') {
+            targetBatchIds.push(cp.batchId);
+            continue;
+          }
+
+          if (rootToBytes32(local.merkleRoot).toLowerCase() !== rootToBytes32(cp.root).toLowerCase()) {
+            targetBatchIds.push(cp.batchId);
+            continue;
+          }
+
+          if (local.fromSeq != null && local.toSeq != null) {
+            const logsInBatch = await this.prisma.blockchainLogger.findMany({
+              where: { seq: { gte: local.fromSeq, lte: local.toSeq }, entryHash: { not: null } },
+              select: { seq: true, entryHash: true },
+            });
+            const expectedCount = Number(cp.leafCount) || local.leafCount || (local.toSeq - local.fromSeq + 1);
+            if (logsInBatch.length !== expectedCount) {
+              targetBatchIds.push(cp.batchId);
+              continue;
+            }
+            const recomputedRoot = computeMerkleRootForAlgorithm(
+              logsInBatch.map((l) => l.entryHash!),
+              local.algorithmVersion ?? MERKLE_SHA256_STRING_V1,
+            );
+            if (rootToBytes32(recomputedRoot).toLowerCase() !== rootToBytes32(cp.root).toLowerCase()) {
+              targetBatchIds.push(cp.batchId);
+              continue;
+            }
+          }
+        }
+      }
+
+      for (const bId of targetBatchIds) {
+        try {
+          await this.recoverBatchDirectFromChain(bId, 'SYSTEM_WATCHDOG', 'Automated 20-minute Background Watchdog Auto-Healing');
+          totalHealed += 1;
+        } catch (err) {
+          console.error(`[WATCHDOG] Failed to auto-heal batch #${bId}:`, err);
+        }
+      }
+
+      this.watchdogState.lastScannedBatches = totalScanned;
+      this.watchdogState.lastHealedBatches = totalHealed;
+      this.watchdogState.statusMessage = totalHealed > 0
+        ? `[WATCHDOG 20m] Đã tự động phát hiện và khôi phục thành công ${totalHealed} lô bị sai lệch!`
+        : `[WATCHDOG 20m] Tất cả ${totalScanned} lô trên Blockchain và DB local đều toàn vẹn 100%.`;
+    } catch (err) {
+      console.error('[WATCHDOG SWEEP ERROR]', err);
+    }
+
+    return { scanned: totalScanned, healed: totalHealed };
+  }
 
   getDeepScanStatus(): DeepScanProgressState {
     return this.deepScanState;

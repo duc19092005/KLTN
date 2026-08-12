@@ -24,6 +24,7 @@ export const auditService = {
   entityWarnings: (params = {}) => api.get('/audit/recovery/entities/warnings', { params }),
   recoverEntities: (items, reason) => api.post('/audit/recovery/entities', { items, reason }),
   getDeepScanStatus: () => api.get('/audit/recovery/deep-scan/status'),
+  getWatchdogStatus: () => api.get('/audit/recovery/watchdog/status'),
   startDeepScan: (stepUpTicket) => api.post(
     '/audit/recovery/deep-scan',
     {},

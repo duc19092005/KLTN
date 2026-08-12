@@ -8,6 +8,8 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { DepartmentService } from '../services/department.service';
 import { AssignManagerDto, CreateDepartmentDto, DepartmentQueryDto, UpdateDepartmentDto } from '../dto/department.dto';
 import { AdministrativeLifecycleService } from '../../../common/lifecycle/administrative-lifecycle.service';
+import { EntityIntegrityGuard } from '../../../common/guards/entity-integrity.guard';
+import { CheckEntityIntegrity } from '../../../common/decorators/check-entity-integrity.decorator';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
@@ -47,26 +49,31 @@ export class DepartmentController {
   historyOne(@Param('id') id: string) {
     return this.service.getHistory(id);
   }
-
-  @Get(':id/audit/verify')
+  @Get(':id/audit/verify')
   @ApiOperation({ summary: 'Verify integrity of one department against blockchain' })
   verifyOne(@Param('id') id: string) {
     return this.service.verifyDepartment(id);
   }
 
   @Patch(':id')
+  @UseGuards(EntityIntegrityGuard)
+  @CheckEntityIntegrity({ entity: 'Department', paramKey: 'id' })
   @ApiOperation({ summary: 'Update a department' })
   update(@Param('id') id: string, @Body() dto: UpdateDepartmentDto, @CurrentUser() user: AuthUser) {
     return this.service.update(id, dto, user?.sub);
   }
 
   @Patch(':id/manager')
+  @UseGuards(EntityIntegrityGuard)
+  @CheckEntityIntegrity({ entity: 'Department', paramKey: 'id' })
   @ApiOperation({ summary: 'Assign or clear department manager' })
   assignManager(@Param('id') id: string, @Body() dto: AssignManagerDto, @CurrentUser() user: AuthUser) {
     return this.service.assignManager(id, dto, user?.sub);
   }
 
   @Delete(':id')
+  @UseGuards(EntityIntegrityGuard)
+  @CheckEntityIntegrity({ entity: 'Department', paramKey: 'id' })
   @ApiOperation({ summary: 'Delete an empty department' })
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.lifecycle.softDelete('departments', id, user.sub);

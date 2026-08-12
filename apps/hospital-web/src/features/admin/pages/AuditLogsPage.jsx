@@ -28,7 +28,11 @@ import {
   AlertTriangle,
   History,
   Activity,
-  Zap
+  Zap,
+  Maximize2,
+  Minimize2,
+  Bot,
+  Cpu
 } from 'lucide-react';
 
 const ACTION_TONE = {
@@ -61,6 +65,7 @@ const BATCH_STATUS_LABEL = {
   ANCHORED: 'Đã neo',
   FAILED: 'Thất bại',
   PENDING: 'Chờ neo',
+  MISSING: 'Thiếu trong DB',
 };
 
 const ROLE_LABELS = {
@@ -86,7 +91,9 @@ function shortHash(hash) {
 
 function canRecoverBatch(batch, chain) {
   if (!batch) return false;
-  if (batch.status !== 'ANCHORED' || !batch.artifactAvailable) return false;
+  if (!batch.artifactAvailable) return false;
+  if (batch.status === 'MISSING') return true;
+  if (batch.status !== 'ANCHORED') return false;
   const integrity = batch.integrity || {};
   const isTamperedLocally = integrity.status === 'TAMPERED' || integrity.status === 'PENDING' || Number(integrity.tampered) > 0 || Number(integrity.pending) > 0;
   if (isTamperedLocally) return true;
@@ -96,10 +103,14 @@ function canRecoverBatch(batch, chain) {
       const match = chain.reason.match(/mong đợi (\d+)/i);
       if (match && match[1]) targetSeq = parseInt(match[1], 10);
     }
-    if (batch.fromSeq <= targetSeq && batch.toSeq >= targetSeq) {
-      return true;
-    }
-    if (batch.fromSeq <= chain.brokenAtSeq && batch.toSeq >= Math.max(1, targetSeq - 1)) {
+    if (batch.fromSeq != null && batch.toSeq != null) {
+      if (batch.fromSeq <= targetSeq && batch.toSeq >= targetSeq) {
+        return true;
+      }
+      if (batch.fromSeq <= chain.brokenAtSeq && batch.toSeq >= Math.max(1, targetSeq - 1)) {
+        return true;
+      }
+    } else {
       return true;
     }
   }
@@ -108,8 +119,9 @@ function canRecoverBatch(batch, chain) {
 
 function recoverBatchDisabledReason(batch, chain) {
   if (!batch) return 'Không có lô.';
-  if (batch.status !== 'ANCHORED') return 'Chỉ khôi phục lô đã neo on-chain.';
   if (!batch.artifactAvailable) return 'Lô không có artifact IPFS để khôi phục.';
+  if (batch.status === 'MISSING') return '';
+  if (batch.status !== 'ANCHORED') return 'Chỉ khôi phục lô đã neo on-chain.';
   if (canRecoverBatch(batch, chain)) return '';
   return 'Lô đang toàn vẹn — không cần khôi phục.';
 }
@@ -197,9 +209,11 @@ export default function AuditLogsPage() {
   const [batchesTotalPages, setBatchesTotalPages] = useState(1);
   const [batchesTotal, setBatchesTotal] = useState(0);
   const [batchSortBy, setBatchSortBy] = useState('batchId');
+  const [batchSortOrder, setBatchSortOrder] = useState('desc');
   const [deepScanFaceOpen, setDeepScanFaceOpen] = useState(false);
   const [deepScanProgress, setDeepScanProgress] = useState(null);
   const [deepScanPolling, setDeepScanPolling] = useState(false);
+  const [deepScanCollapsed, setDeepScanCollapsed] = useState(false);
 
   const loadBatches = useCallback(async () => {
     setLoading(true);
@@ -290,6 +304,13 @@ export default function AuditLogsPage() {
     try {
       const res = await auditService.startDeepScan(ticket);
       toast.success(res.data?.message || 'Đã kích hoạt đối soát chuyên sâu!');
+      setDeepScanProgress({
+        active: true,
+        progressPercent: 0,
+        statusMessage: 'Đang khởi chạy tiến trình đối soát ngầm...',
+        logs: ['[INFO] Đã xác thực khuôn mặt Admin. Đang bắt đầu kiểm tra Merkle Tree & Blockchain...']
+      });
+      setDeepScanCollapsed(false);
       setDeepScanPolling(true);
     } catch (err) {
       toast.error(err?.response?.data?.message || err.message || 'Không thể kích hoạt đối soát.');
@@ -304,9 +325,12 @@ export default function AuditLogsPage() {
           const res = await auditService.getDeepScanStatus();
           const state = res.data || {};
           setDeepScanProgress(state);
-          if (!state.active && state.progressPercent === 100) {
+          if (!state.active) {
             setDeepScanPolling(false);
             refreshAll();
+            setTimeout(() => {
+              setDeepScanProgress(null);
+            }, 5000);
           }
         } catch (err) {
           console.error('Deep scan polling error:', err);
@@ -324,6 +348,12 @@ export default function AuditLogsPage() {
     loadPendingQueue();
     loadChain();
     loadEntityWarnings();
+    auditService.getDeepScanStatus().then((res) => {
+      if (res.data && res.data.active) {
+        setDeepScanProgress(res.data);
+        setDeepScanPolling(true);
+      }
+    }).catch(() => {});
   }, [loadPendingQueue, loadChain, loadEntityWarnings]);
 
   const stats = useMemo(() => {
@@ -552,29 +582,41 @@ export default function AuditLogsPage() {
       <div className="mx-auto max-w-7xl space-y-6 pb-10">
         <Hero onRefresh={refreshAll} onAnchor={handleAnchorNow} loading={loading} anchoring={anchoring} totalBatches={stats.batches} />
 
-        <div className="rounded-3xl border border-amber-200/80 bg-amber-50/80 p-5 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/30">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3.5">
-              <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 shadow-xs">
-                <AlertTriangle className="h-5 w-5" />
+        <div className="rounded-3xl border border-sky-200/80 bg-sky-50/80 p-6 shadow-sm dark:border-sky-900/50 dark:bg-sky-950/30">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+            <div className="flex items-start gap-4">
+              <div className="mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-500 text-white shadow-md">
+                <Activity className="h-6 w-6 animate-pulse" />
               </div>
-              <div>
-                <h4 className="font-bold text-amber-900 dark:text-amber-200 text-sm">
-                  Chế độ Kiểm tra: Trạng thái DB Local
-                </h4>
-                <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300/90 leading-relaxed font-medium">
-                  Hiện tại bảng tổng quan chỉ đang kiểm tra trạng thái toàn vẹn tại DB local, chưa đối chiếu trực tiếp với mỏ neo Blockchain. Để đối soát chuyên sâu và tự động sửa chữa toàn bộ Audit Batch, vui lòng bấm nút bên cạnh.
-                </p>
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="font-bold text-sky-950 dark:text-sky-100 text-base">
+                    Cơ chế Khôi phục & Tự động Giám sát (Self-Healing System)
+                  </h4>
+                  <span className="rounded-full bg-sky-200/80 px-2.5 py-0.5 text-[11px] font-black text-sky-800 dark:bg-sky-900 dark:text-sky-200">
+                    Watchdog: 20 phút / lần (15 lô/lượt)
+                  </span>
+                </div>
+                <div className="text-xs text-sky-800/90 dark:text-sky-300/90 leading-relaxed font-medium space-y-1 mt-1">
+                  <div className="flex items-center gap-1.5">
+                    <Bot className="h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400" />
+                    <span><b>Tự động ngầm:</b> Hệ thống chạy Background Job định kỳ <b>20 phút / lần</b>, phân chia từng đợt (15 - 20 lô/lượt) để đối soát ngầm với Blockchain & IPFS mà không gây nặng server.</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Zap className="h-4 w-4 shrink-0 text-amber-500" />
+                    <span><b>Đối soát thủ công:</b> Nếu muốn kiểm tra và tự khôi phục tức thì mà không cần chờ đến chu kỳ 20 phút, vui lòng xác thực khuôn mặt và bấm nút bên cạnh.</span>
+                  </div>
+                </div>
               </div>
             </div>
             <button
               type="button"
               onClick={() => setDeepScanFaceOpen(true)}
               disabled={deepScanPolling || (deepScanProgress && deepScanProgress.active)}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:bg-amber-800 disabled:opacity-50 transition-colors"
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-sky-600 px-5 py-3 text-xs font-bold text-white shadow-md hover:bg-sky-700 active:bg-sky-800 disabled:opacity-50 transition-all cursor-pointer"
             >
               <Zap className="h-4 w-4" />
-              <span>Kiểm tra chi tiết từng Batch</span>
+              <span>Đối soát & Khôi phục Thủ công ngay</span>
             </button>
           </div>
         </div>
@@ -771,59 +813,120 @@ export default function AuditLogsPage() {
       )}
 
       {deepScanProgress && (
-        <div className="fixed bottom-6 left-6 z-50 w-96 max-w-[calc(100vw-3rem)] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl dark:border-slate-800 dark:bg-slate-900 transition-all duration-300">
-          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-3">
-            <div className="flex items-center gap-2.5">
-              <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${deepScanProgress.active ? 'bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400 animate-pulse' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400'}`}>
-                <Activity className="h-4 w-4" />
+        <div className="fixed bottom-6 right-6 z-50 transition-all duration-300">
+          {deepScanCollapsed ? (
+            <div
+              className="flex items-center gap-2.5 rounded-2xl border border-slate-200/90 bg-white/95 px-3.5 py-2.5 shadow-xl backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95 transition-all hover:scale-105 cursor-pointer select-none"
+              onClick={() => setDeepScanCollapsed(false)}
+              title="Click để xem chi tiết tiến trình đối soát"
+            >
+              <div
+                className={`flex h-7 w-7 items-center justify-center rounded-lg ${
+                  deepScanProgress.active
+                    ? 'bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400 animate-pulse'
+                    : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400'
+                }`}
+              >
+                <Activity className="h-3.5 w-3.5" />
               </div>
-              <div>
-                <h5 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  Đối soát Blockchain & Tự sửa chữa
-                </h5>
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  {deepScanProgress.active ? 'Đang chạy ngầm...' : 'Đã hoàn thành đối soát'}
-                </p>
+              <div className="flex items-center gap-1.5 font-mono text-xs font-bold">
+                <span className="text-slate-500 dark:text-slate-400">Đối soát:</span>
+                <span className="text-sky-600 dark:text-sky-400">{deepScanProgress.progressPercent}%</span>
               </div>
-            </div>
-            {!deepScanProgress.active && (
               <button
                 type="button"
-                onClick={() => setDeepScanProgress(null)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeepScanCollapsed(false);
+                }}
+                className="ml-1 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                title="Mở rộng"
               >
-                <X className="h-4 w-4" />
+                <Maximize2 className="h-3.5 w-3.5" />
               </button>
-            )}
-          </div>
-
-          <div className="space-y-1.5 mb-3">
-            <div className="flex justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
-              <span className="truncate">{deepScanProgress.statusMessage}</span>
-              <span className="shrink-0 font-bold ml-2">{deepScanProgress.progressPercent}%</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeepScanProgress(null);
+                }}
+                className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950 dark:hover:text-rose-400"
+                title="Tắt"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-              <div
-                className="h-full bg-gradient-to-r from-sky-500 to-emerald-500 transition-all duration-300 rounded-full"
-                style={{ width: `${deepScanProgress.progressPercent}%` }}
-              />
-            </div>
-          </div>
-
-          <div className="h-36 overflow-y-auto rounded-xl bg-slate-950 p-2.5 font-mono text-[11px] text-slate-300 space-y-1 scrollbar-thin">
-            {(deepScanProgress.logs || []).map((log, idx) => (
-              <div key={idx} className="leading-relaxed break-words">
-                {log}
+          ) : (
+            <div className="w-96 max-w-[calc(100vw-3rem)] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl dark:border-slate-800 dark:bg-slate-900 transition-all duration-300">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-3">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                      deepScanProgress.active
+                        ? 'bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400 animate-pulse'
+                        : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400'
+                    }`}
+                  >
+                    <Activity className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h5 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                      Đối soát Blockchain & Tự sửa chữa
+                    </h5>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      {deepScanProgress.active ? 'Đang chạy ngầm...' : 'Đã hoàn thành đối soát'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setDeepScanCollapsed(true)}
+                    className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                    title="Thu gọn"
+                  >
+                    <Minimize2 className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeepScanProgress(null)}
+                    className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                    title="Tắt"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
+
+              <div className="space-y-1.5 mb-3">
+                <div className="flex justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <span className="truncate">{deepScanProgress.statusMessage}</span>
+                  <span className="shrink-0 font-bold ml-2">{deepScanProgress.progressPercent}%</span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                  <div
+                    className="h-full bg-gradient-to-r from-sky-500 to-emerald-500 transition-all duration-300 rounded-full"
+                    style={{ width: `${deepScanProgress.progressPercent}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="h-36 overflow-y-auto rounded-xl bg-slate-950 p-2.5 font-mono text-[11px] text-slate-300 space-y-1 scrollbar-thin">
+                {(deepScanProgress.logs || []).map((log, idx) => (
+                  <div key={idx} className="leading-relaxed break-words">
+                    {log}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {deepScanFaceOpen && (
         <FaceStepUpModal
           action="DEEP_SCAN_SELF_HEAL"
-          resourceId="blockchain_audit_deep_scan"
+          resourceId={null}
           title="Quét khuôn mặt Admin để cấp quyền đối soát Blockchain"
           description="Quét khuôn mặt Admin để cấp quyền thực thi cơ chế tự động đối soát Blockchain & tự sửa chữa Audit Batch bị lệch."
           onSuccess={handleDeepScanTicket}

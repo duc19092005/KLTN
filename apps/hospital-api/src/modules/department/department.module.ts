@@ -14,11 +14,14 @@ import { DEPARTMENT_INTEGRITY_ANCHOR } from './application/ports/department-inte
 import { PrismaDepartmentRepository } from './infrastructure/prisma/prisma-department.repository';
 import { BlockchainDepartmentIntegrityAnchor } from './infrastructure/adapters/blockchain-department-integrity.anchor';
 
+import { EntityIntegrityGuard } from '../../common/guards/entity-integrity.guard';
+
 @Module({
   imports: [BlockchainModule],
   controllers: [DepartmentController],
   providers: [
     DepartmentService,
+    EntityIntegrityGuard,
     CreateDepartmentUseCase,
     ListDepartmentsUseCase,
     UpdateDepartmentUseCase,
