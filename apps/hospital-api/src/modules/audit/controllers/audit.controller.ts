@@ -58,7 +58,7 @@ export class AuditController {
   }
 
   @Post('recovery/deep-scan')
-  @RequireFaceStepUp('Quét khuôn mặt Admin để cấp quyền thực thi cơ chế tự động đối soát Blockchain & tự sửa chữa Audit Batch')
+  @RequireFaceStepUp('DEEP_SCAN_SELF_HEAL')
   @ApiOperation({ summary: 'Trigger Face-authenticated deep-scan verification and automated batch self-healing' })
   startDeepScan(@CurrentUser() user: AuthUser) {
     return this.recovery.startDeepScanAndSelfHeal(user.sub);
