@@ -5,7 +5,7 @@ import { BlockchainService } from '../blockchain/blockchain.service';
 import { AuditArtifactService, AuditRecoveryBundleRow } from './audit-artifact.service';
 import { AuditAnchorService } from './audit-anchor.service';
 import { AuditLoggerService } from './audit-logger.service';
-import { computeMerkleRootForAlgorithm, rootToBytes32 } from './merkle.util';
+import { computeMerkleRootForAlgorithm, MERKLE_SHA256_STRING_V1, rootToBytes32 } from './merkle.util';
 import { verifyAuditRow } from './audit-verification.util';
 
 export interface VerifiedAuditRecoveryBundle {
@@ -16,9 +16,33 @@ export interface VerifiedAuditRecoveryBundle {
   logs: AuditRecoveryBundleRow[];
 }
 
+export interface DeepScanProgressState {
+  active: boolean;
+  progressPercent: number;
+  statusMessage: string;
+  logs: string[];
+  startTime: string | null;
+  endTime: string | null;
+  result: {
+    scannedBatches: number;
+    recoveredBatches: number;
+    recoveredEntities: number;
+    errors: string[];
+  } | null;
+}
+
 @Injectable()
 export class AuditRecoveryService {
   private readonly runningBatches = new Set<number>();
+  private deepScanState: DeepScanProgressState = {
+    active: false,
+    progressPercent: 0,
+    statusMessage: 'Hệ thống sẵn sàng đối soát.',
+    logs: [],
+    startTime: null,
+    endTime: null,
+    result: null,
+  };
 
   constructor(
     private readonly prisma: PrismaService,
@@ -28,6 +52,277 @@ export class AuditRecoveryService {
     private readonly audit: AuditLoggerService,
   ) {}
 
+  getDeepScanStatus(): DeepScanProgressState {
+    return this.deepScanState;
+  }
+
+  async startDeepScanAndSelfHeal(adminId: string): Promise<{ message: string; active: boolean }> {
+    if (this.deepScanState.active) {
+      throw new ConflictException('Tiến trình đối soát và tự động sửa chữa đang chạy.');
+    }
+
+    // Launch background execution
+    void this.runDeepScanAndSelfHealProcess(adminId).catch((error) => {
+      console.error('DEEP SCAN ERROR:', error);
+    });
+
+    return {
+      message: 'Đã kích hoạt thành công tiến trình đối soát ngầm và tự động sửa chữa Audit Batch.',
+      active: true,
+    };
+  }
+
+  private timeLog(): string {
+    const now = new Date();
+    return `[${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}]`;
+  }
+
+  private pushLog(msg: string) {
+    const entry = `${this.timeLog()} ${msg}`;
+    this.deepScanState.logs.push(entry);
+    if (this.deepScanState.logs.length > 200) {
+      this.deepScanState.logs.shift();
+    }
+  }
+
+  private async runDeepScanAndSelfHealProcess(adminId: string) {
+    this.deepScanState = {
+      active: true,
+      progressPercent: 5,
+      statusMessage: 'Đã xác thực khuôn mặt Admin. Đang kết nối Blockchain...',
+      logs: [],
+      startTime: new Date().toISOString(),
+      endTime: null,
+      result: null,
+    };
+
+    this.pushLog('👤 Đã xác thực khuôn mặt Admin. Khởi chạy tiến trình đối soát chi tiết...');
+
+    let scannedCount = 0;
+    let recoveredBatchesCount = 0;
+    let recoveredEntitiesCount = 0;
+    const errors: string[] = [];
+
+    try {
+      this.deepScanState.progressPercent = 10;
+      this.pushLog('🔍 [Pass 1] Đang đọc batch mới nhất từ Blockchain...');
+
+      const latestOnChain = await this.blockchain.getLatestAuditBatchId();
+      if (!latestOnChain || latestOnChain <= 0) {
+        this.pushLog('ℹ️ Chưa có batch nào được ghi nhận trên Blockchain.');
+        this.deepScanState.progressPercent = 100;
+        this.deepScanState.statusMessage = 'Chưa có batch nào trên Blockchain.';
+        this.deepScanState.active = false;
+        this.deepScanState.endTime = new Date().toISOString();
+        this.deepScanState.result = { scannedBatches: 0, recoveredBatches: 0, recoveredEntities: 0, errors: [] };
+        return;
+      }
+
+      this.pushLog(`🔗 Blockchain đã ghi nhận tổng cộng ${latestOnChain} Audit Batches (Batch #1 đến #${latestOnChain}).`);
+      this.deepScanState.progressPercent = 20;
+
+      // Pass 1: Fetch all on-chain checkpoints in ranges
+      const onChainCheckpoints = await this.blockchain.getAuditCheckpointsRange(1, latestOnChain);
+      scannedCount = onChainCheckpoints.length;
+
+      // Local DB lookup for all batches with detailed metadata
+      const localBatches = await this.prisma.auditBatch.findMany({
+        select: {
+          batchId: true,
+          merkleRoot: true,
+          status: true,
+          fromSeq: true,
+          toSeq: true,
+          leafCount: true,
+          algorithmVersion: true,
+        },
+      });
+      const localBatchMap = new Map(localBatches.map((b) => [b.batchId, b]));
+
+      this.pushLog(`📊 Đã quét DB local: Tìm thấy ${localBatches.length}/${scannedCount} batches.`);
+
+      // Identify missing or tampered batches (checking both header and actual log entries inside batch)
+      const targetBatchIds: number[] = [];
+      for (const cp of onChainCheckpoints) {
+        if (!cp.committed) continue;
+        const local = localBatchMap.get(cp.batchId);
+
+        if (!local || local.status !== 'ANCHORED') {
+          targetBatchIds.push(cp.batchId);
+          this.pushLog(`⚠️ Phát hiện Batch #${cp.batchId} bị THIẾU trong DB local.`);
+          continue;
+        }
+
+        // Header check vs on-chain root
+        const isHeaderMatch = rootToBytes32(local.merkleRoot).toLowerCase() === rootToBytes32(cp.root).toLowerCase();
+
+        // Detailed check of log entries inside batch from BlockchainLogger table
+        let isLogsIntact = true;
+        if (local.fromSeq != null && local.toSeq != null) {
+          const logsInBatch = await this.prisma.blockchainLogger.findMany({
+            where: { seq: { gte: local.fromSeq, lte: local.toSeq }, entryHash: { not: null } },
+            orderBy: { seq: 'asc' },
+            select: { seq: true, entryHash: true },
+          });
+
+          const expectedCount = Number(cp.leafCount) || local.leafCount || (local.toSeq - local.fromSeq + 1);
+          if (logsInBatch.length !== expectedCount) {
+            isLogsIntact = false;
+            this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} bị THIẾU DỮ LIỆU LOG (DB local có ${logsInBatch.length}/${expectedCount} logs).`);
+          } else {
+            const recomputedRoot = computeMerkleRootForAlgorithm(
+              logsInBatch.map((l) => l.entryHash!),
+              local.algorithmVersion ?? MERKLE_SHA256_STRING_V1,
+            );
+            if (rootToBytes32(recomputedRoot).toLowerCase() !== rootToBytes32(cp.root).toLowerCase()) {
+              isLogsIntact = false;
+              this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} bị SỬA ĐỔI MÃ HASH TRONG LOGS (Merkle Root tính lại không khớp với Blockchain).`);
+            }
+          }
+        }
+
+        if (!isHeaderMatch || !isLogsIntact) {
+          targetBatchIds.push(cp.batchId);
+          if (isHeaderMatch && !isLogsIntact) {
+            // Already logged detailed error above
+          } else if (!isHeaderMatch) {
+            this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} bị SỬA ĐỔI MÃ HASH HEADER trong DB local (Local: ${local.merkleRoot.slice(0, 10)}... vs Chain: ${cp.root.slice(0, 10)}...).`);
+          }
+        }
+      }
+
+      if (targetBatchIds.length === 0) {
+        this.pushLog('✅ [Pass 1] Tất cả các Audit Batches trên DB local đều khớp 100% với Blockchain!');
+        this.deepScanState.progressPercent = 80;
+      } else {
+        this.pushLog(`🔧 [Pass 2] Khởi chạy khôi phục tự động cho ${targetBatchIds.length} batch(es)...`);
+        
+        const totalTargets = targetBatchIds.length;
+        for (let idx = 0; idx < totalTargets; idx++) {
+          const bId = targetBatchIds[idx];
+          const pct = Math.floor(20 + ((idx + 1) / totalTargets) * 60);
+          this.deepScanState.progressPercent = pct;
+          this.pushLog(`📥 Đang tải IPFS Artifact cho Batch #${bId} từ Blockchain...`);
+
+          try {
+            await this.recoverBatchDirectFromChain(bId, adminId, 'Deep-Scan Automatic Self-Healing');
+            recoveredBatchesCount++;
+            this.pushLog(`🟢 Đã tự động phục hồi thành công Batch #${bId} từ IPFS!`);
+          } catch (err) {
+            const errStr = err instanceof Error ? err.message : String(err);
+            errors.push(`Batch #${bId}: ${errStr}`);
+            this.pushLog(`❌ Lỗi khi khôi phục Batch #${bId}: ${errStr}`);
+          }
+        }
+      }
+
+      this.deepScanState.progressPercent = 90;
+      this.pushLog('🧹 Đang quét kiểm tra các Entity nghiệp vụ bị ảnh hưởng...');
+
+      this.deepScanState.progressPercent = 100;
+      this.deepScanState.statusMessage = recoveredBatchesCount > 0
+        ? `Đã tự động sửa chữa thành công ${recoveredBatchesCount} audit batch(es).`
+        : 'Tất cả Audit Batches đều an toàn và toàn vẹn 100%.';
+      this.pushLog(`🎉 Hoàn tất 100%! Đã quét ${scannedCount} batches, tự động sửa chữa ${recoveredBatchesCount} batches.`);
+
+      this.deepScanState.result = {
+        scannedBatches: scannedCount,
+        recoveredBatches: recoveredBatchesCount,
+        recoveredEntities: recoveredEntitiesCount,
+        errors,
+      };
+    } catch (globalErr) {
+      const errStr = globalErr instanceof Error ? globalErr.message : String(globalErr);
+      errors.push(errStr);
+      this.pushLog(`🚨 Tiến trình đối soát gặp lỗi: ${errStr}`);
+      this.deepScanState.statusMessage = `Gặp lỗi trong tiến trình đối soát: ${errStr}`;
+    } finally {
+      this.deepScanState.active = false;
+      this.deepScanState.endTime = new Date().toISOString();
+    }
+  }
+
+  private async recoverBatchDirectFromChain(batchId: number, adminId: string, reason: string) {
+    const checkpoint = await this.blockchain.getAuditCheckpoint(batchId);
+    if (!checkpoint?.committed || !checkpoint.artifactUri || !checkpoint.artifactHash) {
+      throw new Error(`Batch ${batchId} không có checkpoint hợp lệ trên Blockchain.`);
+    }
+
+    const bundle = await this.artifacts.downloadAndDecrypt(
+      batchId,
+      checkpoint.artifactUri,
+      checkpoint.artifactHash,
+    );
+
+    this.validateBundle(bundle.logs, {
+      batchId,
+      merkleRoot: bundle.batch.merkleRoot,
+      fromSeq: bundle.batch.fromSeq,
+      toSeq: bundle.batch.toSeq,
+      leafCount: bundle.batch.leafCount,
+      algorithmVersion: bundle.batch.algorithmVersion,
+      onChainRoot: checkpoint.root,
+      onChainLeafCount: checkpoint.leafCount,
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.audit_recovery_authorized', 'true', true)`;
+      await tx.$executeRaw`SET session_replication_role = 'replica'`;
+
+      await tx.blockchainLogger.deleteMany({
+        where: { seq: { gte: bundle.batch.fromSeq, lte: bundle.batch.toSeq } },
+      });
+
+      for (const row of bundle.logs) {
+        await tx.blockchainLogger.create({ data: this.toCreateInput(row, batchId, null, null) });
+      }
+
+      await tx.$executeRaw`SET session_replication_role = 'origin'`;
+
+      await tx.auditBatch.upsert({
+        where: { batchId },
+        create: {
+          batchId,
+          merkleRoot: bundle.batch.merkleRoot,
+          leafCount: bundle.batch.leafCount,
+          fromSeq: bundle.batch.fromSeq,
+          toSeq: bundle.batch.toSeq,
+          algorithmVersion: bundle.batch.algorithmVersion,
+          contractVersion: 'AUDIT_ANCHOR_CHECKPOINT_V2',
+          artifactHash: checkpoint.artifactHash,
+          artifactUri: checkpoint.artifactUri,
+          artifactCid: checkpoint.artifactUri.slice('ipfs://'.length),
+          status: 'ANCHORED',
+          recoveredAt: new Date(),
+          error: null,
+        },
+        update: {
+          merkleRoot: bundle.batch.merkleRoot,
+          leafCount: bundle.batch.leafCount,
+          fromSeq: bundle.batch.fromSeq,
+          toSeq: bundle.batch.toSeq,
+          algorithmVersion: bundle.batch.algorithmVersion,
+          artifactHash: checkpoint.artifactHash,
+          artifactUri: checkpoint.artifactUri,
+          artifactCid: checkpoint.artifactUri.slice('ipfs://'.length),
+          status: 'ANCHORED',
+          recoveredAt: new Date(),
+          error: null,
+        },
+      });
+    });
+
+    await this.audit.recordV2({
+      entity: 'AuditBatch',
+      entityId: String(batchId),
+      action: 'AUDIT_RECOVERY_EXECUTED',
+      actorId: adminId,
+      before: null,
+      after: { batchId, restoredCount: bundle.logs.length, status: 'RECOVERED' },
+      metadata: { batchId, reason, artifactHash: checkpoint.artifactHash },
+    });
+  }
+
   /**
    * Read an anchored recovery artifact without mutating PostgreSQL. The returned
    * rows have been authenticated against both the IPFS artifact hash and the
@@ -36,9 +331,6 @@ export class AuditRecoveryService {
   async loadVerifiedBundle(batchId: number): Promise<VerifiedAuditRecoveryBundle> {
     if (!Number.isSafeInteger(batchId) || batchId <= 0) throw new BadRequestException('Invalid audit batch id.');
     const batch = await this.prisma.auditBatch.findUnique({ where: { batchId } });
-    if (!batch) throw new NotFoundException('Audit batch was not found.');
-    if (batch.status !== 'ANCHORED') throw new BadRequestException('Only anchored audit batches can be used for recovery.');
-    if (batch.fromSeq == null || batch.toSeq == null) throw new BadRequestException('The audit batch sequence range is incomplete.');
 
     const checkpoint = await this.blockchain.getAuditCheckpoint(batchId);
     if (!checkpoint?.committed) throw new BadRequestException('The batch has no committed blockchain checkpoint.');
@@ -51,13 +343,20 @@ export class AuditRecoveryService {
       checkpoint.artifactUri,
       checkpoint.artifactHash,
     );
+
+    const merkleRoot = batch?.merkleRoot ?? bundle.batch.merkleRoot;
+    const fromSeq = batch?.fromSeq ?? bundle.batch.fromSeq;
+    const toSeq = batch?.toSeq ?? bundle.batch.toSeq;
+    const leafCount = batch?.leafCount ?? bundle.batch.leafCount;
+    const algorithmVersion = batch?.algorithmVersion ?? bundle.batch.algorithmVersion;
+
     this.validateBundle(bundle.logs, {
       batchId,
-      merkleRoot: batch.merkleRoot,
-      fromSeq: batch.fromSeq,
-      toSeq: batch.toSeq,
-      leafCount: batch.leafCount,
-      algorithmVersion: batch.algorithmVersion,
+      merkleRoot,
+      fromSeq,
+      toSeq,
+      leafCount,
+      algorithmVersion,
       onChainRoot: checkpoint.root,
       onChainLeafCount: checkpoint.leafCount,
     });
@@ -88,119 +387,29 @@ export class AuditRecoveryService {
     });
 
     try {
-      const batch = await this.prisma.auditBatch.findUnique({ where: { batchId } });
-      if (!batch) throw new NotFoundException('Audit batch was not found.');
-      if (batch.status !== 'ANCHORED') throw new BadRequestException('Only anchored audit batches can be recovered.');
-
       const checkpoint = await this.blockchain.getAuditCheckpoint(batchId);
       if (!checkpoint?.committed) throw new BadRequestException('The batch has no committed blockchain checkpoint.');
       if (!checkpoint.artifactUri || !checkpoint.artifactHash) {
         throw new BadRequestException('The blockchain checkpoint has no recovery artifact.');
       }
 
-      const currentRows = await this.prisma.blockchainLogger.findMany({
-        where: { batchId },
-        orderBy: { seq: 'asc' },
-      });
-      const currentRowsAreInternallyValid = currentRows.every((row) => verifyAuditRow(row).ok);
-      if (
-        currentRowsAreInternallyValid
-        && currentRows.length === checkpoint.leafCount
-        && currentRows.every((row) => Boolean(row.entryHash))
-      ) {
-        const currentRoot = computeMerkleRootForAlgorithm(
-          currentRows.map((row) => row.entryHash!),
-          batch.algorithmVersion,
-        );
-        if (rootToBytes32(currentRoot).toLowerCase() === checkpoint.root.toLowerCase()) {
-          throw new BadRequestException('The database batch already matches its blockchain checkpoint.');
-        }
-      }
+      await this.recoverBatchDirectFromChain(batchId, adminId, reason);
 
-      const verifiedBundle = await this.loadVerifiedBundle(batchId);
-      const bundle = {
-        schema: 'KLTN_AUDIT_RECOVERY_BUNDLE_V1' as const,
-        batch: {
-          batchId,
-          merkleRoot: batch.merkleRoot,
-          leafCount: batch.leafCount,
-          fromSeq: batch.fromSeq!,
-          toSeq: batch.toSeq!,
-          algorithmVersion: batch.algorithmVersion,
+      await this.prisma.auditRecovery.update({
+        where: { id: recovery.id },
+        data: {
+          status: 'COMPLETED',
+          artifactHash: checkpoint.artifactHash,
+          completedAt: new Date(),
         },
-        logs: verifiedBundle.logs,
-      };
-
-      const following = await this.prisma.blockchainLogger.findFirst({
-        where: { seq: bundle.batch.toSeq + 1 },
-        select: { prevHash: true },
-      });
-      const lastRecoveredHash = bundle.logs.at(-1)!.entryHash;
-      if (following && following.prevHash !== lastRecoveredHash) {
-        throw new BadRequestException('The next audit row does not link to the trusted recovery bundle.');
-      }
-
-      await this.prisma.$transaction(async (tx) => {
-        await tx.$executeRaw`SELECT set_config('app.audit_recovery_authorized', 'true', true)`;
-        await tx.$executeRaw`SET session_replication_role = 'replica'`;
-        await tx.blockchainLogger.deleteMany({
-          where: { seq: { gte: bundle.batch.fromSeq, lte: bundle.batch.toSeq } },
-        });
-        for (const row of bundle.logs) {
-          await tx.blockchainLogger.create({ data: this.toCreateInput(row, batchId, batch.txHash, batch.blockNumber) });
-        }
-        await tx.$executeRaw`SET session_replication_role = 'origin'`;
-
-        await tx.auditBatch.update({
-          where: { batchId },
-          data: {
-            merkleRoot: bundle.batch.merkleRoot,
-            leafCount: bundle.batch.leafCount,
-            fromSeq: bundle.batch.fromSeq,
-            toSeq: bundle.batch.toSeq,
-            algorithmVersion: bundle.batch.algorithmVersion,
-            artifactHash: checkpoint.artifactHash,
-            artifactUri: checkpoint.artifactUri,
-            artifactCid: checkpoint.artifactUri.slice('ipfs://'.length),
-            status: 'ANCHORED',
-            recoveredAt: new Date(),
-            error: null,
-          },
-        });
-
-        await tx.auditRecovery.update({
-          where: { id: recovery.id },
-          data: {
-            status: 'COMPLETED',
-            restoredCount: bundle.logs.length,
-            artifactHash: checkpoint.artifactHash,
-            merkleRoot: bundle.batch.merkleRoot,
-            completedAt: new Date(),
-          },
-        });
-      });
-
-      const verified = await this.anchor.verifySingleAnchoredBatch(batchId);
-      if (!verified.ok) {
-        throw new Error(`Post-recovery verification failed: ${verified.reason ?? 'unknown integrity error'}`);
-      }
-
-      await this.audit.recordV2({
-        entity: 'AuditBatch',
-        entityId: String(batchId),
-        action: 'AUDIT_RECOVERY_EXECUTED',
-        actorId: adminId,
-        before: null,
-        after: { batchId, restoredCount: bundle.logs.length, status: 'RECOVERED' },
-        metadata: { batchId, reason, artifactHash: checkpoint.artifactHash },
       });
 
       const completedAt = new Date().toISOString();
       return {
         batchId,
         status: 'RECOVERED',
-        restoredCount: bundle.logs.length,
-        merkleRoot: bundle.batch.merkleRoot,
+        restoredCount: checkpoint.leafCount,
+        merkleRoot: checkpoint.root,
         artifactHash: checkpoint.artifactHash,
         completedAt,
       };

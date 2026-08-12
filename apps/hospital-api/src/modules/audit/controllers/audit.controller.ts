@@ -51,6 +51,19 @@ export class AuditController {
     private readonly entityRecovery: EntityRecoveryService,
   ) {}
 
+  @Get('recovery/deep-scan/status')
+  @ApiOperation({ summary: 'Get real-time status & logs of background audit deep-scan and self-healing' })
+  getDeepScanStatus() {
+    return this.recovery.getDeepScanStatus();
+  }
+
+  @Post('recovery/deep-scan')
+  @RequireFaceStepUp('DEEP_SCAN_SELF_HEAL')
+  @ApiOperation({ summary: 'Trigger Face-authenticated deep-scan verification and automated batch self-healing' })
+  startDeepScan(@CurrentUser() user: AuthUser) {
+    return this.recovery.startDeepScanAndSelfHeal(user.sub);
+  }
+
   @Get('recovery/entities/warnings')
   @ApiOperation({ summary: 'List business entities whose live data differs from the latest anchored audit snapshot' })
   entityWarnings(@Query('limit') limitRaw?: string) {
