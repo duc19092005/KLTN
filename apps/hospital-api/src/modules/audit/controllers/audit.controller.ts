@@ -15,6 +15,7 @@ import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.de
 import { AuditRecoveryService } from '../../../infrastructure/audit/audit-recovery.service';
 import { RecoverAuditBatchDto } from '../dto/recover-audit-batch.dto';
 import { EntityRecoveryService } from '../../../infrastructure/audit/entity-recovery.service';
+import { BlockchainService } from '../../../infrastructure/blockchain/blockchain.service';
 import { PreviewRecoverAuditEntitiesDto, RecoverAuditEntitiesDto } from '../dto/recover-audit-entities.dto';
 import type { AuditBatch, BlockchainLogger, Prisma } from '@prisma/client';
 
@@ -49,12 +50,19 @@ export class AuditController {
     private readonly prisma: PrismaService,
     private readonly recovery: AuditRecoveryService,
     private readonly entityRecovery: EntityRecoveryService,
+    private readonly blockchain: BlockchainService,
   ) {}
 
   @Get('recovery/deep-scan/status')
   @ApiOperation({ summary: 'Get real-time status & logs of background audit deep-scan and self-healing' })
   getDeepScanStatus() {
     return this.recovery.getDeepScanStatus();
+  }
+
+  @Get('recovery/watchdog/status')
+  @ApiOperation({ summary: 'Get background 20-minute watchdog auto-heal status and schedule' })
+  getWatchdogStatus() {
+    return this.recovery.getWatchdogStatus();
   }
 
   @Post('recovery/deep-scan')
@@ -167,8 +175,7 @@ export class AuditController {
             adminProfile: { select: { adminUserName: true } },
           },
         })
-      : [];
-    const actorMap = new Map(actors.map((a) => [a.id, a]));
+      : [];    const actorMap = new Map(actors.map((a) => [a.id, a]));
     const subjectMap = await this.resolveSubjectContextMap(items);
 
     const itemsWithStatus = items.map((row) => {
@@ -204,55 +211,105 @@ export class AuditController {
     const skip = (page - 1) * limit;
     const sortDir: 'asc' | 'desc' = sortRaw === 'asc' ? 'asc' : 'desc';
     const sortBy = (sortByRaw || 'batchId').toLowerCase();
-    const orderBy =
-      sortBy === 'time' || sortBy === 'anchoredat' || sortBy === 'createdat'
-        ? [{ anchoredAt: sortDir }, { createdAt: sortDir }, { batchId: sortDir }]
-        : [{ batchId: sortDir }];
 
-    const [items, total] = await Promise.all([
-      this.prisma.auditBatch.findMany({
-        orderBy,
-        skip,
-        take: limit,
-        select: {
-          id: true,
-          batchId: true,
-          merkleRoot: true,
-          leafCount: true,
-          fromSeq: true,
-          toSeq: true,
-          status: true,
-          algorithmVersion: true,
-          contractVersion: true,
-          artifactHash: true,
-          artifactUri: true,
-          txHash: true,
-          blockNumber: true,
-          error: true,
-          createdAt: true,
-          anchoredAt: true,
-          recoveredAt: true,
-        },
-      }),
-      this.prisma.auditBatch.count(),
-    ]);
+    const localBatches = await this.prisma.auditBatch.findMany({
+      select: {
+        id: true,
+        batchId: true,
+        merkleRoot: true,
+        leafCount: true,
+        fromSeq: true,
+        toSeq: true,
+        status: true,
+        algorithmVersion: true,
+        contractVersion: true,
+        artifactHash: true,
+        artifactUri: true,
+        txHash: true,
+        blockNumber: true,
+        error: true,
+        createdAt: true,
+        anchoredAt: true,
+        recoveredAt: true,
+      },
+    });
 
-    const rowsByBatch = await this.loadBatchRows(items);
+    const localMap = new Map(localBatches.map((b) => [b.batchId, b]));
+    const allMergedItems: any[] = [...localBatches];
+
+    try {
+      const latestOnChain = await this.blockchain.getLatestAuditBatchId();
+      if (latestOnChain && latestOnChain > 0) {
+        // Fast path: if local DB has all on-chain batches, no RPC range fetch needed
+        const missingOnChainIds: number[] = [];
+        for (let bId = 1; bId <= latestOnChain; bId++) {
+          if (!localMap.has(bId)) missingOnChainIds.push(bId);
+        }
+
+        if (missingOnChainIds.length > 0) {
+          const checkpoints = await this.blockchain.getAuditCheckpointsRange(1, latestOnChain);
+          for (const cp of checkpoints) {
+            if (cp.committed && !localMap.has(cp.batchId)) {
+              allMergedItems.push({
+                id: `missing-batch-${cp.batchId}`,
+                batchId: cp.batchId,
+                merkleRoot: cp.root,
+                leafCount: cp.leafCount,
+                fromSeq: null,
+                toSeq: null,
+                status: 'MISSING',
+                algorithmVersion: 'MERKLE_SHA256_STRING_V1',
+                contractVersion: 'AUDIT_ANCHOR_CHECKPOINT_V2',
+                artifactHash: cp.artifactHash,
+                artifactUri: cp.artifactUri,
+                txHash: null,
+                blockNumber: null,
+                error: 'Lô bị xóa khỏi Database local',
+                createdAt: new Date(cp.timestamp * 1000).toISOString(),
+                anchoredAt: new Date(cp.timestamp * 1000).toISOString(),
+                recoveredAt: null,
+                isMissingFromLocal: true,
+              });
+            }
+          }
+        }
+      }
+    } catch {
+      // Fallback to local DB if blockchain read fails
+    }
+
+    allMergedItems.sort((a, b) => {
+      if (sortBy === 'time' || sortBy === 'anchoredat' || sortBy === 'createdat') {
+        const timeA = new Date(a.anchoredAt || a.createdAt).getTime();
+        const timeB = new Date(b.anchoredAt || b.createdAt).getTime();
+        return sortDir === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+      return sortDir === 'asc' ? a.batchId - b.batchId : b.batchId - a.batchId;
+    });
+
+    const total = allMergedItems.length;
+    const paginatedItems = allMergedItems.slice(skip, skip + limit);
+
+    const rowsByBatch = await this.loadBatchRows(paginatedItems.filter((i) => !i.isMissingFromLocal));
     const contentByBatch = await this.buildBatchContentSummaries(rowsByBatch);
     const integrityByBatch = this.buildBatchIntegritySummaries(rowsByBatch);
 
     return {
-      items: items.map(({ artifactUri, ...item }) => ({
+      items: paginatedItems.map(({ artifactUri, isMissingFromLocal, ...item }) => ({
         ...item,
         artifactAvailable: Boolean(artifactUri && item.artifactHash),
-        contentSummary: contentByBatch.get(item.batchId) ?? [],
-        integrity: integrityByBatch.get(item.batchId) ?? {
-          status: 'PENDING',
-          verified: 0,
-          tampered: 0,
-          pending: 0,
-          total: 0,
-        },
+        contentSummary: isMissingFromLocal
+          ? [{ entity: 'AuditBatch', label: 'Bị xóa khỏi DB local', count: item.leafCount || 1 }]
+          : (contentByBatch.get(item.batchId) ?? []),
+        integrity: isMissingFromLocal
+          ? { status: 'CORRUPTED', verified: 0, tampered: 1, pending: 0, total: 1 }
+          : (integrityByBatch.get(item.batchId) ?? {
+              status: 'PENDING',
+              verified: 0,
+              tampered: 0,
+              pending: 0,
+              total: 0,
+            }),
       })),
       total,
       page,

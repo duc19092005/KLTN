@@ -99,7 +99,7 @@ export default function AuthenticatePage() {
   };
 
   const verifyFaceLogin = async (embedding) => {
-    setBusy(true); showStatus('Đang thực hiện kiểm tra thực thể sống...');
+    setBusy(true); showStatus('Đang thực hiện kiểm tra khuôn mặt...');
     try {
       const challengeRes = await authService.faceChallenge();
       const challenge = challengeRes.data.challenge;

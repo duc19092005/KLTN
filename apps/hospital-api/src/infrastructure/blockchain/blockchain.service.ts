@@ -515,13 +515,21 @@ export class BlockchainService implements OnModuleInit {
     return this.getAuditCheckpointsRange(1, latest);
   }
 
-  async getLatestAuditBatchId(): Promise<number | null> {
+  private cachedLatestBatchId: { value: number | null; timestamp: number } | null = null;
+
+  async getLatestAuditBatchId(forceRefresh = false): Promise<number | null> {
     if (!this.auditAnchor) return null;
+    const now = Date.now();
+    if (!forceRefresh && this.cachedLatestBatchId && now - this.cachedLatestBatchId.timestamp < 15000) {
+      return this.cachedLatestBatchId.value;
+    }
     try {
       const value = await this.auditAnchor.latestBatchId();
-      return Number(value);
+      const num = Number(value);
+      this.cachedLatestBatchId = { value: num, timestamp: now };
+      return num;
     } catch {
-      return null;
+      return this.cachedLatestBatchId?.value ?? null;
     }
   }
 

@@ -23,7 +23,7 @@ import {
   buildAuditEncryptionAad,
   encryptAuditSnapshot,
 } from './audit-encryption.util';
-import { verifyAuditRow } from './audit-verification.util';
+import { verifyAuditRow, verifyAuditRowLight } from './audit-verification.util';
 
 export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'ACCESS' | 'SECURITY';
 
@@ -409,7 +409,7 @@ export class AuditLoggerService {
         await this.anchor.sendTelegramAlert('Phát hiện đứt gãy chuỗi nhật ký (kiểm tra chuỗi)', reason, row.seq);
         return { ok: false, total: rows.length, brokenAtSeq: row.seq, reason };
       }
-      const verification = verifyAuditRow(row);
+      const verification = verifyAuditRowLight(row);
       if (!verification.ok) {
         const reason = verification.reason || 'entryHash không khớp; nội dung bản ghi có thể đã bị sửa';
         await this.anchor.sendTelegramAlert('Phát hiện đứt gãy chuỗi nhật ký (kiểm tra chuỗi)', reason, row.seq);
