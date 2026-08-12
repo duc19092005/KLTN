@@ -64,6 +64,7 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
         finalConclusion: {
           select: {
             id: true,
+            aiDiagnosisId: true,
             finalDiagnosis: true,
             treatmentPlan: true,
             prescription: true,
@@ -72,6 +73,19 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
             concludedAt: true,
             doctor: { select: { staffProfile: { select: { fullName: true } } } },
           },
+        },
+        aiDiagnoses: {
+          select: {
+            id: true,
+            result: true,
+            confidence: true,
+            status: true,
+            doctorFeedback: true,
+            createdAt: true,
+            aiModel: { select: { id: true, modelName: true, modelVersion: true, provider: true } },
+            reviewedByDoctor: { select: { staffProfile: { select: { fullName: true } } } },
+          },
+          orderBy: { createdAt: 'desc' },
         },
         medicalOrders: {
           select: {

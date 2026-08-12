@@ -995,6 +995,7 @@ function MedicalHistoryPanel({ history }) {
   }, [history]);
 
   const diagnosisCount = history.filter((visit) => visit.finalConclusion?.finalDiagnosis).length;
+  const aiDiagnosisCount = history.reduce((total, visit) => total + (visit.aiDiagnoses?.length || 0), 0);
   const resultCount = history.reduce(
     (total, visit) => total + (visit.medicalOrders || []).reduce((orderTotal, order) => orderTotal + (order.results?.length || 0), 0),
     0
@@ -1015,9 +1016,10 @@ function MedicalHistoryPanel({ history }) {
               Các lượt khám đã hoàn tất được sắp xếp mới nhất trước. Thông tin này hỗ trợ suy luận, không thay thế đánh giá hiện tại.
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid grid-cols-4 gap-2 text-center">
             <HistoryMetric value={history.length} label="Lượt khám" />
             <HistoryMetric value={diagnosisCount} label="Kết luận" />
+            <HistoryMetric value={aiDiagnosisCount} label="Tham vấn AI" />
             <HistoryMetric value={resultCount} label="Kết quả" />
           </div>
         </div>
@@ -1065,14 +1067,17 @@ function MedicalHistoryPanel({ history }) {
                 </button>
 
                 {expanded ? (
-                  <div id={`medical-history-detail-${historicalVisit.id}`} className="mt-4 grid gap-4 border-t border-slate-100 pt-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <HistoryTextCard icon={<Activity className="h-4 w-4" />} title="Hướng điều trị" value={conclusion?.treatmentPlan} />
-                      <HistoryTextCard icon={<Pill className="h-4 w-4" />} title="Toa thuốc" value={conclusion?.prescription} tone="emerald" />
-                      <HistoryTextCard icon={<Clock className="h-4 w-4" />} title="Dặn dò / Tái khám" value={conclusion?.followUpNote} />
-                      <HistoryTextCard icon={<FileText className="h-4 w-4" />} title="Ghi chú bác sĩ" value={conclusion?.doctorNote} />
+                  <div id={`medical-history-detail-${historicalVisit.id}`} className="mt-4 space-y-4 border-t border-slate-100 pt-4">
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <HistoryTextCard icon={<Activity className="h-4 w-4" />} title="Hướng điều trị" value={conclusion?.treatmentPlan} />
+                        <HistoryTextCard icon={<Pill className="h-4 w-4" />} title="Toa thuốc" value={conclusion?.prescription} tone="emerald" />
+                        <HistoryTextCard icon={<Clock className="h-4 w-4" />} title="Dặn dò / Tái khám" value={conclusion?.followUpNote} />
+                        <HistoryTextCard icon={<FileText className="h-4 w-4" />} title="Ghi chú bác sĩ" value={conclusion?.doctorNote} />
+                      </div>
+                      <HistoricalOrders orders={historicalVisit.medicalOrders || []} />
                     </div>
-                    <HistoricalOrders orders={historicalVisit.medicalOrders || []} />
+                    <HistoricalAiDiagnoses diagnoses={historicalVisit.aiDiagnoses || []} selectedDiagnosisId={conclusion?.aiDiagnosisId} />
                   </div>
                 ) : null}
               </li>
@@ -1104,6 +1109,77 @@ function HistoryTextCard({ icon, title, value, tone = 'indigo' }) {
       </h4>
       <p className="mt-2 whitespace-pre-wrap text-xs font-semibold leading-5 text-slate-700">{value || 'Không ghi nhận'}</p>
     </article>
+  );
+}
+
+function HistoricalAiDiagnoses({ diagnoses, selectedDiagnosisId }) {
+  if (diagnoses.length === 0) return null;
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50/80 via-white to-sky-50/60" aria-label="Chẩn đoán tham vấn AI trước đây">
+      <div className="flex flex-col gap-3 border-b border-violet-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h4 className="flex items-center gap-2 text-xs font-black text-violet-950">
+            <Sparkles className="h-4 w-4 text-violet-600" aria-hidden="true" />
+            Tham vấn AI trước đây
+          </h4>
+          <p className="mt-1 text-[10px] font-semibold text-slate-500">Chỉ dùng để tham khảo; kết luận cuối cùng thuộc về bác sĩ.</p>
+        </div>
+        <span className="w-fit rounded-full border border-violet-200 bg-white px-2.5 py-1 text-[10px] font-bold text-violet-700">{diagnoses.length} bản phân tích</span>
+      </div>
+
+      <div className="grid gap-3 p-4 lg:grid-cols-2">
+        {diagnoses.map((diagnosis) => {
+          const parsed = normalizeAiAnalysis(diagnosis.result);
+          const reviewed = diagnosis.status === 'DOCTOR_REVIEWED' || Boolean(diagnosis.reviewedByDoctor);
+          const modelName = parsed.modelName || diagnosis.aiModel?.modelName || 'Mô hình AI';
+          const provider = parsed.provider || diagnosis.aiModel?.provider || 'AI';
+          return (
+            <article key={diagnosis.id} className="rounded-2xl border border-white bg-white/90 p-4 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
+                <div>
+                  <span className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-500">{provider}</span>
+                  <h5 className="mt-0.5 text-xs font-black text-slate-900">
+                    {modelName}{diagnosis.aiModel?.modelVersion ? ` · ${diagnosis.aiModel.modelVersion}` : ''}
+                  </h5>
+                  <time className="mt-1 block text-[10px] font-semibold text-slate-400" dateTime={diagnosis.createdAt}>{formatDate(diagnosis.createdAt)} · {formatTime(diagnosis.createdAt)}</time>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {diagnosis.id === selectedDiagnosisId ? <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[10px] font-black text-violet-700">Được dùng khi kết luận</span> : null}
+                  <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-black text-sky-700">Tin cậy {formatConfidence(diagnosis.confidence)}</span>
+                  <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${reviewed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                    {reviewed ? 'Đã được bác sĩ xem' : 'Chưa được bác sĩ duyệt'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-3 space-y-3 text-xs">
+                {parsed.summary ? <AiSection title="Tổng quan lâm sàng" value={parsed.summary} /> : null}
+                <ImageFindingsSection value={parsed.imageFindings} />
+                <DiagnosticProbabilitySection value={parsed.diagnosticProbabilities} />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {parsed.clinicalConsiderations || parsed.possibleConditions ? (
+                    <AiSection title="Cân nhắc lâm sàng" value={parsed.clinicalConsiderations || parsed.possibleConditions} list />
+                  ) : null}
+                  {parsed.riskFlags ? <AiSection title="Cảnh báo rủi ro" value={parsed.riskFlags} list /> : null}
+                </div>
+                {!parsed.summary && !parsed.imageFindings?.length && !parsed.diagnosticProbabilities?.length ? (
+                  <p className="rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-500">Không có nội dung phân tích chi tiết.</p>
+                ) : null}
+              </div>
+
+              {diagnosis.doctorFeedback ? (
+                <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/70 p-3">
+                  <strong className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Phản hồi của bác sĩ</strong>
+                  <p className="mt-1 whitespace-pre-wrap text-xs font-semibold leading-5 text-slate-700">{diagnosis.doctorFeedback}</p>
+                  {diagnosis.reviewedByDoctor?.staffProfile?.fullName ? <p className="mt-1 text-[10px] font-bold text-slate-400">BS. {diagnosis.reviewedByDoctor.staffProfile.fullName}</p> : null}
+                </div>
+              ) : null}
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
