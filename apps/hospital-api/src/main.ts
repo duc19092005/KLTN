@@ -89,6 +89,7 @@ function fieldLabel(property: string): string {
     citizenId: 'CCCD/CMND',
     birthDate: 'Ngày sinh',
     address: 'Địa chỉ',
+    emergencyContact: 'Số điện thoại người liên hệ khẩn cấp',
     avatarUrl: 'URL ảnh đại diện',
     departmentId: 'Phòng ban',
     role: 'Vai trò',
@@ -135,6 +136,10 @@ function validationMessage(label: string, constraint: string): string {
     min: `${label} nhỏ hơn giá trị tối thiểu cho phép.`,
     max: `${label} lớn hơn giá trị tối đa cho phép.`,
     maxLength: `${label} vượt quá độ dài cho phép.`,
+    matches:
+      label === 'Số điện thoại người liên hệ khẩn cấp'
+        ? 'Số điện thoại người liên hệ khẩn cấp phải gồm 10 chữ số và đúng đầu số Việt Nam, ví dụ: 0912345678.'
+        : `${label} không đúng định dạng yêu cầu.`,
     isEthereumAddress: `${label} phải là địa chỉ ví Ethereum hợp lệ.`,
     whitelistValidation: `${label} không được phép gửi lên hệ thống.`,
   };
