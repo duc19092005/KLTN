@@ -56,7 +56,7 @@ export default function ReceptionistQueuePage() {
                 className="rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-sky-700 flex items-center gap-2 transition-all"
               >
                 <Plus className="w-4 h-4" />
-                <span>+ Tiếp nhận mới</span>
+                <span>Tiếp nhận mới</span>
               </button>
             </div>
           </div>
