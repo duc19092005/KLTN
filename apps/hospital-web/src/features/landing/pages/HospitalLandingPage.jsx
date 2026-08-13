@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { LoginPage } from '../../auth';
 import SiteHeader from '../components/SiteHeader';
 import HeroSection from '../components/HeroSection';
+import PatientJourneySection from '../components/PatientJourneySection';
 import VisionSection from '../components/VisionSection';
 import SpecialitiesSection from '../components/SpecialitiesSection';
 import DoctorsSection from '../components/DoctorsSection';
@@ -52,10 +53,10 @@ export default function HospitalLandingPage() {
   }, []);
 
   return (
-    <div className="landing-editorial min-h-screen relative">
+    <div className="landing-editorial min-h-screen relative font-sans text-slate-800 antialiased selection:bg-sky-100 selection:text-sky-700">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:border focus:border-[#001836] focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-medium focus:text-[#001836]"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:border focus:border-slate-900 focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-medium focus:text-slate-900"
       >
         Bỏ qua đến nội dung chính
       </a>
@@ -67,6 +68,7 @@ export default function HospitalLandingPage() {
 
       <main id="main-content" className="pt-20">
         <HeroSection />
+        <PatientJourneySection />
         <VisionSection />
         <SpecialitiesSection />
         <DoctorsSection />
