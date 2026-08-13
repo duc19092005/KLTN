@@ -37,7 +37,10 @@ export class AdministrativeLifecycleService {
       const after = await this.updateLifecycle(tx, entity, current, UserStatus.DELETE, OperationalStatus.DELETE, {
         deletedAt: now, deletedBy: actorId, restoredAt: null,
       });
-      await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'DELETE', actorId, before: this.snapshot(entity, current), after: this.snapshot(entity, after) }, tx);
+      const afterSnapshot = this.snapshot(entity, after);
+      const { salt, hash } = this.audit.hashSnapshot(afterSnapshot);
+      await this.updateIntegrityHash(tx, entity, id, hash, salt);
+      await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'DELETE', actorId, before: this.snapshot(entity, current), after: afterSnapshot }, tx);
       return after;
     });
     return { deleted: true, id, status: 'DELETE', deletedAt: now };
@@ -56,7 +59,10 @@ export class AdministrativeLifecycleService {
       const after = await this.updateLifecycle(tx, entity, current, UserStatus.INACTIVE, OperationalStatus.INACTIVE, {
         deletedAt: null, deletedBy: null, restoredAt: now,
       });
-      await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'RESTORE', actorId, before: this.snapshot(entity, current), after: this.snapshot(entity, after) }, tx);
+      const afterSnapshot = this.snapshot(entity, after);
+      const { salt, hash } = this.audit.hashSnapshot(afterSnapshot);
+      await this.updateIntegrityHash(tx, entity, id, hash, salt);
+      await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'RESTORE', actorId, before: this.snapshot(entity, current), after: afterSnapshot }, tx);
     });
     return { restored: true, id, status: 'INACTIVE', restoredAt: now };
   }
@@ -160,6 +166,14 @@ export class AdministrativeLifecycleService {
     await tx.user.update({ where: { id: userId }, data: { status: userStatus, ...metadata } });
     if (entity === 'staff') return tx.staffProfile.findUniqueOrThrow({ where: { id: current.id }, include: { user: true } });
     return tx.doctorProfile.findUniqueOrThrow({ where: { id: current.id }, include: { staffProfile: { include: { user: true } } } });
+  }
+
+  private async updateIntegrityHash(tx: any, entity: LifecycleEntity, id: string, hash256: string, dataSalt: string) {
+    const data = { hash256, dataSalt };
+    if (entity === 'departments') return tx.department.update({ where: { id }, data });
+    if (entity === 'ai-models') return tx.aiModelRegistry.update({ where: { id }, data });
+    if (entity === 'staff') return tx.staffProfile.update({ where: { id }, data });
+    return tx.doctorProfile.update({ where: { id }, data });
   }
 
   private statusOf(entity: LifecycleEntity, row: any) { return entity === 'staff' ? row.user.status : entity === 'doctors' ? row.staffProfile.user.status : row.status; }
