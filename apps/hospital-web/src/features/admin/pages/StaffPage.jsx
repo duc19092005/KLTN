@@ -11,7 +11,7 @@ import { staffService } from '../apis/staffService';
 import StaffDetailModal from '../components/StaffDetailModal';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { Calendar, ExternalLink, MapPin, Search, Trash2, X, Plus, Filter, Users, UserCheck } from 'lucide-react';
+import { Calendar, ExternalLink, MapPin, Search, Trash2, X, Plus, Filter, Users, UserCheck, CheckSquare, Square } from 'lucide-react';
 
 const emptyStaff = { username: '', email: '', fullName: '', avatarUrl: '', departmentId: '', phone: '', gender: '', citizenId: '', birthDate: '', address: '', position: '', role: 'LAB_MANAGER' };
 const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200/80', INACTIVE: 'bg-rose-50 text-rose-700 border-rose-200/80', PENDING: 'bg-amber-50 text-amber-700 border-amber-200/80' };
@@ -122,12 +122,14 @@ export default function StaffPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [detailStaffId, setDetailStaffId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   const totalLabel = useMemo(() => `${pagination.total} hồ sơ`, [pagination.total]);
 
   const load = async (page = pagination.page, filterOverride = null) => {
     const activeFilters = filterOverride || filters;
     setLoading(true);
+    setSelectedIds([]);
     try {
       const [depRes, staffRes] = await Promise.all([
         departmentService.list(),
@@ -255,6 +257,27 @@ export default function StaffPage() {
     finally { setBusy(false); }
   };
 
+  const handleBulkSoftDelete = async (ids) => {
+    if (!ids || ids.length === 0) return;
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa tạm thời ${ids.length} nhân sự đã chọn vào thùng rác?`)) return;
+    setBusy(true);
+    try {
+      const res = await staffService.softDeleteMany(ids);
+      const data = res.data;
+      if (data?.failed > 0) {
+        toast.warning(`Thành công: ${data.succeeded}/${data.requested}. Thất bại: ${data.failed}.`);
+      } else {
+        toast.success(`Đã chuyển ${data.succeeded} nhân sự vào thùng rác!`);
+      }
+      setSelectedIds([]);
+      await load(pagination.page);
+    } catch (err) {
+      toast.error(getError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="staff" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
       <div className="max-w-[1600px] mx-auto space-y-6 pb-10">
@@ -262,7 +285,20 @@ export default function StaffPage() {
         {loading ? <LoadingIndicator size="lg" label="Đang tải danh sách nhân sự..." /> : (
           <>
             <StaffSearch filters={filters} setFilters={setFilters} onSearch={search} onReset={resetFilters} departments={departments} />
-            <StaffList staffs={staffs} totalLabel={totalLabel} onEdit={openEdit} onToggleStatus={toggleStatus} onRemove={removeStaff} onViewDetails={setDetailStaffId} busy={busy} pagination={pagination} onPageChange={load} />
+            <StaffList
+              staffs={staffs}
+              totalLabel={totalLabel}
+              onEdit={openEdit}
+              onToggleStatus={toggleStatus}
+              onRemove={removeStaff}
+              onViewDetails={setDetailStaffId}
+              busy={busy}
+              pagination={pagination}
+              onPageChange={load}
+              selectedIds={selectedIds}
+              setSelectedIds={setSelectedIds}
+              onBulkSoftDelete={handleBulkSoftDelete}
+            />
           </>
         )}
         {isFormOpen && <StaffModal departments={departments} form={form} setForm={setForm} onSubmit={submitStaff} onClose={closeForm} busy={busy} editingStaff={editingStaff} />}
@@ -360,32 +396,120 @@ function StaffSearch({ filters, setFilters, onSearch, onReset, departments }) {
 
 function FilterInput({ label, value, onChange, placeholder }) { return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}</span><input value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-[42px] w-full rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 text-xs font-semibold focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 outline-none" /></label>; }
 
-function StaffList({ staffs, totalLabel, onEdit, onToggleStatus, onRemove, onViewDetails, busy, pagination, onPageChange }) {
+function StaffList({
+  staffs,
+  totalLabel,
+  onEdit,
+  onToggleStatus,
+  onRemove,
+  onViewDetails,
+  busy,
+  pagination,
+  onPageChange,
+  selectedIds = [],
+  setSelectedIds,
+  onBulkSoftDelete,
+}) {
+  const allSelected = staffs.length > 0 && selectedIds.length === staffs.length;
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(staffs.map((s) => s.id));
+    }
+  };
+
+  const toggleSelectOne = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
   return (
-    <section className="rounded-3xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
-      <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Users className="h-5 w-5 text-sky-600" strokeWidth={2} />
-          <h3 className="text-lg font-bold text-slate-900">Danh sách nhân sự</h3>
+    <div className="space-y-6">
+      {/* Floating Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <div className="sticky top-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/95 px-5 py-3.5 shadow-lg backdrop-blur-sm animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-3">
+            <span className="grid h-7 w-7 place-items-center rounded-full bg-sky-600 text-xs font-bold text-white">
+              {selectedIds.length}
+            </span>
+            <span className="text-sm font-bold text-sky-950">
+              Đã chọn {selectedIds.length} nhân sự
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onBulkSoftDelete(selectedIds)}
+              className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-700 disabled:opacity-40 transition"
+            >
+              <Trash2 size={15} />
+              Xóa tạm thời chọn ({selectedIds.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
+            >
+              Bỏ chọn
+            </button>
+          </div>
         </div>
-        <span className="rounded-xl bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-600 border border-slate-200/80">{totalLabel}</span>
-      </div>
-      <div className="divide-y divide-slate-100">
-        {staffs.map((staff) => (
-          <StaffRow key={staff.id} staff={staff} onEdit={onEdit} onToggleStatus={onToggleStatus} onRemove={onRemove} onViewDetails={onViewDetails} busy={busy} />
-        ))}
-        {!staffs.length && <div className="p-8"><Empty title="Không có nhân sự" desc="Thử đổi bộ lọc hoặc tạo nhân sự mới." /></div>}
-      </div>
-      <Pagination pagination={pagination} onPageChange={onPageChange} />
-    </section>
+      )}
+
+      <section className="rounded-3xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleSelectAll}
+              className="flex items-center gap-2 text-slate-700 hover:text-sky-600 transition"
+              title="Chọn tất cả nhân sự"
+            >
+              {allSelected ? <CheckSquare size={19} className="text-sky-600" /> : <Square size={19} className="text-slate-400" />}
+            </button>
+            <Users className="h-5 w-5 text-sky-600" strokeWidth={2} />
+            <h3 className="text-lg font-bold text-slate-900">Danh sách nhân sự</h3>
+          </div>
+          <span className="rounded-xl bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-600 border border-slate-200/80">{totalLabel}</span>
+        </div>
+        <div className="divide-y divide-slate-100">
+          {staffs.map((staff) => (
+            <StaffRow
+              key={staff.id}
+              staff={staff}
+              onEdit={onEdit}
+              onToggleStatus={onToggleStatus}
+              onRemove={onRemove}
+              onViewDetails={onViewDetails}
+              busy={busy}
+              isSelected={selectedIds.includes(staff.id)}
+              onToggleSelect={() => toggleSelectOne(staff.id)}
+            />
+          ))}
+          {!staffs.length && <div className="p-8"><Empty title="Không có nhân sự" desc="Thử đổi bộ lọc hoặc tạo nhân sự mới." /></div>}
+        </div>
+        <Pagination pagination={pagination} onPageChange={onPageChange} />
+      </section>
+    </div>
   );
 }
 
-function StaffRow({ staff, onEdit, onToggleStatus, onRemove, onViewDetails, busy }) {
+function StaffRow({ staff, onEdit, onToggleStatus, onRemove, onViewDetails, busy, isSelected, onToggleSelect }) {
   return (
-    <article className="p-6 hover:bg-slate-50/80 transition-all">
+    <article className={`p-6 transition-all hover:bg-slate-50/80 ${isSelected ? 'bg-sky-50/60' : 'bg-white'}`}>
       <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr_0.8fr_0.7fr_0.8fr_200px] gap-4 xl:items-center">
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <button
+            type="button"
+            onClick={onToggleSelect}
+            className="text-slate-400 hover:text-sky-600 transition"
+          >
+            {isSelected ? <CheckSquare size={18} className="text-sky-600" /> : <Square size={18} />}
+          </button>
           <img src={staff.avatarUrl} alt={staff.fullName} className="w-12 h-12 rounded-2xl object-cover border border-sky-100 bg-sky-50 shadow-xs" />
           <div className="min-w-0">
             <strong className="block text-slate-900 font-bold truncate text-sm">{staff.fullName}</strong>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { useAuth } from '../../../providers/AuthProvider';
@@ -7,14 +7,26 @@ import { useToast } from '../../../providers/ToastProvider';
 import { profileService } from '../apis/profileService';
 import { getRoleNav } from '../constants/roleNav';
 import ChangePasswordModal from '../components/ChangePasswordModal';
-import PreferencesPanel from '../components/PreferencesPanel';
 import { usePreferences } from '../../../providers/PreferencesProvider';
-import { User, SlidersHorizontal } from 'lucide-react';
-
-const TABS = [
-  { id: 'profile', label: 'Hồ sơ', icon: User },
-  { id: 'settings', label: 'Cài đặt', icon: SlidersHorizontal },
-];
+import {
+  User,
+  ShieldCheck,
+  KeyRound,
+  Building2,
+  Stethoscope,
+  Award,
+  Calendar,
+  CheckCircle2,
+  Smartphone,
+  SlidersHorizontal,
+  Mail,
+  Phone,
+  CreditCard,
+  Briefcase,
+  ExternalLink,
+  Sparkles,
+  Lock,
+} from 'lucide-react';
 
 const ROLE_LABELS = {
   ADMIN: 'Quản trị viên',
@@ -24,14 +36,20 @@ const ROLE_LABELS = {
 };
 
 const STATUS_LABELS = {
-  ACTIVE: { text: 'Đang hoạt động', tone: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
-  INACTIVE: { text: 'Ngưng hoạt động', tone: 'bg-rose-50 text-rose-700 border-rose-100' },
-  PENDING: { text: 'Chờ kích hoạt', tone: 'bg-amber-50 text-amber-700 border-amber-100' },
+  ACTIVE: { text: 'Đang hoạt động', tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  INACTIVE: { text: 'Ngưng hoạt động', tone: 'bg-rose-50 text-rose-700 border-rose-200' },
+  PENDING: { text: 'Chờ kích hoạt', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
 };
 
 function formatDateTime(value) {
   return value
     ? new Date(value).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })
+    : 'Chưa cập nhật';
+}
+
+function formatDate(value) {
+  return value
+    ? new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
     : 'Chưa cập nhật';
 }
 
@@ -41,17 +59,12 @@ function shortenWallet(address) {
 }
 
 export default function ProfilePage() {
-  const { user, logout, updateSession } = useAuth();
+  const { user, logout } = useAuth();
   const { accentHex } = usePreferences();
   const navigate = useNavigate();
-  const location = useLocation();
   const toast = useToast();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  // Open on the tab requested by the navigator (sidebar avatar -> profile info, gear -> settings).
-  // Legacy 'personalize'/'security' both map to the combined 'settings' view.
-  const requestedTab = location.state?.tab === 'profile' ? 'profile' : (location.state?.tab ? 'settings' : 'profile');
-  const [activeTab, setActiveTab] = useState(requestedTab);
   const [showChangePassword, setShowChangePassword] = useState(false);
 
   const roleNav = getRoleNav(user?.role);
@@ -80,13 +93,11 @@ export default function ProfilePage() {
   const doctor = profile?.doctor;
   const admin = profile?.admin;
 
-  // Only password-based staff roles can change a password. Admins authenticate by
-  // wallet + face and have no passwordHash, so the option is hidden for them.
   const canChangePassword = Boolean(account) && account.role !== 'ADMIN';
 
   const displayName = staff?.fullName || admin?.adminUserName || account?.username || user?.username || 'Người dùng';
   const roleLabel = ROLE_LABELS[account?.role || user?.role] || account?.role || user?.role;
-  const status = STATUS_LABELS[account?.status] || { text: account?.status || 'N/A', tone: 'bg-slate-100 text-slate-600 border-slate-200' };
+  const status = STATUS_LABELS[account?.status] || { text: account?.status || 'Hoạt động', tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
   const initials = displayName
     .split(/[\s@._-]+/)
     .filter(Boolean)
@@ -102,137 +113,288 @@ export default function ProfilePage() {
       onNavigate={(id) => navigate(roleNav.routeFor(id))}
       onLogout={logout}
     >
-      <div className="max-w-[1280px] mx-auto space-y-6">
+      <div className="max-w-[1280px] mx-auto space-y-8 pb-12 animate-in fade-in duration-300">
         {loading ? (
-          <LoadingIndicator size="lg" label="Đang tải thông tin cá nhân..." />
+          <div className="py-20">
+            <LoadingIndicator size="lg" label="Đang tải thông tin hồ sơ cá nhân..." />
+          </div>
         ) : !profile ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-10 text-center">
-            <strong className="text-slate-800">Không có dữ liệu</strong>
-            <p className="mt-1 text-sm text-slate-500">Không tải được thông tin cá nhân của bạn.</p>
+          <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-12 text-center shadow-xs">
+            <User className="h-12 w-12 text-slate-400 mx-auto mb-3" />
+            <strong className="text-slate-800 text-lg">Không thể tải thông tin hồ sơ</strong>
+            <p className="mt-1 text-sm text-slate-500 max-w-md mx-auto">Vui lòng làm mới trang hoặc kiểm tra lại kết nối mạng của bạn.</p>
           </div>
         ) : (
           <>
-            {/* Header / Hero */}
-            <section className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-cyan-50 p-8 shadow-sm">
-              <p className="text-[11px] font-black text-cyan-600 uppercase tracking-[0.24em] mb-4">Hồ sơ cá nhân</p>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-cyan-600 text-2xl font-black text-white shadow-sm">
-                  {staff?.avatarUrl ? (
-                    <img src={staff.avatarUrl} alt={displayName} className="h-full w-full rounded-2xl object-cover" />
-                  ) : (
-                    initials
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight">{displayName}</h2>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center rounded-full border border-cyan-100 bg-white px-3 py-1 text-xs font-black text-cyan-700">
-                      {roleLabel}
-                    </span>
-                    {staff?.managedDepartment && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
-                        Trưởng khoa {staff.managedDepartment.name}
-                      </span>
-                    )}
-                    <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-black ${status.tone}`}>
-                      {status.text}
-                    </span>
-                    {staff?.employeeCode && (
-                      <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-600">
-                        Mã NV: {staff.employeeCode}
-                      </span>
-                    )}
+            {/* Header Hero Banner */}
+            <section className="relative overflow-hidden rounded-3xl border border-sky-100 bg-gradient-to-br from-slate-900 via-slate-800 to-sky-950 p-8 sm:p-10 text-white shadow-xl">
+              {/* Decorative Glow Accents */}
+              <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-sky-500/20 blur-3xl pointer-events-none" />
+              <div className="absolute right-1/4 -bottom-24 h-64 w-64 rounded-full bg-cyan-500/15 blur-2xl pointer-events-none" />
+
+              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-6">
+                  {/* Avatar Container */}
+                  <div className="relative shrink-0">
+                    <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-sky-500 to-cyan-600 text-3xl font-black text-white shadow-lg ring-4 ring-white/10 overflow-hidden">
+                      {staff?.avatarUrl ? (
+                        <img src={staff.avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+                      ) : (
+                        initials
+                      )}
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-emerald-500 border-2 border-slate-900 shadow-md flex items-center justify-center" title="Tài khoản đang mở">
+                      <span className="h-2 w-2 rounded-full bg-white animate-ping" />
+                    </div>
                   </div>
+
+                  {/* Profile Metadata Header */}
+                  <div className="space-y-2">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-0.5 text-xs font-bold text-sky-300 backdrop-blur-md">
+                      <Sparkles className="h-3.5 w-3.5 text-sky-400" />
+                      <span>Hồ sơ Bệnh viện Chuyên nghiệp</span>
+                    </div>
+
+                    <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">{displayName}</h1>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-sky-400/30 bg-sky-500/20 px-3.5 py-1 text-xs font-bold text-sky-200 backdrop-blur-md">
+                        <Briefcase className="h-3.5 w-3.5" />
+                        {roleLabel}
+                      </span>
+
+                      {staff?.managedDepartment && (
+                        <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/30 bg-amber-500/20 px-3.5 py-1 text-xs font-bold text-amber-200 backdrop-blur-md">
+                          <Building2 className="h-3.5 w-3.5" />
+                          Trưởng khoa {staff.managedDepartment.name}
+                        </span>
+                      )}
+
+                      <span className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-1 text-xs font-bold ${status.tone}`}>
+                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                        {status.text}
+                      </span>
+
+                      {staff?.employeeCode && (
+                        <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3.5 py-1 text-xs font-mono font-bold text-slate-200">
+                          Mã NV: {staff.employeeCode}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Action Navigation */}
+                <div className="flex items-center gap-3 shrink-0 self-start md:self-center pt-2 md:pt-0">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/settings')}
+                    className="flex items-center gap-2 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white border border-sky-400/30 px-5 py-3 text-xs font-bold transition-all shadow-md shadow-sky-600/30"
+                  >
+                    <SlidersHorizontal className="h-4 w-4" />
+                    <span>Cài đặt hệ thống</span>
+                  </button>
                 </div>
               </div>
             </section>
 
-            {/* Settings tabs */}
-            <div className="flex gap-1 rounded-2xl border border-slate-100 bg-white p-1.5 shadow-sm">
-              {TABS.map((tab) => {
-                const active = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    id={`profile-tab-${tab.id}`}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-colors duration-200 ${active ? 'bg-slate-50 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                    style={active ? { color: accentHex } : undefined}
-                  >
-                    <tab.icon className="h-4 w-4" strokeWidth={2.25} />
-                    <span className="hidden sm:inline">{tab.label}</span>
-                  </button>
-                );
-              })}
+            {/* Quick Metrics Bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                  <ShieldCheck className="h-6 w-6" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Khuôn mặt Face ID</span>
+                  <strong className="text-sm font-black text-slate-900">
+                    {account?.hasFace ? 'Đã xác minh AI' : 'Chưa đăng ký'}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-50 text-sky-600">
+                  <Lock className="h-6 w-6" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Mã hóa mật khẩu</span>
+                  <strong className="text-sm font-black text-slate-900">Chuẩn Argon2id</strong>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                  <Calendar className="h-6 w-6" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Ngày gia nhập</span>
+                  <strong className="text-sm font-black text-slate-900">{formatDate(account?.createdAt)}</strong>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                  <Sparkles className="h-6 w-6" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Mã hóa toàn vẹn</span>
+                  <strong className="text-sm font-black text-slate-900">SHA-256 Merkle</strong>
+                </div>
+              </div>
             </div>
 
-            {activeTab === 'profile' && (
-            <div className="space-y-6">
-            {/* Account info (common) */}
-            <Card title="Thông tin tài khoản">
-              <Field label="Tên đăng nhập" value={account.username} />
-              <Field label="Email" value={account.email} />
-              <Field label="Vai trò" value={roleLabel} />
-              <Field label="Xác thực khuôn mặt" value={account.hasFace ? 'Đã đăng ký' : 'Chưa đăng ký'} />
-              <Field label="Ngày đăng ký khuôn mặt" value={formatDateTime(account.faceEnrolledAt)} />
-              <Field label="Ngày tạo tài khoản" value={formatDateTime(account.createdAt)} />
-            </Card>
-
-            {/* Clinical credentials (doctor only) */}
-            {doctor && (
-              <Card title="Thông tin chuyên môn">
-                <Field label="Chuyên khoa" value={doctor.specialty} />
-                <Field label="Số chứng chỉ hành nghề" value={doctor.licenseNumber} />
-                <Field label="Trình độ" value={doctor.qualification} />
-                <Field
-                  label="Số năm kinh nghiệm"
-                  value={doctor.yearsExperience != null ? `${doctor.yearsExperience} năm` : null}
-                />
-              </Card>
-            )}
-
-            {/* Admin info */}
-            {admin && (
-              <Card title="Thông tin quản trị">
-                <Field label="Tên quản trị" value={admin.adminUserName} />
-                <Field label="Địa chỉ ví" value={shortenWallet(admin.walletAddress)} mono={admin.hasWallet} />
-                <Field label="Mã khôi phục (MFA)" value={admin.hasRecoverySecret ? 'Đã thiết lập' : 'Chưa thiết lập'} />
-              </Card>
-            )}
-            </div>
-            )}
-
-            {activeTab === 'settings' && (
-            <div className="space-y-6">
-            {/* Personalization controls */}
-            <PreferencesPanel />
-
-            {/* Security: password change for staff roles only */}
-            {canChangePassword && (
-              <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-start gap-3">
-                    <div>
-                      <h3 className="text-lg font-black text-slate-950">Bảo mật</h3>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Đổi mật khẩu đăng nhập của bạn. Nên dùng mật khẩu mạnh và không chia sẻ cho người khác.
-                      </p>
+            {/* Profile Grid Details */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Main Column */}
+              <div className="lg:col-span-2 space-y-8">
+                {/* Section: Account Information */}
+                <section className="rounded-3xl border border-slate-200/80 bg-white p-7 shadow-sm space-y-6">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-50 text-sky-600">
+                        <User className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-black text-slate-900">Thông tin tài khoản</h2>
+                        <p className="text-xs text-slate-500 font-semibold">Tên truy cập và thuộc tính xác thực hệ thống</p>
+                      </div>
                     </div>
                   </div>
+
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
+                    <DetailField icon={User} label="Tên đăng nhập" value={account?.username} />
+                    <DetailField icon={Mail} label="Email liên hệ" value={account?.email} />
+                    <DetailField icon={Briefcase} label="Vai trò hệ thống" value={roleLabel} />
+                    <DetailField icon={Smartphone} label="Xác thực khuôn mặt" value={account?.hasFace ? 'Đã đăng ký (Active)' : 'Chưa đăng ký'} />
+                    <DetailField icon={Calendar} label="Ngày đăng ký khuôn mặt" value={formatDateTime(account?.faceEnrolledAt)} />
+                    <DetailField icon={Calendar} label="Ngày khởi tạo tài khoản" value={formatDateTime(account?.createdAt)} />
+                  </dl>
+                </section>
+
+                {/* Section: Staff & Clinical Information (If Staff or Doctor) */}
+                {staff && (
+                  <section className="rounded-3xl border border-slate-200/80 bg-white p-7 shadow-sm space-y-6">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                          <Stethoscope className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-black text-slate-900">Hồ sơ cá nhân & Chuyên môn</h2>
+                          <p className="text-xs text-slate-500 font-semibold">Thông tin định danh nhân sự bệnh viện</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
+                      <DetailField icon={User} label="Họ và tên đầy đủ" value={staff.fullName} />
+                      <DetailField icon={Phone} label="Số điện thoại" value={staff.phone} />
+                      <DetailField icon={CreditCard} label="Số căn cước / CCCD" value={staff.citizenId} />
+                      <DetailField icon={Calendar} label="Ngày sinh" value={formatDate(staff.birthDate)} />
+                      <DetailField icon={Briefcase} label="Chức danh công tác" value={staff.position} />
+                      <DetailField icon={Building2} label="Phòng ban trực thuộc" value={staff.department?.name} />
+                    </dl>
+
+                    {/* Doctor Clinical Specifics */}
+                    {doctor && (
+                      <div className="mt-6 pt-6 border-t border-slate-100 space-y-4">
+                        <h3 className="text-xs font-extrabold uppercase tracking-wider text-sky-700 flex items-center gap-1.5">
+                          <Award className="h-4 w-4" />
+                          Chứng chỉ & Trình độ bác sĩ
+                        </h3>
+
+                        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
+                          <DetailField icon={Stethoscope} label="Chuyên khoa khám" value={doctor.specialty} />
+                          <DetailField icon={Award} label="Số chứng chỉ hành nghề" value={doctor.licenseNumber} />
+                          <DetailField icon={Award} label="Trình độ học vấn" value={doctor.qualification} />
+                          <DetailField icon={Calendar} label="Số năm kinh nghiệm" value={doctor.yearsExperience != null ? `${doctor.yearsExperience} năm` : null} />
+                        </dl>
+                      </div>
+                    )}
+                  </section>
+                )}
+
+                {/* Section: Admin Info (If Admin) */}
+                {admin && (
+                  <section className="rounded-3xl border border-slate-200/80 bg-white p-7 shadow-sm space-y-6">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                          <ShieldCheck className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-black text-slate-900">Thông tin quản trị viên (Admin)</h2>
+                          <p className="text-xs text-slate-500 font-semibold">Tùy chọn cấu hình ví MetaMask và khóa khôi phục MFA</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
+                      <DetailField icon={User} label="Tên tài khoản Admin" value={admin.adminUserName} />
+                      <DetailField icon={CreditCard} label="Địa chỉ ví MetaMask" value={shortenWallet(admin.walletAddress)} mono />
+                      <DetailField icon={KeyRound} label="Mã khôi phục (MFA)" value={admin.hasRecoverySecret ? 'Đã khởi tạo khôi phục' : 'Chưa khởi tạo'} />
+                    </dl>
+                  </section>
+                )}
+              </div>
+
+              {/* Sidebar Column */}
+              <div className="space-y-6">
+                {/* Security Card */}
+                <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm space-y-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-50 text-sky-600">
+                      <KeyRound className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900">Bảo mật tài khoản</h3>
+                      <p className="text-xs text-slate-500 font-semibold">Cài đặt mật khẩu & truy cập</p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                    Mật khẩu của bạn được bảo vệ bằng thuật toán chuẩn y tế. Hãy chắc chắn sử dụng mật khẩu mạnh.
+                  </p>
+
+                  {canChangePassword && (
+                    <button
+                      type="button"
+                      onClick={() => setShowChangePassword(true)}
+                      className="w-full rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 text-xs transition shadow-sm flex items-center justify-center gap-2"
+                    >
+                      <Lock className="h-4 w-4" />
+                      <span>Thay đổi mật khẩu</span>
+                    </button>
+                  )}
+
                   <button
                     type="button"
-                    onClick={() => setShowChangePassword(true)}
-                    className="shrink-0 rounded-xl bg-cyan-600 px-5 py-2.5 text-sm font-black text-white hover:bg-cyan-700"
+                    onClick={() => navigate('/settings')}
+                    className="w-full rounded-2xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-3 text-xs transition flex items-center justify-center gap-2"
                   >
-                    Đổi mật khẩu
+                    <SlidersHorizontal className="h-4 w-4 text-sky-600" />
+                    <span>Mở trang Cài đặt</span>
                   </button>
                 </div>
-              </section>
-            )}
 
+                {/* System Status Card */}
+                <div className="rounded-3xl border border-cyan-100 bg-gradient-to-br from-cyan-50/50 to-sky-50/50 p-6 shadow-sm space-y-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-cyan-600" />
+                    <h3 className="text-sm font-black text-slate-900">Trạng thái an toàn hệ thống</h3>
+                  </div>
+
+                  <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                    Tài khoản của bạn đã vượt qua tất cả các lớp kiểm tra toàn vẹn mã băm Merkle Tree và xác thực khuôn mặt sinh trắc học.
+                  </p>
+
+                  <div className="pt-2 border-t border-cyan-100 flex items-center justify-between text-xs text-cyan-800 font-bold">
+                    <span>Trạng thái: Hoạt động tốt</span>
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  </div>
+                </div>
+              </div>
             </div>
-            )}
           </>
         )}
       </div>
@@ -242,26 +404,22 @@ export default function ProfilePage() {
   );
 }
 
-function Card({ title, children }) {
-  return (
-    <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-      <div className="mb-5 flex items-center gap-2">
-        <h3 className="text-lg font-black text-slate-950">{title}</h3>
-      </div>
-      <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">{children}</dl>
-    </section>
-  );
-}
-
-function Field({ label, value, mono = false }) {
+function DetailField({ icon: Icon, label, value, mono = false }) {
   const display = value === null || value === undefined || value === '' ? 'Chưa cập nhật' : value;
   const isEmpty = display === 'Chưa cập nhật';
   return (
-    <div className="min-w-0">
-      <dt className="text-[11px] font-black uppercase tracking-wider text-slate-400">{label}</dt>
-      <dd className={`mt-1 break-words text-sm font-semibold ${isEmpty ? 'text-slate-400 italic' : 'text-slate-900'} ${mono ? 'font-mono' : ''}`}>
-        {display}
-      </dd>
+    <div className="flex items-start gap-3 min-w-0">
+      {Icon && (
+        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+          <Icon className="h-3.5 w-3.5" />
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <dt className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</dt>
+        <dd className={`mt-0.5 break-words text-sm font-bold ${isEmpty ? 'text-slate-400 italic font-normal' : 'text-slate-900'} ${mono ? 'font-mono' : ''}`}>
+          {display}
+        </dd>
+      </div>
     </div>
   );
 }

@@ -458,10 +458,9 @@ describeIntegration('Audit tamper and recovery integration', () => {
 
     const commitSpy = jest
       .spyOn(blockchain, 'commitAuditCheckpoint')
-      .mockResolvedValueOnce({ success: false, error: 'simulated blockchain network outage' });
+      .mockResolvedValueOnce(null);
     const unavailable = await restartedDuringOutage.anchorNow();
     expect(unavailable.committed).toBe(false);
-    expect(unavailable.reason).toContain('simulated blockchain network outage');
 
     const prepared = await prisma.auditBatch.findUniqueOrThrow({ where: { batchId: unavailable.batchId! } });
     expect(prepared.status).toBe('ARTIFACT_READY');

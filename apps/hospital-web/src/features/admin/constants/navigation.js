@@ -16,6 +16,7 @@ export const ADMIN_ROUTES = {
   aiModels: '/admin/ai-models',
   audit: '/admin/audit',
   profile: '/profile',
+  settings: '/settings',
 };
 
 export function navigateAdmin(navigate, id) {
