@@ -72,23 +72,23 @@ export default function SettingsPage() {
     >
       <div className="max-w-[1280px] mx-auto space-y-8 pb-12 animate-in fade-in duration-300">
         {/* Header Hero Banner */}
-        <section className="relative overflow-hidden rounded-3xl border border-sky-100 bg-gradient-to-br from-slate-900 via-slate-800 to-sky-950 p-8 sm:p-10 text-white shadow-xl">
+        <section className="relative overflow-hidden rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-50/90 via-white to-cyan-50/70 p-8 sm:p-10 text-slate-900 shadow-sm">
           {/* Subtle Background Glow Accent */}
-          <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-sky-500/20 blur-3xl pointer-events-none" />
-          <div className="absolute right-1/3 -bottom-20 h-56 w-56 rounded-full bg-indigo-500/15 blur-2xl pointer-events-none" />
+          <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-sky-200/30 blur-3xl pointer-events-none" />
+          <div className="absolute right-1/3 -bottom-20 h-56 w-56 rounded-full bg-cyan-200/25 blur-2xl pointer-events-none" />
 
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-500/10 px-3.5 py-1 text-xs font-bold text-sky-300 backdrop-blur-md">
-                <Sparkles className="h-3.5 w-3.5 text-sky-400" />
+              <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-100/80 px-3.5 py-1 text-xs font-bold text-sky-800 shadow-2xs">
+                <Sparkles className="h-3.5 w-3.5 text-sky-600" />
                 <span>Hệ thống Tùy chỉnh & Bảo mật</span>
               </div>
-              <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white flex items-center gap-3">
-                <Settings className="h-8 w-8 text-sky-400 shrink-0" strokeWidth={2.25} />
+              <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 flex items-center gap-3">
+                <Settings className="h-8 w-8 text-sky-600 shrink-0" strokeWidth={2.25} />
                 Cài đặt & Tùy biến
               </h1>
-              <p className="text-sm font-medium text-slate-300 max-w-2xl leading-relaxed">
-                Tùy chỉnh giao diện làm việc, thiết lập ưu tiên thông báo và quản lý cấu hình an toàn sinh trắc học cho tài khoản <strong className="text-sky-300">{roleLabel}</strong>.
+              <p className="text-sm font-medium text-slate-600 max-w-2xl leading-relaxed">
+                Tùy chỉnh giao diện làm việc, thiết lập ưu tiên thông báo và quản lý cấu hình an toàn sinh trắc học cho tài khoản <strong className="text-sky-700">{roleLabel}</strong>.
               </p>
             </div>
 
@@ -96,9 +96,9 @@ export default function SettingsPage() {
               <button
                 type="button"
                 onClick={() => navigate('/profile')}
-                className="flex items-center gap-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 px-5 py-3 text-xs font-bold text-white transition-all backdrop-blur-md shadow-sm"
+                className="flex items-center gap-2 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200 px-5 py-3 text-xs font-bold text-slate-700 transition-all shadow-xs"
               >
-                <User className="h-4 w-4 text-sky-300" />
+                <User className="h-4 w-4 text-sky-600" />
                 <span>Xem Hồ sơ</span>
               </button>
             </div>
@@ -128,7 +128,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <h2 className="text-xl font-black text-slate-900 tracking-tight">Bảo mật & Sinh trắc học</h2>
-              <p className="text-xs text-slate-500 font-medium">Trạng thái xác thực khuôn mặt Face ID, tài khoản và khóa mật khẩu</p>
+              <p className="text-xs text-slate-500 font-medium">Trạng thái xác thực khuôn mặt Face ID, tài khoản và mật khẩu</p>
             </div>
           </div>
 
@@ -152,11 +152,11 @@ export default function SettingsPage() {
               </div>
 
               <p className="mt-4 text-xs text-slate-600 font-medium leading-relaxed">
-                Khuôn mặt của bạn đã được mã hóa vector 128 chiều và lưu trữ an toàn trên mạng phân tán. Dùng để xác thực cấp 2 khi thực hiện thao tác nhạy cảm.
+                Dữ liệu khuôn mặt của bạn đã được đăng ký và lưu trữ an toàn trong hệ thống bệnh viện. Được sử dụng để xác thực nhanh và bảo vệ quyền truy cập tài khoản.
               </p>
 
               <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500">Mô hình AI: FaceNet MobileNet</span>
+                <span className="text-xs font-bold text-slate-500">Công nghệ AI: Nhận diện sinh trắc học</span>
                 <button
                   type="button"
                   onClick={() => navigate('/authenticate')}
@@ -178,19 +178,19 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <h3 className="text-base font-bold text-slate-900">Mật khẩu đăng nhập</h3>
-                      <p className="text-xs font-semibold text-slate-500 mt-0.5">Quản lý khóa bảo vệ tài khoản</p>
+                      <p className="text-xs font-semibold text-slate-500 mt-0.5">Quản lý bảo vệ tài khoản</p>
                     </div>
                   </div>
                   <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">
                     <Lock className="h-3.5 w-3.5" />
-                    Bảo vệ Argon2id
+                    Mã hóa an toàn
                   </span>
                 </div>
 
                 <p className="mt-4 text-xs text-slate-600 font-medium leading-relaxed">
                   {canChangePassword
-                    ? 'Nên định kỳ thay đổi mật khẩu định kỳ 90 ngày để tránh lộ tài khoản. Mật khẩu được mã hóa bằng thuật toán Argon2id chuẩn y tế.'
-                    : 'Tài khoản Admin quản trị sử dụng phương thức đăng nhập sinh trắc học và ví MetaMask trực tiếp.'}
+                    ? 'Nên thay đổi mật khẩu định kỳ để đảm bảo an toàn tối đa cho tài khoản làm việc của bạn.'
+                    : 'Tài khoản Quản trị viên sử dụng phương thức đăng nhập bằng xác thực sinh trắc học và ví bảo mật.'}
                 </p>
               </div>
 
@@ -285,27 +285,27 @@ export default function SettingsPage() {
                 <Cpu className="h-4 w-4" />
               </div>
               <div>
-                <h2 className="text-xl font-black text-slate-900 tracking-tight">Mạng Blockchain & Nút Neo Data</h2>
-                <p className="text-xs text-slate-500 font-medium">Trạng thái kết nối Smart Contract Sepolia và hạ tầng lưu trữ Pinata IPFS</p>
+                <h2 className="text-xl font-black text-slate-900 tracking-tight">Hệ thống Bảo vệ & Lưu trữ Dữ liệu</h2>
+                <p className="text-xs text-slate-500 font-medium">Trạng thái kết nối hạ tầng bảo mật dữ liệu y tế và sao lưu tự động</p>
               </div>
             </div>
 
             <div className="rounded-3xl border border-cyan-200/80 bg-gradient-to-br from-cyan-50/40 via-white to-sky-50/40 p-6 shadow-sm">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="p-4 rounded-2xl bg-white border border-slate-200/80">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Mạng Blockchain</span>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Mạng lưu trữ an toàn</span>
                   <div className="mt-1 flex items-center gap-2 font-bold text-slate-900 text-sm">
                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Ethereum Sepolia Testnet
+                    Hệ thống xác thực phi tập trung
                   </div>
                 </div>
                 <div className="p-4 rounded-2xl bg-white border border-slate-200/80">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Mã hóa Audit</span>
-                  <div className="mt-1 font-bold text-slate-900 text-sm">SHA-256 Merkle Tree V2</div>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Nhật ký kiểm toán</span>
+                  <div className="mt-1 font-bold text-slate-900 text-sm">Hệ thống kiểm tra toàn vẹn</div>
                 </div>
                 <div className="p-4 rounded-2xl bg-white border border-slate-200/80">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Lưu trữ Snapshot</span>
-                  <div className="mt-1 font-bold text-slate-900 text-sm">Pinata IPFS Gateway</div>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Sao lưu dữ liệu</span>
+                  <div className="mt-1 font-bold text-slate-900 text-sm">Sao lưu dữ liệu đám mây</div>
                 </div>
               </div>
             </div>

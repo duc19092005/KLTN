@@ -127,44 +127,44 @@ export default function ProfilePage() {
         ) : (
           <>
             {/* Header Hero Banner */}
-            <section className="relative overflow-hidden rounded-3xl border border-sky-100 bg-gradient-to-br from-slate-900 via-slate-800 to-sky-950 p-8 sm:p-10 text-white shadow-xl">
+            <section className="relative overflow-hidden rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-50/90 via-white to-cyan-50/70 p-8 sm:p-10 text-slate-900 shadow-sm">
               {/* Decorative Glow Accents */}
-              <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-sky-500/20 blur-3xl pointer-events-none" />
-              <div className="absolute right-1/4 -bottom-24 h-64 w-64 rounded-full bg-cyan-500/15 blur-2xl pointer-events-none" />
+              <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-sky-200/30 blur-3xl pointer-events-none" />
+              <div className="absolute right-1/4 -bottom-24 h-64 w-64 rounded-full bg-cyan-200/25 blur-2xl pointer-events-none" />
 
               <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-6">
                   {/* Avatar Container */}
                   <div className="relative shrink-0">
-                    <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-sky-500 to-cyan-600 text-3xl font-black text-white shadow-lg ring-4 ring-white/10 overflow-hidden">
+                    <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-sky-500 to-cyan-600 text-3xl font-black text-white shadow-lg ring-4 ring-sky-100 overflow-hidden">
                       {staff?.avatarUrl ? (
                         <img src={staff.avatarUrl} alt={displayName} className="h-full w-full object-cover" />
                       ) : (
                         initials
                       )}
                     </div>
-                    <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-emerald-500 border-2 border-slate-900 shadow-md flex items-center justify-center" title="Tài khoản đang mở">
+                    <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-emerald-500 border-2 border-white shadow-md flex items-center justify-center" title="Tài khoản đang hoạt động">
                       <span className="h-2 w-2 rounded-full bg-white animate-ping" />
                     </div>
                   </div>
 
                   {/* Profile Metadata Header */}
                   <div className="space-y-2">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-0.5 text-xs font-bold text-sky-300 backdrop-blur-md">
-                      <Sparkles className="h-3.5 w-3.5 text-sky-400" />
+                    <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-100/80 px-3 py-0.5 text-xs font-bold text-sky-800 shadow-2xs">
+                      <Sparkles className="h-3.5 w-3.5 text-sky-600" />
                       <span>Hồ sơ Bệnh viện Chuyên nghiệp</span>
                     </div>
 
-                    <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">{displayName}</h1>
+                    <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900">{displayName}</h1>
 
                     <div className="flex flex-wrap items-center gap-2 pt-1">
-                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-sky-400/30 bg-sky-500/20 px-3.5 py-1 text-xs font-bold text-sky-200 backdrop-blur-md">
+                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-100/80 px-3.5 py-1 text-xs font-bold text-sky-800">
                         <Briefcase className="h-3.5 w-3.5" />
                         {roleLabel}
                       </span>
 
                       {staff?.managedDepartment && (
-                        <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/30 bg-amber-500/20 px-3.5 py-1 text-xs font-bold text-amber-200 backdrop-blur-md">
+                        <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-1 text-xs font-bold text-amber-800">
                           <Building2 className="h-3.5 w-3.5" />
                           Trưởng khoa {staff.managedDepartment.name}
                         </span>
@@ -176,7 +176,7 @@ export default function ProfilePage() {
                       </span>
 
                       {staff?.employeeCode && (
-                        <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3.5 py-1 text-xs font-mono font-bold text-slate-200">
+                        <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-100 px-3.5 py-1 text-xs font-mono font-bold text-slate-700">
                           Mã NV: {staff.employeeCode}
                         </span>
                       )}
@@ -189,7 +189,7 @@ export default function ProfilePage() {
                   <button
                     type="button"
                     onClick={() => navigate('/settings')}
-                    className="flex items-center gap-2 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white border border-sky-400/30 px-5 py-3 text-xs font-bold transition-all shadow-md shadow-sky-600/30"
+                    className="flex items-center gap-2 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white border border-sky-500 px-5 py-3 text-xs font-bold transition-all shadow-md shadow-sky-600/20"
                   >
                     <SlidersHorizontal className="h-4 w-4" />
                     <span>Cài đặt hệ thống</span>
@@ -207,7 +207,7 @@ export default function ProfilePage() {
                 <div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Khuôn mặt Face ID</span>
                   <strong className="text-sm font-black text-slate-900">
-                    {account?.hasFace ? 'Đã xác minh AI' : 'Chưa đăng ký'}
+                    {account?.hasFace ? 'Đã xác minh' : 'Chưa đăng ký'}
                   </strong>
                 </div>
               </div>
@@ -217,8 +217,8 @@ export default function ProfilePage() {
                   <Lock className="h-6 w-6" />
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Mã hóa mật khẩu</span>
-                  <strong className="text-sm font-black text-slate-900">Chuẩn Argon2id</strong>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Bảo mật mật khẩu</span>
+                  <strong className="text-sm font-black text-slate-900">Mã hóa an toàn</strong>
                 </div>
               </div>
 
@@ -237,8 +237,8 @@ export default function ProfilePage() {
                   <Sparkles className="h-6 w-6" />
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Mã hóa toàn vẹn</span>
-                  <strong className="text-sm font-black text-slate-900">SHA-256 Merkle</strong>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Bảo vệ dữ liệu</span>
+                  <strong className="text-sm font-black text-slate-900">Đạt chuẩn y tế</strong>
                 </div>
               </div>
             </div>
@@ -265,7 +265,7 @@ export default function ProfilePage() {
                     <DetailField icon={User} label="Tên đăng nhập" value={account?.username} />
                     <DetailField icon={Mail} label="Email liên hệ" value={account?.email} />
                     <DetailField icon={Briefcase} label="Vai trò hệ thống" value={roleLabel} />
-                    <DetailField icon={Smartphone} label="Xác thực khuôn mặt" value={account?.hasFace ? 'Đã đăng ký (Active)' : 'Chưa đăng ký'} />
+                    <DetailField icon={Smartphone} label="Xác thực khuôn mặt" value={account?.hasFace ? 'Đã đăng ký' : 'Chưa đăng ký'} />
                     <DetailField icon={Calendar} label="Ngày đăng ký khuôn mặt" value={formatDateTime(account?.faceEnrolledAt)} />
                     <DetailField icon={Calendar} label="Ngày khởi tạo tài khoản" value={formatDateTime(account?.createdAt)} />
                   </dl>
@@ -324,15 +324,15 @@ export default function ProfilePage() {
                         </div>
                         <div>
                           <h2 className="text-lg font-black text-slate-900">Thông tin quản trị viên (Admin)</h2>
-                          <p className="text-xs text-slate-500 font-semibold">Tùy chọn cấu hình ví MetaMask và khóa khôi phục MFA</p>
+                          <p className="text-xs text-slate-500 font-semibold">Thông tin địa chỉ ví và phương thức bảo mật</p>
                         </div>
                       </div>
                     </div>
 
                     <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
                       <DetailField icon={User} label="Tên tài khoản Admin" value={admin.adminUserName} />
-                      <DetailField icon={CreditCard} label="Địa chỉ ví MetaMask" value={shortenWallet(admin.walletAddress)} mono />
-                      <DetailField icon={KeyRound} label="Mã khôi phục (MFA)" value={admin.hasRecoverySecret ? 'Đã khởi tạo khôi phục' : 'Chưa khởi tạo'} />
+                      <DetailField icon={CreditCard} label="Địa chỉ ví bảo mật" value={shortenWallet(admin.walletAddress)} mono />
+                      <DetailField icon={KeyRound} label="Bảo mật tài khoản" value={admin.hasRecoverySecret ? 'Đã kích hoạt' : 'Chưa kích hoạt'} />
                     </dl>
                   </section>
                 )}
@@ -353,7 +353,7 @@ export default function ProfilePage() {
                   </div>
 
                   <p className="text-xs text-slate-600 font-medium leading-relaxed">
-                    Mật khẩu của bạn được bảo vệ bằng thuật toán chuẩn y tế. Hãy chắc chắn sử dụng mật khẩu mạnh.
+                    Mật khẩu của bạn được bảo vệ bằng mã hóa cao cấp. Hãy chắc chắn sử dụng mật khẩu mạnh.
                   </p>
 
                   {canChangePassword && (
@@ -385,7 +385,7 @@ export default function ProfilePage() {
                   </div>
 
                   <p className="text-xs text-slate-600 font-medium leading-relaxed">
-                    Tài khoản của bạn đã vượt qua tất cả các lớp kiểm tra toàn vẹn mã băm Merkle Tree và xác thực khuôn mặt sinh trắc học.
+                    Tài khoản của bạn được bảo vệ an toàn qua các lớp kiểm tra định danh sinh trắc học và hệ thống mã hóa bảo mật.
                   </p>
 
                   <div className="pt-2 border-t border-cyan-100 flex items-center justify-between text-xs text-cyan-800 font-bold">
