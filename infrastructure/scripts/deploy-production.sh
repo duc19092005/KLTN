@@ -10,6 +10,7 @@ LEGACY_BACKEND_ENV_FILE="${LEGACY_BACKEND_ENV_FILE:-$REPOSITORY_ROOT/backend/.en
 HEALTH_URL="${HEALTH_URL:-http://localhost/api/health}"
 PREVIOUS_BACKEND_FILE="${PREVIOUS_BACKEND_FILE:-$REPOSITORY_ROOT/.previous_backend_image}"
 PREVIOUS_FRONTEND_FILE="${PREVIOUS_FRONTEND_FILE:-$REPOSITORY_ROOT/.previous_frontend_image}"
+
 log() { printf '[%s] %s\n' "$(date -Is)" "$*"; }
 fail() { log "ERROR: $*"; exit 1; }
 
@@ -36,6 +37,7 @@ rollback() {
     export BACKEND_IMAGE
     BACKEND_IMAGE="$(cat "$PREVIOUS_BACKEND_FILE")"
   fi
+
   if [[ -s "$PREVIOUS_FRONTEND_FILE" ]]; then
     export FRONTEND_IMAGE
     FRONTEND_IMAGE="$(cat "$PREVIOUS_FRONTEND_FILE")"
@@ -59,9 +61,11 @@ on_error() {
 migrate_legacy_backend_env() {
   if [[ -f "$BACKEND_ENV_FILE" ]]; then
     chmod 600 "$BACKEND_ENV_FILE"
+
     if [[ -f "$LEGACY_BACKEND_ENV_FILE" ]]; then
       log "WARNING: Legacy backend env still exists at ${LEGACY_BACKEND_ENV_FILE}; using ${BACKEND_ENV_FILE}"
     fi
+
     return
   fi
 
@@ -76,10 +80,12 @@ migrate_legacy_backend_env() {
 
 migrate_legacy_backend_env
 trap on_error ERR
+
 require_cmd docker
 require_cmd curl
 
 docker compose version >/dev/null 2>&1 || fail "Docker Compose plugin is not available"
+
 [[ -f "$COMPOSE_FILE" ]] || fail "Missing ${COMPOSE_FILE}"
 [[ -f "$ENV_FILE" ]] || fail "Missing ${ENV_FILE}. Create it on the VPS from .env.example"
 [[ -f "$BACKEND_ENV_FILE" ]] || fail "Missing ${BACKEND_ENV_FILE}. Create it on the VPS from apps/hospital-api/.env.example"
@@ -90,27 +96,38 @@ REQUESTED_APP_VERSION="${APP_VERSION:-}"
 
 DOTENV_LIBRARY="$SCRIPT_DIR/lib/dotenv.sh"
 [[ -f "$DOTENV_LIBRARY" ]] || fail "Missing dotenv loader: ${DOTENV_LIBRARY}"
+
 # shellcheck source=infrastructure/scripts/lib/dotenv.sh
 source "$DOTENV_LIBRARY"
 
 load_dotenv_file "$ENV_FILE"
 load_dotenv_file "$BACKEND_ENV_FILE"
 
-if [[ -n "$REQUESTED_BACKEND_IMAGE" ]]; then BACKEND_IMAGE="$REQUESTED_BACKEND_IMAGE"; fi
-if [[ -n "$REQUESTED_FRONTEND_IMAGE" ]]; then FRONTEND_IMAGE="$REQUESTED_FRONTEND_IMAGE"; fi
-if [[ -n "$REQUESTED_APP_VERSION" ]]; then APP_VERSION="$REQUESTED_APP_VERSION"; fi
+if [[ -n "$REQUESTED_BACKEND_IMAGE" ]]; then
+  BACKEND_IMAGE="$REQUESTED_BACKEND_IMAGE"
+fi
+
+if [[ -n "$REQUESTED_FRONTEND_IMAGE" ]]; then
+  FRONTEND_IMAGE="$REQUESTED_FRONTEND_IMAGE"
+fi
+
+if [[ -n "$REQUESTED_APP_VERSION" ]]; then
+  APP_VERSION="$REQUESTED_APP_VERSION"
+fi
 
 [[ -n "${BACKEND_IMAGE:-}" ]] || fail "BACKEND_IMAGE is required"
 [[ -n "${FRONTEND_IMAGE:-}" ]] || fail "FRONTEND_IMAGE is required"
 
-if [[ "\${AUDIT_BATCH_DISABLED:-false}" != "true" ]]; then
-  [[ "\${AUDIT_RECOVERY_ENCRYPTION_KEY:-}" =~ ^[0-9A-Fa-f]{64}$ ]] \
+if [[ "${AUDIT_BATCH_DISABLED:-false}" != "true" ]]; then
+  [[ "${AUDIT_RECOVERY_ENCRYPTION_KEY:-}" =~ ^[0-9A-Fa-f]{64}$ ]] \
     || fail "AUDIT_RECOVERY_ENCRYPTION_KEY must contain exactly 64 hexadecimal characters"
-  [[ "\${AUDIT_RECOVERY_ENCRYPTION_KEY}" != "$(printf '00%.0s' {1..32})" ]] \
+
+  [[ "${AUDIT_RECOVERY_ENCRYPTION_KEY}" != "$(printf '00%.0s' {1..32})" ]] \
     || fail "AUDIT_RECOVERY_ENCRYPTION_KEY must not be an all-zero placeholder"
 fi
 
 log "Saving current image references for rollback"
+
 current_image backend > "$PREVIOUS_BACKEND_FILE" || true
 current_image frontend > "$PREVIOUS_FRONTEND_FILE" || true
 
@@ -125,19 +142,26 @@ export BACKEND_IMAGE FRONTEND_IMAGE
 export APP_VERSION="${APP_VERSION:-$(printf '%s' "$BACKEND_IMAGE" | awk -F: '{print $NF}')}"
 
 log "Pulling new images"
+
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" pull backend frontend nginx postgres
+
 log "Starting database dependency"
+
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d postgres
+
 COMPOSE_DEPLOY=(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE")
 
 log "Running Prisma production migrations"
+
 "${COMPOSE_DEPLOY[@]}" run --rm --no-deps backend ./node_modules/.bin/prisma migrate deploy
 
 log "Updating application containers"
+
 "${COMPOSE_DEPLOY[@]}" up -d --remove-orphans
 
 wait_for_health
 
 log "Deployment completed successfully"
 log "Pruning dangling Docker images only"
+
 docker image prune -f >/dev/null || true
