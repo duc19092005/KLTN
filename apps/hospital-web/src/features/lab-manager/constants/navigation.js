@@ -10,6 +10,7 @@ export const LAB_MANAGER_ROUTES = {
   orders: '/lab-manager/orders',
   results: '/lab-manager/results',
   profile: '/profile',
+  settings: '/settings',
 };
 
 export function labManagerRouteFor(id) {

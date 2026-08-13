@@ -17,7 +17,7 @@ import LoadingIndicator from '../shared/components/LoadingIndicator';
 import { getDashboardRoute } from '../shared/constants/roleRoutes';
 import HospitalLandingPage from '../features/landing/pages/HospitalLandingPage';
 import PatientHomePage from '../features/patient/pages/PatientHomePage';
-import { ProfilePage } from '../features/profile';
+import { ProfilePage, SettingsPage } from '../features/profile';
 
 // Where a first-login user belongs: face FIRST so the user is biometrically known before being
 // trusted to set a permanent password. Once the face is on file, fall back to /change-password.
@@ -72,6 +72,7 @@ export default function App() {
         <Route path="/lab-manager/orders" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><LabOrdersPage /></ProtectedRoute>} />
         <Route path="/lab-manager/results" element={<ProtectedRoute requireVerified roles={['LAB_MANAGER']}><LabResultsPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute requireVerified roles={['ADMIN', 'RECEPTIONIST', 'DOCTOR', 'LAB_MANAGER']}><ProfilePage /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute requireVerified roles={['ADMIN', 'RECEPTIONIST', 'DOCTOR', 'LAB_MANAGER']}><SettingsPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to={isAuthenticated ? (user?.firstLogin ? firstLoginRoute(user) : dashboardRoute) : '/'} replace />} />
       </Routes>
     </div>
