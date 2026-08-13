@@ -28,6 +28,7 @@ import { AuditLoggerService } from './audit-logger.service';
 import {
   compareLiveSnapshotToAuditAfter,
   verifyAuditRow,
+  verifyAuditRowLight,
 } from './audit-verification.util';
 import { canonicalize } from './audit-hash.util';
 import { EntityRecreationBundleCache, EntityRecreationService } from './entity-recreation.service';
@@ -119,6 +120,11 @@ export class EntityRecoveryService {
     for (const target of uniqueTargets) {
       const live = await this.loadLiveSnapshot(this.prisma, target.entity, target.entityId);
       if (!live) {
+        // Entity bị xóa vĩnh viễn có chủ ý — không coi là mất dữ liệu, không đề xuất recreation.
+        if (await this.isIntentionallyDeleted(target.entityId)) {
+          items.push({ ...target, state: 'INTENTIONALLY_DELETED', operation: 'NONE', recoverable: false, blockers: [], sensitiveDataHidden: true });
+          continue;
+        }
         if (!this.recreation) {
           items.push({ ...target, state: 'MISSING', operation: 'RECREATE', recoverable: false, blockers: ['ENTITY_RECREATION_UNAVAILABLE'], sensitiveDataHidden: true });
         } else {
@@ -170,12 +176,11 @@ export class EntityRecoveryService {
       if (!latest.has(key)) latest.set(key, row);
     }
 
-    const warnings: EntityIntegrityWarning[] = [];
     const recreationCache = this.recreation?.createBundleCache();
-    for (const row of latest.values()) {
-      const warning = await this.evaluateRow(row, recreationCache);
-      if (warning) warnings.push(warning);
-    }
+    const evaluated = await Promise.all(
+      Array.from(latest.values()).map((row) => this.evaluateRow(row, recreationCache)),
+    );
+    const warnings = evaluated.filter((warning): warning is EntityIntegrityWarning => warning !== null);
 
     return { items: warnings, total: warnings.length };
   }
@@ -211,6 +216,7 @@ export class EntityRecoveryService {
       try {
         results.push(await this.recoverOne(target, actorId, reason, recreationCache));
       } catch (error) {
+        console.error('RECOVERY ERROR:', error);
         results.push({
           ...target,
           status: 'FAILED',
@@ -236,6 +242,12 @@ export class EntityRecoveryService {
   ) {
     const liveSnapshot = await this.loadLiveSnapshot(this.prisma, target.entity, target.entityId);
     if (!liveSnapshot) {
+      // Nếu entity đã bị xóa vĩnh viễn có chủ ý, không cho phép recovery qua luồng này.
+      if (await this.isIntentionallyDeleted(target.entityId)) {
+        throw new ConflictException(
+          `Entity '${target.entity}' (${target.entityId}) đã bị xóa vĩnh viễn có chủ ý. Không thể khôi phục qua luồng entity recovery.`,
+        );
+      }
       if (!this.recreation) throw new ConflictException('Entity recreation service chưa được cấu hình.');
       return this.recreation.recreate(target, actorId, reason, recreationCache);
     }
@@ -305,13 +317,13 @@ export class EntityRecoveryService {
       sensitiveDataHidden: true as const,
     };
 
-    const verification = verifyAuditRow(row);
-    if (!verification.ok) {
+    const lightVerification = verifyAuditRowLight(row);
+    if (!lightVerification.ok) {
       return {
         ...base,
         status: 'AUDIT_UNTRUSTED',
         recoverable: false,
-        fieldsChanged: this.safeFieldNames(entity, verification.suspiciousFields),
+        fieldsChanged: this.safeFieldNames(entity, lightVerification.suspiciousFields),
         blockers: ['AUDIT_ROW_INTEGRITY_FAILED'], dependencies: [], recoveryMode: 'AUDIT_BATCH_FIRST',
         message: 'Audit nguồn có dấu hiệu sai lệch. Hãy phục hồi audit batch từ IPFS trước.',
       };
@@ -319,6 +331,9 @@ export class EntityRecoveryService {
 
     const liveSnapshot = await this.loadLiveSnapshot(this.prisma, entity, row.entityId);
     if (!liveSnapshot) {
+      // Entity đã bị xóa vĩnh viễn có chủ ý bởi admin — không phải lỗi integrity, không cảnh báo.
+      if (await this.isIntentionallyDeleted(row.entityId)) return null;
+
       const preview = this.recreation
         ? await this.recreation.previewOne({ entity, entityId: row.entityId }, recreationCache)
         : null;
@@ -339,6 +354,8 @@ export class EntityRecoveryService {
           : `Không thể khôi phục tự động: ${(preview?.blockers ?? ['không có snapshot tin cậy']).join(', ')}.`,
       };
     }
+
+    const verification = verifyAuditRow(row);
 
     if (!this.hasCompleteSnapshot(entity, verification.decryptedAfter)) {
       const partialComparison = this.compareCommittedSnapshotFields(
@@ -484,6 +501,24 @@ export class EntityRecoveryService {
     });
   }
 
+  /**
+   * Kiểm tra xem entity có từng bị xóa vĩnh viễn có chủ ý bởi admin hay không.
+   * Tìm row AdministrativeDeletion/PERMANENT_DELETE có entityId khớp trong audit log.
+   * Nếu có → entity đã gone intentionally, không phải mất trái phép → không cảnh báo, không recreate.
+   */
+  private async isIntentionallyDeleted(entityId: string): Promise<boolean> {
+    const row = await this.prisma.blockchainLogger.findFirst({
+      where: {
+        entity: 'AdministrativeDeletion',
+        entityId,
+        action: 'PERMANENT_DELETE',
+        seq: { not: null },
+      },
+      select: { id: true },
+    });
+    return row !== null;
+  }
+
   private async loadLiveSnapshot(client: DbClient, entity: RecoverableAuditEntity, entityId: string): Promise<Snapshot | null> {
     if (entity === 'Patient') {
       const row = await client.patient.findUnique({ where: { id: entityId } });
@@ -523,10 +558,10 @@ export class EntityRecoveryService {
     if (entity === 'MedicalResult') {
       const row = await client.medicalResult.findUnique({
         where: { id: entityId },
-        include: { files: true, order: { select: { visitId: true } } },
+        include: { files: true, order: { select: { visitId: true, status: true } } },
       });
       if (!row) return null;
-      return buildMedicalResultSnapshot({ ...row, visitId: row.order?.visitId ?? null });
+      return buildMedicalResultSnapshot(row);
     }
     if (entity === 'Appointment') {
       const row = await client.appointment.findUnique({

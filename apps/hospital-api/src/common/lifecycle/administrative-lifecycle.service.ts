@@ -37,7 +37,10 @@ export class AdministrativeLifecycleService {
       const after = await this.updateLifecycle(tx, entity, current, UserStatus.DELETE, OperationalStatus.DELETE, {
         deletedAt: now, deletedBy: actorId, restoredAt: null,
       });
-      await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'DELETE', actorId, before: this.snapshot(entity, current), after: this.snapshot(entity, after) }, tx);
+      const afterSnapshot = this.snapshot(entity, after);
+      const { salt, hash } = this.audit.hashSnapshot(afterSnapshot);
+      await this.updateIntegrityHash(tx, entity, id, hash, salt);
+      await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'DELETE', actorId, before: this.snapshot(entity, current), after: afterSnapshot }, tx);
       return after;
     });
     return { deleted: true, id, status: 'DELETE', deletedAt: now };
@@ -56,7 +59,10 @@ export class AdministrativeLifecycleService {
       const after = await this.updateLifecycle(tx, entity, current, UserStatus.INACTIVE, OperationalStatus.INACTIVE, {
         deletedAt: null, deletedBy: null, restoredAt: now,
       });
-      await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'RESTORE', actorId, before: this.snapshot(entity, current), after: this.snapshot(entity, after) }, tx);
+      const afterSnapshot = this.snapshot(entity, after);
+      const { salt, hash } = this.audit.hashSnapshot(afterSnapshot);
+      await this.updateIntegrityHash(tx, entity, id, hash, salt);
+      await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'RESTORE', actorId, before: this.snapshot(entity, current), after: afterSnapshot }, tx);
     });
     return { restored: true, id, status: 'INACTIVE', restoredAt: now };
   }
@@ -93,10 +99,57 @@ export class AdministrativeLifecycleService {
     return { permanentlyDeleted: true, id };
   }
 
+  async softDeleteMany(entity: LifecycleEntity, ids: string[], actorId: string) {
+    const unique = [...new Set(ids)];
+    const results = await Promise.all(
+      unique.map(async (id) => {
+        try {
+          const r = await this.softDelete(entity, id, actorId);
+          return { id, status: 'DELETED' as const, deletedAt: r.deletedAt };
+        } catch (err) {
+          return { id, status: 'FAILED' as const, message: this.safeMessage(err) };
+        }
+      }),
+    );
+    return this.summarizeBulk(results);
+  }
+
+  async restoreMany(entity: LifecycleEntity, ids: string[], actorId: string) {
+    const unique = [...new Set(ids)];
+    const results = await Promise.all(
+      unique.map(async (id) => {
+        try {
+          const r = await this.restore(entity, id, actorId);
+          return { id, status: 'RESTORED' as const, restoredAt: r.restoredAt };
+        } catch (err) {
+          return { id, status: 'FAILED' as const, message: this.safeMessage(err) };
+        }
+      }),
+    );
+    return this.summarizeBulk(results);
+  }
+
+  async permanentDeleteMany(entity: LifecycleEntity, ids: string[], actorId: string) {
+    const unique = [...new Set(ids)];
+    const results = await Promise.all(
+      unique.map(async (id) => {
+        try {
+          await this.permanentDelete(entity, id, actorId);
+          return { id, status: 'PERMANENTLY_DELETED' as const };
+        } catch (err) {
+          return { id, status: 'FAILED' as const, message: this.safeMessage(err) };
+        }
+      }),
+    );
+    return this.summarizeBulk(results);
+  }
+
+
   private find(entity: LifecycleEntity, id: string) {
     if (entity === 'ai-models') return this.prisma.aiModelRegistry.findUnique({ where: { id }, include: { _count: { select: { diagnoses: true, aiQualities: true, blockchainLogs: true } } } });
     if (entity === 'departments') return this.prisma.department.findUnique({ where: { id }, include: { _count: { select: { staffs: true, visits: true, medicalOrders: true, appointments: true, blockchainLogs: true } } } });
     if (entity === 'staff') return this.prisma.staffProfile.findUnique({ where: { id }, include: { user: true, _count: { select: { assignedVisits: true, blockchainLogs: true } }, doctorProfile: true, managedDepartment: true } });
+
     return this.prisma.doctorProfile.findUnique({
       where: { id },
       include: {
@@ -113,6 +166,14 @@ export class AdministrativeLifecycleService {
     await tx.user.update({ where: { id: userId }, data: { status: userStatus, ...metadata } });
     if (entity === 'staff') return tx.staffProfile.findUniqueOrThrow({ where: { id: current.id }, include: { user: true } });
     return tx.doctorProfile.findUniqueOrThrow({ where: { id: current.id }, include: { staffProfile: { include: { user: true } } } });
+  }
+
+  private async updateIntegrityHash(tx: any, entity: LifecycleEntity, id: string, hash256: string, dataSalt: string) {
+    const data = { hash256, dataSalt };
+    if (entity === 'departments') return tx.department.update({ where: { id }, data });
+    if (entity === 'ai-models') return tx.aiModelRegistry.update({ where: { id }, data });
+    if (entity === 'staff') return tx.staffProfile.update({ where: { id }, data });
+    return tx.doctorProfile.update({ where: { id }, data });
   }
 
   private statusOf(entity: LifecycleEntity, row: any) { return entity === 'staff' ? row.user.status : entity === 'doctors' ? row.staffProfile.user.status : row.status; }
@@ -189,5 +250,20 @@ export class AdministrativeLifecycleService {
     return row._count.aiQualities + row._count.medicalOrders + row._count.appointments
       + row._count.reviewedAiDiagnoses + row._count.medicalConclusions
       + row.staffProfile._count.assignedVisits + Number(Boolean(row.staffProfile.managedDepartment));
+  }
+
+  private summarizeBulk(results: Array<{ id: string; status: string; [key: string]: unknown }>) {
+    return {
+      requested: results.length,
+      succeeded: results.filter((r) => r.status !== 'FAILED').length,
+      failed: results.filter((r) => r.status === 'FAILED').length,
+      results,
+    };
+  }
+
+  private safeMessage(err: unknown): string {
+    if (err instanceof Error) return err.message;
+    if (typeof err === 'object' && err !== null && 'message' in err) return String((err as { message: unknown }).message);
+    return 'Lỗi không xác định.';
   }
 }

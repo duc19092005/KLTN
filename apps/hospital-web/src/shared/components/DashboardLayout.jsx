@@ -98,11 +98,11 @@ export default function DashboardLayout({
 
   const openProfile = () => {
     setIsSidebarOpen(false);
-    navigate('/profile', { state: { tab: 'profile' } });
+    navigate('/profile');
   };
   const openSettings = () => {
     setIsSidebarOpen(false);
-    navigate('/profile', { state: { tab: 'personalize' } });
+    navigate('/settings');
   };
 
   const filteredNavItems = navItems;

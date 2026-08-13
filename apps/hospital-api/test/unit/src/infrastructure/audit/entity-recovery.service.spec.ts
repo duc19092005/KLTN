@@ -249,12 +249,12 @@ describe('EntityRecoveryService integrity gate', () => {
     const tx = {
       $executeRaw: jest.fn().mockResolvedValue(1),
       patient: {
-        findUnique: jest.fn().mockResolvedValueOnce(tampered).mockResolvedValueOnce(restored),
+        findUnique: jest.fn().mockResolvedValueOnce(tampered).mockResolvedValue(restored),
         update: jest.fn().mockResolvedValue(restored),
       },
     };
     const prisma = {
-      blockchainLogger: { findFirst: jest.fn().mockResolvedValue(row) },
+      blockchainLogger: { findFirst: jest.fn().mockResolvedValue(row), findMany: jest.fn().mockResolvedValue([row]) },
       patient: { findUnique: jest.fn().mockResolvedValue(tampered) },
       $transaction: jest.fn().mockImplementation(async (callback) => callback(tx)),
     };
@@ -271,6 +271,7 @@ describe('EntityRecoveryService integrity gate', () => {
       'Khôi phục theo cảnh báo toàn vẹn',
     );
 
+    console.log('RECOVERY RESULT:', JSON.stringify(result, null, 2));
     expect(result).toMatchObject({ requested: 1, recovered: 1, failed: 0 });
     expect(tx.patient.update).toHaveBeenCalledTimes(2);
     expect(audit.recordV2).toHaveBeenCalledWith(expect.objectContaining({
@@ -291,7 +292,7 @@ describe('EntityRecoveryService integrity gate', () => {
     };
     const row = buildStaffAuditRow(legacySnapshot);
     const prisma = {
-      blockchainLogger: { findFirst: jest.fn().mockResolvedValue(row) },
+      blockchainLogger: { findFirst: jest.fn().mockResolvedValue(row), findMany: jest.fn().mockResolvedValue([row]) },
       staffProfile: {
         findUnique: jest.fn().mockResolvedValue({
           ...legacySnapshot,
@@ -320,7 +321,7 @@ describe('EntityRecoveryService integrity gate', () => {
     const tx = {
       $executeRaw: jest.fn().mockResolvedValue(1),
       aiDiagnosis: {
-        findUnique: jest.fn().mockResolvedValueOnce(tampered).mockResolvedValueOnce(trusted),
+        findUnique: jest.fn().mockResolvedValueOnce(tampered).mockResolvedValue(trusted),
         update: jest.fn().mockResolvedValue(trusted),
       },
       aiModelRegistry: { findUnique: jest.fn().mockResolvedValue({ id: trusted.aiModelId }) },
@@ -328,7 +329,7 @@ describe('EntityRecoveryService integrity gate', () => {
       visit: { findUnique: jest.fn().mockResolvedValue({ id: trusted.visitId }) },
     };
     const prisma = {
-      blockchainLogger: { findFirst: jest.fn().mockResolvedValue(row) },
+      blockchainLogger: { findFirst: jest.fn().mockResolvedValue(row), findMany: jest.fn().mockResolvedValue([row]) },
       aiDiagnosis: { findUnique: jest.fn().mockResolvedValue(tampered) },
       $transaction: jest.fn().mockImplementation(async (callback) => callback(tx)),
     };

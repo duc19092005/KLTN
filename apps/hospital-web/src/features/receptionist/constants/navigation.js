@@ -11,6 +11,7 @@ export const RECEPTIONIST_ROUTES = {
   'visit-queue': '/receptionist/queue',
   'patient-records': '/receptionist/records',
   profile: '/profile',
+  settings: '/settings',
 };
 
 export function receptionistRouteFor(id) {

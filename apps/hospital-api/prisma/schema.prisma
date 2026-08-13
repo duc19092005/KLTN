@@ -137,7 +137,6 @@ model User {
   patientAccesses          PatientAccess[]
   refreshTokens            RefreshToken[]
   performedResults         MedicalResult[]
-  stepUpTickets            StepUpTicket[]
   notifications            Notification[]
   auditLogs                AuditLog[]         @relation("AuditLogActor")
   blockchainLogs           BlockchainLogger[] @relation("BlockchainLoggerActor")
@@ -779,26 +778,11 @@ model AuditRecovery {
   artifactHash  String?
   merkleRoot    String?
   failureReason String?
-  createdAt     DateTime                @default(now())
+  createdAt     DateTime  @default(now())
   completedAt   DateTime?
-  stageRows     AuditRecoveryStageRow[]
 
   @@index([batchId, createdAt])
   @@index([requestedById, createdAt])
-}
-
-/// Ephemeral validated rows used inside the same recovery transaction before replacement.
-model AuditRecoveryStageRow {
-  id         String        @id @default(uuid())
-  recoveryId String
-  recovery   AuditRecovery @relation(fields: [recoveryId], references: [id], onDelete: Cascade)
-  seq        Int
-  entryHash  String
-  payload    Json
-  createdAt  DateTime      @default(now())
-
-  @@unique([recoveryId, seq])
-  @@index([recoveryId])
 }
 
 /// Short-lived, single-use proof that a user re-authenticated with their face immediately
@@ -807,27 +791,7 @@ model AuditRecoveryStageRow {
 /// session, irreversible or money-touching operations demand a fresh biometric scan at the moment
 /// of the action so a hijacked or unattended session cannot trigger them.
 ///
-/// Flow: POST /auth/face-stepup runs the same face match + on-chain integrity gate as login, then
-/// mints a ticket scoped to (userId, action, optional resourceId) that expires in minutes. The
-/// client replays the ticket via the x-stepup-ticket header on the protected request; FaceStepUpGuard
-/// consumes it atomically (usedAt) so it can never be replayed. We store only the SHA256 of the raw
-/// token, never the token itself.
-model StepUpTicket {
-  id         String    @id @default(uuid())
-  tokenHash  String    @unique // SHA256(raw ticket token); raw token is returned to client once
-  userId     String
-  user       User      @relation(fields: [userId], references: [id])
-  action     String // scope, e.g. "DELETE_DOCTOR" | "ANCHOR_BLOCKCHAIN"
-  resourceId String? // optional: binds the ticket to one specific target record
-  ip         String?
-  expiresAt  DateTime // typically now + a few minutes
-  usedAt     DateTime? // set on first (and only) consumption
-  createdAt  DateTime  @default(now())
 
-  @@index([userId])
-  @@index([action])
-  @@index([expiresAt])
-}
 
 model RefreshToken {
   id     String @id @default(uuid())

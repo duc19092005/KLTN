@@ -9,7 +9,7 @@ import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { aiModelService } from '../apis/aiModelService';
 import { useToast } from '../../../providers/ToastProvider';
 import AiModelDetailModal from '../components/AiModelDetailModal';
-import { Trash2, Cpu, Plus, Filter, Search, Sparkles, ShieldCheck, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Trash2, Cpu, Plus, Filter, Search, Sparkles, ShieldCheck, CheckCircle2, AlertTriangle, CheckSquare, Square } from 'lucide-react';
 
 const PROVIDERS = [
   { value: 'chatgpt', label: 'ChatGPT / OpenAI', endpoint: 'https://api.openai.com/v1/chat/completions', hint: 'API Chat Completions của OpenAI', cloud: true },
@@ -152,11 +152,13 @@ export default function AiModelsPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   const [statsData, setStatsData] = useState(null);
 
   const load = async (page = pagination.page, currentFilter = filter, currentSearch = search, currentStatus = statusFilter) => {
     setLoading(true);
+    setSelectedIds([]);
     try {
       const [res, statsRes] = await Promise.all([
         aiModelService.list({
@@ -325,10 +327,77 @@ export default function AiModelsPage() {
     }
   };
 
+  const handleBulkSoftDelete = async (ids) => {
+    if (!ids || ids.length === 0) return;
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa tạm thời ${ids.length} mô hình AI đã chọn vào thùng rác?`)) return;
+    setSaving(true);
+    try {
+      const res = await aiModelService.softDeleteMany(ids);
+      const data = res.data;
+      if (data?.failed > 0) {
+        toast.warning(`Thành công: ${data.succeeded}/${data.requested}. Thất bại: ${data.failed}.`);
+      } else {
+        toast.success(`Đã chuyển ${data.succeeded} mô hình AI vào thùng rác!`);
+      }
+      setSelectedIds([]);
+      await load(pagination.page);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Không thể xóa hàng loạt mô hình AI');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const allSelected = visibleModels.length > 0 && selectedIds.length === visibleModels.length;
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(visibleModels.map((m) => m.id));
+    }
+  };
+  const toggleSelectOne = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="aiModels" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
       <div className="mx-auto max-w-[1600px] space-y-6 pb-10">
         <Hero onCreate={openCreateModal} onTrash={() => navigate('/admin/ai-models/trash')} total={pagination.total} />
+
+        {/* Floating Bulk Action Bar */}
+        {selectedIds.length > 0 && (
+          <div className="sticky top-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/95 px-5 py-3.5 shadow-lg backdrop-blur-sm animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-3">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-sky-600 text-xs font-bold text-white">
+                {selectedIds.length}
+              </span>
+              <span className="text-sm font-bold text-sky-950">
+                Đã chọn {selectedIds.length} mô hình AI
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => handleBulkSoftDelete(selectedIds)}
+                className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-700 disabled:opacity-40 transition"
+              >
+                <Trash2 size={15} />
+                Xóa tạm thời chọn ({selectedIds.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedIds([])}
+                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
+              >
+                Bỏ chọn
+              </button>
+            </div>
+          </div>
+        )}
 
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((item) => (
@@ -342,9 +411,19 @@ export default function AiModelsPage() {
         <section className="rounded-3xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
           <div className="p-6 border-b border-slate-100">
             <div className="mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">Danh mục mô hình AI</h2>
-                <p className="text-xs font-medium text-slate-400">Lọc theo nền tảng, trạng thái hiển thị và từ khóa mô hình.</p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={toggleSelectAll}
+                  className="flex items-center gap-2 text-slate-700 hover:text-sky-600 transition"
+                  title="Chọn tất cả mô hình AI"
+                >
+                  {allSelected ? <CheckSquare size={19} className="text-sky-600" /> : <Square size={19} className="text-slate-400" />}
+                </button>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Danh mục mô hình AI</h2>
+                  <p className="text-xs font-medium text-slate-400">Lọc theo nền tảng, trạng thái hiển thị và từ khóa mô hình.</p>
+                </div>
               </div>
               {(filter || statusFilter || search) && (
                 <button type="button" onClick={() => { setFilter(''); setStatusFilter(''); setSearch(''); load(1, '', '', ''); }} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">Xóa lọc</button>
@@ -376,7 +455,19 @@ export default function AiModelsPage() {
           </div>
           <div className="p-6 space-y-4 max-h-[760px] overflow-y-auto">
             {loading && <LoadingIndicator size="lg" label="Đang tải mô hình AI..." />}
-            {!loading && visibleModels.map((model) => <ModelCard key={model.id} model={model} onViewDetails={setDetailModelId} onEdit={openEditModal} onToggleStatus={toggleModelStatus} onDelete={requestDelete} busy={saving} />)}
+            {!loading && visibleModels.map((model) => (
+              <ModelCard
+                key={model.id}
+                model={model}
+                onViewDetails={setDetailModelId}
+                onEdit={openEditModal}
+                onToggleStatus={toggleModelStatus}
+                onDelete={requestDelete}
+                busy={saving}
+                isSelected={selectedIds.includes(model.id)}
+                onToggleSelect={() => toggleSelectOne(model.id)}
+              />
+            ))}
             {!loading && !visibleModels.length && <Empty title="Chưa có mô hình AI" desc="Bấm + Thêm mô hình AI để mở cửa sổ đăng ký mô hình." />}
           </div>
           <Pagination pagination={pagination} onPageChange={load} />
@@ -505,8 +596,9 @@ function CreateModelModal({ form, updateForm, onSubmit, onClose, saving, testing
   if (typeof document === 'undefined' || !document.body) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fadeIn">
-      <form onSubmit={handleSubmit} noValidate className="w-full max-w-[1280px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fadeIn">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <form onSubmit={handleSubmit} noValidate className="relative z-10 w-full max-w-[1280px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
         <div className="flex justify-between gap-4">
           <div>
             <h3 className="text-2xl font-bold text-slate-900">{editing ? 'Cập nhật mô hình AI' : 'Thêm mô hình AI'}</h3>
@@ -615,7 +707,7 @@ function TextAreaField({ label, value, onChange, onBlur, error, required = false
 }
 function FieldError({ message }) { return <p className={`min-h-[14px] text-[11px] font-bold leading-3 transition-colors ${message ? 'text-rose-600' : 'text-transparent'}`}>{message || 'Lỗi'}</p>; }
 
-function ModelCard({ model, onViewDetails, onEdit, onToggleStatus, onDelete, busy }) {
+function ModelCard({ model, onViewDetails, onEdit, onToggleStatus, onDelete, busy, isSelected, onToggleSelect }) {
   const isLocal = model.provider === 'local';
   const badgeCls = 'bg-sky-50 text-sky-700 border-sky-200/80';
   const badge = isLocal ? 'TỰ LƯU TRỮ' : (providerLabel(model.provider) || model.provider || 'API').toUpperCase();
@@ -625,20 +717,29 @@ function ModelCard({ model, onViewDetails, onEdit, onToggleStatus, onDelete, bus
   const statusLabel = isInactive ? 'Đang ẩn' : 'Đang hoạt động';
 
   return (
-    <article className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-5 space-y-3">
+    <article className={`rounded-2xl border transition-all p-5 space-y-3 ${isSelected ? 'border-sky-300 bg-sky-50/60 shadow-xs' : 'border-slate-200/80 bg-slate-50/50'}`}>
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-bold text-slate-900 text-base">{model.modelName}</h3>
-            <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${badgeCls}`}>{badge}</span>
-            {hasAccuracy && (
-              <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${model.averageAccuracy >= 80 ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                Độ tin cậy: {model.averageAccuracy}% ({model.totalRatings} đánh giá)
-              </span>
-            )}
-            <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${statusClass}`}>{statusLabel}</span>
+        <div className="flex items-start gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={onToggleSelect}
+            className="mt-0.5 text-slate-400 hover:text-sky-600 transition"
+          >
+            {isSelected ? <CheckSquare size={18} className="text-sky-600" /> : <Square size={18} />}
+          </button>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-bold text-slate-900 text-base">{model.modelName}</h3>
+              <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${badgeCls}`}>{badge}</span>
+              {hasAccuracy && (
+                <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${model.averageAccuracy >= 80 ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                  Độ tin cậy: {model.averageAccuracy}% ({model.totalRatings} đánh giá)
+                </span>
+              )}
+              <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${statusClass}`}>{statusLabel}</span>
+            </div>
+            <p className="mt-1 text-xs font-semibold text-slate-400">Phiên bản {model.modelVersion} · {model.recommendedSpecialty || 'Chưa gán chuyên khoa'}</p>
           </div>
-          <p className="mt-1 text-xs font-semibold text-slate-400">Phiên bản {model.modelVersion} · {model.recommendedSpecialty || 'Chưa gán chuyên khoa'}</p>
         </div>
         <div className="flex gap-2 items-center">
           <BlockchainStatusBadge status={model.blockchainStatus} />

@@ -7,6 +7,7 @@ import { GetVisitResultsUseCase } from './application/use-cases/get-visit-result
 import { GenerateAiAnalysisUseCase } from './application/use-cases/generate-ai-analysis.use-case';
 import { ReviewAiDiagnosisUseCase } from './application/use-cases/review-ai-diagnosis.use-case';
 import { CreateMedicalConclusionUseCase } from './application/use-cases/create-medical-conclusion.use-case';
+import { ListPatientMedicalHistoryUseCase } from './application/use-cases/list-patient-medical-history.use-case';
 import { CLINICAL_DECISION_REPOSITORY } from './application/ports/clinical-decision.repository.port';
 import { AI_PROVIDER_GATEWAY } from './application/ports/ai-provider-gateway.port';
 import { MEDICAL_IMAGE_ATTACHMENT } from './application/ports/medical-image-attachment.port';
@@ -24,6 +25,7 @@ import { BlockchainMedicalConclusionIntegrityAnchor } from './infrastructure/ada
     GenerateAiAnalysisUseCase,
     ReviewAiDiagnosisUseCase,
     CreateMedicalConclusionUseCase,
+    ListPatientMedicalHistoryUseCase,
     ClinicalDecisionPolicy,
     ClinicalPromptBuilder,
     { provide: CLINICAL_DECISION_REPOSITORY, useClass: PrismaClinicalDecisionRepository },

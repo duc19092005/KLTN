@@ -114,4 +114,22 @@ describe('AuditRecoveryService verified IPFS reader', () => {
 
     await expect(service.loadVerifiedBundle(1)).rejects.toThrow('Merkle root');
   });
+
+  it('successfully loads verified bundle even when PostgreSQL AuditBatch is missing (DB Wipe scenario)', async () => {
+    const { service, row } = await setup();
+    // Simulate DB wipe: prisma.auditBatch.findUnique returns null
+    (service['prisma'] as any).auditBatch.findUnique.mockResolvedValue(null);
+
+    const result = await service.loadVerifiedBundle(1);
+    expect(result.logs).toHaveLength(1);
+    expect(result.logs[0].entryHash).toBe(row.entryHash);
+    expect(result.batchId).toBe(1);
+  });
+
+  it('tracks deep scan progress and state', () => {
+    const service = new AuditRecoveryService({} as never, {} as never, {} as never, {} as never, {} as never);
+    const initialStatus = service.getDeepScanStatus();
+    expect(initialStatus.active).toBe(false);
+    expect(initialStatus.progressPercent).toBe(0);
+  });
 });

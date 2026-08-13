@@ -6,6 +6,7 @@ export const CLINICAL_DECISION_REPOSITORY = Symbol('CLINICAL_DECISION_REPOSITORY
 /** Minimal visit shape for doctor ownership checks. */
 export type ClinicalVisitInfo = {
   id: string;
+  patientId: string;
   departmentId: string;
   staffId: string | null;
   status: string;
@@ -41,6 +42,23 @@ export type UpsertConclusionData = {
 };
 
 /**
+ * Full Visit fields required by EntityRecoveryService for the `Visit` entity
+ * (REQUIRED_SNAPSHOT_FIELDS.Visit). This is the canonical shape consumed by
+ * `buildVisitSnapshot`.
+ */
+export type ClinicalVisitAuditSnapshot = {
+  id: string;
+  visitCode: string;
+  patientId: string;
+  departmentId: string;
+  staffId: string | null;
+  status: string;
+  source: string;
+  checkInAt: Date | string;
+  completedAt: Date | string | null;
+};
+
+/**
  * Persistence boundary for the clinical-decision workflow. The Prisma
  * implementation keeps the visit include shapes and the conclusion upsert +
  * visit COMPLETED transition transaction unchanged.
@@ -49,6 +67,7 @@ export interface ClinicalDecisionRepositoryPort {
   findDoctorByUserId(userId: string): Promise<ClinicalDoctor | null>;
   findVisitById(visitId: string): Promise<ClinicalVisitInfo | null>;
   findFullVisit(visitId: string): Promise<any>;
+  findPatientMedicalHistory(patientId: string, currentVisitId: string): Promise<unknown[]>;
 
   findAiModelById(id: string): Promise<AiModelRegistry | null>;
   findDefaultAiModelForSpecialty(specialty: string): Promise<AiModelRegistry | null>;
@@ -74,6 +93,10 @@ export interface ClinicalDecisionRepositoryPort {
   /** Atomic: upsert conclusion + transition visit to COMPLETED. */
   upsertConclusionAndCompleteVisit(
     data: UpsertConclusionData,
-    afterWrite?: (conclusion: unknown, tx: import('@prisma/client').Prisma.TransactionClient) => Promise<void>,
+    afterWrite?: (
+      conclusion: unknown,
+      visitAfter: ClinicalVisitAuditSnapshot | null,
+      tx: import('@prisma/client').Prisma.TransactionClient,
+    ) => Promise<void>,
   ): Promise<unknown>;
 }

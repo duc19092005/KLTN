@@ -13,6 +13,9 @@ export const staffService = {
   remove: (id) => api.delete(`/staff/${id}`),
   restore: (id) => api.patch(`/staff/${id}/restore`),
   permanentDelete: (id) => api.delete(`/staff/${id}/permanent`),
+  softDeleteMany: (ids) => api.post('/staff/bulk/soft-delete', { ids }),
+  restoreMany: (ids) => api.post('/staff/bulk/restore', { ids }),
+  permanentDeleteMany: (ids) => api.post('/staff/bulk/permanent-delete', { ids }),
   uploadAvatar: (file) => {
     const formData = new FormData();
     formData.append('file', file);

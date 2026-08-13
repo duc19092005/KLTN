@@ -121,6 +121,16 @@ contract AuditAnchor {
         return checkpoints[batchId].merkleRoot;
     }
 
+    struct CheckpointSummary {
+        uint256 batchId;
+        bytes32 merkleRoot;
+        bytes32 artifactHash;
+        string artifactUri;
+        uint256 leafCount;
+        uint256 timestamp;
+        bool committed;
+    }
+
     /// @notice Full checkpoint details for a batch.
     function getCheckpoint(uint256 batchId)
         external
@@ -136,5 +146,36 @@ contract AuditAnchor {
     {
         Checkpoint storage cp = checkpoints[batchId];
         return (cp.merkleRoot, cp.artifactHash, cp.artifactUri, cp.leafCount, cp.timestamp, cp.committed);
+    }
+
+    /// @notice Fetch a range of batch checkpoints for audit recovery and DB synchronization.
+    /// @param fromBatchId Starting batch ID (inclusive).
+    /// @param toBatchId Ending batch ID (inclusive).
+    function getCheckpointsRange(uint256 fromBatchId, uint256 toBatchId)
+        external
+        view
+        returns (CheckpointSummary[] memory items)
+    {
+        if (fromBatchId == 0 || toBatchId < fromBatchId || latestBatchId < fromBatchId) {
+            return new CheckpointSummary[](0);
+        }
+
+        uint256 end = toBatchId > latestBatchId ? latestBatchId : toBatchId;
+        uint256 count = end - fromBatchId + 1;
+        items = new CheckpointSummary[](count);
+
+        for (uint256 i = 0; i < count; i++) {
+            uint256 bId = fromBatchId + i;
+            Checkpoint storage cp = checkpoints[bId];
+            items[i] = CheckpointSummary({
+                batchId: bId,
+                merkleRoot: cp.merkleRoot,
+                artifactHash: cp.artifactHash,
+                artifactUri: cp.artifactUri,
+                leafCount: cp.leafCount,
+                timestamp: cp.timestamp,
+                committed: cp.committed
+            });
+        }
     }
 }

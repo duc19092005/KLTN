@@ -9,7 +9,7 @@ import { departmentService } from '../apis/departmentService';
 import { staffService } from '../apis/staffService';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { Search, Trash2, X, Plus, Building2, Layers, Filter, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Search, Trash2, X, Plus, Building2, Layers, Filter, CheckCircle2, ShieldCheck, CheckSquare, Square } from 'lucide-react';
 import AuditHistoryChanges from '../components/AuditHistoryChanges';
 
 const DEPARTMENT_TYPES = [
@@ -102,9 +102,11 @@ export default function DepartmentsPage() {
   const [busy, setBusy] = useState(false);
   const [pendingDeleteDepartment, setPendingDeleteDepartment] = useState(null);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
+  const [selectedIds, setSelectedIds] = useState([]);
 
   const load = async (page = pagination.page) => {
     setLoading(true);
+    setSelectedIds([]);
     try {
       const [depRes, staffRes] = await Promise.all([
         departmentService.list({ page, limit: pagination.limit }),
@@ -233,6 +235,27 @@ export default function DepartmentsPage() {
     finally { setBusy(false); }
   };
 
+  const handleBulkSoftDelete = async (ids) => {
+    if (!ids || ids.length === 0) return;
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa tạm thời ${ids.length} phòng ban đã chọn vào thùng rác?`)) return;
+    setBusy(true);
+    try {
+      const res = await departmentService.softDeleteMany(ids);
+      const data = res.data;
+      if (data?.failed > 0) {
+        toast.warning(`Thành công: ${data.succeeded}/${data.requested}. Thất bại: ${data.failed}.`);
+      } else {
+        toast.success(`Đã chuyển ${data.succeeded} phòng ban vào thùng rác!`);
+      }
+      setSelectedIds([]);
+      await load(pagination.page);
+    } catch (err) {
+      toast.error(getError(err, 'Không thể xóa hàng loạt phòng ban'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const selectedStaffs = selectedDepartment ? staffs.filter((s) => s.departmentId === selectedDepartment.id) : [];
 
   return (
@@ -240,7 +263,23 @@ export default function DepartmentsPage() {
       <div className="mx-auto max-w-[1600px] space-y-6 pb-10">
         <Hero onCreate={openCreate} onTrash={() => navigate('/admin/departments/trash')} total={pagination.total} />
         {loading ? <LoadingIndicator size="lg" label="Đang tải danh sách phòng ban..." /> : (
-          <DepartmentDirectory departments={departments} staffs={staffs} busy={busy} selectedDepartment={selectedDepartment} onSelect={handleSelectDepartment} onAssignManager={assignManager} onEdit={openEdit} onHide={hideDepartment} onRestore={restoreDepartment} onDelete={confirmRemoveDepartment} pagination={pagination} onPageChange={load} />
+          <DepartmentDirectory
+            departments={departments}
+            staffs={staffs}
+            busy={busy}
+            selectedDepartment={selectedDepartment}
+            onSelect={handleSelectDepartment}
+            onAssignManager={assignManager}
+            onEdit={openEdit}
+            onHide={hideDepartment}
+            onRestore={restoreDepartment}
+            onDelete={confirmRemoveDepartment}
+            pagination={pagination}
+            onPageChange={load}
+            selectedIds={selectedIds}
+            setSelectedIds={setSelectedIds}
+            onBulkSoftDelete={handleBulkSoftDelete}
+          />
         )}
         {selectedDepartment && (
           <DepartmentDetail
@@ -314,7 +353,23 @@ function Hero({ onCreate, onTrash, total }) {
   );
 }
 
-function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, onSelect, onAssignManager, onEdit, onHide, onRestore, onDelete, pagination, onPageChange }) {
+function DepartmentDirectory({
+  departments,
+  staffs,
+  busy,
+  selectedDepartment,
+  onSelect,
+  onAssignManager,
+  onEdit,
+  onHide,
+  onRestore,
+  onDelete,
+  pagination,
+  onPageChange,
+  selectedIds = [],
+  setSelectedIds,
+  onBulkSoftDelete,
+}) {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [orderFilter, setOrderFilter] = useState('');
@@ -331,8 +386,56 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
     return matchesKeyword && matchesType && matchesOrder && matchesStatus;
   });
 
+  const allSelected = visibleDepartments.length > 0 && selectedIds.length === visibleDepartments.length;
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(visibleDepartments.map((d) => d.id));
+    }
+  };
+
+  const toggleSelectOne = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
   return (
     <div className="space-y-6">
+      {/* Floating Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <div className="sticky top-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/95 px-5 py-3.5 shadow-lg backdrop-blur-sm animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-3">
+            <span className="grid h-7 w-7 place-items-center rounded-full bg-sky-600 text-xs font-bold text-white">
+              {selectedIds.length}
+            </span>
+            <span className="text-sm font-bold text-sky-950">
+              Đã chọn {selectedIds.length} phòng ban
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onBulkSoftDelete(selectedIds)}
+              className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-700 disabled:opacity-40 transition"
+            >
+              <Trash2 size={15} />
+              Xóa tạm thời chọn ({selectedIds.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
+            >
+              Bỏ chọn
+            </button>
+          </div>
+        </div>
+      )}
+
       <section className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm">
         <div className="mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
@@ -363,7 +466,15 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
 
       <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleSelectAll}
+              className="flex items-center gap-2 text-slate-700 hover:text-sky-600 transition"
+              title="Chọn tất cả phòng ban"
+            >
+              {allSelected ? <CheckSquare size={19} className="text-sky-600" /> : <Square size={19} className="text-slate-400" />}
+            </button>
             <Building2 className="h-5 w-5 text-sky-600" strokeWidth={2} />
             <h3 className="text-lg font-bold text-slate-900">Danh sách phòng ban</h3>
           </div>
@@ -374,20 +485,30 @@ function DepartmentDirectory({ departments, staffs, busy, selectedDepartment, on
           {visibleDepartments.map((dep) => {
             const depStaffs = staffs.filter((s) => s.departmentId === dep.id);
             const active = selectedDepartment?.id === dep.id;
+            const isChecked = selectedIds.includes(dep.id);
             return (
-              <article key={dep.id} className={`p-6 transition-all hover:bg-slate-50/80 ${active ? 'bg-sky-50/50' : 'bg-white'}`}>
+              <article key={dep.id} className={`p-6 transition-all hover:bg-slate-50/80 ${isChecked ? 'bg-sky-50/60' : active ? 'bg-sky-50/30' : 'bg-white'}`}>
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_0.95fr_0.55fr_0.55fr_0.8fr_300px] xl:items-center">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-sky-600">{dep.departmentCode}</span>
-                      <span className={`rounded-md border px-2 py-0.5 text-[10px] font-bold ${statusTone[dep.status] || statusTone.ACTIVE}`}>{getStatusLabel(dep.status)}</span>
+                  <div className="min-w-0 flex items-start gap-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleSelectOne(dep.id)}
+                      className="mt-1 text-slate-400 hover:text-sky-600 transition"
+                    >
+                      {isChecked ? <CheckSquare size={18} className="text-sky-600" /> : <Square size={18} />}
+                    </button>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-sky-600">{dep.departmentCode}</span>
+                        <span className={`rounded-md border px-2 py-0.5 text-[10px] font-bold ${statusTone[dep.status] || statusTone.ACTIVE}`}>{getStatusLabel(dep.status)}</span>
+                      </div>
+                      <h4 className="mt-1 truncate text-base font-bold text-slate-900">{dep.name}</h4>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        <span className="rounded-md bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700 border border-sky-100">{getTypeLabel(dep.type)}</span>
+                        <span className={`rounded-md border px-2 py-0.5 text-[10px] font-bold ${orderTone[String(Boolean(dep.canReceiveOrders))]}`}>{dep.canReceiveOrders ? 'Nhận chỉ định' : 'Không nhận chỉ định'}</span>
+                      </div>
+                      <p className="mt-1.5 line-clamp-1 text-xs font-medium text-slate-400">{dep.description || 'Chưa có mô tả'}</p>
                     </div>
-                    <h4 className="mt-1 truncate text-base font-bold text-slate-900">{dep.name}</h4>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      <span className="rounded-md bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700 border border-sky-100">{getTypeLabel(dep.type)}</span>
-                      <span className={`rounded-md border px-2 py-0.5 text-[10px] font-bold ${orderTone[String(Boolean(dep.canReceiveOrders))]}`}>{dep.canReceiveOrders ? 'Nhận chỉ định' : 'Không nhận chỉ định'}</span>
-                    </div>
-                    <p className="mt-1.5 line-clamp-1 text-xs font-medium text-slate-400">{dep.description || 'Chưa có mô tả'}</p>
                   </div>
 
                   <Info label="Phụ trách" value={dep.manager?.fullName || 'Chưa gán'} />
@@ -437,8 +558,9 @@ function DepartmentDetail({ department, staffs, onGoStaff, onClose }) {
   if (!department) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm" onClick={onClose}>
-      <aside className="flex max-h-[92vh] w-full max-w-[1280px] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose} />
+      <aside className="relative z-10 flex max-h-[92vh] w-full max-w-[1280px] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="shrink-0 border-b border-slate-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <p className="text-[11px] font-extrabold uppercase tracking-wider text-sky-600">Chi tiết phòng ban</p>
@@ -617,8 +739,9 @@ function DepartmentHistory({ departmentId }) {
 
 function DeleteDepartmentModal({ department, busy, onCancel, onConfirm }) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm" onClick={busy ? undefined : onCancel}>
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={busy ? undefined : onCancel} />
+      <div className="relative z-10 w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="border-b border-slate-100 p-6">
           <p className="text-xs font-bold uppercase tracking-wider text-rose-600">Cảnh báo xóa</p>
           <h3 className="mt-1 text-xl font-bold text-slate-900">Xóa phòng ban?</h3>
@@ -711,8 +834,9 @@ function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing, stru
   if (typeof document === 'undefined' || !document.body) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fadeIn">
-      <form onSubmit={handleSubmit} noValidate className="w-full max-w-xl rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fadeIn">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <form onSubmit={handleSubmit} noValidate className="relative z-10 w-full max-w-xl rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
         <div className="flex items-start justify-between">
           <div>
             <h3 className="text-2xl font-bold text-slate-900">{editing ? 'Cập nhật phòng ban' : 'Tạo phòng ban'}</h3>

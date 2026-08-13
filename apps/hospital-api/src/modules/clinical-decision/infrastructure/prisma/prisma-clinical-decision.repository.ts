@@ -1,9 +1,10 @@
-  import { Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { AiModelRegistry, MedicalOrderStatus, Prisma, VisitStatus } from '@prisma/client';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import {
   ClinicalDecisionRepositoryPort,
   ClinicalDoctor,
+  ClinicalVisitAuditSnapshot,
   ClinicalVisitInfo,
   CreateAiDiagnosisData,
   UpsertConclusionData,
@@ -35,13 +36,84 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
   async findVisitById(visitId: string): Promise<ClinicalVisitInfo | null> {
     const visit = await this.prisma.visit.findUnique({
       where: { id: visitId },
-      select: { id: true, departmentId: true, staffId: true, status: true },
+      select: { id: true, patientId: true, departmentId: true, staffId: true, status: true },
     });
     return visit;
   }
 
   async findFullVisit(visitId: string): Promise<any> {
     return this.prisma.visit.findUniqueOrThrow({ where: { id: visitId }, include: this.visitDecisionInclude() });
+  }
+
+  async findPatientMedicalHistory(patientId: string, currentVisitId: string): Promise<unknown[]> {
+    return this.prisma.visit.findMany({
+      where: {
+        patientId,
+        id: { not: currentVisitId },
+        status: VisitStatus.COMPLETED,
+      },
+      select: {
+        id: true,
+        visitCode: true,
+        status: true,
+        source: true,
+        checkInAt: true,
+        completedAt: true,
+        department: { select: { id: true, name: true, type: true } },
+        staff: { select: { id: true, fullName: true, doctorProfile: { select: { specialty: true } } } },
+        finalConclusion: {
+          select: {
+            id: true,
+            aiDiagnosisId: true,
+            finalDiagnosis: true,
+            treatmentPlan: true,
+            prescription: true,
+            followUpNote: true,
+            doctorNote: true,
+            concludedAt: true,
+            doctor: { select: { staffProfile: { select: { fullName: true } } } },
+          },
+        },
+        aiDiagnoses: {
+          select: {
+            id: true,
+            result: true,
+            confidence: true,
+            status: true,
+            doctorFeedback: true,
+            createdAt: true,
+            aiModel: { select: { id: true, modelName: true, modelVersion: true, provider: true } },
+            reviewedByDoctor: { select: { staffProfile: { select: { fullName: true } } } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        medicalOrders: {
+          select: {
+            id: true,
+            orderCode: true,
+            orderType: true,
+            priority: true,
+            clinicalNote: true,
+            status: true,
+            orderedAt: true,
+            completedAt: true,
+            targetDepartment: { select: { id: true, name: true, type: true } },
+            results: {
+              select: {
+                id: true,
+                resultCode: true,
+                note: true,
+                returnedAt: true,
+                files: { select: { id: true, originalName: true, mimeType: true, size: true, createdAt: true } },
+              },
+              orderBy: { returnedAt: 'desc' },
+            },
+          },
+          orderBy: { orderedAt: 'desc' },
+        },
+      },
+      orderBy: { checkInAt: 'desc' },
+    });
   }
 
   async findAiModelById(id: string): Promise<AiModelRegistry | null> {
@@ -90,6 +162,7 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
       visit: diagnosis.visit
         ? {
             id: diagnosis.visit.id,
+            patientId: diagnosis.visit.patientId,
             departmentId: diagnosis.visit.departmentId,
             staffId: diagnosis.visit.staffId,
             status: diagnosis.visit.status,
@@ -135,7 +208,11 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
 
   async upsertConclusionAndCompleteVisit(
     data: UpsertConclusionData,
-    afterWrite?: (conclusion: unknown, tx: Prisma.TransactionClient) => Promise<void>,
+    afterWrite?: (
+      conclusion: unknown,
+      visitAfter: ClinicalVisitAuditSnapshot | null,
+      tx: Prisma.TransactionClient,
+    ) => Promise<void>,
   ): Promise<unknown> {
     return this.prisma.$transaction(async (tx) => {
       const conclusion = await tx.medicalConclusion.upsert({
@@ -162,19 +239,35 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
         include: { aiDiagnosis: { include: { aiModel: true } }, doctor: { include: { staffProfile: true } }, visit: { include: { patient: { select: { patientCode: true } } } } },
       });
 
-      await tx.visit.update({
+      const visitAfter = await tx.visit.update({
         where: { id: data.visitId },
         data: {
           status: VisitStatus.COMPLETED,
           completedAt: new Date(),
           ...(data.staffId ? { staffId: data.staffId } : {}),
         },
+        select: this.visitAuditSelect(),
       });
 
-      await afterWrite?.(conclusion, tx);
+      await afterWrite?.(conclusion, visitAfter, tx);
 
       return conclusion;
     });
+  }
+
+  /** Full Visit fields required by the audit snapshot (REQUIRED_SNAPSHOT_FIELDS.Visit). */
+  private visitAuditSelect() {
+    return {
+      id: true,
+      visitCode: true,
+      patientId: true,
+      departmentId: true,
+      staffId: true,
+      status: true,
+      source: true,
+      checkInAt: true,
+      completedAt: true,
+    } as const;
   }
 
   private visitDecisionInclude() {

@@ -62,7 +62,39 @@ export type CreatedOrderRecord = {
   clinicalNote: string | null;
 };
 
-export type OrderCreatedHook = (order: CreatedOrderRecord, tx: Prisma.TransactionClient) => Promise<void>;
+/**
+ * Full MedicalOrder fields required by EntityRecoveryService
+ * (REQUIRED_SNAPSHOT_FIELDS.MedicalOrder). Consumed by `buildMedicalOrderSnapshot`.
+ */
+export type OrderStatusUpdatedRecord = CreatedOrderRecord;
+
+/**
+ * Full Visit fields required by EntityRecoveryService for the `Visit` entity
+ * (REQUIRED_SNAPSHOT_FIELDS.Visit). This is the canonical shape consumed by
+ * `buildVisitSnapshot`.
+ */
+export type VisitAuditSnapshotData = {
+  id: string;
+  visitCode: string;
+  patientId: string;
+  departmentId: string;
+  staffId: string | null;
+  status: string;
+  source: string;
+  checkInAt: Date | string;
+  completedAt: Date | string | null;
+};
+
+export type OrderCreatedHook = (
+  order: CreatedOrderRecord,
+  visitAfter: VisitAuditSnapshotData,
+  tx: Prisma.TransactionClient,
+) => Promise<void>;
+
+export type OrderStatusUpdatedHook = (
+  order: OrderStatusUpdatedRecord,
+  tx: Prisma.TransactionClient,
+) => Promise<void>;
 
 export type CreateResultCommand = {
   orderId: string;
@@ -96,12 +128,10 @@ export type OrderDepartmentInfo = {
   canReceiveOrders: boolean;
 };
 
-
-
 export type CreateResultTransactionPayload = {
   result: unknown;
   order: unknown;
-  visitTransition: { visitId: string; status: string } | null;
+  visitTransition: { visit: VisitAuditSnapshotData; previousStatus: string } | null;
 };
 
 /**
@@ -125,7 +155,7 @@ export interface MedicalOrderRepositoryPort {
 
   findOrderForManage(id: string): Promise<({ id: string } & OrderForAccess & { status: MedicalOrderStatus; visitId: string; orderType: string }) | null>;
 
-  updateStatus(id: string, status: MedicalOrderStatus, completedAt?: Date): Promise<unknown>;
+  updateStatus(id: string, status: MedicalOrderStatus, completedAt?: Date, afterWrite?: OrderStatusUpdatedHook): Promise<unknown>;
 
   /** Atomic: create result+files, set order RESULT_READY, and transition visit to WAITING_CONCLUSION when all ready. */
   createResultWithTransitions(

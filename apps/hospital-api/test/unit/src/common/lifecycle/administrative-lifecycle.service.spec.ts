@@ -33,7 +33,10 @@ describe('AdministrativeLifecycleService', () => {
         },
       })),
     };
-    const audit = { recordV2: jest.fn().mockResolvedValue(undefined) };
+    const audit = {
+      recordV2: jest.fn().mockResolvedValue(undefined),
+      hashSnapshot: jest.fn().mockReturnValue({ salt: 'salt-1', hash: 'hash-1' }),
+    };
     const entityRecovery = { assertTrusted: jest.fn().mockResolvedValue(undefined) };
     return {
       service: new AdministrativeLifecycleService(prisma as never, audit as never, entityRecovery as never),

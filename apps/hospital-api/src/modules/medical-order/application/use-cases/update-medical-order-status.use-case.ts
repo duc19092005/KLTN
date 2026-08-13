@@ -1,18 +1,25 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { MedicalOrderStatus } from '@prisma/client';
 import { AuthUser } from '../../../../common/types/auth-user.type';
+import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { buildMedicalOrderSnapshot } from '../../domain/medical-order-snapshot';
 import { MedicalOrderAccessPolicy } from '../policies/medical-order-access.policy';
 import { MEDICAL_ORDER_REPOSITORY, MedicalOrderRepositoryPort } from '../ports/medical-order.repository.port';
 
 /**
  * LAB_MANAGER/ADMIN updates an order status. LAB_MANAGER must be the real
  * staff account for the target department and have an active approved shift.
+ *
+ * Every status change is recorded in the audit log (MedicalOrder UPDATE) inside
+ * the same transaction so the live DB state always matches the anchored audit
+ * snapshot (no ENTITY_INTEGRITY_WARNING on the admin integrity page).
  */
 @Injectable()
 export class UpdateMedicalOrderStatusUseCase {
   constructor(
     @Inject(MEDICAL_ORDER_REPOSITORY) private readonly repo: MedicalOrderRepositoryPort,
     private readonly accessPolicy: MedicalOrderAccessPolicy,
+    private readonly audit: AuditLoggerService,
   ) {}
 
   async execute(id: string, status: MedicalOrderStatus, user: AuthUser, demoMode = false): Promise<unknown> {
@@ -33,7 +40,21 @@ export class UpdateMedicalOrderStatusUseCase {
 
     const completedAt =
       status === MedicalOrderStatus.RESULT_READY || status === MedicalOrderStatus.CANCELLED ? new Date() : undefined;
-    return this.repo.updateStatus(id, status, completedAt);
+    return this.repo.updateStatus(id, status, completedAt, async (updatedOrder, tx) => {
+      await this.audit.recordV2(
+        {
+          entity: 'MedicalOrder',
+          entityId: id,
+          action: 'UPDATE',
+          actorId: user.sub,
+          before: { orderId: order.id, visitId: order.visitId, status: order.status },
+          after: buildMedicalOrderSnapshot(updatedOrder),
+          metadata: { schema: 'KLTN_MEDICAL_ORDER_STATUS_AUDIT_V2', field: 'status', from: order.status, to: status },
+          onChainStatus: 'PENDING',
+        },
+        tx,
+      );
+    });
   }
 
   private async resolveStaff(userId: string) {

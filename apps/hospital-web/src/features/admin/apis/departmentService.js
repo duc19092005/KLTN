@@ -7,6 +7,9 @@ export const departmentService = {
   remove: (id) => api.delete(`/departments/${id}`),
   restore: (id) => api.patch(`/departments/${id}/restore`),
   permanentDelete: (id) => api.delete(`/departments/${id}/permanent`),
+  softDeleteMany: (ids) => api.post('/departments/bulk/soft-delete', { ids }),
+  restoreMany: (ids) => api.post('/departments/bulk/restore', { ids }),
+  permanentDeleteMany: (ids) => api.post('/departments/bulk/permanent-delete', { ids }),
   assignManager: (id, managerId) => api.patch(`/departments/${id}/manager`, { managerId }),
 
   // Blockchain audit: tamper-evidence verification + change history

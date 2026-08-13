@@ -310,4 +310,23 @@ describe('AuditAnchor', function () {
     // Keeps the canonical constants referenced so accidental edits are caught by the test above.
     expect(leafA).to.match(/^0x[0-9a-f]{64}$/);
   });
+
+  it('queries a range of checkpoints via getCheckpointsRange', async function () {
+    const root1 = rootForThreeLeaves();
+    const root2 = `0x${'e'.repeat(64)}`;
+    await anchor.commitCheckpoint(1, root1, 3, artifactHash, artifactUri);
+    await anchor.commitCheckpoint(2, root2, 5, artifactHash, 'ipfs://bafybeigtwo');
+
+    const range = await anchor.getCheckpointsRange(1, 2);
+    expect(range.length).to.equal(2);
+    expect(range[0].batchId).to.equal(1n);
+    expect(range[0].merkleRoot).to.equal(root1);
+    expect(range[0].artifactUri).to.equal(artifactUri);
+    expect(range[1].batchId).to.equal(2n);
+    expect(range[1].merkleRoot).to.equal(root2);
+    expect(range[1].artifactUri).to.equal('ipfs://bafybeigtwo');
+
+    const empty = await anchor.getCheckpointsRange(10, 20);
+    expect(empty.length).to.equal(0);
+  });
 });

@@ -27,7 +27,7 @@ describe('UpdateMedicalOrderStatusUseCase', () => {
       updateStatus: jest.fn().mockResolvedValue({ ...order, status: MedicalOrderStatus.IN_PROGRESS }),
     };
 
-    const useCase = new UpdateMedicalOrderStatusUseCase(repo as any, new MedicalOrderAccessPolicy());
+    const useCase = new UpdateMedicalOrderStatusUseCase(repo as any, new MedicalOrderAccessPolicy(), { recordV2: jest.fn() } as any);
     return { useCase, repo };
   }
 
@@ -39,7 +39,7 @@ describe('UpdateMedicalOrderStatusUseCase', () => {
       status: MedicalOrderStatus.IN_PROGRESS,
     });
 
-    expect(repo.updateStatus).toHaveBeenCalledWith(order.id, MedicalOrderStatus.IN_PROGRESS, undefined);
+    expect(repo.updateStatus).toHaveBeenCalledWith(order.id, MedicalOrderStatus.IN_PROGRESS, undefined, expect.anything());
   });
 
   it('rejects status update when staff department does not match order target department', async () => {

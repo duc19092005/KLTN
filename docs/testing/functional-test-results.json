@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-02T08:01:54.468Z",
+  "generatedAt": "2026-08-09T09:11:05.452Z",
   "environment": "local-test",
   "testCommand": "npm run test:functional",
   "expectedCaseCount": 125,
@@ -593,7 +593,7 @@
     },
     {
       "id": "TC8.07",
-      "status": "FAILED",
+      "status": "PASSED",
       "execution": "functional-jest"
     },
     {
