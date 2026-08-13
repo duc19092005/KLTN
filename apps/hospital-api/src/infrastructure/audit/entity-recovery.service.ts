@@ -120,6 +120,11 @@ export class EntityRecoveryService {
     for (const target of uniqueTargets) {
       const live = await this.loadLiveSnapshot(this.prisma, target.entity, target.entityId);
       if (!live) {
+        // Entity bị xóa vĩnh viễn có chủ ý — không coi là mất dữ liệu, không đề xuất recreation.
+        if (await this.isIntentionallyDeleted(target.entityId)) {
+          items.push({ ...target, state: 'INTENTIONALLY_DELETED', operation: 'NONE', recoverable: false, blockers: [], sensitiveDataHidden: true });
+          continue;
+        }
         if (!this.recreation) {
           items.push({ ...target, state: 'MISSING', operation: 'RECREATE', recoverable: false, blockers: ['ENTITY_RECREATION_UNAVAILABLE'], sensitiveDataHidden: true });
         } else {
@@ -237,6 +242,12 @@ export class EntityRecoveryService {
   ) {
     const liveSnapshot = await this.loadLiveSnapshot(this.prisma, target.entity, target.entityId);
     if (!liveSnapshot) {
+      // Nếu entity đã bị xóa vĩnh viễn có chủ ý, không cho phép recovery qua luồng này.
+      if (await this.isIntentionallyDeleted(target.entityId)) {
+        throw new ConflictException(
+          `Entity '${target.entity}' (${target.entityId}) đã bị xóa vĩnh viễn có chủ ý. Không thể khôi phục qua luồng entity recovery.`,
+        );
+      }
       if (!this.recreation) throw new ConflictException('Entity recreation service chưa được cấu hình.');
       return this.recreation.recreate(target, actorId, reason, recreationCache);
     }
@@ -320,6 +331,9 @@ export class EntityRecoveryService {
 
     const liveSnapshot = await this.loadLiveSnapshot(this.prisma, entity, row.entityId);
     if (!liveSnapshot) {
+      // Entity đã bị xóa vĩnh viễn có chủ ý bởi admin — không phải lỗi integrity, không cảnh báo.
+      if (await this.isIntentionallyDeleted(row.entityId)) return null;
+
       const preview = this.recreation
         ? await this.recreation.previewOne({ entity, entityId: row.entityId }, recreationCache)
         : null;
@@ -485,6 +499,24 @@ export class EntityRecoveryService {
       where: { entity, entityId, seq: { not: null } },
       orderBy: { seq: 'desc' },
     });
+  }
+
+  /**
+   * Kiểm tra xem entity có từng bị xóa vĩnh viễn có chủ ý bởi admin hay không.
+   * Tìm row AdministrativeDeletion/PERMANENT_DELETE có entityId khớp trong audit log.
+   * Nếu có → entity đã gone intentionally, không phải mất trái phép → không cảnh báo, không recreate.
+   */
+  private async isIntentionallyDeleted(entityId: string): Promise<boolean> {
+    const row = await this.prisma.blockchainLogger.findFirst({
+      where: {
+        entity: 'AdministrativeDeletion',
+        entityId,
+        action: 'PERMANENT_DELETE',
+        seq: { not: null },
+      },
+      select: { id: true },
+    });
+    return row !== null;
   }
 
   private async loadLiveSnapshot(client: DbClient, entity: RecoverableAuditEntity, entityId: string): Promise<Snapshot | null> {

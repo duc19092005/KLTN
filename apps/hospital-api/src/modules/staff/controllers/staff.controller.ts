@@ -12,6 +12,7 @@ import { CreateStaffDto, StaffQueryDto, UpdateStaffDto } from '../dto/staff.dto'
 import { StaffService } from '../services/staff.service';
 import { uploadAvatarToCloudinary } from '../../../infrastructure/storage/cloudinary-avatar-uploader';
 import { AdministrativeLifecycleService } from '../../../common/lifecycle/administrative-lifecycle.service';
+import { BulkLifecycleDto } from '../../../common/lifecycle/dto/bulk-lifecycle.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
@@ -96,6 +97,24 @@ export class StaffController {
   @Delete(':id/permanent')
   permanentDelete(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.lifecycle.permanentDelete('staff', id, user.sub);
+  }
+
+  @Post('bulk/soft-delete')
+  @ApiOperation({ summary: 'Bulk soft-delete staff (up to 100, per-item isolation)' })
+  bulkSoftDelete(@Body() dto: BulkLifecycleDto, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.softDeleteMany('staff', dto.ids, user.sub);
+  }
+
+  @Post('bulk/restore')
+  @ApiOperation({ summary: 'Bulk restore staff from soft-delete (up to 100, per-item isolation)' })
+  bulkRestore(@Body() dto: BulkLifecycleDto, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.restoreMany('staff', dto.ids, user.sub);
+  }
+
+  @Post('bulk/permanent-delete')
+  @ApiOperation({ summary: 'Bulk permanent-delete staff (up to 100, per-item isolation)' })
+  bulkPermanentDelete(@Body() dto: BulkLifecycleDto, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.permanentDeleteMany('staff', dto.ids, user.sub);
   }
 
   @Post('upload-avatar')

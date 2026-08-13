@@ -11,6 +11,7 @@ import { CreateDoctorDto, CreateDoctorWithStaffDto, DoctorQueryDto, UpdateDoctor
 import { DoctorService } from '../services/doctor.service';
 import { uploadAvatarToCloudinary } from '../../../infrastructure/storage/cloudinary-avatar-uploader';
 import { AdministrativeLifecycleService } from '../../../common/lifecycle/administrative-lifecycle.service';
+import { BulkLifecycleDto } from '../../../common/lifecycle/dto/bulk-lifecycle.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
@@ -110,4 +111,21 @@ export class DoctorController {
     return this.lifecycle.permanentDelete('doctors', id, user.sub);
   }
 
+  @Post('bulk/soft-delete')
+  @ApiOperation({ summary: 'Bulk soft-delete doctors (up to 100, per-item isolation)' })
+  bulkSoftDelete(@Body() dto: BulkLifecycleDto, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.softDeleteMany('doctors', dto.ids, user.sub);
+  }
+
+  @Post('bulk/restore')
+  @ApiOperation({ summary: 'Bulk restore doctors from soft-delete (up to 100, per-item isolation)' })
+  bulkRestore(@Body() dto: BulkLifecycleDto, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.restoreMany('doctors', dto.ids, user.sub);
+  }
+
+  @Post('bulk/permanent-delete')
+  @ApiOperation({ summary: 'Bulk permanent-delete doctors (up to 100, per-item isolation)' })
+  bulkPermanentDelete(@Body() dto: BulkLifecycleDto, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.permanentDeleteMany('doctors', dto.ids, user.sub);
+  }
 }

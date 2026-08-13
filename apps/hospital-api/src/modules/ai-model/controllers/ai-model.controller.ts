@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
@@ -8,6 +8,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { AiModelQueryDto, CreateAiModelDto, TestAiModelApiDto, RateAiModelDto, UpdateAiModelDto } from '../dto/ai-model.dto';
 import { AiModelService } from '../services/ai-model.service';
 import { AdministrativeLifecycleService } from '../../../common/lifecycle/administrative-lifecycle.service';
+import { BulkLifecycleDto } from '../../../common/lifecycle/dto/bulk-lifecycle.dto';
 
 @ApiTags('AI Model Registry')
 @ApiBearerAuth()
@@ -111,5 +112,25 @@ export class AiModelController {
   rate(@Param('id') id: string, @Body() dto: RateAiModelDto, @CurrentUser() user: AuthUser) {
     return this.service.rateModel(id, user.sub, dto.aiDiagnosisId, dto.satisfied, dto.feedback);
   }
-}
 
+  @Roles('ADMIN')
+  @Post('bulk/soft-delete')
+  @ApiOperation({ summary: 'Bulk soft-delete AI models (up to 100, per-item isolation)' })
+  bulkSoftDelete(@Body() dto: BulkLifecycleDto, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.softDeleteMany('ai-models', dto.ids, user.sub);
+  }
+
+  @Roles('ADMIN')
+  @Post('bulk/restore')
+  @ApiOperation({ summary: 'Bulk restore AI models from soft-delete (up to 100, per-item isolation)' })
+  bulkRestore(@Body() dto: BulkLifecycleDto, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.restoreMany('ai-models', dto.ids, user.sub);
+  }
+
+  @Roles('ADMIN')
+  @Post('bulk/permanent-delete')
+  @ApiOperation({ summary: 'Bulk permanent-delete AI models (up to 100, per-item isolation)' })
+  bulkPermanentDelete(@Body() dto: BulkLifecycleDto, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.permanentDeleteMany('ai-models', dto.ids, user.sub);
+  }
+}

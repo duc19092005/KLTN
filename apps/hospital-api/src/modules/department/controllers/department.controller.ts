@@ -10,6 +10,7 @@ import { AssignManagerDto, CreateDepartmentDto, DepartmentQueryDto, UpdateDepart
 import { AdministrativeLifecycleService } from '../../../common/lifecycle/administrative-lifecycle.service';
 import { EntityIntegrityGuard } from '../../../common/guards/entity-integrity.guard';
 import { CheckEntityIntegrity } from '../../../common/decorators/check-entity-integrity.decorator';
+import { BulkLifecycleDto } from '../../../common/lifecycle/dto/bulk-lifecycle.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
@@ -87,5 +88,23 @@ export class DepartmentController {
   @Delete(':id/permanent')
   permanentDelete(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.lifecycle.permanentDelete('departments', id, user.sub);
+  }
+
+  @Post('bulk/soft-delete')
+  @ApiOperation({ summary: 'Bulk soft-delete departments (up to 100, per-item isolation)' })
+  bulkSoftDelete(@Body() dto: BulkLifecycleDto, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.softDeleteMany('departments', dto.ids, user.sub);
+  }
+
+  @Post('bulk/restore')
+  @ApiOperation({ summary: 'Bulk restore departments from soft-delete (up to 100, per-item isolation)' })
+  bulkRestore(@Body() dto: BulkLifecycleDto, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.restoreMany('departments', dto.ids, user.sub);
+  }
+
+  @Post('bulk/permanent-delete')
+  @ApiOperation({ summary: 'Bulk permanent-delete departments (up to 100, per-item isolation)' })
+  bulkPermanentDelete(@Body() dto: BulkLifecycleDto, @CurrentUser() user: AuthUser) {
+    return this.lifecycle.permanentDeleteMany('departments', dto.ids, user.sub);
   }
 }
