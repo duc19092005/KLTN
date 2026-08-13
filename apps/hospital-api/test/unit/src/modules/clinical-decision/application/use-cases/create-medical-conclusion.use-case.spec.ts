@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { MedicalOrderStatus } from '@prisma/client';
 import { CreateMedicalConclusionUseCase } from '../../../../../../../src/modules/clinical-decision/application/use-cases/create-medical-conclusion.use-case';
 import { ClinicalDecisionPolicy } from '../../../../../../../src/modules/clinical-decision/application/policies/clinical-decision.policy';
+import { ListPatientMedicalHistoryUseCase } from '../../../../../../../src/modules/clinical-decision/application/use-cases/list-patient-medical-history.use-case';
 
 describe('CreateMedicalConclusionUseCase integration rules', () => {
   const doctorUserId = 'doctor-user-1';
@@ -10,7 +11,7 @@ describe('CreateMedicalConclusionUseCase integration rules', () => {
   function makeUseCase(pendingOrders: number) {
     const repo = {
       findDoctorByUserId: jest.fn().mockResolvedValue({ id: 'doctor-1', staffId: 'staff-1', departmentId: 'dept-1', specialty: 'General' }),
-      findVisitById: jest.fn().mockResolvedValue({ id: visitId, departmentId: 'dept-1', staffId: 'staff-1', status: 'WAITING_CONCLUSION' }),
+      findVisitById: jest.fn().mockResolvedValue({ id: visitId, patientId: 'patient-1', departmentId: 'dept-1', staffId: 'staff-1', status: 'WAITING_CONCLUSION' }),
       countPendingMedicalOrders: jest.fn().mockResolvedValue(pendingOrders),
       findAiDiagnosisById: jest.fn(),
       findConclusionByVisitId: jest.fn(),
@@ -88,5 +89,37 @@ describe('CreateMedicalConclusionUseCase integration rules', () => {
     const readyStatuses: MedicalOrderStatus[] = [MedicalOrderStatus.CANCELLED, MedicalOrderStatus.RESULT_READY];
     const pending = statuses.filter((status) => !readyStatuses.includes(status)).length;
     expect(pending).toBe(1);
+  });
+});
+
+describe('ListPatientMedicalHistoryUseCase access', () => {
+  const doctor = { id: 'doctor-1', staffId: 'staff-1', departmentId: 'dept-1', specialty: 'General' };
+  const currentVisit = { id: 'visit-1', patientId: 'patient-1', departmentId: 'dept-1', staffId: 'staff-1', status: 'IN_PROGRESS' };
+
+  it('returns prior history after authorizing the current patient visit', async () => {
+    const repo = {
+      findDoctorByUserId: jest.fn().mockResolvedValue(doctor),
+      findVisitById: jest.fn().mockResolvedValue(currentVisit),
+      findPatientMedicalHistory: jest.fn().mockResolvedValue([{ id: 'visit-old' }]),
+    };
+    const useCase = new ListPatientMedicalHistoryUseCase(repo as any, new ClinicalDecisionPolicy());
+
+    await expect(useCase.execute(currentVisit.patientId, currentVisit.id, 'doctor-user-1')).resolves.toEqual([{ id: 'visit-old' }]);
+    expect(repo.findPatientMedicalHistory).toHaveBeenCalledWith(currentVisit.patientId, currentVisit.id);
+  });
+
+  it.each([
+    ['another patient', { ...currentVisit }, 'patient-other', 'Không tìm thấy bệnh án của bệnh nhân trong lượt khám này.'],
+    ['another doctor', { ...currentVisit, staffId: 'staff-other' }, currentVisit.patientId, 'Lượt khám này đã được bác sĩ khác phụ trách.'],
+  ])('does not query history for %s', async (_case, visit, patientId, message) => {
+    const repo = {
+      findDoctorByUserId: jest.fn().mockResolvedValue(doctor),
+      findVisitById: jest.fn().mockResolvedValue(visit),
+      findPatientMedicalHistory: jest.fn(),
+    };
+    const useCase = new ListPatientMedicalHistoryUseCase(repo as any, new ClinicalDecisionPolicy());
+
+    await expect(useCase.execute(patientId, currentVisit.id, 'doctor-user-1')).rejects.toThrow(message);
+    expect(repo.findPatientMedicalHistory).not.toHaveBeenCalled();
   });
 });

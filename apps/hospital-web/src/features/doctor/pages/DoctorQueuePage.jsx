@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, FileText, Printer, Stethoscope, Search, RefreshCw, CheckCircle2, Clock, Activity, AlertCircle, Sparkles, User, Building2, ChevronRight, X, UserCheck, ShieldCheck } from 'lucide-react';
+import { Download, FileText, Printer, Stethoscope, Search, RefreshCw, CheckCircle2, Clock, Activity, AlertCircle, Sparkles, User, Building2, ChevronRight, ChevronDown, X, UserCheck, ShieldCheck, History, Pill } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
@@ -152,6 +152,7 @@ export default function DoctorQueuePage() {
   const [visits, setVisits] = useState([]);
   const [activeVisit, setActiveVisit] = useState(null);
   const [decision, setDecision] = useState(null);
+  const [medicalHistory, setMedicalHistory] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [aiModels, setAiModels] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -208,8 +209,21 @@ export default function DoctorQueuePage() {
     if (!visitId) return;
     setDetailLoading(true);
     try {
-      const res = await clinicalDecisionService.getVisitResults(visitId);
+      const patientId = activeVisit?.id === visitId ? activeVisit.patientId : undefined;
+      const [decisionRes, historyResult] = await Promise.all([
+        clinicalDecisionService.getVisitResults(visitId),
+        patientId
+          ? clinicalDecisionService.getPatientMedicalHistory(patientId, visitId).then((res) => ({ res })).catch((error) => ({ error }))
+          : Promise.resolve({ res: { data: [] } }),
+      ]);
+      const res = decisionRes;
       setDecision(res.data);
+      if (historyResult.error) {
+        setMedicalHistory([]);
+        toast.error(historyResult.error.response?.data?.message || 'Không tải được bệnh án lịch sử.');
+      } else {
+        setMedicalHistory(getItems(historyResult.res.data));
+      }
       const latestAi = res.data?.aiDiagnoses?.[0];
       setSelectedAiId(latestAi?.id || '');
 
@@ -229,6 +243,8 @@ export default function DoctorQueuePage() {
       } else setConclusionForm(emptyConclusion);
     } catch (err) {
       setDecision(null);
+      setMedicalHistory([]);
+      toast.error(err.response?.data?.message || 'Không tải được hồ sơ lượt khám.');
     } finally { setDetailLoading(false); }
   };
 
@@ -340,6 +356,27 @@ export default function DoctorQueuePage() {
       await loadDecision(activeVisit.id);
     } catch (err) { toast.error(err.response?.data?.message || 'Không tạo được phân tích AI'); }
     finally { setBusy(false); }
+  };
+
+  const reviewAiDiagnosis = async (diagnosisId, doctorFeedback) => {
+    if (!diagnosisId || busy) return false;
+    setBusy(true);
+    try {
+      const res = await clinicalDecisionService.reviewAiDiagnosis(diagnosisId, {
+        doctorFeedback: doctorFeedback.trim() || undefined,
+      });
+      setDecision((current) => current ? {
+        ...current,
+        aiDiagnoses: (current.aiDiagnoses || []).map((diagnosis) => diagnosis.id === diagnosisId ? { ...diagnosis, ...res.data } : diagnosis),
+      } : current);
+      toast.success('Đã xác nhận bác sĩ xem bản phân tích AI.');
+      return true;
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Không thể xác nhận đã xem phân tích AI.');
+      return false;
+    } finally {
+      setBusy(false);
+    }
   };
 
   const submitConclusion = async (event) => {
@@ -503,8 +540,9 @@ export default function DoctorQueuePage() {
             onClose={() => setShowWorkflowModal(false)}
             orderProps={{ forms: orderForms, setForms: setOrderForms, departments, existingOrders: decision?.medicalOrders || [], onSubmit: submitOrder, busy }}
             resultProps={{ orders: decision?.medicalOrders || [] }}
-            aiProps={{ diagnoses: decision?.aiDiagnoses || [], aiModels, selectedAiModelId, setSelectedAiModelId, selectedAiId, setSelectedAiId, onGenerate: generateAi, busy }}
+            aiProps={{ diagnoses: decision?.aiDiagnoses || [], aiModels, selectedAiModelId, setSelectedAiModelId, selectedAiId, setSelectedAiId, onGenerate: generateAi, onReview: reviewAiDiagnosis, busy }}
             conclusionProps={{ form: conclusionForm, setForm: setConclusionForm, onSubmit: submitConclusion, busy, completed: Boolean(decision?.finalConclusion), activeVisit, activeConclusion: conclusionForm }}
+            history={medicalHistory}
           />
         )}
 
@@ -805,7 +843,7 @@ function StatusBadge({ status }) {
 /* ==========================================
    MODAL WIZARD STEP-BY-STEP CHUẨN HÓA KHÁM BỆNH
    ========================================== */
-function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, resultProps, aiProps, conclusionProps }) {
+function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, resultProps, aiProps, conclusionProps, history = [] }) {
   const orders = orderProps?.existingOrders || [];
   const readyOrders = orders.filter((order) => order.status === 'RESULT_READY');
   const pendingOrders = orders.filter((order) => ['ORDERED', 'IN_PROGRESS'].includes(order.status));
@@ -842,6 +880,15 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
       tone: 'emerald',
       enabled: canConclude,
     },
+    {
+      step: 4,
+      eyebrow: 'Hồ sơ tham khảo',
+      title: 'Bệnh án lịch sử',
+      desc: 'Đối chiếu chẩn đoán, điều trị và kết quả từ các lần khám trước.',
+      status: history.length ? `${history.length} lượt khám trước` : 'Chưa có tiền sử khám',
+      tone: 'sky',
+      enabled: true,
+    },
   ];
 
   const goStep = (step) => {
@@ -876,7 +923,7 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
           </div>
 
           {/* STEPPER NAV */}
-          <div className="mt-4 flex items-center justify-center gap-6">
+          <div className="mt-4 flex items-center justify-center gap-3">
             {steps.map((step, index) => {
               const isCurrent = activeStep === step.step;
               const isDone = step.step < activeStep || (step.step === 3 && hasConclusion);
@@ -890,15 +937,17 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
               return (
                 <React.Fragment key={step.step}>
                   <button
+                    id={`doctor-workflow-step-${step.step}`}
                     type="button"
                     onClick={() => goStep(step.step)}
                     disabled={!step.enabled}
-                    aria-label={`Bước ${step.step}`}
-                    className={`flex h-9 w-9 items-center justify-center rounded-full border text-xs font-bold transition-all ${circleClass}`}
+                    aria-label={step.step === 4 ? 'Mở bệnh án lịch sử' : `Bước ${step.step}`}
+                    aria-current={isCurrent ? 'step' : undefined}
+                    className={`flex h-9 min-w-9 items-center justify-center rounded-full border px-2.5 text-xs font-bold transition-all ${circleClass}`}
                   >
-                    {step.step}
+                    {step.step === 4 ? <History className="h-4 w-4" aria-hidden="true" /> : step.step}
                   </button>
-                  {index < steps.length - 1 && <span className="h-0.5 w-20 bg-slate-200" />}
+                  {index < steps.length - 1 && <span className="h-0.5 w-12 bg-slate-200" />}
                 </React.Fragment>
               );
             })}
@@ -944,10 +993,259 @@ function WorkflowModal({ visit, activeStep, setActiveStep, onClose, orderProps, 
               <WorkflowActions secondaryLabel="Xem lại bước 2" onSecondary={() => goStep(2)} />
             </div>
           )}
+
+          {activeStep === 4 && (
+            <div className="animate-fadeIn">
+              <MedicalHistoryPanel history={history} />
+            </div>
+          )}
         </div>
       </div>
     </div>,
     document.body
+  );
+}
+
+function MedicalHistoryPanel({ history }) {
+  const [openVisitId, setOpenVisitId] = useState(history[0]?.id || '');
+
+  useEffect(() => {
+    setOpenVisitId((current) => history.some((visit) => visit.id === current) ? current : history[0]?.id || '');
+  }, [history]);
+
+  const diagnosisCount = history.filter((visit) => visit.finalConclusion?.finalDiagnosis).length;
+  const aiDiagnosisCount = history.reduce((total, visit) => total + (visit.aiDiagnoses?.length || 0), 0);
+  const resultCount = history.reduce(
+    (total, visit) => total + (visit.medicalOrders || []).reduce((orderTotal, order) => orderTotal + (order.results?.length || 0), 0),
+    0
+  );
+
+  return (
+    <section aria-labelledby="medical-history-title" className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm">
+      <div className="border-b border-slate-100 bg-white px-6 py-5">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex max-w-2xl items-start gap-3.5">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-sky-200 bg-sky-50 text-sky-700">
+              <History className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-[10px] font-extrabold uppercase tracking-widest text-sky-600">Hồ sơ tham khảo lâm sàng</p>
+              <h3 id="medical-history-title" className="mt-0.5 text-lg font-bold text-slate-900">Bệnh án lịch sử</h3>
+              <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                Đối chiếu các lượt khám đã hoàn tất. Thông tin lịch sử hỗ trợ đánh giá, không thay thế kết luận hiện tại.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
+            <HistoryMetric value={history.length} label="Lượt khám" />
+            <HistoryMetric value={diagnosisCount} label="Kết luận" />
+            <HistoryMetric value={aiDiagnosisCount} label="Tham vấn AI" />
+            <HistoryMetric value={resultCount} label="Kết quả" />
+          </div>
+        </div>
+      </div>
+
+      {history.length === 0 ? (
+        <div className="p-8">
+          <Empty title="Chưa có bệnh án lịch sử" desc="Bệnh nhân chưa có lượt khám đã hoàn tất nào trước lần khám hiện tại." />
+        </div>
+      ) : (
+        <ol className="divide-y divide-slate-100" aria-label="Các lượt khám trước">
+          {history.map((historicalVisit, index) => {
+            const expanded = openVisitId === historicalVisit.id;
+            const conclusion = historicalVisit.finalConclusion;
+            const resultTotal = (historicalVisit.medicalOrders || []).reduce((total, order) => total + (order.results?.length || 0), 0);
+            const doctorName = conclusion?.doctor?.staffProfile?.fullName || historicalVisit.staff?.fullName || 'Chưa cập nhật';
+            return (
+              <li key={historicalVisit.id} className="relative pl-12 pr-5 py-5 [content-visibility:auto]">
+                <span className={`absolute left-5 top-6 grid h-6 w-6 place-items-center rounded-full border text-[10px] font-black ${index === 0 ? 'border-sky-500 bg-sky-600 text-white ring-4 ring-sky-50' : 'border-slate-200 bg-white text-slate-500'}`}>
+                  {index + 1}
+                </span>
+                {index < history.length - 1 ? <span className="absolute bottom-0 left-8 top-12 w-px bg-slate-200" aria-hidden="true" /> : null}
+
+                <button
+                  id={`medical-history-visit-${historicalVisit.id}`}
+                  type="button"
+                  onClick={() => setOpenVisitId(expanded ? '' : historicalVisit.id)}
+                  aria-expanded={expanded}
+                  aria-controls={`medical-history-detail-${historicalVisit.id}`}
+                  className="group flex w-full flex-col gap-3 text-left sm:flex-row sm:items-start sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <time className="text-sm font-black text-slate-900" dateTime={historicalVisit.checkInAt}>{formatDate(historicalVisit.checkInAt)}</time>
+                      <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-500">{historicalVisit.visitCode}</span>
+                      {index === 0 ? <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">Gần nhất</span> : null}
+                    </div>
+                    <p className="mt-1 truncate text-xs font-bold text-slate-500">{historicalVisit.department?.name || 'Chưa cập nhật khoa'} · BS. {doctorName}</p>
+                    <span className="mt-2 flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-emerald-700">
+                      <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> Kết luận của bác sĩ
+                    </span>
+                    <p className="mt-1 text-sm font-bold leading-5 text-slate-900">{conclusion?.finalDiagnosis || 'Chưa có chẩn đoán được ghi nhận'}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2 self-stretch sm:self-auto">
+                    <span className="rounded-lg border border-sky-100 bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-700">{resultTotal} kết quả</span>
+                    <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} aria-hidden="true" />
+                  </div>
+                </button>
+
+                {expanded ? (
+                  <div id={`medical-history-detail-${historicalVisit.id}`} className="mt-4 space-y-4 border-t border-slate-100 pt-4">
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <HistoryTextCard icon={<Activity className="h-4 w-4" />} title="Hướng điều trị" value={conclusion?.treatmentPlan} />
+                        <HistoryTextCard icon={<Pill className="h-4 w-4" />} title="Toa thuốc" value={conclusion?.prescription} tone="emerald" />
+                        <HistoryTextCard icon={<Clock className="h-4 w-4" />} title="Dặn dò / Tái khám" value={conclusion?.followUpNote} />
+                        <HistoryTextCard icon={<FileText className="h-4 w-4" />} title="Ghi chú bác sĩ" value={conclusion?.doctorNote} />
+                      </div>
+                      <HistoricalOrders orders={historicalVisit.medicalOrders || []} />
+                    </div>
+                    <HistoricalAiDiagnoses diagnoses={historicalVisit.aiDiagnoses || []} selectedDiagnosisId={conclusion?.aiDiagnosisId} />
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+function HistoryMetric({ value, label }) {
+  return (
+    <div className="min-w-[76px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+      <strong className="block text-base font-black text-slate-900">{value}</strong>
+      <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">{label}</span>
+    </div>
+  );
+}
+
+function HistoryTextCard({ icon, title, value, tone = 'sky' }) {
+  const accent = tone === 'emerald'
+    ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+    : 'border-sky-100 bg-sky-50 text-sky-700';
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+      <h4 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-slate-700">
+        <span className={`grid h-7 w-7 place-items-center rounded-lg border ${accent}`}>{icon}</span>
+        <span>{title}</span>
+      </h4>
+      <p className="mt-2 whitespace-pre-wrap text-xs font-semibold leading-5 text-slate-600">{value || 'Không ghi nhận'}</p>
+    </article>
+  );
+}
+
+function HistoricalAiDiagnoses({ diagnoses, selectedDiagnosisId }) {
+  if (diagnoses.length === 0) return null;
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white" aria-label="Chẩn đoán tham vấn AI trước đây">
+      <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/70 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-sky-200 bg-sky-50 text-sky-700">
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div>
+            <h4 className="text-xs font-black text-slate-900">Tham vấn AI trước đây</h4>
+            <p className="mt-0.5 text-[10px] font-semibold text-slate-500">Dữ liệu hỗ trợ tham khảo; kết luận của bác sĩ là quyết định chuyên môn cuối cùng.</p>
+          </div>
+        </div>
+        <span className="w-fit rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-slate-600">{diagnoses.length} bản phân tích</span>
+      </div>
+
+      <div className="divide-y divide-slate-100">
+        {diagnoses.map((diagnosis) => {
+          const parsed = normalizeAiAnalysis(diagnosis.result);
+          const reviewed = diagnosis.status === 'DOCTOR_REVIEWED' || Boolean(diagnosis.reviewedByDoctor);
+          const modelName = parsed.modelName || diagnosis.aiModel?.modelName || 'Mô hình AI';
+          const provider = parsed.provider || diagnosis.aiModel?.provider || 'AI';
+          return (
+            <article key={diagnosis.id} className="p-4 transition-colors hover:bg-slate-50/40">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-sky-600">{provider}</span>
+                  <h5 className="mt-0.5 text-xs font-black text-slate-900">
+                    {modelName}{diagnosis.aiModel?.modelVersion ? ` · ${diagnosis.aiModel.modelVersion}` : ''}
+                  </h5>
+                  <time className="mt-1 block text-[10px] font-semibold text-slate-400" dateTime={diagnosis.createdAt}>{formatDate(diagnosis.createdAt)} · {formatTime(diagnosis.createdAt)}</time>
+                </div>
+                <div className="flex flex-wrap gap-1.5 sm:justify-end">
+                  {diagnosis.id === selectedDiagnosisId ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-black text-sky-700">
+                      <CheckCircle2 className="h-3 w-3" aria-hidden="true" /> Được đối chiếu khi kết luận
+                    </span>
+                  ) : null}
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-600">Tin cậy {formatConfidence(diagnosis.confidence)}</span>
+                  <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${reviewed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                    {reviewed ? 'Bác sĩ đã xác nhận xem' : 'Chưa xác nhận đã xem'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3 border-t border-slate-100 pt-3 text-xs">
+                {parsed.summary ? <AiSection title="Tổng quan lâm sàng" value={parsed.summary} /> : null}
+                <ImageFindingsSection value={parsed.imageFindings} />
+                <DiagnosticProbabilitySection value={parsed.diagnosticProbabilities} />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {parsed.clinicalConsiderations || parsed.possibleConditions ? (
+                    <AiSection title="Cân nhắc lâm sàng" value={parsed.clinicalConsiderations || parsed.possibleConditions} list />
+                  ) : null}
+                  {parsed.riskFlags ? <AiSection title="Cảnh báo rủi ro" value={parsed.riskFlags} list /> : null}
+                </div>
+                {!parsed.summary && !parsed.imageFindings?.length && !parsed.diagnosticProbabilities?.length ? (
+                  <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 text-xs font-semibold text-slate-500">Không có nội dung phân tích chi tiết.</p>
+                ) : null}
+              </div>
+
+              {diagnosis.doctorFeedback ? (
+                <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/70 p-3">
+                  <strong className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Phản hồi của bác sĩ</strong>
+                  <p className="mt-1 whitespace-pre-wrap text-xs font-semibold leading-5 text-slate-700">{diagnosis.doctorFeedback}</p>
+                  {diagnosis.reviewedByDoctor?.staffProfile?.fullName ? <p className="mt-1 text-[10px] font-bold text-slate-400">BS. {diagnosis.reviewedByDoctor.staffProfile.fullName}</p> : null}
+                </div>
+              ) : null}
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function HistoricalOrders({ orders }) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4" aria-label="Chỉ định và kết quả cũ">
+      <div className="flex items-center justify-between gap-3">
+        <h4 className="text-xs font-black text-slate-900">Cận lâm sàng đã thực hiện</h4>
+        <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-slate-500 shadow-sm">{orders.length} phiếu</span>
+      </div>
+      {orders.length === 0 ? (
+        <p className="mt-3 text-xs font-medium text-slate-400">Không có chỉ định trong lượt khám này.</p>
+      ) : (
+        <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
+          {orders.map((order) => (
+            <article key={order.id} className="rounded-xl border border-slate-200 bg-white p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <strong className="block text-xs font-bold text-slate-800">{order.orderType}</strong>
+                  <span className="text-[10px] font-semibold text-slate-400">{order.targetDepartment?.name || order.orderCode}</span>
+                </div>
+                <span className="text-[10px] font-bold text-emerald-700">{order.results?.length || 0} KQ</span>
+              </div>
+              {(order.results || []).map((result) => (
+                <div key={result.id} className="mt-2 border-l-2 border-sky-200 pl-3">
+                  <p className="whitespace-pre-wrap text-[11px] font-semibold leading-4 text-slate-600">{result.note || 'Không có ghi chú kết quả.'}</p>
+                  {result.files?.length ? (
+                    <p className="mt-1 text-[10px] font-bold text-sky-700">{result.files.length} tệp kết quả đã lưu trong hồ sơ</p>
+                  ) : null}
+                </div>
+              ))}
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -1182,11 +1480,27 @@ function ResultsPanel({ orders }) {
   );
 }
 
-function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId, selectedAiId, setSelectedAiId, onGenerate, busy }) {
+function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId, selectedAiId, setSelectedAiId, onGenerate, onReview, busy }) {
+  const [reviewFeedback, setReviewFeedback] = useState('');
+  const [reviewing, setReviewing] = useState(false);
   const rankedDiagnoses = useMemo(() => [...diagnoses].sort((a, b) => (Number(b.confidence) || 0) - (Number(a.confidence) || 0)), [diagnoses]);
   const currentDiagnosis = rankedDiagnoses.find((diagnosis) => diagnosis.id === selectedAiId) || rankedDiagnoses[0];
   const parsedResult = normalizeAiAnalysis(currentDiagnosis?.result);
-  const selectedModel = aiModels.find((model) => model.id === selectedAiModelId);
+  const reviewed = currentDiagnosis?.status === 'DOCTOR_REVIEWED' || Boolean(currentDiagnosis?.reviewedByDoctor);
+
+  useEffect(() => {
+    setReviewFeedback(currentDiagnosis?.doctorFeedback || '');
+  }, [currentDiagnosis?.id, currentDiagnosis?.doctorFeedback]);
+
+  const confirmReviewed = async () => {
+    if (!currentDiagnosis || reviewed || reviewing) return;
+    setReviewing(true);
+    try {
+      await onReview(currentDiagnosis.id, reviewFeedback);
+    } finally {
+      setReviewing(false);
+    }
+  };
 
   return (
     <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm space-y-5">
@@ -1235,6 +1549,7 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
               {rankedDiagnoses.map((diagnosis, index) => {
                 const parsed = normalizeAiAnalysis(diagnosis.result);
                 const isSelected = diagnosis.id === currentDiagnosis?.id;
+                const isReviewed = diagnosis.status === 'DOCTOR_REVIEWED' || Boolean(diagnosis.reviewedByDoctor);
                 return (
                   <button
                     key={diagnosis.id}
@@ -1257,6 +1572,10 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
                       <span>Độ tin cậy</span>
                       <span className="text-sky-600">{formatConfidence(diagnosis.confidence)}</span>
                     </div>
+                    <div className={`mt-2 flex items-center gap-1.5 border-t pt-2 text-[10px] font-bold ${isReviewed ? 'border-emerald-100 text-emerald-700' : 'border-amber-100 text-amber-700'}`}>
+                      {isReviewed ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />}
+                      <span>{isReviewed ? 'Đã xác nhận xem' : 'Chưa xác nhận xem'}</span>
+                    </div>
                   </button>
                 );
               })}
@@ -1273,9 +1592,15 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
                   {parsedResult.modelName || currentDiagnosis?.aiModel?.modelName || currentDiagnosis?.aiModel?.name || 'Mô hình AI'}
                 </h4>
               </div>
-              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-                Confidence {formatConfidence(currentDiagnosis?.confidence)}
-              </span>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                  Tin cậy {formatConfidence(currentDiagnosis?.confidence)}
+                </span>
+                <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${reviewed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                  {reviewed ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />}
+                  {reviewed ? 'Đã xác nhận xem' : 'Chưa xác nhận xem'}
+                </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1295,6 +1620,77 @@ function AiPanel({ diagnoses, aiModels, selectedAiModelId, setSelectedAiModelId,
                 <AiSection title="Cảnh báo rủi ro" value={parsedResult.riskFlags} list />
               </div>
             </div>
+
+            {reviewed ? (
+              <section className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4" aria-label="Trạng thái xem phân tích AI">
+                <div className="flex items-start gap-3">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-emerald-200 bg-white text-emerald-700">
+                    <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <h5 className="text-xs font-black text-emerald-900">Bác sĩ đã xác nhận xem bản phân tích này</h5>
+                    <p className="mt-1 text-[11px] font-semibold leading-4 text-emerald-800/80">
+                      Đây là xác nhận đã tham khảo thông tin AI, không phải phê duyệt AI thành chẩn đoán cuối.
+                    </p>
+                    {currentDiagnosis.doctorFeedback ? (
+                      <div className="mt-3 border-t border-emerald-200 pt-3">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Phản hồi chuyên môn</span>
+                        <p className="mt-1 whitespace-pre-wrap text-xs font-semibold leading-5 text-slate-700">{currentDiagnosis.doctorFeedback}</p>
+                      </div>
+                    ) : null}
+                    {currentDiagnosis.reviewedByDoctor?.staffProfile?.fullName ? (
+                      <p className="mt-2 text-[10px] font-bold text-slate-500">BS. {currentDiagnosis.reviewedByDoctor.staffProfile.fullName}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </section>
+            ) : (
+              <section className="rounded-2xl border border-slate-200 bg-white p-4" aria-labelledby={`ai-review-title-${currentDiagnosis.id}`}>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start gap-3">
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-sky-200 bg-sky-50 text-sky-700">
+                        <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                      <div>
+                        <h5 id={`ai-review-title-${currentDiagnosis.id}`} className="text-xs font-black text-slate-900">Xác nhận bác sĩ đã xem</h5>
+                        <p className="mt-1 text-[11px] font-semibold leading-4 text-slate-500">
+                          Có thể ghi nhận nhận xét chuyên môn trước khi xác nhận. Phản hồi là tùy chọn và được lưu trong hồ sơ kiểm toán.
+                        </p>
+                      </div>
+                    </div>
+                    <label htmlFor={`ai-review-feedback-${currentDiagnosis.id}`} className="mt-3 block text-[10px] font-black uppercase tracking-wider text-slate-600">
+                      Phản hồi chuyên môn <span className="font-semibold normal-case tracking-normal text-slate-400">(không bắt buộc)</span>
+                    </label>
+                    <textarea
+                      id={`ai-review-feedback-${currentDiagnosis.id}`}
+                      value={reviewFeedback}
+                      onChange={(event) => setReviewFeedback(event.target.value)}
+                      maxLength={2000}
+                      rows={3}
+                      disabled={busy}
+                      placeholder="Ví dụ: Phù hợp với triệu chứng và kết quả cận lâm sàng; cần đối chiếu thêm..."
+                      className="mt-1.5 w-full resize-y rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-xs font-semibold leading-5 text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                    <p className="mt-1 text-right text-[10px] font-semibold text-slate-400">{reviewFeedback.length}/2000 ký tự</p>
+                  </div>
+                  <button
+                    id={`confirm-ai-reviewed-${currentDiagnosis.id}`}
+                    type="button"
+                    onClick={confirmReviewed}
+                    disabled={busy || reviewing}
+                    className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 text-xs font-bold text-white shadow-xs transition-colors hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {reviewing ? <LoadingIndicator size="sm" tone="white" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
+                    {reviewing ? 'Đang xác nhận...' : 'Xác nhận đã xem'}
+                  </button>
+                </div>
+                <p className="mt-3 flex items-start gap-1.5 border-t border-slate-100 pt-3 text-[10px] font-semibold leading-4 text-amber-700">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  Thao tác này không tự động chọn kết quả AI làm kết luận. Bác sĩ vẫn phải lập chẩn đoán cuối ở bước 3.
+                </p>
+              </section>
+            )}
           </section>
         </div>
       ) : (
