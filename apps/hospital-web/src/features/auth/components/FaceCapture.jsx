@@ -36,12 +36,12 @@ export default function FaceCapture({
     setExtractingEmbedding(true);
     try {
       if (captureMode !== 'enroll' && Array.isArray(meta.descriptor) && meta.descriptor.length === 128) {
-        onCapture?.(meta.descriptor);
+        await onCapture?.(meta.descriptor);
         return;
       }
 
       if (captureMode === 'enroll' && Array.isArray(meta.descriptors) && meta.descriptors.length >= 3) {
-        onCapture?.(meta.descriptors);
+        await onCapture?.(meta.descriptors);
         return;
       }
 
@@ -61,20 +61,24 @@ export default function FaceCapture({
         if (!mountedRef.current) return;
         const retry = await detectFrame(sources[0]);
         if (!retry?.embedding?.length) {
-          onError?.('Không thể trích xuất định danh khuôn mặt. Vui lòng thử lại.');
-          return;
+          const errText = 'Không thể trích xuất định danh khuôn mặt. Vui lòng thử lại.';
+          onError?.(errText);
+          throw new Error(errText);
         }
         embeddings.push(retry.embedding);
       }
 
       if (captureMode === 'enroll' && embeddings.length < 3) {
-        onError?.('Không đủ mẫu khuôn mặt tin cậy. Vui lòng ghi danh lại trong điều kiện đủ sáng.');
-        return;
+        const errText = 'Không đủ mẫu khuôn mặt tin cậy. Vui lòng ghi danh lại trong điều kiện đủ sáng.';
+        onError?.(errText);
+        throw new Error(errText);
       }
 
-      onCapture?.(captureMode === 'enroll' ? embeddings : embeddings[0]);
+      await onCapture?.(captureMode === 'enroll' ? embeddings : embeddings[0]);
     } catch (err) {
-      onError?.('Lỗi trích xuất: ' + err.message);
+      const errMsg = err?.response?.data?.message || err?.message || 'Xác thực sinh trắc học thất bại.';
+      onError?.(errMsg);
+      throw err;
     } finally {
       if (mountedRef.current) setExtractingEmbedding(false);
     }

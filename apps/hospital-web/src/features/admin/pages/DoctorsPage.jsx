@@ -12,7 +12,7 @@ import { departmentService } from '../apis/departmentService';
 import DoctorDetailModal from '../components/DoctorDetailModal';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { Calendar, ExternalLink, MapPin, Search, Trash2, Plus, Stethoscope, Filter, UserCheck, CheckSquare, Square } from 'lucide-react';
+import { Calendar, ExternalLink, MapPin, Search, Trash2, Plus, Stethoscope, Filter, UserCheck, CheckSquare, Square, Sparkles, Eye, EyeOff, Pencil, Layers, ShieldCheck } from 'lucide-react';
 
 const OSM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
 const MIN_BIRTH_YEAR = 1900;
@@ -28,8 +28,8 @@ const MAX_ADDRESS_LENGTH = 255;
 const MIN_YEARS_EXPERIENCE = 1;
 const MAX_YEARS_EXPERIENCE = 50;
 const MAX_LICENSE_NUMBER_LENGTH = 30;
-const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200/80', INACTIVE: 'bg-rose-50 text-rose-700 border-rose-200/80', PENDING: 'bg-amber-50 text-amber-700 border-amber-200/80' };
-const statusLabel = { ACTIVE: 'Đang hoạt động', INACTIVE: 'Ngưng hoạt động', PENDING: 'Chờ kích hoạt' };
+const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200/80', INACTIVE: 'bg-amber-50 text-amber-700 border-amber-200/80', PENDING: 'bg-amber-50 text-amber-700 border-amber-200/80' };
+const statusLabel = { ACTIVE: 'Đang hoạt động', INACTIVE: 'Đã ẩn', PENDING: 'Chờ kích hoạt' };
 
 function buildGoogleMapsDirectionsUrl(lat, lng) { return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`; }
 function buildAddressQueries(query) {
@@ -353,22 +353,48 @@ export default function DoctorsPage() {
     );
   };
 
+  const stats = useMemo(() => [
+    { label: 'Tổng số bác sĩ', value: pagination.total, icon: Stethoscope, tone: 'bg-sky-50 text-sky-600 border-sky-100' },
+    { label: 'Đang hoạt động', value: doctors.filter((d) => d.staffProfile?.user?.status === 'ACTIVE').length, icon: UserCheck, tone: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+    { label: 'Chuyên khoa khám', value: new Set(doctors.map((d) => d.specialty).filter(Boolean)).size, icon: Layers, tone: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
+    { label: 'Đã xác thực', value: doctors.filter((d) => d.blockchainStatus === 'VERIFIED' || d.isActiveOnChain).length, icon: ShieldCheck, tone: 'bg-amber-50 text-amber-600 border-amber-100' },
+  ], [doctors, pagination.total]);
+
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="doctors" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
-      <div className="max-w-[1600px] mx-auto space-y-6 pb-10">
+      <div className="max-w-[1600px] mx-auto space-y-7 pb-12 animate-in fade-in duration-300">
         <Hero totalLabel={totalLabel} onCreate={openCreate} onTrash={() => navigate('/admin/doctors/trash')} total={pagination.total} />
-        {loading ? <LoadingIndicator size="lg" label="Đang tải danh sách bác sĩ..." /> : (
+
+        {/* Metrics Grid */}
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+          {stats.map((item) => {
+            const Icon = item.icon;
+            return (
+              <div key={item.label} className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm hover:shadow-md transition-all flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">{item.label}</p>
+                  <strong className="mt-1 block text-3xl font-black text-slate-900 tracking-tight">{String(item.value).padStart(2, '0')}</strong>
+                </div>
+                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl border shrink-0 ${item.tone}`}>
+                  <Icon className="h-6 w-6" />
+                </div>
+              </div>
+            );
+          })}
+        </section>
+
+        {loading ? <LoadingIndicator size="lg" label="Đang tải danh sách bác sĩ chuyên khoa..." /> : (
           <>
             <SearchBar filters={filters} setFilters={setFilters} onSearch={search} onReset={() => setFilters({ specialty: '', search: '', status: '' })} />
 
             {/* Floating Bulk Action Bar */}
             {selectedIds.length > 0 && (
-              <div className="sticky top-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/95 px-5 py-3.5 shadow-lg backdrop-blur-sm animate-in fade-in slide-in-from-top-2">
+              <div className="sticky top-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-300 bg-white/95 px-6 py-4 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-top-2">
                 <div className="flex items-center gap-3">
-                  <span className="grid h-7 w-7 place-items-center rounded-full bg-sky-600 text-xs font-bold text-white">
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-sky-600 text-xs font-black text-white shadow-md">
                     {selectedIds.length}
                   </span>
-                  <span className="text-sm font-bold text-sky-950">
+                  <span className="text-sm font-black text-slate-900">
                     Đã chọn {selectedIds.length} bác sĩ
                   </span>
                 </div>
@@ -377,7 +403,7 @@ export default function DoctorsPage() {
                     type="button"
                     disabled={busy}
                     onClick={() => handleBulkSoftDelete(selectedIds)}
-                    className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-700 disabled:opacity-40 transition"
+                    className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-rose-700 disabled:opacity-40 transition"
                   >
                     <Trash2 size={15} />
                     Xóa tạm thời chọn ({selectedIds.length})
@@ -385,7 +411,7 @@ export default function DoctorsPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedIds([])}
-                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
+                    className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
                   >
                     Bỏ chọn
                   </button>
@@ -402,15 +428,15 @@ export default function DoctorsPage() {
                     className="flex items-center gap-2 text-slate-700 hover:text-sky-600 transition"
                     title="Chọn tất cả bác sĩ"
                   >
-                    {allSelected ? <CheckSquare size={19} className="text-sky-600" /> : <Square size={19} className="text-slate-400" />}
+                    {allSelected ? <CheckSquare size={20} className="text-sky-600" /> : <Square size={20} className="text-slate-400" />}
                   </button>
-                  <Stethoscope className="h-5 w-5 text-sky-600" strokeWidth={2} />
+                  <Stethoscope className="h-5 w-5 text-sky-600" strokeWidth={2.25} />
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900">Danh sách bác sĩ</h3>
-                    <p className="text-xs font-medium text-slate-400">Quản lý hồ sơ chuyên môn và phòng khám phụ trách.</p>
+                    <h3 className="text-lg font-black text-slate-900">Danh sách Bác sĩ Chuyên khoa</h3>
+                    <p className="text-xs font-semibold text-slate-400">Quản lý chứng chỉ hành nghề, trình độ chuyên môn và phòng khám phụ trách.</p>
                   </div>
                 </div>
-                <span className="rounded-xl bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-600 border border-slate-200/80">{totalLabel}</span>
+                <span className="rounded-xl bg-sky-50 px-4 py-1.5 text-xs font-bold text-sky-800 border border-sky-200/80">{totalLabel}</span>
               </div>
               <div className="divide-y divide-slate-100">
                 {doctors.map((doctor) => (
@@ -426,7 +452,7 @@ export default function DoctorsPage() {
                     onToggleSelect={() => toggleSelectOne(doctor.id)}
                   />
                 ))}
-                {!doctors.length && <div className="p-8 text-center text-xs font-bold text-slate-400">Chưa có bác sĩ nào.</div>}
+                {!doctors.length && <div className="p-12 text-center text-xs font-bold text-slate-400">Chưa có bác sĩ nào trong danh sách.</div>}
               </div>
               <Pagination pagination={pagination} onPageChange={load} />
             </section>
@@ -441,37 +467,42 @@ export default function DoctorsPage() {
 
 function Hero({ onCreate, onTrash, total }) {
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-8 shadow-sm">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-200/60">
-              Đội ngũ Bác sĩ ({total} chuyên gia)
-            </span>
+    <div className="relative overflow-hidden rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-50/90 via-white to-cyan-50/70 p-7 sm:p-9 text-slate-900 shadow-sm">
+      {/* Decorative Glow */}
+      <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-sky-200/30 blur-3xl" />
+      <div className="pointer-events-none absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-cyan-200/25 blur-2xl" />
+
+      <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-100/80 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-sky-800 shadow-2xs">
+            <Sparkles className="h-3.5 w-3.5 text-sky-600" />
+            <span>Bệnh Viện Đa Khoa Quốc Tế KLTN · Đội Ngũ Bác Sĩ ({total} chuyên gia)</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            Quản lý Đội ngũ Bác sĩ
+
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+            Quản lý Đội ngũ Bác sĩ Chuyên khoa
           </h1>
-          <p className="text-sm font-medium text-slate-500">
-            Quản lý chứng chỉ hành nghề, chuyên khoa khám và lịch phân công bác sĩ.
+
+          <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed max-w-2xl">
+            Quản lý danh sách chứng chỉ hành nghề, bằng cấp chuyên môn, phòng khám phụ trách và trạng thái xác thực bảo mật.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
           <button
             type="button"
             title="Bác sĩ đã xóa"
             onClick={onTrash}
-            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all shadow-xs"
+            className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all shadow-xs"
           >
-            <Trash2 size={18} strokeWidth={2} />
+            <Trash2 size={19} strokeWidth={2} />
           </button>
           <button
             onClick={onCreate}
-            className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-sky-700 transition-all"
+            className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white font-bold px-6 py-3.5 text-xs uppercase tracking-wider transition-all shadow-md shadow-sky-600/20"
           >
             <Plus className="h-4 w-4" strokeWidth={2.5} />
-            Thêm bác sĩ mới
+            <span>Thêm bác sĩ mới</span>
           </button>
         </div>
       </div>
@@ -489,55 +520,79 @@ function SearchBar({ filters, setFilters, onSearch, onReset }) {
             <Filter className="h-5 w-5" strokeWidth={2} />
           </span>
           <div>
-            <p className="text-base font-bold text-slate-900">Bộ lọc bác sĩ</p>
-            <p className="text-xs font-medium text-slate-400">{activeCount > 0 ? `${activeCount} bộ lọc đang áp dụng` : 'Tìm theo chuyên khoa, từ khóa và trạng thái hiển thị.'}</p>
+            <p className="text-base font-black text-slate-900">Bộ lọc thông tin bác sĩ</p>
+            <p className="text-xs font-semibold text-slate-400">{activeCount > 0 ? `${activeCount} bộ lọc đang được áp dụng` : 'Tìm kiếm theo chuyên khoa khám, họ tên hoặc trạng thái tài khoản.'}</p>
           </div>
         </div>
-        {activeCount > 0 && <button type="button" onClick={onReset} className="inline-flex items-center gap-1 rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">Xóa lọc</button>}
+        {activeCount > 0 && <button type="button" onClick={onReset} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">Xóa lọc</button>}
       </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.15fr_1.4fr_1fr_140px] lg:items-end">
-        <FilterSelect label="Chuyên khoa" value={filters.specialty} onChange={(v) => setFilters({ ...filters, specialty: v })} empty="Tất cả chuyên khoa" options={SPECIALTIES} />
-        <FilterInput label="Tìm kiếm" value={filters.search} onChange={(v) => setFilters({ ...filters, search: v })} placeholder="Tên bác sĩ, chứng chỉ..." />
-        <FilterSelect label="Ẩn / hiện" value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })} empty="Tất cả trạng thái" options={[{ value: 'ACTIVE', label: 'Đang hiện' }, { value: 'INACTIVE', label: 'Đã ẩn' }]} />
-        <div className="space-y-1.5"><span className="block text-xs font-bold text-transparent">Tìm kiếm</span><button className="inline-flex h-[42px] w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 text-xs font-bold text-white shadow-xs hover:bg-sky-700 whitespace-nowrap"><Search className="h-4 w-4" strokeWidth={2.5} /> Tìm kiếm</button></div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[1.15fr_1.4fr_1fr_140px] lg:items-end">
+        <FilterSelect label="Chuyên khoa khám" value={filters.specialty} onChange={(v) => setFilters({ ...filters, specialty: v })} empty="Tất cả chuyên khoa" options={SPECIALTIES} />
+        <FilterInput label="Từ khóa tìm kiếm" value={filters.search} onChange={(v) => setFilters({ ...filters, search: v })} placeholder="Tên bác sĩ, số chứng chỉ..." />
+        <FilterSelect label="Trạng thái" value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })} empty="Tất cả trạng thái" options={[{ value: 'ACTIVE', label: 'Đang hiện' }, { value: 'INACTIVE', label: 'Đã ẩn' }]} />
+        <div className="space-y-1.5">
+          <span className="block text-xs font-bold text-transparent">Thao tác</span>
+          <button className="inline-flex h-[44px] w-full items-center justify-center gap-2 rounded-2xl bg-sky-600 px-4 text-xs font-bold text-white shadow-xs hover:bg-sky-700 whitespace-nowrap">
+            <Search className="h-4 w-4" strokeWidth={2.5} />
+            <span>Tìm kiếm</span>
+          </button>
+        </div>
       </div>
     </form>
   );
 }
 
-function FilterInput({ label, value, onChange, placeholder }) { return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}</span><input value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-[42px] w-full rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 text-xs font-semibold focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 outline-none" /></label>; }
-function FilterSelect({ label, value, onChange, options, empty }) { return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}</span><select value={value || ''} onChange={(e) => onChange(e.target.value)} className="h-[42px] w-full rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 text-xs font-semibold focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 outline-none">{empty && <option value="">{empty}</option>}{options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>; }
+function FilterInput({ label, value, onChange, placeholder }) { return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}</span><input value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-[44px] w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3.5 text-xs font-semibold focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 outline-none transition-all" /></label>; }
+function FilterSelect({ label, value, onChange, options, empty }) { return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}</span><select value={value || ''} onChange={(e) => onChange(e.target.value)} className="h-[44px] w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3.5 text-xs font-semibold focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 outline-none transition-all">{empty && <option value="">{empty}</option>}{options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>; }
 
 function DoctorRow({ doctor, onEdit, onToggleStatus, onRemove, onViewDetails, busy, isSelected, onToggleSelect }) {
   return (
-    <article className={`p-6 transition-all hover:bg-slate-50/80 ${isSelected ? 'bg-sky-50/60' : 'bg-white'}`}>
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_0.9fr_0.9fr_0.85fr_0.9fr_220px] xl:items-center">
+    <article className={`p-6 transition-all hover:bg-sky-50/30 ${isSelected ? 'bg-sky-50/70' : 'bg-white'}`}>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_0.9fr_0.9fr_0.85fr_0.9fr_230px] xl:items-center">
         <div className="flex items-center gap-3.5 min-w-0">
           <button
             type="button"
             onClick={onToggleSelect}
-            className="text-slate-400 hover:text-sky-600 transition"
+            className="text-slate-400 hover:text-sky-600 transition shrink-0"
           >
-            {isSelected ? <CheckSquare size={18} className="text-sky-600" /> : <Square size={18} />}
+            {isSelected ? <CheckSquare size={20} className="text-sky-600" /> : <Square size={20} />}
           </button>
-          <img src={doctor.staffProfile?.avatarUrl} alt={doctor.staffProfile?.fullName || 'Bác sĩ'} className="w-12 h-12 rounded-2xl object-cover border border-sky-100 bg-sky-50 shadow-xs" />
+          <img src={doctor.staffProfile?.avatarUrl} alt={doctor.staffProfile?.fullName || 'Bác sĩ'} className="w-12 h-12 rounded-2xl object-cover border-2 border-white ring-2 ring-sky-100 shadow-md shrink-0 bg-sky-50" />
           <div className="min-w-0">
             <strong className="block text-slate-900 font-bold truncate text-sm">{doctor.staffProfile?.fullName}</strong>
             <span className="text-xs font-medium text-slate-400 truncate block">{doctor.staffProfile?.user?.email}</span>
           </div>
         </div>
+
         <Info label="Chuyên khoa" value={getSpecialtyLabel(doctor.specialty)} />
         <Info label="Phòng khám" value={doctor.staffProfile?.department?.name || 'Chưa gán'} />
-        <span className={`w-fit rounded-lg border px-2.5 py-1 text-xs font-bold ${statusTone[doctor.staffProfile?.user?.status] || statusTone.ACTIVE}`}>{statusLabel[doctor.staffProfile?.user?.status] || 'Không rõ'}</span>
+
+        <span className={`w-fit rounded-full border px-3 py-1 text-[11px] font-bold ${statusTone[doctor.staffProfile?.user?.status] || statusTone.ACTIVE}`}>
+          {statusLabel[doctor.staffProfile?.user?.status] || 'Không rõ'}
+        </span>
+
         <div>
           <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Trạng thái dữ liệu</p>
           <BlockchainStatusBadge status={doctor.blockchainStatus} size="xs" />
         </div>
+
         <div className="flex flex-wrap gap-2 xl:justify-end">
-          <SmallButton onClick={() => onViewDetails(doctor.id)} disabled={busy}>Chi tiết</SmallButton>
-          <SmallButton onClick={() => onEdit(doctor)} disabled={busy}>Sửa</SmallButton>
-          <SmallButton onClick={() => onToggleStatus(doctor)} disabled={busy}>{doctor.staffProfile?.user?.status === 'INACTIVE' ? 'Hiện' : 'Ẩn'}</SmallButton>
-          <SmallButton danger onClick={() => onRemove(doctor)} disabled={busy}>Xóa</SmallButton>
+          <SmallButton onClick={() => onViewDetails(doctor.id)} disabled={busy}>
+            <Eye className="h-3.5 w-3.5" />
+            <span>Chi tiết</span>
+          </SmallButton>
+          <SmallButton onClick={() => onEdit(doctor)} disabled={busy}>
+            <Pencil className="h-3.5 w-3.5" />
+            <span>Sửa</span>
+          </SmallButton>
+          <SmallButton onClick={() => onToggleStatus(doctor)} disabled={busy}>
+            {doctor.staffProfile?.user?.status === 'INACTIVE' ? <Eye className="h-3.5 w-3.5 text-emerald-600" /> : <EyeOff className="h-3.5 w-3.5 text-amber-600" />}
+            <span>{doctor.staffProfile?.user?.status === 'INACTIVE' ? 'Hiện' : 'Ẩn'}</span>
+          </SmallButton>
+          <SmallButton danger onClick={() => onRemove(doctor)} disabled={busy}>
+            <Trash2 className="h-3.5 w-3.5" />
+            <span>Xóa</span>
+          </SmallButton>
         </div>
       </div>
     </article>
@@ -689,60 +744,71 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
   if (typeof document === 'undefined' || !document.body) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fadeIn">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <form onSubmit={handleSubmit} className="relative z-10 w-full max-w-[1280px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
-        <div className="flex justify-between gap-4">
-          <div>
-            <h3 className="text-2xl font-bold text-slate-900">{isCreate ? 'Thêm bác sĩ' : 'Cập nhật bác sĩ'}</h3>
-            <p className="text-xs font-semibold text-slate-400">
-              {isCreate
-                ? 'Tạo mới hồ sơ nhân sự kèm thông tin chứng chỉ bác sĩ.'
-                : 'Cập nhật thông tin nhân sự, chuyên môn và phòng khám phụ trách.'}
-            </p>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-md" onClick={onClose} />
+      <form onSubmit={handleSubmit} className="relative z-10 w-full max-w-[1150px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white shadow-2xl border border-slate-200 space-y-6 overflow-hidden">
+        
+        {/* Modal Header */}
+        <div className="bg-gradient-to-r from-sky-50 via-white to-cyan-50 p-6 sm:p-7 border-b border-sky-100 flex items-center justify-between">
+          <div className="space-y-1">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-100/80 px-3 py-0.5 text-xs font-bold text-sky-800">
+              <Sparkles className="h-3.5 w-3.5 text-sky-600" />
+              <span>Cấu Hình Hồ Sơ Bác Sĩ Chuyên Khoa</span>
+            </span>
+            <h3 className="text-xl font-black text-slate-900">{isCreate ? 'Thêm bác sĩ mới' : 'Cập nhật thông tin bác sĩ'}</h3>
           </div>
-          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50">Đóng</button>
+          <button type="button" onClick={onClose} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition">
+            Đóng
+          </button>
         </div>
-        <SectionTitle title="Thông tin tài khoản và nhân sự" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Input label="Họ tên" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: onlyVietnameseNameChars(v) })} onBlur={() => validateField('fullName')} error={fieldErrors.fullName} required maxLength={MAX_FULL_NAME_LENGTH} />
-          <AvatarUpload value={form.avatarUrl} onChange={(url) => setForm({ ...form, avatarUrl: url })} uploadFn={doctorService.uploadAvatar} />
-          <Input label="Tên đăng nhập" value={form.username} onChange={(v) => setForm({ ...form, username: onlyUsernameChars(v) })} onBlur={() => validateField('username')} error={fieldErrors.username} disabled={!isCreate} required maxLength={MAX_USERNAME_LENGTH} />
-          <Input label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: onlyEmailChars(v) })} onBlur={() => validateField('email')} error={fieldErrors.email} disabled={!isCreate} required />
-          <Input label="Số điện thoại" value={form.phone} onChange={(v) => setForm({ ...form, phone: onlyDigits(v).slice(0, 10) })} onBlur={() => validateField('phone')} error={fieldErrors.phone} required maxLength={10} />
-          <Input label="CCCD/CMND" value={form.citizenId} onChange={(v) => setForm({ ...form, citizenId: onlyDigits(v).slice(0, 12) })} onBlur={() => validateField('citizenId')} error={fieldErrors.citizenId} required maxLength={12} />
-          <DateInput label="Ngày sinh" value={form.birthDate} onChange={(v) => setForm({ ...form, birthDate: v })} onBlur={(nextValue) => validateField('birthDate', nextValue)} error={fieldErrors.birthDate} required />
-          <Select label="Giới tính" value={form.gender} onChange={(v) => { setForm({ ...form, gender: v }); validateField('gender', v); }} error={fieldErrors.gender} empty="Chọn giới tính" required options={['Nam', 'Nữ']} />
-          <Select label="Phòng ban" value={form.departmentId} onChange={(v) => { setForm({ ...form, departmentId: v }); validateField('departmentId', v); }} error={fieldErrors.departmentId} empty="Chưa gán phòng ban" required options={departments.filter((d) => ['EXAMINATION', 'CLINICAL'].includes(d.type)).map((d) => ({ value: d.id, label: `${d.departmentCode || 'PB'} - ${d.name}` }))} />
-          <Select label="Chức danh" value={form.position} onChange={(v) => { setForm({ ...form, position: limitPosition(v) }); validateField('position', v); }} error={fieldErrors.position} empty="Chọn chức danh" required options={DOCTOR_POSITIONS} />
-          <AddressInput
-            label="Địa chỉ"
-            value={form.address}
-            onChange={(v) => {
-              setAddressTouched(true);
-              setForm({ ...form, address: limitAddress(v) });
-            }}
-            onBlur={handleAddressBlur}
-            onFocus={handleAddressFocus}
-            error={fieldErrors.address}
-            maxLength={MAX_ADDRESS_LENGTH}
-            suggestions={addressSuggestions}
-            loading={addressLoading}
-            searched={addressSearched}
-            open={addressDropdownOpen}
-            onSelect={selectAddress}
-          />
+
+        <div className="p-6 sm:p-8 space-y-6">
+          <SectionTitle title="Thông tin tài khoản & nhân sự" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Input label="Họ tên" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: onlyVietnameseNameChars(v) })} onBlur={() => validateField('fullName')} error={fieldErrors.fullName} required maxLength={MAX_FULL_NAME_LENGTH} />
+            <AvatarUpload value={form.avatarUrl} onChange={(url) => setForm({ ...form, avatarUrl: url })} uploadFn={doctorService.uploadAvatar} />
+            <Input label="Tên đăng nhập" value={form.username} onChange={(v) => setForm({ ...form, username: onlyUsernameChars(v) })} onBlur={() => validateField('username')} error={fieldErrors.username} disabled={!isCreate} required maxLength={MAX_USERNAME_LENGTH} />
+            <Input label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: onlyEmailChars(v) })} onBlur={() => validateField('email')} error={fieldErrors.email} disabled={!isCreate} required />
+            <Input label="Số điện thoại" value={form.phone} onChange={(v) => setForm({ ...form, phone: onlyDigits(v).slice(0, 10) })} onBlur={() => validateField('phone')} error={fieldErrors.phone} required maxLength={10} />
+            <Input label="CCCD/CMND" value={form.citizenId} onChange={(v) => setForm({ ...form, citizenId: onlyDigits(v).slice(0, 12) })} onBlur={() => validateField('citizenId')} error={fieldErrors.citizenId} required maxLength={12} />
+            <DateInput label="Ngày sinh" value={form.birthDate} onChange={(v) => setForm({ ...form, birthDate: v })} onBlur={(nextValue) => validateField('birthDate', nextValue)} error={fieldErrors.birthDate} required />
+            <Select label="Giới tính" value={form.gender} onChange={(v) => { setForm({ ...form, gender: v }); validateField('gender', v); }} error={fieldErrors.gender} empty="Chọn giới tính" required options={['Nam', 'Nữ']} />
+            <Select label="Phòng ban" value={form.departmentId} onChange={(v) => { setForm({ ...form, departmentId: v }); validateField('departmentId', v); }} error={fieldErrors.departmentId} empty="Chưa gán phòng ban" required options={departments.filter((d) => ['EXAMINATION', 'CLINICAL'].includes(d.type)).map((d) => ({ value: d.id, label: `${d.departmentCode || 'PB'} - ${d.name}` }))} />
+            <Select label="Chức danh" value={form.position} onChange={(v) => { setForm({ ...form, position: limitPosition(v) }); validateField('position', v); }} error={fieldErrors.position} empty="Chọn chức danh" required options={DOCTOR_POSITIONS} />
+            <AddressInput
+              label="Địa chỉ"
+              value={form.address}
+              onChange={(v) => {
+                setAddressTouched(true);
+                setForm({ ...form, address: limitAddress(v) });
+              }}
+              onBlur={handleAddressBlur}
+              onFocus={handleAddressFocus}
+              error={fieldErrors.address}
+              maxLength={MAX_ADDRESS_LENGTH}
+              suggestions={addressSuggestions}
+              loading={addressLoading}
+              searched={addressSearched}
+              open={addressDropdownOpen}
+              onSelect={selectAddress}
+            />
+          </div>
+
+          <SectionTitle title="Thông tin bằng cấp & Chuyên môn" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Select label="Chuyên khoa khám" value={form.specialty} onChange={(v) => { setForm({ ...form, specialty: v }); validateField('specialty', v); }} error={fieldErrors.specialty} empty="Chọn chuyên khoa" required options={SPECIALTIES} />
+            <Input label="Số chứng chỉ hành nghề" value={form.licenseNumber} onChange={(v) => setForm({ ...form, licenseNumber: v.slice(0, MAX_LICENSE_NUMBER_LENGTH) })} onBlur={() => validateField('licenseNumber')} error={fieldErrors.licenseNumber} required maxLength={MAX_LICENSE_NUMBER_LENGTH} />
+            <Select label="Trình độ học vấn" value={form.qualification} onChange={(v) => { setForm({ ...form, qualification: v }); validateField('qualification', v); }} error={fieldErrors.qualification} empty="Chọn trình độ" required options={QUALIFICATIONS} />
+            <Input type="text" label="Số năm kinh nghiệm" value={form.yearsExperience} onChange={(v) => setForm({ ...form, yearsExperience: onlyDigits(v).slice(0, 2) })} onBlur={() => validateField('yearsExperience')} error={fieldErrors.yearsExperience} required maxLength={2} inputMode="numeric" pattern="[0-9]*" />
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-100">
+            <button type="button" onClick={onClose} className="flex-1 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition">Hủy</button>
+            <button disabled={busy} className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-sky-600 px-5 py-3.5 text-xs font-bold text-white shadow-md hover:bg-sky-700 disabled:opacity-70 transition">
+              {busy && <LoadingIndicator size="sm" tone="white" />}{isCreate ? 'Tạo bác sĩ mới' : 'Lưu thay đổi'}
+            </button>
+          </div>
         </div>
-        <SectionTitle title="Thông tin chuyên môn" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select label="Chuyên khoa" value={form.specialty} onChange={(v) => { setForm({ ...form, specialty: v }); validateField('specialty', v); }} error={fieldErrors.specialty} empty="Chọn chuyên khoa" required options={SPECIALTIES} />
-          <Input label="Số chứng chỉ" value={form.licenseNumber} onChange={(v) => setForm({ ...form, licenseNumber: v.slice(0, MAX_LICENSE_NUMBER_LENGTH) })} onBlur={() => validateField('licenseNumber')} error={fieldErrors.licenseNumber} required maxLength={MAX_LICENSE_NUMBER_LENGTH} />
-          <Select label="Trình độ" value={form.qualification} onChange={(v) => { setForm({ ...form, qualification: v }); validateField('qualification', v); }} error={fieldErrors.qualification} empty="Chọn trình độ" required options={QUALIFICATIONS} />
-          <Input type="text" label="Số năm kinh nghiệm" value={form.yearsExperience} onChange={(v) => setForm({ ...form, yearsExperience: onlyDigits(v).slice(0, 2) })} onBlur={() => validateField('yearsExperience')} error={fieldErrors.yearsExperience} required maxLength={2} inputMode="numeric" pattern="[0-9]*" />
-        </div>
-        <button disabled={busy} className="w-full rounded-2xl bg-sky-600 px-5 py-3 text-sm font-bold text-white hover:bg-sky-700 disabled:opacity-70 shadow-sm transition-all">
-          {isCreate ? 'Tạo bác sĩ' : 'Lưu thay đổi'}
-        </button>
       </form>
     </div>,
     document.body

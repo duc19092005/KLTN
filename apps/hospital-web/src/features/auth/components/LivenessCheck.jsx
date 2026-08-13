@@ -423,6 +423,30 @@ export default function LivenessCheck({
     return { ok: true, worstDistance, anchor, descriptors };
   };
 
+  const restartScan = () => {
+    passSentRef.current = false;
+    blinkStateRef.current = { closed: false, verified: false };
+    identityAnchorRef.current = null;
+    anchorPendingRef.current = false;
+    holdStartRef.current = null;
+    poseFramesRef.current = [];
+    capturedCanvasRef.current = null;
+
+    stateRef.current.currentIdx = 0;
+    stateRef.current.passedDirs = [];
+    stateRef.current.allPassed = false;
+
+    setAllPassedUI(false);
+    setBlinkVerified(false);
+    setDisplayIdx(0);
+    setDisplayPassed([]);
+    setDisplayProgress(0);
+    setStatus('active');
+    setMessage('Vui lòng đưa khuôn mặt vào chính giữa kén quét sinh trắc');
+
+    startLoop();
+  };
+
   // ─── Completion effect ────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -456,11 +480,19 @@ export default function LivenessCheck({
 
       console.log(`[Liveness] identity continuity OK, worst distance ${continuity.worstDistance?.toFixed(3)}`);
       const descriptor = Array.isArray(continuity.anchor) ? continuity.anchor : null;
-      onLivenessPassRef.current?.(
-        isEnrollMode && poseFrames.length > 0 ? poseFrames : (frame || videoRef.current),
-        { descriptor, descriptors: continuity.descriptors },
-      );
-    }, 1500);
+      try {
+        await onLivenessPassRef.current?.(
+          isEnrollMode && poseFrames.length > 0 ? poseFrames : (frame || videoRef.current),
+          { descriptor, descriptors: continuity.descriptors },
+        );
+      } catch (passErr) {
+        setStatus('error');
+        setAllPassedUI(false);
+        const errMsg = passErr?.response?.data?.message || passErr?.message || 'Xác thực sinh trắc học thất bại.';
+        setMessage(errMsg);
+        onErrorRef.current?.(errMsg);
+      }
+    }, 1200);
     return () => clearTimeout(timer);
   }, [allPassedUI, disabled, isEnrollMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -623,10 +655,10 @@ export default function LivenessCheck({
         {status === 'error' && (
           <button
             type="button"
-            onClick={() => window.location.reload()}
-            className="w-full mt-4 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 px-4 rounded-xl text-xs transition-colors shadow-sm outline-none"
+            onClick={restartScan}
+            className="w-full mt-4 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 px-4 rounded-xl text-xs transition-colors shadow-sm outline-none flex items-center justify-center gap-2"
           >
-            Khởi động lại Camera cấu hình
+            <span>Quét lại khuôn mặt</span>
           </button>
         )}
       </div>

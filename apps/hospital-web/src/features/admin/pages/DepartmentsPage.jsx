@@ -9,7 +9,7 @@ import { departmentService } from '../apis/departmentService';
 import { staffService } from '../apis/staffService';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { Search, Trash2, X, Plus, Building2, Layers, Filter, CheckCircle2, ShieldCheck, CheckSquare, Square } from 'lucide-react';
+import { Search, Trash2, X, Plus, Building2, Layers, Filter, CheckCircle2, ShieldCheck, CheckSquare, Square, Sparkles, Eye, EyeOff, Pencil, Activity, UserCheck } from 'lucide-react';
 import AuditHistoryChanges from '../components/AuditHistoryChanges';
 
 const DEPARTMENT_TYPES = [
@@ -23,9 +23,9 @@ const DEPARTMENT_TYPES = [
 ];
 
 const emptyForm = { departmentCode: '', name: '', floor: '', status: 'ACTIVE', type: 'EXAMINATION', canReceiveOrders: false, description: '' };
-const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200/80', INACTIVE: 'bg-rose-50 text-rose-700 border-rose-200/80' };
+const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200/80', INACTIVE: 'bg-amber-50 text-amber-700 border-amber-200/80' };
 const orderTone = { true: 'bg-sky-50 text-sky-700 border-sky-200/80', false: 'bg-slate-50 text-slate-600 border-slate-200/80' };
-const STATUS_LABELS = { ACTIVE: 'Đang hoạt động', INACTIVE: 'Ngưng hoạt động', PENDING: 'Chờ kích hoạt' };
+const STATUS_LABELS = { ACTIVE: 'Đang hoạt động', INACTIVE: 'Đã ẩn', PENDING: 'Chờ kích hoạt' };
 const BLOCKCHAIN_TONE = {
   VERIFIED: { label: 'Xác thực khớp với blockchain', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
   TAMPERED: { label: 'CẢNH BÁO: Dữ liệu đã bị sửa đổi!', cls: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500' },
@@ -258,10 +258,36 @@ export default function DepartmentsPage() {
 
   const selectedStaffs = selectedDepartment ? staffs.filter((s) => s.departmentId === selectedDepartment.id) : [];
 
+  const stats = React.useMemo(() => [
+    { label: 'Tổng số phòng ban', value: pagination.total, icon: Building2, tone: 'bg-sky-50 text-sky-600 border-sky-100' },
+    { label: 'Phòng khám & Lâm sàng', value: departments.filter((d) => d.type === 'EXAMINATION' || d.type === 'CLINICAL').length, icon: Activity, tone: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+    { label: 'Đã gán phụ trách', value: departments.filter((d) => d.managerId).length, icon: UserCheck, tone: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
+    { label: 'Đã xác thực', value: departments.filter((d) => d.blockchainStatus === 'VERIFIED' || d.blockchainStatus === 'ANCHORED').length, icon: ShieldCheck, tone: 'bg-amber-50 text-amber-600 border-amber-100' },
+  ], [departments, pagination.total]);
+
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="departments" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
-      <div className="mx-auto max-w-[1600px] space-y-6 pb-10">
+      <div className="mx-auto max-w-[1600px] space-y-7 pb-12 animate-in fade-in duration-300">
         <Hero onCreate={openCreate} onTrash={() => navigate('/admin/departments/trash')} total={pagination.total} />
+
+        {/* Metrics Grid */}
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+          {stats.map((item) => {
+            const Icon = item.icon;
+            return (
+              <div key={item.label} className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm hover:shadow-md transition-all flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">{item.label}</p>
+                  <strong className="mt-1 block text-3xl font-black text-slate-900 tracking-tight">{String(item.value).padStart(2, '0')}</strong>
+                </div>
+                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl border shrink-0 ${item.tone}`}>
+                  <Icon className="h-6 w-6" />
+                </div>
+              </div>
+            );
+          })}
+        </section>
+
         {loading ? <LoadingIndicator size="lg" label="Đang tải danh sách phòng ban..." /> : (
           <DepartmentDirectory
             departments={departments}
@@ -315,37 +341,42 @@ export default function DepartmentsPage() {
 
 function Hero({ onCreate, onTrash, total }) {
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-8 shadow-sm">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 border border-sky-200/60">
-              Quản lý Đơn vị ({total} phòng)
-            </span>
+    <div className="relative overflow-hidden rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-50/90 via-white to-cyan-50/70 p-7 sm:p-9 text-slate-900 shadow-sm">
+      {/* Decorative Glow */}
+      <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-sky-200/30 blur-3xl" />
+      <div className="pointer-events-none absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-cyan-200/25 blur-2xl" />
+
+      <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-100/80 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-sky-800 shadow-2xs">
+            <Sparkles className="h-3.5 w-3.5 text-sky-600" />
+            <span>Bệnh Viện Đa Khoa Quốc Tế KLTN · Danh Mục Đơn Vị ({total} phòng)</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            Danh mục Khoa / Phòng ban
+
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+            Danh mục Khoa & Phòng ban
           </h1>
-          <p className="text-sm font-medium text-slate-500">
-            Quản lý sơ đồ tổ chức, gán phụ trách và xác thực dữ liệu phòng ban trên Blockchain.
+
+          <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed max-w-2xl">
+            Quản lý sơ đồ tổ chức phòng khám, gán nhân sự phụ trách và xác thực dữ liệu phòng ban trên Blockchain.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
           <button
             type="button"
             title="Thùng rác phòng ban đã xóa"
             onClick={onTrash}
-            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all shadow-xs"
+            className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all shadow-xs"
           >
-            <Trash2 size={18} strokeWidth={2} />
+            <Trash2 size={19} strokeWidth={2} />
           </button>
           <button
             onClick={onCreate}
-            className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-sky-700 transition-all"
+            className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white font-bold px-6 py-3.5 text-xs uppercase tracking-wider transition-all shadow-md shadow-sky-600/20"
           >
             <Plus className="h-4 w-4" strokeWidth={2.5} />
-            Tạo phòng ban
+            <span>Tạo phòng ban mới</span>
           </button>
         </div>
       </div>
@@ -406,12 +437,12 @@ function DepartmentDirectory({
     <div className="space-y-6">
       {/* Floating Bulk Action Bar */}
       {selectedIds.length > 0 && (
-        <div className="sticky top-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/95 px-5 py-3.5 shadow-lg backdrop-blur-sm animate-in fade-in slide-in-from-top-2">
+        <div className="sticky top-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-300 bg-white/95 px-6 py-4 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center gap-3">
-            <span className="grid h-7 w-7 place-items-center rounded-full bg-sky-600 text-xs font-bold text-white">
+            <span className="grid h-8 w-8 place-items-center rounded-full bg-sky-600 text-xs font-black text-white shadow-md">
               {selectedIds.length}
             </span>
-            <span className="text-sm font-bold text-sky-950">
+            <span className="text-sm font-black text-slate-900">
               Đã chọn {selectedIds.length} phòng ban
             </span>
           </div>
@@ -420,7 +451,7 @@ function DepartmentDirectory({
               type="button"
               disabled={busy}
               onClick={() => onBulkSoftDelete(selectedIds)}
-              className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-700 disabled:opacity-40 transition"
+              className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-rose-700 disabled:opacity-40 transition"
             >
               <Trash2 size={15} />
               Xóa tạm thời chọn ({selectedIds.length})
@@ -428,7 +459,7 @@ function DepartmentDirectory({
             <button
               type="button"
               onClick={() => setSelectedIds([])}
-              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
             >
               Bỏ chọn
             </button>
@@ -443,24 +474,27 @@ function DepartmentDirectory({
               <Filter className="h-5 w-5" strokeWidth={2} />
             </span>
             <div>
-              <p className="text-base font-bold text-slate-900">Bộ lọc phòng ban</p>
-              <p className="text-xs font-medium text-slate-400">Tìm nhanh theo tên, loại, chỉ định và trạng thái hiển thị.</p>
+              <p className="text-base font-black text-slate-900">Bộ lọc danh mục phòng ban</p>
+              <p className="text-xs font-semibold text-slate-400">Tìm nhanh theo tên phòng ban, phân loại chức năng và trạng thái.</p>
             </div>
           </div>
           {(search || typeFilter || orderFilter || statusFilter) && (
-            <button type="button" onClick={() => { setSearch(''); setTypeFilter(''); setOrderFilter(''); setStatusFilter(''); }} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">
+            <button type="button" onClick={() => { setSearch(''); setTypeFilter(''); setOrderFilter(''); setStatusFilter(''); }} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">
               <X className="h-3.5 w-3.5" /> Xóa bộ lọc
             </button>
           )}
         </div>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr_1fr_1fr_140px] lg:items-end">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_140px] lg:items-end">
           <FilterInput label="Tên / Mã phòng ban" value={search} onChange={setSearch} placeholder="Nhập tên hoặc mã phòng ban..." />
           <FilterSelect label="Phân loại" value={typeFilter} onChange={setTypeFilter} options={DEPARTMENT_TYPES} empty="Tất cả phân loại" />
           <FilterSelect label="Chỉ định" value={orderFilter} onChange={setOrderFilter} options={[{ value: 'true', label: 'Nhận chỉ định' }, { value: 'false', label: 'Không nhận chỉ định' }]} empty="Tất cả" />
-          <FilterSelect label="Ẩn / hiện" value={statusFilter} onChange={setStatusFilter} options={[{ value: 'ACTIVE', label: 'Đang hiện' }, { value: 'INACTIVE', label: 'Đã ẩn' }]} empty="Tất cả trạng thái" />
-          <div className="space-y-1.5"><span className="block text-xs font-bold text-transparent">Tìm kiếm</span><button type="button" className="inline-flex h-[42px] w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 text-xs font-bold text-white shadow-xs hover:bg-sky-700 whitespace-nowrap">
-            <Search className="h-4 w-4" strokeWidth={2.5} /> Tìm kiếm
-          </button></div>
+          <FilterSelect label="Trạng thái" value={statusFilter} onChange={setStatusFilter} options={[{ value: 'ACTIVE', label: 'Đang hiện' }, { value: 'INACTIVE', label: 'Đã ẩn' }]} empty="Tất cả trạng thái" />
+          <div className="space-y-1.5">
+            <span className="block text-xs font-bold text-transparent">Thao tác</span>
+            <button type="button" className="inline-flex h-[44px] w-full items-center justify-center gap-2 rounded-2xl bg-sky-600 px-4 text-xs font-bold text-white shadow-xs hover:bg-sky-700 whitespace-nowrap">
+              <Search className="h-4 w-4" strokeWidth={2.5} /> Tìm kiếm
+            </button>
+          </div>
         </div>
       </section>
 
@@ -473,12 +507,12 @@ function DepartmentDirectory({
               className="flex items-center gap-2 text-slate-700 hover:text-sky-600 transition"
               title="Chọn tất cả phòng ban"
             >
-              {allSelected ? <CheckSquare size={19} className="text-sky-600" /> : <Square size={19} className="text-slate-400" />}
+              {allSelected ? <CheckSquare size={20} className="text-sky-600" /> : <Square size={20} className="text-slate-400" />}
             </button>
-            <Building2 className="h-5 w-5 text-sky-600" strokeWidth={2} />
-            <h3 className="text-lg font-bold text-slate-900">Danh sách phòng ban</h3>
+            <Building2 className="h-5 w-5 text-sky-600" strokeWidth={2.25} />
+            <h3 className="text-lg font-black text-slate-900">Danh sách Phòng ban & Khoa chuyên môn</h3>
           </div>
-          <span className="rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-600">{visibleDepartments.length} / {pagination.total} phòng</span>
+          <span className="rounded-xl border border-sky-200/80 bg-sky-50 px-4 py-1.5 text-xs font-bold text-sky-800">{visibleDepartments.length} / {pagination.total} phòng</span>
         </div>
 
         <div className="divide-y divide-slate-100">
@@ -487,27 +521,27 @@ function DepartmentDirectory({
             const active = selectedDepartment?.id === dep.id;
             const isChecked = selectedIds.includes(dep.id);
             return (
-              <article key={dep.id} className={`p-6 transition-all hover:bg-slate-50/80 ${isChecked ? 'bg-sky-50/60' : active ? 'bg-sky-50/30' : 'bg-white'}`}>
+              <article key={dep.id} className={`p-6 transition-all hover:bg-sky-50/30 ${isChecked ? 'bg-sky-50/70' : active ? 'bg-sky-50/40' : 'bg-white'}`}>
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_0.95fr_0.55fr_0.55fr_0.8fr_300px] xl:items-center">
                   <div className="min-w-0 flex items-start gap-3">
                     <button
                       type="button"
                       onClick={() => toggleSelectOne(dep.id)}
-                      className="mt-1 text-slate-400 hover:text-sky-600 transition"
+                      className="mt-1 text-slate-400 hover:text-sky-600 transition shrink-0"
                     >
-                      {isChecked ? <CheckSquare size={18} className="text-sky-600" /> : <Square size={18} />}
+                      {isChecked ? <CheckSquare size={20} className="text-sky-600" /> : <Square size={20} />}
                     </button>
-                    <div className="min-w-0">
+                    <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-sky-600">{dep.departmentCode}</span>
-                        <span className={`rounded-md border px-2 py-0.5 text-[10px] font-bold ${statusTone[dep.status] || statusTone.ACTIVE}`}>{getStatusLabel(dep.status)}</span>
+                        <span className="text-[11px] font-black uppercase tracking-wider text-sky-600">{dep.departmentCode}</span>
+                        <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${statusTone[dep.status] || statusTone.ACTIVE}`}>{getStatusLabel(dep.status)}</span>
                       </div>
-                      <h4 className="mt-1 truncate text-base font-bold text-slate-900">{dep.name}</h4>
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        <span className="rounded-md bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700 border border-sky-100">{getTypeLabel(dep.type)}</span>
-                        <span className={`rounded-md border px-2 py-0.5 text-[10px] font-bold ${orderTone[String(Boolean(dep.canReceiveOrders))]}`}>{dep.canReceiveOrders ? 'Nhận chỉ định' : 'Không nhận chỉ định'}</span>
+                      <h4 className="truncate text-base font-black text-slate-900">{dep.name}</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="rounded-full bg-sky-50 px-2.5 py-0.5 text-[10px] font-bold text-sky-700 border border-sky-100">{getTypeLabel(dep.type)}</span>
+                        <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${orderTone[String(Boolean(dep.canReceiveOrders))]}`}>{dep.canReceiveOrders ? 'Nhận chỉ định' : 'Không nhận chỉ định'}</span>
                       </div>
-                      <p className="mt-1.5 line-clamp-1 text-xs font-medium text-slate-400">{dep.description || 'Chưa có mô tả'}</p>
+                      <p className="line-clamp-1 text-xs font-medium text-slate-400">{dep.description || 'Chưa có mô tả chi tiết'}</p>
                     </div>
                   </div>
 
@@ -520,24 +554,39 @@ function DepartmentDirectory({
                   </div>
 
                   <div className="flex flex-wrap gap-2 xl:justify-end">
-                    <select disabled={busy} value={dep.managerId || ''} onChange={(e) => onAssignManager(dep.id, e.target.value)} className="min-w-[140px] flex-1 rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 xl:flex-none">
+                    <select disabled={busy} value={dep.managerId || ''} onChange={(e) => onAssignManager(dep.id, e.target.value)} className="min-w-[140px] flex-1 rounded-2xl border border-slate-200/80 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 xl:flex-none">
                       <option value="">Chọn phụ trách</option>
                       {depStaffs.map((staff) => <option key={staff.id} value={staff.id}>{staff.fullName}</option>)}
                     </select>
-                    <SmallButton onClick={() => onSelect(dep)} disabled={busy}>Chi tiết</SmallButton>
-                    <SmallButton onClick={() => onEdit(dep)} disabled={busy}>Sửa</SmallButton>
+                    <SmallButton onClick={() => onSelect(dep)} disabled={busy}>
+                      <Eye className="h-3.5 w-3.5" />
+                      <span>Chi tiết</span>
+                    </SmallButton>
+                    <SmallButton onClick={() => onEdit(dep)} disabled={busy}>
+                      <Pencil className="h-3.5 w-3.5" />
+                      <span>Sửa</span>
+                    </SmallButton>
                     {dep.status === 'INACTIVE' ? (
-                      <SmallButton onClick={() => onRestore(dep.id)} disabled={busy}>Hiện</SmallButton>
+                      <SmallButton onClick={() => onRestore(dep.id)} disabled={busy}>
+                        <Eye className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>Hiện</span>
+                      </SmallButton>
                     ) : (
-                      <SmallButton onClick={() => onHide(dep.id)} disabled={busy}>Ẩn</SmallButton>
+                      <SmallButton onClick={() => onHide(dep.id)} disabled={busy}>
+                        <EyeOff className="h-3.5 w-3.5 text-amber-600" />
+                        <span>Ẩn</span>
+                      </SmallButton>
                     )}
-                    <SmallButton danger onClick={() => onDelete(dep)} disabled={busy}>Xóa</SmallButton>
+                    <SmallButton danger onClick={() => onDelete(dep)} disabled={busy}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Xóa</span>
+                    </SmallButton>
                   </div>
                 </div>
               </article>
             );
           })}
-          {!visibleDepartments.length && <div className="p-8"><Empty title="Không có phòng ban phù hợp" desc="Thử đổi bộ lọc hoặc tạo phòng ban mới." /></div>}
+          {!visibleDepartments.length && <div className="p-12 text-center text-xs font-bold text-slate-400">Không có phòng ban nào trong danh sách.</div>}
         </div>
 
         <Pagination pagination={pagination} onPageChange={onPageChange} />
@@ -547,10 +596,10 @@ function DepartmentDirectory({
 }
 
 function FilterInput({ label, value, onChange, placeholder }) {
-  return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}</span><input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-[42px] w-full rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 text-xs font-semibold outline-none transition focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100" /></label>;
+  return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}</span><input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-[44px] w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3.5 text-xs font-semibold outline-none transition focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100" /></label>;
 }
 function FilterSelect({ label, value, onChange, options, empty }) {
-  return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}</span><select value={value} onChange={(e) => onChange(e.target.value)} className="h-[42px] w-full rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 text-xs font-semibold outline-none transition focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100">{empty && <option value="">{empty}</option>}{options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>;
+  return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}</span><select value={value} onChange={(e) => onChange(e.target.value)} className="h-[44px] w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3.5 text-xs font-semibold outline-none transition focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100">{empty && <option value="">{empty}</option>}{options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>;
 }
 
 function DepartmentDetail({ department, staffs, onGoStaff, onClose }) {

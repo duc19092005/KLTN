@@ -204,14 +204,14 @@ export function classifyDirectionFromAngle(yaw, pitch) {
   // If both axes are significant pick the dominant one
   if (yawSig && pitchSig) {
     if (absYaw > absPitch) {
-      return yaw > 0 ? 'left' : 'right';
+      return yaw < 0 ? 'left' : 'right';
     } else {
-      return pitch > 0 ? 'up' : 'down';
+      return pitch < 0 ? 'up' : 'down';
     }
   }
 
-  if (yawSig)   return yaw   > 0 ? 'left' : 'right';
-  if (pitchSig) return pitch > 0 ? 'up'   : 'down';
+  if (yawSig)   return yaw   < 0 ? 'left' : 'right';
+  if (pitchSig) return pitch < 0 ? 'up'   : 'down';
 
   return 'center';
 }
