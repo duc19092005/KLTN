@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { LoginPage } from '../../auth';
 import SiteHeader from '../components/SiteHeader';
@@ -12,12 +12,26 @@ import NewsSection from '../components/NewsSection';
 import BookingCtaSection from '../components/BookingCtaSection';
 import SideNavProgress from '../components/SideNavProgress';
 import SiteFooter from '../components/SiteFooter';
+import { ArrowUp } from 'lucide-react';
 import '../landing.css';
 
 export default function HospitalLandingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const showLogin = searchParams.get('login') === 'true';
   const initialMode = searchParams.get('tab') || 'staff';
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 400);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const openStaffLogin = useCallback(() => {
     setSearchParams({ login: 'true', tab: 'staff' });
@@ -66,7 +80,7 @@ export default function HospitalLandingPage() {
       {/* Side Bar Scroll Status & Navigation Indicator */}
       <SideNavProgress />
 
-      <main id="main-content" className="pt-20">
+      <main id="main-content" className="pt-16">
         <HeroSection />
         <PatientJourneySection />
         <VisionSection />
@@ -78,6 +92,18 @@ export default function HospitalLandingPage() {
       </main>
 
       <SiteFooter />
+
+      {/* Floating Scroll To Top Button */}
+      {showScrollTop && (
+        <button
+          type="button"
+          onClick={scrollToTop}
+          className="fixed bottom-6 right-6 z-40 flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-lg hover:border-sky-500 hover:bg-sky-600 hover:text-white transition-all duration-300 hover:scale-105 active:scale-95 animate-in fade-in"
+          aria-label="Cuộn lên đầu trang"
+        >
+          <ArrowUp className="w-5 h-5" />
+        </button>
+      )}
 
       {showLogin && (
         <LoginPage isModal initialMode={initialMode} onClose={closeLogin} />

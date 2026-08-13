@@ -1,19 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 /**
- * Scroll-reveal wrapper — fades/slides in when entering viewport.
+ * Scroll-reveal wrapper — fades/slides in when entering viewport both scrolling down & up.
  * @param {'up'|'left'|'right'|'fade'|'scale'} variant
  * @param {number} delay ms stagger
- * @param {boolean} once reveal only once (default true)
+ * @param {boolean} once reveal only once (default false for bi-directional scroll animation)
  */
 export default function Reveal({
   children,
   className = '',
   variant = 'up',
   delay = 0,
-  once = true,
+  once = false,
   as: Tag = 'div',
-  threshold = 0.14,
+  threshold = 0.1,
 }) {
   const ref = useRef(null);
   const [visible, setVisible] = useState(false);
@@ -28,26 +28,19 @@ export default function Reveal({
       return undefined;
     }
 
-    // Already in view on first paint (hero / top of page)
-    const rect = el.getBoundingClientRect();
-    if (rect.top < window.innerHeight * 0.92 && rect.bottom > 0) {
-      // slight delay so transition still plays
-      const t = window.setTimeout(() => setVisible(true), 40 + delay);
-      return () => window.clearTimeout(t);
-    }
-
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           setVisible(true);
           if (once) observer.disconnect();
         } else if (!once) {
+          // Reset when leaving viewport so scrolling back up or down re-triggers smooth animation
           setVisible(false);
         }
       },
       {
         threshold,
-        rootMargin: '0px 0px -6% 0px',
+        rootMargin: '0px 0px -4% 0px',
       },
     );
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { loadModels, detectFace } from '../apis/faceService';
+import { initFaceEngine, detectFrame } from '../apis/faceEngine';
 import LivenessCheck from './LivenessCheck';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 
@@ -31,50 +31,54 @@ export default function FaceCapture({
   // Liveness passed → extract face descriptor(s) from the captured frame(s).
   // `meta.descriptor` (verify/session mode) is the identity-anchor descriptor LivenessCheck already
   // validated during the continuity check; reuse it directly so we don't re-detect on the final
-  // frame, which is often a turned/blurred pose that face-api can't read.
+  // frame, which is often a turned/blurred pose.
   const handleLivenessPass = async (source, meta = {}) => {
     setExtractingEmbedding(true);
     try {
       if (captureMode !== 'enroll' && Array.isArray(meta.descriptor) && meta.descriptor.length === 128) {
-        onCapture?.(meta.descriptor);
+        await onCapture?.(meta.descriptor);
         return;
       }
 
       if (captureMode === 'enroll' && Array.isArray(meta.descriptors) && meta.descriptors.length >= 3) {
-        onCapture?.(meta.descriptors);
+        await onCapture?.(meta.descriptors);
         return;
       }
 
-      await loadModels();
+      await initFaceEngine();
       if (!mountedRef.current) return;
 
       const sources = Array.isArray(source) ? source : [source];
       const embeddings = [];
 
       for (const item of sources) {
-        const embedding = await detectFace(item);
-        if (embedding) embeddings.push(embedding);
+        const result = await detectFrame(item);
+        if (result?.embedding?.length === 128) embeddings.push(result.embedding);
       }
 
       if (embeddings.length === 0) {
         await new Promise((resolve) => setTimeout(resolve, 500));
         if (!mountedRef.current) return;
-        const retry = await detectFace(sources[0]);
-        if (!retry) {
-          onError?.('Không thể trích xuất định danh khuôn mặt. Vui lòng thử lại.');
-          return;
+        const retry = await detectFrame(sources[0]);
+        if (!retry?.embedding?.length) {
+          const errText = 'Không thể trích xuất định danh khuôn mặt. Vui lòng thử lại.';
+          onError?.(errText);
+          throw new Error(errText);
         }
-        embeddings.push(retry);
+        embeddings.push(retry.embedding);
       }
 
       if (captureMode === 'enroll' && embeddings.length < 3) {
-        onError?.('Không đủ mẫu khuôn mặt tin cậy. Vui lòng ghi danh lại trong điều kiện đủ sáng.');
-        return;
+        const errText = 'Không đủ mẫu khuôn mặt tin cậy. Vui lòng ghi danh lại trong điều kiện đủ sáng.';
+        onError?.(errText);
+        throw new Error(errText);
       }
 
-      onCapture?.(captureMode === 'enroll' ? embeddings : embeddings[0]);
+      await onCapture?.(captureMode === 'enroll' ? embeddings : embeddings[0]);
     } catch (err) {
-      onError?.('Lỗi trích xuất: ' + err.message);
+      const errMsg = err?.response?.data?.message || err?.message || 'Xác thực sinh trắc học thất bại.';
+      onError?.(errMsg);
+      throw err;
     } finally {
       if (mountedRef.current) setExtractingEmbedding(false);
     }
