@@ -140,6 +140,7 @@ describe('AuditController readable V2 diff', () => {
       prisma as any,
       { recover: jest.fn() } as any,
       { listWarnings: jest.fn(), recoverMany: jest.fn() } as any,
+      {} as any,
     );
     return { controller, row };
   }
@@ -259,6 +260,7 @@ describe('AuditController incomplete audit batch regression', () => {
       {} as any,
       {} as any,
       prisma as any,
+      {} as any,
       {} as any,
       {} as any,
     );

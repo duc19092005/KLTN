@@ -12,7 +12,7 @@ import { departmentService } from '../apis/departmentService';
 import DoctorDetailModal from '../components/DoctorDetailModal';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { Calendar, ExternalLink, MapPin, Search, Trash2, Plus, Stethoscope, Filter, UserCheck } from 'lucide-react';
+import { Calendar, ExternalLink, MapPin, Search, Trash2, Plus, Stethoscope, Filter, UserCheck, CheckSquare, Square } from 'lucide-react';
 
 const OSM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
 const MIN_BIRTH_YEAR = 1900;
@@ -191,10 +191,12 @@ export default function DoctorsPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [detailDoctorId, setDetailDoctorId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
   const totalLabel = useMemo(() => `${pagination.total} bác sĩ`, [pagination.total]);
 
   const load = async (page = pagination.page) => {
     setLoading(true);
+    setSelectedIds([]);
     try {
       const doctorParams = {
         page,
@@ -314,7 +316,42 @@ export default function DoctorsPage() {
     finally { setBusy(false); }
   };
 
+  const handleBulkSoftDelete = async (ids) => {
+    if (!ids || ids.length === 0) return;
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa tạm thời ${ids.length} bác sĩ đã chọn vào thùng rác?`)) return;
+    setBusy(true);
+    try {
+      const res = await doctorService.softDeleteMany(ids);
+      const data = res.data;
+      if (data?.failed > 0) {
+        toast.warning(`Thành công: ${data.succeeded}/${data.requested}. Thất bại: ${data.failed}.`);
+      } else {
+        toast.success(`Đã chuyển ${data.succeeded} bác sĩ vào thùng rác!`);
+      }
+      setSelectedIds([]);
+      await load(pagination.page);
+    } catch (err) {
+      toast.error(getError(err, 'Không thể xóa hàng loạt bác sĩ'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const search = async (event) => { event.preventDefault(); await load(1); };
+
+  const allSelected = doctors.length > 0 && selectedIds.length === doctors.length;
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(doctors.map((d) => d.id));
+    }
+  };
+  const toggleSelectOne = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
 
   return (
     <DashboardLayout user={user} navItems={ADMIN_NAV_ITEMS} activeItem="doctors" onNavigate={(id) => navigateAdmin(navigate, id)} onLogout={logout}>
@@ -323,9 +360,50 @@ export default function DoctorsPage() {
         {loading ? <LoadingIndicator size="lg" label="Đang tải danh sách bác sĩ..." /> : (
           <>
             <SearchBar filters={filters} setFilters={setFilters} onSearch={search} onReset={() => setFilters({ specialty: '', search: '', status: '' })} />
+
+            {/* Floating Bulk Action Bar */}
+            {selectedIds.length > 0 && (
+              <div className="sticky top-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/95 px-5 py-3.5 shadow-lg backdrop-blur-sm animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-7 w-7 place-items-center rounded-full bg-sky-600 text-xs font-bold text-white">
+                    {selectedIds.length}
+                  </span>
+                  <span className="text-sm font-bold text-sky-950">
+                    Đã chọn {selectedIds.length} bác sĩ
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => handleBulkSoftDelete(selectedIds)}
+                    className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-700 disabled:opacity-40 transition"
+                  >
+                    <Trash2 size={15} />
+                    Xóa tạm thời chọn ({selectedIds.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds([])}
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
+                  >
+                    Bỏ chọn
+                  </button>
+                </div>
+              </div>
+            )}
+
             <section className="rounded-3xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={toggleSelectAll}
+                    className="flex items-center gap-2 text-slate-700 hover:text-sky-600 transition"
+                    title="Chọn tất cả bác sĩ"
+                  >
+                    {allSelected ? <CheckSquare size={19} className="text-sky-600" /> : <Square size={19} className="text-slate-400" />}
+                  </button>
                   <Stethoscope className="h-5 w-5 text-sky-600" strokeWidth={2} />
                   <div>
                     <h3 className="text-lg font-bold text-slate-900">Danh sách bác sĩ</h3>
@@ -335,7 +413,19 @@ export default function DoctorsPage() {
                 <span className="rounded-xl bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-600 border border-slate-200/80">{totalLabel}</span>
               </div>
               <div className="divide-y divide-slate-100">
-                {doctors.map((doctor) => <DoctorRow key={doctor.id} doctor={doctor} onEdit={openEdit} onToggleStatus={toggleDoctorStatus} onRemove={removeDoctor} onViewDetails={setDetailDoctorId} busy={busy} />)}
+                {doctors.map((doctor) => (
+                  <DoctorRow
+                    key={doctor.id}
+                    doctor={doctor}
+                    onEdit={openEdit}
+                    onToggleStatus={toggleDoctorStatus}
+                    onRemove={removeDoctor}
+                    onViewDetails={setDetailDoctorId}
+                    busy={busy}
+                    isSelected={selectedIds.includes(doctor.id)}
+                    onToggleSelect={() => toggleSelectOne(doctor.id)}
+                  />
+                ))}
                 {!doctors.length && <div className="p-8 text-center text-xs font-bold text-slate-400">Chưa có bác sĩ nào.</div>}
               </div>
               <Pagination pagination={pagination} onPageChange={load} />
@@ -418,11 +508,18 @@ function SearchBar({ filters, setFilters, onSearch, onReset }) {
 function FilterInput({ label, value, onChange, placeholder }) { return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}</span><input value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-[42px] w-full rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 text-xs font-semibold focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 outline-none" /></label>; }
 function FilterSelect({ label, value, onChange, options, empty }) { return <label className="block space-y-1.5"><span className="text-xs font-bold text-slate-700">{label}</span><select value={value || ''} onChange={(e) => onChange(e.target.value)} className="h-[42px] w-full rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 text-xs font-semibold focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100 outline-none">{empty && <option value="">{empty}</option>}{options.map((opt) => typeof opt === 'string' ? <option key={opt} value={opt}>{opt}</option> : <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>; }
 
-function DoctorRow({ doctor, onEdit, onToggleStatus, onRemove, onViewDetails, busy }) {
+function DoctorRow({ doctor, onEdit, onToggleStatus, onRemove, onViewDetails, busy, isSelected, onToggleSelect }) {
   return (
-    <article className="p-6 hover:bg-slate-50/80 transition-all">
+    <article className={`p-6 transition-all hover:bg-slate-50/80 ${isSelected ? 'bg-sky-50/60' : 'bg-white'}`}>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_0.9fr_0.9fr_0.85fr_0.9fr_220px] xl:items-center">
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <button
+            type="button"
+            onClick={onToggleSelect}
+            className="text-slate-400 hover:text-sky-600 transition"
+          >
+            {isSelected ? <CheckSquare size={18} className="text-sky-600" /> : <Square size={18} />}
+          </button>
           <img src={doctor.staffProfile?.avatarUrl} alt={doctor.staffProfile?.fullName || 'Bác sĩ'} className="w-12 h-12 rounded-2xl object-cover border border-sky-100 bg-sky-50 shadow-xs" />
           <div className="min-w-0">
             <strong className="block text-slate-900 font-bold truncate text-sm">{doctor.staffProfile?.fullName}</strong>
