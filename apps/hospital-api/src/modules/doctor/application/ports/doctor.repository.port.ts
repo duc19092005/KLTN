@@ -30,6 +30,7 @@ export interface DoctorRepositoryPort {
   findStaffForDoctorCreate(staffProfileId: string): Promise<StaffForDoctorCreate | null>;
   departmentExists(id: string): Promise<boolean>;
   findDepartment(id: string): Promise<{ id: string; type: string } | null>;
+  countActiveStaffInDepartment(departmentId: string, excludeStaffId?: string): Promise<number>;
 
   findDoctorByLicense(licenseNumber: string): Promise<{ id: string } | null>;
   findStaffByCitizenId(citizenId: string): Promise<{ id: string } | null>;

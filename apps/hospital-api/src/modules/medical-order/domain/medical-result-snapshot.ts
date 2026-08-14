@@ -18,16 +18,15 @@ export function buildMedicalResultSnapshot(result: any) {
     etag: file.etag ?? null,
   }));
   return {
-    resultId: result.id,
+    resultId: result.resultId ?? result.id ?? null,
     resultCode: result.resultCode,
     orderId: result.orderId,
     visitId: result.visitId ?? result.order?.visitId ?? null,
     performedById: result.performedById ?? null,
-    files,
     fileCount: files.length,
     mimeTypes: files.map((file: any) => file.mimeType ?? 'unknown'),
     fileSizes: files.map((file: any) => file.size ?? 0),
-    status: result.status ?? result.order?.status ?? null,
+    files,
     note: result.note ?? null,
     returnedAt: toIsoString(result.returnedAt ?? null),
     createdAt: toIsoString(result.createdAt ?? null),

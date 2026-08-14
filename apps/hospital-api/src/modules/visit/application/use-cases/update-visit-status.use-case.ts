@@ -31,7 +31,8 @@ export class UpdateVisitStatusUseCase {
       if (!doctor.departmentId || visit.departmentId !== doctor.departmentId) {
         throw new ForbiddenException('Bác sĩ chỉ có thể cập nhật lượt khám trong phòng ban của mình.');
       }
-      if (visit.staffId && visit.staffId !== doctor.staffId) {
+      // Allow doctor to claim a WAITING visit in their department; once IN_PROGRESS, lock to assigned doctor.
+      if (visit.staffId && visit.staffId !== doctor.staffId && visit.status !== VisitStatus.WAITING) {
         throw new ForbiddenException('Lượt khám này đã được bác sĩ khác phụ trách.');
       }
       assignedStaffId = doctor.staffId;

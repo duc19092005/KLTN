@@ -35,6 +35,16 @@ export class PrismaStaffRepository implements StaffRepositoryPort {
     return { id: dept.id, type: dept.type };
   }
 
+  async countActiveStaffInDepartment(departmentId: string, excludeStaffId?: string): Promise<number> {
+    return this.prisma.staffProfile.count({
+      where: {
+        departmentId,
+        ...(excludeStaffId ? { id: { not: excludeStaffId } } : {}),
+        user: { status: 'ACTIVE' },
+      },
+    });
+  }
+
   async findUserByUsernameOrEmail(username?: string, email?: string) {
     const checks: Prisma.UserWhereInput[] = [];
     if (username) checks.push({ username: username.trim() });
