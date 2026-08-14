@@ -416,6 +416,7 @@ export class BlockchainService implements OnModuleInit {
           artifactUri,
         );
         const receipt = await tx.wait();
+        this.cachedLatestBatchId = { value: batchId, timestamp: Date.now() };
         return {
           success: true,
           txHash: receipt.hash,

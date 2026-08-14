@@ -1431,11 +1431,41 @@ function BatchIntegrityBadge({ integrity, isBrokenSeqBatch }) {
 }
 
 function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason, setReason, recovering, onRecover, onRefresh }) {
+  const [viewMode, setViewMode] = useState('clustered'); // 'clustered' | 'flat'
   const recoverable = warnings.filter((item) => item.recoverable);
   const allSelected = recoverable.length > 0 && recoverable.every((item) => selected.includes(`${item.entity}:${item.entityId}`));
   const selectedCount = recoverable.filter((item) => selected.includes(`${item.entity}:${item.entityId}`)).length;
   const toggleAll = () => setSelected(allSelected ? [] : recoverable.map((item) => `${item.entity}:${item.entityId}`));
   const toggleOne = (key) => setSelected((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
+
+  // Group warnings into clinical case clusters
+  const clusters = useMemo(() => {
+    const map = new Map();
+    for (const item of warnings) {
+      const key = item.clusterKey || item.entityId;
+      if (!map.has(key)) {
+        map.set(key, {
+          clusterKey: key,
+          clusterLabel: item.clusterLabel || `Ca bệnh / Cụm thực thể #${key.slice(0, 8)}`,
+          items: [],
+          hasRecoverable: false,
+        });
+      }
+      const entry = map.get(key);
+      entry.items.push(item);
+      if (item.recoverable) entry.hasRecoverable = true;
+    }
+    return Array.from(map.values());
+  }, [warnings]);
+
+  const selectCluster = (clusterItems) => {
+    const keys = clusterItems.filter((i) => i.recoverable).map((i) => `${i.entity}:${i.entityId}`);
+    setSelected((current) => {
+      const set = new Set(current);
+      keys.forEach((k) => set.add(k));
+      return Array.from(set);
+    });
+  };
 
   if (!loading && warnings.length === 0) {
     return (
@@ -1458,87 +1488,249 @@ function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason,
 
   return (
     <section className="overflow-hidden rounded-3xl border border-rose-200 bg-white shadow-sm dark:border-rose-900 dark:bg-slate-900">
+      {/* Header with View Mode Switcher */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rose-100 bg-rose-50 px-6 py-4 dark:border-rose-900 dark:bg-rose-950/40">
         <div className="flex items-start gap-3">
           <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
           <div>
-            <h2 className="text-sm font-bold text-rose-950 dark:text-rose-100">Dữ liệu thực thể cần kiểm tra ({warnings.length})</h2>
-            <p className="mt-0.5 text-xs font-semibold text-rose-700 dark:text-rose-300">Thao tác sửa và xóa trên các bản ghi này đang tạm thời bị chặn để đảm bảo an toàn.</p>
+            <h2 className="text-sm font-bold text-rose-950 dark:text-rose-100">
+              Dữ liệu thực thể cần kiểm tra & khôi phục ({warnings.length} bản ghi · {clusters.length} ca bệnh/cụm)
+            </h2>
+            <p className="mt-0.5 text-xs font-semibold text-rose-700 dark:text-rose-300">
+              Hệ thống tự động giải quyết các tầng phụ thuộc (DAG Auto-Resolution) theo chuỗi thực thể.
+            </p>
           </div>
         </div>
-        <button type="button" onClick={onRefresh} disabled={loading || recovering} className="rounded-xl p-2 text-rose-700 hover:bg-rose-100 disabled:opacity-50" title="Quét lại dữ liệu">
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+
+        <div className="flex items-center gap-2">
+          {/* Mode Switcher */}
+          <div className="inline-flex rounded-xl bg-white p-1 shadow-xs border border-rose-200/80 dark:bg-slate-800 dark:border-slate-700 text-[11px] font-bold">
+            <button
+              type="button"
+              onClick={() => setViewMode('clustered')}
+              className={`rounded-lg px-3 py-1.5 transition-all ${viewMode === 'clustered' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300'}`}
+            >
+              Gom cụm Ca khám ({clusters.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('flat')}
+              className={`rounded-lg px-3 py-1.5 transition-all ${viewMode === 'flat' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300'}`}
+            >
+              Danh sách phẳng ({warnings.length})
+            </button>
+          </div>
+
+          <button type="button" onClick={onRefresh} disabled={loading || recovering} className="rounded-xl p-2 text-rose-700 hover:bg-rose-100 disabled:opacity-50" title="Quét lại dữ liệu">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-xs">
-          <thead className="border-b border-slate-100 bg-slate-50 text-slate-500 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-400">
-            <tr>
-              <th className="w-12 px-6 py-3.5">
-                <input type="checkbox" checked={allSelected} onChange={toggleAll} disabled={!recoverable.length || recovering} aria-label="Chọn tất cả bản ghi có thể khôi phục" className="h-4 w-4 accent-sky-600" />
-              </th>
-              <th className="px-4 py-3.5 font-bold">Đối tượng</th>
-              <th className="px-4 py-3.5 font-bold">Mốc tin cậy</th>
-              <th className="px-4 py-3.5 font-bold">Phát hiện</th>
-              <th className="px-4 py-3.5 font-bold">Trạng thái</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {warnings.map((item) => {
-              const key = `${item.entity}:${item.entityId}`;
-              const fields = (item.fieldsChanged || []).map((field) => field === 'SENSITIVE_FIELD_CHANGED'
-                ? 'Trường nhạy cảm đã thay đổi'
-                : fieldDisplayName({ fieldPath: `${item.entity}.${field}`, field }));
+      {/* CLUSTERED CASE VIEW */}
+      {viewMode === 'clustered' && (
+        <div className="p-6 space-y-4">
+          <div className="flex items-center justify-between gap-3 text-xs font-semibold text-slate-500 pb-2 border-b border-slate-100 dark:border-slate-800">
+            <span>Hiển thị theo từng ca bệnh/lượt khám. Bấm "Khôi phục trọn gói ca này" để tự động giải quyết toàn bộ cây dữ liệu phụ thuộc.</span>
+            <button
+              type="button"
+              onClick={toggleAll}
+              disabled={!recoverable.length || recovering}
+              className="text-sky-600 hover:text-sky-700 font-bold text-xs"
+            >
+              {allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả ca khám'}
+            </button>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {clusters.map((cluster) => {
+              const clusterKeys = cluster.items.map((i) => `${i.entity}:${i.entityId}`);
+              const isClusterSelected = cluster.items.some((i) => i.recoverable && selected.includes(`${i.entity}:${i.entityId}`));
+              const allClusterSelected = cluster.items.filter((i) => i.recoverable).every((i) => selected.includes(`${i.entity}:${i.entityId}`));
+
               return (
-                <tr key={key} className="align-top hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td className="px-6 py-4">
-                    <input type="checkbox" checked={selected.includes(key)} onChange={() => toggleOne(key)} disabled={!item.recoverable || recovering} aria-label={`Chọn ${item.entity}`} className="h-4 w-4 accent-sky-600 disabled:opacity-30" />
-                  </td>
-                  <td className="px-4 py-4">
-                    <p className="font-bold text-slate-900 dark:text-slate-100">{ENTITY_LABELS[item.entity] || item.entity}</p>
-                    <p className="mt-1 font-mono text-[10px] text-slate-400">{shortHash(item.entityId)}</p>
-                  </td>
-                  <td className="px-4 py-4 text-slate-600 dark:text-slate-400">
-                    <p className="font-bold">SEQ {item.latestTrustedSeq ?? '—'} · Batch #{item.batchId ?? '—'}</p>
-                    <p className="mt-1 text-[10px] text-slate-400">{formatTime(item.anchoredAt)}</p>
-                  </td>
-                  <td className="max-w-sm px-4 py-4 text-slate-600 dark:text-slate-400">
-                    <p className="font-semibold">{fields.length ? fields.join(', ') : 'Không công khai chi tiết dữ liệu'}</p>
-                    <p className="mt-1 text-[10px] text-slate-400">{item.message}</p>
-                    {(item.blockers || []).length > 0 && (
-                      <p className="mt-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
-                        Trở ngại: {item.blockers.join(', ')}
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className={`inline-flex rounded-lg border px-2.5 py-1 text-[10px] font-bold ${item.recoverable ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300' : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300'}`}>
-                      {item.recoveryMode === 'DEPENDENCY_CHAIN'
-                        ? 'Khôi phục chuỗi phụ thuộc'
-                        : item.recoveryMode === 'AUDIT_BATCH_FIRST'
-                          ? 'Khôi phục audit batch trước'
-                          : item.recoveryMode === 'PITR_REQUIRED'
-                            ? 'Cần backup/PITR thủ công'
-                            : item.recoverable ? 'Có thể khôi phục' : 'Không thể khôi phục tự động'}
-                    </span>
-                  </td>
-                </tr>
+                <div
+                  key={cluster.clusterKey}
+                  className={`rounded-2xl border p-4.5 transition-all ${
+                    isClusterSelected
+                      ? 'border-sky-300 bg-sky-50/40 shadow-xs dark:border-sky-800 dark:bg-sky-950/20'
+                      : 'border-slate-200/80 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-800/40'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 font-black text-xs">
+                        {cluster.items.length}
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 truncate">
+                          {cluster.clusterLabel}
+                        </h3>
+                        <p className="text-[10px] font-mono text-slate-400 truncate">
+                          ID: {cluster.clusterKey}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => selectCluster(cluster.items)}
+                      disabled={!cluster.hasRecoverable || recovering}
+                      className={`shrink-0 rounded-xl px-3 py-1.5 text-[11px] font-bold transition-all shadow-2xs ${
+                        allClusterSelected
+                          ? 'bg-sky-600 text-white'
+                          : 'bg-slate-100 text-slate-700 hover:bg-sky-50 hover:text-sky-700 dark:bg-slate-800 dark:text-slate-300'
+                      }`}
+                    >
+                      {allClusterSelected ? '✓ Đã chọn cả ca' : 'Chọn trọn gói ca này'}
+                    </button>
+                  </div>
+
+                  {/* Entities in cluster */}
+                  <div className="mt-3.5 space-y-2">
+                    {cluster.items.map((item) => {
+                      const key = `${item.entity}:${item.entityId}`;
+                      const isItemChecked = selected.includes(key);
+                      return (
+                        <div
+                          key={key}
+                          onClick={() => item.recoverable && toggleOne(key)}
+                          className={`flex items-center justify-between gap-2.5 rounded-xl border p-2.5 text-xs transition-all cursor-pointer ${
+                            isItemChecked
+                              ? 'border-sky-200 bg-white dark:border-sky-800 dark:bg-slate-900 shadow-2xs'
+                              : 'border-slate-100 bg-slate-50/70 hover:bg-slate-100/80 dark:border-slate-800 dark:bg-slate-800/60'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={isItemChecked}
+                              onChange={() => toggleOne(key)}
+                              disabled={!item.recoverable || recovering}
+                              className="h-3.5 w-3.5 accent-sky-600"
+                            />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-800 dark:text-slate-200">
+                                  {ENTITY_LABELS[item.entity] || item.entity}
+                                </span>
+                                <span className="text-[10px] font-mono text-slate-400">
+                                  {shortHash(item.entityId)}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-500 truncate max-w-xs mt-0.5">
+                                {item.message}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 flex items-center gap-1.5">
+                            {item.recoveryMode === 'DEPENDENCY_CHAIN' && (
+                              <span className="rounded-md bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 text-[9px] font-bold text-indigo-700 dark:bg-indigo-950 dark:border-indigo-800 dark:text-indigo-300" title="Tự động khôi phục các thực thể cha trước khi tạo thực thể này">
+                                Chuỗi phụ thuộc
+                              </span>
+                            )}
+                            <span className={`rounded-md border px-2 py-0.5 text-[10px] font-bold ${
+                              item.status === 'TAMPERED'
+                                ? 'border-rose-200 bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
+                                : 'border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                            }`}>
+                              {item.status === 'MISSING' ? 'Bị mất dữ liệu' : item.status === 'TAMPERED' ? 'Bị sửa đổi' : item.status}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               );
             })}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        </div>
+      )}
 
+      {/* FLAT TABLE VIEW */}
+      {viewMode === 'flat' && (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-xs">
+            <thead className="border-b border-slate-100 bg-slate-50 text-slate-500 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-400">
+              <tr>
+                <th className="w-12 px-6 py-3.5">
+                  <input type="checkbox" checked={allSelected} onChange={toggleAll} disabled={!recoverable.length || recovering} aria-label="Chọn tất cả bản ghi có thể khôi phục" className="h-4 w-4 accent-sky-600" />
+                </th>
+                <th className="px-4 py-3.5 font-bold">Đối tượng & Cụm ca</th>
+                <th className="px-4 py-3.5 font-bold">Mốc tin cậy</th>
+                <th className="px-4 py-3.5 font-bold">Phát hiện & Phụ thuộc</th>
+                <th className="px-4 py-3.5 font-bold">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {warnings.map((item) => {
+                const key = `${item.entity}:${item.entityId}`;
+                const fields = (item.fieldsChanged || []).map((field) => field === 'SENSITIVE_FIELD_CHANGED'
+                  ? 'Trường nhạy cảm đã thay đổi'
+                  : fieldDisplayName({ fieldPath: `${item.entity}.${field}`, field }));
+                return (
+                  <tr key={key} className="align-top hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <td className="px-6 py-4">
+                      <input type="checkbox" checked={selected.includes(key)} onChange={() => toggleOne(key)} disabled={!item.recoverable || recovering} aria-label={`Chọn ${item.entity}`} className="h-4 w-4 accent-sky-600 disabled:opacity-30" />
+                    </td>
+                    <td className="px-4 py-4">
+                      <p className="font-bold text-slate-900 dark:text-slate-100">{ENTITY_LABELS[item.entity] || item.entity}</p>
+                      <p className="mt-0.5 font-mono text-[10px] text-slate-400">{shortHash(item.entityId)}</p>
+                      {item.clusterLabel && (
+                        <span className="mt-1 inline-block rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                          {item.clusterLabel}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 text-slate-600 dark:text-slate-400">
+                      <p className="font-bold">SEQ {item.latestTrustedSeq ?? '—'} · Batch #{item.batchId ?? '—'}</p>
+                      <p className="mt-1 text-[10px] text-slate-400">{formatTime(item.anchoredAt)}</p>
+                    </td>
+                    <td className="max-w-sm px-4 py-4 text-slate-600 dark:text-slate-400">
+                      <p className="font-semibold">{fields.length ? fields.join(', ') : 'Không công khai chi tiết dữ liệu'}</p>
+                      <p className="mt-1 text-[10px] text-slate-400">{item.message}</p>
+                      {(item.blockers || []).length > 0 && (
+                        <p className="mt-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
+                          Trở ngại: {item.blockers.join(', ')}
+                        </p>
+                      )}
+                      {(item.dependencies || []).length > 0 && (
+                        <p className="mt-1 text-[10px] font-semibold text-indigo-700 dark:text-indigo-400">
+                          Phụ thuộc cha: {item.dependencies.map((d) => ENTITY_LABELS[d.entity] || d.entity).join(', ')} (tự động vá)
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className={`inline-flex rounded-lg border px-2.5 py-1 text-[10px] font-bold ${item.recoverable ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300' : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300'}`}>
+                        {item.recoveryMode === 'DEPENDENCY_CHAIN'
+                          ? 'Khôi phục chuỗi phụ thuộc'
+                          : item.recoveryMode === 'AUDIT_BATCH_FIRST'
+                            ? 'Khôi phục audit batch trước'
+                            : item.recoveryMode === 'PITR_REQUIRED'
+                              ? 'Cần backup/PITR thủ công'
+                              : item.recoverable ? 'Có thể khôi phục' : 'Không thể khôi phục tự động'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Action Footer */}
       {recoverable.length > 0 && (
         <div className="grid gap-3 border-t border-slate-100 bg-slate-50 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end dark:border-slate-800 dark:bg-slate-800/40">
           <label className="block space-y-1.5">
             <span className="block text-xs font-bold text-slate-700 dark:text-slate-300">Lý do khôi phục</span>
-            <textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} rows={2} placeholder="Nhập lý do hoặc mã sự cố..." className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" />
+            <textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} rows={2} placeholder="Nhập lý do sự cố khôi phục..." className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" />
           </label>
           <button type="button" onClick={onRecover} disabled={recovering || selectedCount === 0 || reason.trim().length < 10} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-40 shadow-xs">
             <RefreshCw className={`h-4 w-4 ${recovering ? 'animate-spin' : ''}`} />
-            {recovering ? 'Đang khôi phục...' : `Khôi phục ${selectedCount} bản ghi`}
+            {recovering ? 'Đang tự động khôi phục...' : `Khôi phục ${selectedCount} bản ghi đã chọn`}
           </button>
         </div>
       )}

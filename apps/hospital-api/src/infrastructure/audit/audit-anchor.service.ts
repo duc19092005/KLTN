@@ -292,7 +292,7 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
       // Allocate a monotonic batchId, reconciling local state with the on-chain counter so we
       // never reuse an id the contract already has (it rejects duplicates).
       const localMax = await this.prisma.auditBatch.aggregate({ _max: { batchId: true } });
-      const onChainLatest = (await this.blockchain.getLatestAuditBatchId()) ?? 0;
+      const onChainLatest = (await this.blockchain.getLatestAuditBatchId(true)) ?? 0;
       const batchId = Math.max(localMax._max.batchId ?? 0, onChainLatest) + 1;
 
       const entryHashes = pending.map((p) => p.entryHash!);
@@ -347,13 +347,14 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
         artifact.artifactUri,
       );
 
-      if (!res.success) {
+      if (!res || !res.success) {
+        const errReason = res && 'error' in res ? (res as any).error : 'Blockchain checkpoint commit failed.';
         await this.prisma.auditBatch.update({
           where: { batchId },
-          data: { status: 'ARTIFACT_READY', error: (res as any).error ?? 'Blockchain checkpoint commit failed.' },
+          data: { status: 'ARTIFACT_READY', error: errReason },
         });
-        this.logger.error(`Batch ${batchId} commit failed: ${(res as any).error}`);
-        return { committed: false, batchId, reason: (res as any).error };
+        this.logger.error(`Batch ${batchId} commit failed: ${errReason}`);
+        return { committed: false, batchId, reason: errReason };
       }
 
       await this.prisma.auditBatch.update({
@@ -457,8 +458,8 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
             batch.artifactHash,
             batch.artifactUri,
           );
-          if (!result.success) {
-            const reason = 'error' in result ? result.error : 'Blockchain checkpoint commit failed.';
+          if (!result || !result.success) {
+            const reason = result && 'error' in result ? (result as any).error : 'Blockchain checkpoint commit failed.';
             await this.prisma.auditBatch.update({ where: { batchId: batch.batchId }, data: { error: reason } });
             continue;
           }

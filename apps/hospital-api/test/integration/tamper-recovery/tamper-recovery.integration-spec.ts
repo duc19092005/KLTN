@@ -19,6 +19,43 @@ import { buildAiQualitySnapshot } from '../../../src/modules/ai-model/domain/ai-
 import { buildVisitSnapshot } from '../../../src/modules/visit/domain/visit-snapshot';
 import { buildMedicalConclusionSnapshot } from '../../../src/modules/clinical-decision/domain/medical-conclusion-snapshot';
 import { AdministrativeLifecycleService } from '../../../src/common/lifecycle/administrative-lifecycle.service';
+import { RateAiModelUseCase } from '../../../src/modules/ai-model/application/use-cases/rate-ai-model.use-case';
+import { GetAiModelStatsUseCase } from '../../../src/modules/ai-model/application/use-cases/get-ai-model-stats.use-case';
+import { CreateAiModelUseCase } from '../../../src/modules/ai-model/application/use-cases/create-ai-model.use-case';
+import { UpdateAiModelUseCase } from '../../../src/modules/ai-model/application/use-cases/update-ai-model.use-case';
+import { CreateAiModelDto, UpdateAiModelDto, RateAiModelDto } from '../../../src/modules/ai-model/dto/ai-model.dto';
+import { PrismaAiModelRepository } from '../../../src/modules/ai-model/infrastructure/prisma/prisma-ai-model.repository';
+import { AiModelCryptoAdapter } from '../../../src/modules/ai-model/infrastructure/adapters/ai-model-crypto.adapter';
+import { HttpAiModelConnectivityAdapter } from '../../../src/modules/ai-model/infrastructure/adapters/http-ai-model-connectivity.adapter';
+import { BlockchainAiModelIntegrityAnchor } from '../../../src/modules/ai-model/infrastructure/adapters/blockchain-ai-model-integrity.anchor';
+
+import { CreateDepartmentUseCase } from '../../../src/modules/department/application/use-cases/create-department.use-case';
+import { UpdateDepartmentUseCase } from '../../../src/modules/department/application/use-cases/update-department.use-case';
+import { CreateDepartmentDto, UpdateDepartmentDto } from '../../../src/modules/department/dto/department.dto';
+import { PrismaDepartmentRepository } from '../../../src/modules/department/infrastructure/prisma/prisma-department.repository';
+import { BlockchainDepartmentIntegrityAnchor } from '../../../src/modules/department/infrastructure/adapters/blockchain-department-integrity.anchor';
+import { DepartmentValidator } from '../../../src/modules/department/application/services/department.validator';
+
+import { CreateDoctorWithStaffUseCase } from '../../../src/modules/doctor/application/use-cases/create-doctor-with-staff.use-case';
+import { UpdateDoctorUseCase } from '../../../src/modules/doctor/application/use-cases/update-doctor.use-case';
+import { CreateDoctorWithStaffDto } from '../../../src/modules/doctor/dto/doctor.dto';
+import { PrismaDoctorRepository } from '../../../src/modules/doctor/infrastructure/prisma/prisma-doctor.repository';
+import { BlockchainDoctorIntegrityAnchor } from '../../../src/modules/doctor/infrastructure/adapters/blockchain-doctor-integrity.anchor';
+
+import { CreatePatientUseCase } from '../../../src/modules/patient/application/use-cases/create-patient.use-case';
+import { CreatePatientDto } from '../../../src/modules/patient/dto/patient.dto';
+import { PrismaPatientRepository } from '../../../src/modules/patient/infrastructure/prisma/prisma-patient.repository';
+import { AuditPatientIntegrityAnchor } from '../../../src/modules/patient/infrastructure/adapters/audit-patient-integrity.anchor';
+
+import { CreateVisitUseCase } from '../../../src/modules/visit/application/use-cases/create-visit.use-case';
+import { CreateVisitDto } from '../../../src/modules/visit/dto/visit.dto';
+import { PrismaVisitRepository } from '../../../src/modules/visit/infrastructure/prisma/prisma-visit.repository';
+
+import { CreateMedicalConclusionUseCase } from '../../../src/modules/clinical-decision/application/use-cases/create-medical-conclusion.use-case';
+import { CreateMedicalConclusionDto } from '../../../src/modules/clinical-decision/dto/clinical-decision.dto';
+import { PrismaClinicalDecisionRepository } from '../../../src/modules/clinical-decision/infrastructure/prisma/prisma-clinical-decision.repository';
+import { BlockchainMedicalConclusionIntegrityAnchor } from '../../../src/modules/clinical-decision/infrastructure/adapters/blockchain-medical-conclusion-integrity.anchor';
+import { ClinicalDecisionPolicy } from '../../../src/modules/clinical-decision/application/policies/clinical-decision.policy';
 import * as crypto from 'crypto';
 
 const enabled = process.env.RUN_TAMPER_RECOVERY_E2E === 'true';
@@ -1234,6 +1271,565 @@ describeIntegration('Audit tamper and recovery integration', () => {
     const recreatedConclusion = await prisma.medicalConclusion.findUniqueOrThrow({ where: { id: conclusion.id } });
     expect(recreatedConclusion.finalDiagnosis).toBe('Delete simulation final diagnosis - Sot xuat huyet Dengue');
     expect(recreatedConclusion.treatmentPlan).toBe('Delete simulation treatment plan - Truyen dich & theo doi');
+  });
+
+  it('executes full AI Model diagnosis, conclusion, rating, detects tampering and recreates on deletion', async () => {
+    // 1. Setup UseCases and Repositories
+    const deptRepo = new PrismaDepartmentRepository(prisma);
+    const deptAnchor = new BlockchainDepartmentIntegrityAnchor(prisma, audit, anchor);
+    const deptValidator = new DepartmentValidator(deptRepo);
+    const createDepartmentUseCase = new CreateDepartmentUseCase(deptRepo, deptAnchor, deptValidator);
+    const updateDepartmentUseCase = new UpdateDepartmentUseCase(deptRepo, deptAnchor, deptValidator, entityRecovery);
+
+    const doctorRepo = new PrismaDoctorRepository(prisma);
+    const doctorAnchor = new BlockchainDoctorIntegrityAnchor(prisma, audit, anchor);
+    const nullMailer = { sendTemporaryPassword: async () => {} };
+    const createDoctorWithStaffUseCase = new CreateDoctorWithStaffUseCase(doctorRepo, doctorAnchor, nullMailer as any);
+    const updateDoctorUseCase = new UpdateDoctorUseCase(doctorRepo, doctorAnchor, entityRecovery);
+
+    const aiModelRepo = new PrismaAiModelRepository(prisma);
+    const aiModelCrypto = new AiModelCryptoAdapter();
+    const aiModelConnectivity = new HttpAiModelConnectivityAdapter();
+    const aiModelAnchor = new BlockchainAiModelIntegrityAnchor(prisma, audit, anchor);
+    const createAiModelUseCase = new CreateAiModelUseCase(aiModelRepo, aiModelCrypto, aiModelConnectivity, aiModelAnchor);
+    const updateAiModelUseCase = new UpdateAiModelUseCase(aiModelRepo, aiModelCrypto, aiModelConnectivity, aiModelAnchor, entityRecovery);
+
+    const patientRepo = new PrismaPatientRepository(prisma);
+    const patientAnchor = new AuditPatientIntegrityAnchor(prisma, audit, anchor);
+    const createPatientUseCase = new CreatePatientUseCase(patientRepo, patientAnchor);
+
+    const visitRepo = new PrismaVisitRepository(prisma);
+    const nullNotification = { createNotification: async () => {} };
+    const createVisitUseCase = new CreateVisitUseCase(visitRepo, prisma, nullNotification as any, audit);
+
+    const clinicalRepo = new PrismaClinicalDecisionRepository(prisma);
+    const clinicalAnchor = new BlockchainMedicalConclusionIntegrityAnchor(prisma, audit, anchor);
+    const clinicalPolicy = new ClinicalDecisionPolicy();
+    const createMedicalConclusionUseCase = new CreateMedicalConclusionUseCase(clinicalRepo, clinicalAnchor, clinicalPolicy, audit);
+
+    const rateAiModelUseCase = new RateAiModelUseCase(prisma, audit);
+    const getAiModelStatsUseCase = new GetAiModelStatsUseCase(prisma, audit, anchor);
+
+    // 2. Setup Admin User
+    const admin = await prisma.user.create({
+      data: {
+        username: `ai-admin-${Date.now()}-${Math.random()}`,
+        email: `admin-${Date.now()}@test.local`,
+        role: 'ADMIN',
+        status: 'ACTIVE',
+        firstLogin: false,
+      },
+    });
+
+    // 3. Department Flow: Create & Update via API DTOs (CreateDepartmentDto, UpdateDepartmentDto)
+    const createDeptDto: CreateDepartmentDto = {
+      departmentCode: `PK-${Date.now().toString().slice(-4)}`,
+      name: `Khoa Kham Tim Mach ${Date.now().toString().slice(-4)}`,
+      floor: '2A',
+      type: 'EXAMINATION',
+      canReceiveOrders: false,
+      status: 'ACTIVE',
+      description: 'Phong kham va dieu tri benh ly tim mach chuyen sau',
+    };
+    const dept = await createDepartmentUseCase.execute(createDeptDto, admin.id);
+    expect(dept.departmentCode).toBe(createDeptDto.departmentCode);
+    expect(dept.floor).toBe('2A');
+
+    const updateDeptDto: UpdateDepartmentDto = {
+      description: 'Phong kham va dieu tri benh ly tim mach, mach vanh va ho hap',
+    };
+    const updatedDept = await updateDepartmentUseCase.execute(dept.id, updateDeptDto, admin.id);
+    expect(updatedDept.description).toBe(updateDeptDto.description);
+
+    // 4. Doctor & Staff Flow: Create & Update via API DTOs (CreateDoctorWithStaffDto, UpdateDoctorDto)
+    const createDocDto: CreateDoctorWithStaffDto = {
+      username: `drnguyen${Date.now().toString().slice(-4)}`,
+      email: `dr.nguyen.${Date.now()}@hospital.local`,
+      fullName: 'BS Nguyen Van AI Test',
+      phone: '0981234567',
+      gender: 'Nam',
+      citizenId: `${Date.now()}`.slice(-12).padStart(12, '8'),
+      birthDate: '1982-06-15',
+      address: 'Ha Noi, Viet Nam',
+      avatarUrl: 'https://cdn.hospital.local/avatars/dr-nguyen.jpg',
+      departmentId: dept.id,
+      position: 'Bac si dieu tri',
+      specialty: 'CARDIOLOGY',
+      licenseNumber: `CCHN-${Date.now().toString().slice(-6)}`,
+      qualification: 'BS CKI',
+      yearsExperience: 12,
+    };
+    const doctor = await createDoctorWithStaffUseCase.execute(createDocDto, admin.id);
+    expect(doctor.staffProfile.fullName).toBe('BS Nguyen Van AI Test');
+    expect(doctor.specialty).toBe('CARDIOLOGY');
+
+    const updateDocDto = {
+      qualification: 'BS CKII',
+      yearsExperience: 15,
+    };
+    const updatedDoc = await updateDoctorUseCase.execute(doctor.id, updateDocDto, admin.id);
+    expect(updatedDoc.qualification).toBe('BS CKII');
+    expect(updatedDoc.yearsExperience).toBe(15);
+
+    // 5. AI Model Flow: Create & Update via API DTOs (CreateAiModelDto, UpdateAiModelDto)
+    const createAiModelDto: CreateAiModelDto = {
+      modelName: 'CardioSmart Diagnostic Pro',
+      modelVersion: '3.2.0',
+      recommendedSpecialty: 'CARDIOLOGY',
+      type: 'API',
+      provider: 'local',
+      apiEndpoint: 'http://localhost:8000/v1/cardio-predict',
+      secretOrIpHash: 'api-key-ai-model-test-secret',
+      description: 'Mo hinh AI ho tro chan doan som benh ly mach vanh va loan nhip tim',
+    };
+    const aiModel = await createAiModelUseCase.execute(createAiModelDto, admin.id);
+    expect(aiModel.modelName).toBe('CardioSmart Diagnostic Pro');
+    expect(aiModel.modelVersion).toBe('3.2.0');
+
+    const updateAiModelDto: UpdateAiModelDto = {
+      description: 'Mo hinh AI ho tro chan doan som benh ly mach vanh, loan nhip tim va thieu mau cuc bo',
+    };
+    const updatedAiModel = await updateAiModelUseCase.execute(aiModel.id, updateAiModelDto, admin.id);
+    expect(updatedAiModel.description).toBe(updateAiModelDto.description);
+
+    // 6. Patient Flow: Create via API DTO (CreatePatientDto)
+    const createPatientDto: CreatePatientDto = {
+      fullName: 'Le Thi Benh Nhan AI',
+      gender: 'FEMALE',
+      birthDate: '1990-08-20',
+      citizenId: `${Date.now()}`.slice(-12).padStart(12, '9'),
+      phone: '0912345678',
+      address: 'Hai Phong, Viet Nam',
+    };
+    const patient = await createPatientUseCase.execute(createPatientDto, admin.id);
+    expect(patient.fullName).toBe('Le Thi Benh Nhan AI');
+
+    // 7. Visit Intake Flow: Create via API DTO (CreateVisitDto)
+    const createVisitDto: CreateVisitDto = {
+      patientId: patient.id,
+      departmentId: dept.id,
+      staffId: doctor.staffProfile.id,
+    };
+    const doctorUserId = doctor.staffProfile.userId;
+    const visitResult = (await createVisitUseCase.execute(createVisitDto, {
+      sub: doctorUserId,
+      role: 'DOCTOR',
+      username: createDocDto.username,
+    } as any)) as any;
+    const visit = visitResult;
+    expect(visit.id).toBeDefined();
+
+    // 8. AI Diagnosis Record: Generated & Reviewed by Doctor
+    const aiDiag = await prisma.aiDiagnosis.create({
+      data: {
+        aiModelId: aiModel.id,
+        patientId: patient.id,
+        visitId: visit.id,
+        prompt: 'Trieu chung: dau nguc trai lan len vai, dien tam do ST chenh len',
+        result: JSON.stringify({ diagnosis: 'Nhoi mau co tim cap ST chenh len', probability: 0.98, urgency: 'EMERGENCY' }),
+        confidence: 0.98,
+        status: 'DOCTOR_REVIEWED',
+        reviewedByDoctorId: doctor.id,
+        doctorFeedback: 'Dong y voi chan doan cua AI - Can can thiep mach vanh khan cap',
+      },
+    });
+    await audit.recordV2({
+      entity: 'AiDiagnosis',
+      entityId: aiDiag.id,
+      action: 'CREATE',
+      actorId: doctorUserId,
+      before: null,
+      after: buildAiDiagnosisSnapshot(aiDiag),
+    });
+
+    // 9. Clinical Decision Flow: Issue Medical Conclusion via API DTO (CreateMedicalConclusionDto)
+    await prisma.visit.update({ where: { id: visit.id }, data: { status: 'WAITING_CONCLUSION' } });
+
+    const conclusionDto: CreateMedicalConclusionDto = {
+      visitId: visit.id,
+      aiDiagnosisId: aiDiag.id,
+      finalDiagnosis: 'Nhoi mau co tim cap thanh truoc (STEMI)',
+      treatmentPlan: 'Chuyen phong Catheter can thiep mach vanh qua da khau cap (PCI)',
+      prescription: 'Aspirin 300mg, Clopidogrel 300mg, Heparin khong phan doan',
+      followUpNote: 'Theo doi sat dien tim va men tim tai phong hoi suc cap cuu',
+      doctorNote: 'Benh nhan da duoc giai thich tinh trang va dong y can thiep',
+    };
+    const conclusion: any = await createMedicalConclusionUseCase.execute(conclusionDto, doctorUserId);
+    expect(conclusion.finalDiagnosis).toBe(conclusionDto.finalDiagnosis);
+
+    // 10. AI Model Rating Flow: Doctor rates AI Model via API DTO (RateAiModelDto)
+    const rateDto: RateAiModelDto = {
+      aiDiagnosisId: aiDiag.id,
+      satisfied: true,
+      feedback: 'Model AI nhan dien dien tam do va trieu chung cuc ky chinh xac, giup xu tri kip thoi',
+    };
+    const quality = await rateAiModelUseCase.execute(
+      aiModel.id,
+      doctorUserId,
+      rateDto.aiDiagnosisId,
+      rateDto.satisfied,
+      rateDto.feedback,
+    );
+    expect(quality).toBeDefined();
+    expect(quality.trustablePercent).toBe(100);
+
+    // 11. Blockchain Anchor: Seal all logs onto Merkle Batch + Smart Contract + IPFS
+    const anchorResult = await anchor.anchorNow();
+    expect(anchorResult.committed).toBe(true);
+
+    // 12. VERIFY INITIAL UNTAMPERED STATE
+    // 12a. Check AI Model Stats UseCase
+    const initialStats = await getAiModelStatsUseCase.execute();
+    const evaluatedModel = initialStats.allModels.find((m) => m.id === aiModel.id);
+    expect(evaluatedModel).toBeDefined();
+    expect(evaluatedModel?.totalRatings).toBe(1);
+    expect(evaluatedModel?.positiveRatings).toBe(1);
+    expect(evaluatedModel?.averageAccuracy).toBe(100);
+    expect(evaluatedModel?.feedbacks).toHaveLength(0); // Only tampered feedbacks shown in tampered list
+
+    // 12b. Check EntityRecoveryService warnings -> expect 0 warnings across all entities
+    const warningsBeforeTamper = await entityRecovery.listWarnings();
+    const qualityWarning = warningsBeforeTamper.items.find((w) => w.entity === 'AiQuality' && w.entityId === quality.id);
+    expect(qualityWarning).toBeUndefined();
+
+    // 12c. Check assertTrusted for AiQuality and AiModelRegistry
+    await expect(entityRecovery.assertTrusted('AiQuality', quality.id)).resolves.not.toThrow();
+    await expect(entityRecovery.assertTrusted('AiModelRegistry', aiModel.id)).resolves.not.toThrow();
+
+    // 13. TAMPER SIMULATION: Hacker directly modifies Postgres DB
+    await prisma.aiQuality.update({
+      where: { id: quality.id },
+      data: {
+        trustablePercent: 0,
+        doctorConclusionAboutModel: 'HACKER ALTERED DOCTOR FEEDBACK TO NEGATIVE',
+      },
+    });
+
+    // 13a. Verify GetAiModelStatsUseCase detects TAMPERED status immediately
+    const tamperedStats = await getAiModelStatsUseCase.execute();
+    const tamperedModel = tamperedStats.allModels.find((m) => m.id === aiModel.id);
+    expect(tamperedModel?.feedbacks).toHaveLength(1);
+    expect(tamperedModel?.feedbacks[0].audit.status).toBe('TAMPERED');
+    expect(tamperedModel?.feedbacks[0].audit.dbMatches).toBe(false);
+    expect(tamperedModel?.feedbacks[0].audit.chainMatches).toBe(false);
+
+    // 13b. Verify EntityRecoveryService detects TAMPERED
+    const warningsAfterTamper = await entityRecovery.listWarnings();
+    const tamperedQualityWarning = warningsAfterTamper.items.find((w) => w.entity === 'AiQuality' && w.entityId === quality.id);
+    expect(tamperedQualityWarning).toBeDefined();
+    expect(tamperedQualityWarning?.status).toBe('TAMPERED');
+    expect(tamperedQualityWarning?.recoverable).toBe(true);
+
+    // 13c. Verify assertTrusted throws ConflictException
+    await expect(entityRecovery.assertTrusted('AiQuality', quality.id)).rejects.toThrow(ConflictException);
+
+    // 13d. In-place Recovery: recover from blockchain anchor
+    const recoverResult = await entityRecovery.recoverMany(
+      [{ entity: 'AiQuality', entityId: quality.id }],
+      admin.id,
+      'Recovery of tampered AI quality evaluation via DTO flow',
+    );
+    expect(recoverResult.requested).toBe(1);
+    expect(recoverResult.recovered).toBe(1);
+    expect(recoverResult.failed).toBe(0);
+
+    // 13e. Verify DB data and hashes are fully restored
+    const restoredQuality = await prisma.aiQuality.findUniqueOrThrow({ where: { id: quality.id } });
+    expect(restoredQuality.trustablePercent).toBe(100);
+    expect(restoredQuality.doctorConclusionAboutModel).toBe(rateDto.feedback);
+
+    // 13f. Re-verify with GetAiModelStatsUseCase -> back to VERIFIED
+    const recoveredStats = await getAiModelStatsUseCase.execute();
+    const recoveredModel = recoveredStats.allModels.find((m) => m.id === aiModel.id);
+    expect(recoveredModel?.averageAccuracy).toBe(100);
+    expect(recoveredModel?.feedbacks).toHaveLength(0);
+
+    // 14. HARD-DELETION & IPFS RECREATION SIMULATION
+    // Delete AiQuality row directly from DB
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SET LOCAL app.audit_recovery_authorized = 'true'`;
+      await tx.aiQuality.delete({ where: { id: quality.id } });
+    });
+    expect(await prisma.aiQuality.findUnique({ where: { id: quality.id } })).toBeNull();
+
+    // 14a. Preview recreation -> MISSING & RECREATE
+    const deletePreview = await entityRecovery.previewMany([{ entity: 'AiQuality', entityId: quality.id }]);
+    expect(deletePreview.items).toHaveLength(1);
+    expect(deletePreview.items[0].state).toBe('MISSING');
+    expect(deletePreview.items[0].operation).toBe('RECREATE');
+    expect(deletePreview.items[0].recoverable).toBe(true);
+
+    // 14b. Recreate entity from IPFS artifact + Blockchain Merkle proof
+    const recreationResult = await entityRecovery.recoverMany(
+      [{ entity: 'AiQuality', entityId: quality.id }],
+      admin.id,
+      'Recreate deleted AI quality evaluation from IPFS bundle',
+    );
+    expect(recreationResult.requested).toBe(1);
+    expect(recreationResult.recovered).toBe(1);
+    expect(recreationResult.results[0].status).toBe('RECREATED');
+
+    // 14c. Verify record is back in DB, fully verified with foreign keys intact
+    const recreatedQuality = await prisma.aiQuality.findUniqueOrThrow({ where: { id: quality.id } });
+    expect(recreatedQuality.doctorId).toBe(doctor.id);
+    expect(recreatedQuality.aiModelId).toBe(aiModel.id);
+    expect(recreatedQuality.aiDiagnosisId).toBe(aiDiag.id);
+    expect(recreatedQuality.trustablePercent).toBe(100);
+    expect(recreatedQuality.doctorConclusionAboutModel).toBe(rateDto.feedback);
+
+    const finalStats = await getAiModelStatsUseCase.execute();
+    const finalModel = finalStats.allModels.find((m) => m.id === aiModel.id);
+    expect(finalModel?.totalRatings).toBe(1);
+    expect(finalModel?.averageAccuracy).toBe(100);
+  });
+
+  it('18. Cascading Dependency Auto-Resolution: Hard deleting multi-tier parent & child entities (Patient + Visit + AiDiagnosis + MedicalConclusion + AiQuality) and recovering leaf node automatically resolves & heals entire chain in topological order', async () => {
+    // 0. Instantiate Clean Architecture UseCases & Services
+    const deptRepo = new PrismaDepartmentRepository(prisma);
+    const deptAnchor = new BlockchainDepartmentIntegrityAnchor(prisma, audit, anchor);
+    const deptValidator = new DepartmentValidator(deptRepo);
+    const createDepartmentUseCase = new CreateDepartmentUseCase(deptRepo, deptAnchor, deptValidator);
+
+    const doctorRepo = new PrismaDoctorRepository(prisma);
+    const doctorAnchor = new BlockchainDoctorIntegrityAnchor(prisma, audit, anchor);
+    const nullMailer = { sendTemporaryPassword: async () => {} };
+    const createDoctorWithStaffUseCase = new CreateDoctorWithStaffUseCase(doctorRepo, doctorAnchor, nullMailer as any);
+
+    const aiModelRepo = new PrismaAiModelRepository(prisma);
+    const aiModelCrypto = new AiModelCryptoAdapter();
+    const aiModelConnectivity = new HttpAiModelConnectivityAdapter();
+    const aiModelAnchor = new BlockchainAiModelIntegrityAnchor(prisma, audit, anchor);
+    const createAiModelUseCase = new CreateAiModelUseCase(aiModelRepo, aiModelCrypto, aiModelConnectivity, aiModelAnchor);
+
+    const patientRepo = new PrismaPatientRepository(prisma);
+    const patientAnchor = new AuditPatientIntegrityAnchor(prisma, audit, anchor);
+    const createPatientUseCase = new CreatePatientUseCase(patientRepo, patientAnchor);
+
+    const visitRepo = new PrismaVisitRepository(prisma);
+    const nullNotification = { createNotification: async () => {} };
+    const createVisitUseCase = new CreateVisitUseCase(visitRepo, prisma, nullNotification as any, audit);
+
+    const clinicalRepo = new PrismaClinicalDecisionRepository(prisma);
+    const clinicalAnchor = new BlockchainMedicalConclusionIntegrityAnchor(prisma, audit, anchor);
+    const clinicalPolicy = new ClinicalDecisionPolicy();
+    const createMedicalConclusionUseCase = new CreateMedicalConclusionUseCase(clinicalRepo, clinicalAnchor, clinicalPolicy, audit);
+
+    const rateAiModelUseCase = new RateAiModelUseCase(prisma, audit);
+
+    const admin = await prisma.user.create({
+      data: {
+        username: `ai-admin-casc-${Date.now()}-${Math.random()}`,
+        email: `admin-casc-${Date.now()}@test.local`,
+        role: 'ADMIN',
+        status: 'ACTIVE',
+        firstLogin: false,
+      },
+    });
+
+    // 1. Setup Department & Doctor via UseCases
+    const deptDto: CreateDepartmentDto = {
+      departmentCode: `DEPT-CASC-${Date.now()}`,
+      name: `Khoa Cap Cuu Cascading ${Date.now()}`,
+      floor: '1',
+      type: 'EXAMINATION',
+      canReceiveOrders: false,
+      status: 'ACTIVE',
+      description: 'Khoa cap cuu test cascading auto resolution',
+    };
+    const dept = await createDepartmentUseCase.execute(deptDto, admin.id);
+
+    const docDto: CreateDoctorWithStaffDto = {
+      username: `dr.cascade.${Date.now()}`,
+      email: `dr.cascade.${Date.now()}@hospital.local`,
+      fullName: 'BS Tran Van Cascade',
+      phone: '0933333333',
+      gender: 'Nam',
+      citizenId: `${Date.now()}`.slice(-12).padStart(12, '7'),
+      birthDate: '1985-03-10',
+      address: 'Da Nang, Viet Nam',
+      avatarUrl: 'https://cdn.hospital.local/avatars/dr-tran.jpg',
+      departmentId: dept.id,
+      position: 'Bac si cap cuu',
+      specialty: 'CARDIOLOGY',
+      licenseNumber: `CCHN-CASC-${Date.now().toString().slice(-6)}`,
+      qualification: 'BS CKI',
+      yearsExperience: 8,
+    };
+    const doctor = await createDoctorWithStaffUseCase.execute(docDto, admin.id);
+    const doctorUserId = doctor.staffProfile.userId;
+
+    // 2. Setup AI Model via UseCase
+    const aiModelDto: CreateAiModelDto = {
+      modelName: 'Cascade Trauma Detector',
+      modelVersion: '1.0.0',
+      recommendedSpecialty: 'CARDIOLOGY',
+      type: 'API',
+      provider: 'local',
+      apiEndpoint: 'http://localhost:8000/v1/trauma-detect',
+      secretOrIpHash: 'secret-trauma-test',
+      description: 'Model AI nhan dien chan thuong cap',
+    };
+    const aiModel = await createAiModelUseCase.execute(aiModelDto, admin.id);
+
+    // 3. Setup Patient via UseCase
+    const patientDto: CreatePatientDto = {
+      fullName: 'Ngo Thi Cascade Patient',
+      gender: 'FEMALE',
+      birthDate: '1998-11-12',
+      citizenId: `${Date.now()}`.slice(-12).padStart(12, '6'),
+      phone: '0944444444',
+      address: 'Can Tho, Viet Nam',
+    };
+    const patient = await createPatientUseCase.execute(patientDto, admin.id);
+
+    // 4. Setup Visit via UseCase
+    const visitDto: CreateVisitDto = {
+      patientId: patient.id,
+      departmentId: dept.id,
+      staffId: doctor.staffProfile.id,
+    };
+    const visit: any = await createVisitUseCase.execute(visitDto, {
+      sub: doctorUserId,
+      role: 'DOCTOR',
+      username: docDto.username,
+    } as any);
+
+    // 5. Setup AiDiagnosis directly & record audit
+    const aiDiag = await prisma.aiDiagnosis.create({
+      data: {
+        aiModelId: aiModel.id,
+        patientId: patient.id,
+        visitId: visit.id,
+        prompt: 'Trauma scan CT scan brain',
+        result: '{"epiduralHematoma": false, "fracture": false}',
+        confidence: 0.99,
+        status: 'DOCTOR_REVIEWED',
+        reviewedByDoctorId: doctor.id,
+        doctorFeedback: 'Ket qua chinh xac, khong co dau hieu xuat huyet',
+      },
+    });
+    await audit.recordV2({
+      entity: 'AiDiagnosis',
+      entityId: aiDiag.id,
+      action: 'CREATE',
+      actorId: doctorUserId,
+      before: null,
+      after: buildAiDiagnosisSnapshot(aiDiag),
+    });
+
+    // 6. Setup MedicalConclusion via UseCase
+    await prisma.visit.update({ where: { id: visit.id }, data: { status: 'WAITING_CONCLUSION' } });
+    const conclusionDto: CreateMedicalConclusionDto = {
+      visitId: visit.id,
+      aiDiagnosisId: aiDiag.id,
+      finalDiagnosis: 'Chan thuong dau nhe (GCS 15 diem), khong ton thuong noi so',
+      treatmentPlan: 'Theo doi ngoai tru trong 48h, tai kham neu dau dau tang hoac non',
+      prescription: 'Paracetamol 500mg uong khi dau',
+      followUpNote: 'Tai kham sau 3 ngay hoac ngay khi co dau hieu bat thuong',
+      doctorNote: 'Nguoi nha da hieu ro huong dan theo doi tai nha',
+    };
+    const conclusion: any = await createMedicalConclusionUseCase.execute(conclusionDto, doctorUserId);
+
+    // 7. Setup AiQuality rating via UseCase
+    const rateDto: RateAiModelDto = {
+      aiDiagnosisId: aiDiag.id,
+      satisfied: true,
+      feedback: 'Model phan tich anh CT cap cuu rat nhanh va dang tin cay',
+    };
+    const quality = await rateAiModelUseCase.execute(
+      aiModel.id,
+      doctorUserId,
+      rateDto.aiDiagnosisId,
+      rateDto.satisfied,
+      rateDto.feedback,
+    );
+
+    // 8. Seal all audit logs to Merkle Batch & on-chain smart contract
+    const anchorResult = await anchor.anchorNow();
+    expect(anchorResult.committed).toBe(true);
+
+    // 9. CASCADING HARD-DELETE SIMULATION:
+    // Delete in reverse order from DB: AiQuality -> MedicalConclusion -> AiDiagnosis -> Visit -> Patient
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SET LOCAL app.audit_recovery_authorized = 'true'`;
+      await tx.aiQuality.delete({ where: { id: quality.id } });
+      await tx.medicalConclusion.delete({ where: { id: conclusion.id } });
+      await tx.aiDiagnosis.delete({ where: { id: aiDiag.id } });
+      await tx.visit.delete({ where: { id: visit.id } });
+      await tx.patient.delete({ where: { id: patient.id } });
+    });
+
+    // Verify all 5 entities are completely gone from PostgreSQL
+    expect(await prisma.aiQuality.findUnique({ where: { id: quality.id } })).toBeNull();
+    expect(await prisma.medicalConclusion.findUnique({ where: { id: conclusion.id } })).toBeNull();
+    expect(await prisma.aiDiagnosis.findUnique({ where: { id: aiDiag.id } })).toBeNull();
+    expect(await prisma.visit.findUnique({ where: { id: visit.id } })).toBeNull();
+    expect(await prisma.patient.findUnique({ where: { id: patient.id } })).toBeNull();
+
+    // 10. RECURSIVE AUTO-DEPENDENCY HEALING:
+    // User / Admin ONLY clicks "Recover" on the single leaf entity: AiQuality.
+    // The backend must automatically detect that AiDiagnosis is missing, which depends on Visit, which depends on Patient.
+    // It must recursively recreate: Patient -> Visit -> AiDiagnosis -> AiQuality without ANY manual intervention!
+    const leafRecoveryResult = await entityRecovery.recoverMany(
+      [{ entity: 'AiQuality', entityId: quality.id }],
+      admin.id,
+      'One-click cascading auto-heal starting from leaf node AiQuality',
+    );
+
+    expect(leafRecoveryResult.failed).toBe(0);
+    expect(leafRecoveryResult.recovered).toBe(1);
+
+    // 11. Verify that Patient, Visit, AiDiagnosis, and AiQuality are ALL back in DB!
+    const restoredPatient = await prisma.patient.findUniqueOrThrow({ where: { id: patient.id } });
+    expect(restoredPatient.fullName).toBe('Ngo Thi Cascade Patient');
+    expect(restoredPatient.patientCode).toBe(patient.patientCode);
+
+    const restoredVisit = await prisma.visit.findUniqueOrThrow({ where: { id: visit.id } });
+    expect(restoredVisit.patientId).toBe(restoredPatient.id);
+    expect(restoredVisit.departmentId).toBe(dept.id);
+
+    const restoredAiDiag = await prisma.aiDiagnosis.findUniqueOrThrow({ where: { id: aiDiag.id } });
+    expect(restoredAiDiag.patientId).toBe(restoredPatient.id);
+    expect(restoredAiDiag.visitId).toBe(restoredVisit.id);
+    expect(restoredAiDiag.aiModelId).toBe(aiModel.id);
+
+    const restoredQuality = await prisma.aiQuality.findUniqueOrThrow({ where: { id: quality.id } });
+    expect(restoredQuality.aiDiagnosisId).toBe(restoredAiDiag.id);
+    expect(restoredQuality.aiModelId).toBe(aiModel.id);
+    expect(restoredQuality.doctorId).toBe(doctor.id);
+    expect(restoredQuality.trustablePercent).toBe(100);
+
+    // 12. SHUFFLED BULK RECOVERY TEST:
+    // Delete AiQuality and AiDiagnosis again, while MedicalConclusion is also still missing.
+    // Submit [AiQuality (Level 6), MedicalConclusion (Level 5), AiDiagnosis (Level 4)] in reverse topological order.
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SET LOCAL app.audit_recovery_authorized = 'true'`;
+      await tx.aiQuality.delete({ where: { id: quality.id } });
+      await tx.aiDiagnosis.delete({ where: { id: aiDiag.id } });
+    });
+
+    const shuffledRecoveryResult = await entityRecovery.recoverMany(
+      [
+        { entity: 'AiQuality', entityId: quality.id }, // Level 6
+        { entity: 'MedicalConclusion', entityId: conclusion.id }, // Level 5
+        { entity: 'AiDiagnosis', entityId: aiDiag.id }, // Level 4
+      ],
+      admin.id,
+      'Bulk recovery with topological auto-ordering',
+    );
+
+    expect(shuffledRecoveryResult.failed).toBe(0);
+    expect(shuffledRecoveryResult.recovered).toBe(3);
+
+    const finalDiagnosis = await prisma.aiDiagnosis.findUniqueOrThrow({ where: { id: aiDiag.id } });
+    expect(finalDiagnosis.id).toBe(aiDiag.id);
+
+    const finalConclusion = await prisma.medicalConclusion.findUniqueOrThrow({ where: { id: conclusion.id } });
+    expect(finalConclusion.finalDiagnosis).toBe(conclusionDto.finalDiagnosis);
+    expect(finalConclusion.visitId).toBe(restoredVisit.id);
+
+    const finalQuality = await prisma.aiQuality.findUniqueOrThrow({ where: { id: quality.id } });
+    expect(finalQuality.trustablePercent).toBe(100);
   });
 
   async function seedTrustedPatientChange() {

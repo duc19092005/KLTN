@@ -73,7 +73,25 @@ export interface EntityIntegrityWarning {
   recoveryMode: 'DIRECT_ENTITY' | 'DEPENDENCY_CHAIN' | 'AUDIT_BATCH_FIRST' | 'PITR_REQUIRED';
   sensitiveDataHidden: true;
   message: string;
+  clusterKey?: string | null;
+  clusterLabel?: string | null;
+  autoResolvable?: boolean;
 }
+
+export const ENTITY_DEPENDENCY_ORDER: Record<RecoverableAuditEntity, number> = {
+  Department: 0,
+  Patient: 0,
+  AiModelRegistry: 0,
+  StaffProfile: 1,
+  DoctorProfile: 2,
+  Visit: 3,
+  Appointment: 3,
+  MedicalOrder: 4,
+  AiDiagnosis: 4,
+  MedicalResult: 5,
+  MedicalConclusion: 5,
+  AiQuality: 6,
+};
 
 const REQUIRED_SNAPSHOT_FIELDS: Record<RecoverableAuditEntity, readonly string[]> = {
   Patient: ['patientCode', 'fullName', 'gender', 'birthDate', 'citizenId', 'phone', 'address', 'insuranceNumber', 'emergencyContact'],
@@ -85,7 +103,7 @@ const REQUIRED_SNAPSHOT_FIELDS: Record<RecoverableAuditEntity, readonly string[]
   MedicalConclusion: ['visitId', 'patientCode', 'doctorId', 'aiDiagnosisId', 'finalDiagnosis', 'treatmentPlan', 'prescription', 'followUpNote', 'doctorNote'],
   AiDiagnosis: ['aiModelId', 'patientId', 'visitId', 'prompt', 'result', 'confidence', 'status', 'reviewedByDoctorId', 'doctorFeedback'],
   MedicalOrder: ['orderId', 'orderCode', 'visitId', 'patientId', 'doctorId', 'targetDepartmentId', 'orderType', 'priority', 'status', 'clinicalNote'],
-  MedicalResult: ['resultId', 'resultCode', 'orderId', 'visitId', 'performedById', 'fileCount', 'mimeTypes', 'fileSizes', 'files', 'status', 'note', 'returnedAt', 'createdAt'],
+  MedicalResult: ['resultId', 'resultCode', 'orderId', 'visitId', 'performedById', 'fileCount', 'mimeTypes', 'fileSizes', 'files', 'note', 'returnedAt', 'createdAt'],
   Appointment: ['appointmentCode', 'patientId', 'departmentId', 'doctorId', 'scheduledAt', 'status', 'doctorStaffId'],
   AiQuality: ['doctorId', 'aiModelId', 'aiDiagnosisId', 'doctorConclusionAboutModel', 'trustablePercent'],
 };
@@ -115,16 +133,12 @@ export class EntityRecoveryService {
 
   async previewMany(targets: EntityRecoveryTarget[]) {
     const uniqueTargets = [...new Map(targets.map((target) => [this.targetKey(target.entity, target.entityId), target])).values()];
+    uniqueTargets.sort((a, b) => (ENTITY_DEPENDENCY_ORDER[a.entity] ?? 99) - (ENTITY_DEPENDENCY_ORDER[b.entity] ?? 99));
     const items: Array<Record<string, unknown>> = [];
     const recreationCache = this.recreation?.createBundleCache();
     for (const target of uniqueTargets) {
       const live = await this.loadLiveSnapshot(this.prisma, target.entity, target.entityId);
       if (!live) {
-        // Entity bị xóa vĩnh viễn có chủ ý — không coi là mất dữ liệu, không đề xuất recreation.
-        if (await this.isIntentionallyDeleted(target.entityId)) {
-          items.push({ ...target, state: 'INTENTIONALLY_DELETED', operation: 'NONE', recoverable: false, blockers: [], sensitiveDataHidden: true });
-          continue;
-        }
         if (!this.recreation) {
           items.push({ ...target, state: 'MISSING', operation: 'RECREATE', recoverable: false, blockers: ['ENTITY_RECREATION_UNAVAILABLE'], sensitiveDataHidden: true });
         } else {
@@ -146,6 +160,9 @@ export class EntityRecoveryService {
         blockers: warning && !warning.recoverable ? warning.blockers : [],
         dependencies: warning?.dependencies ?? [],
         recoveryMode: warning?.recoveryMode ?? 'DIRECT_ENTITY',
+        clusterKey: warning?.clusterKey ?? target.entityId,
+        clusterLabel: warning?.clusterLabel ?? null,
+        autoResolvable: warning?.autoResolvable ?? false,
         sensitiveDataHidden: true,
       });
     }
@@ -209,6 +226,8 @@ export class EntityRecoveryService {
 
   async recoverMany(targets: EntityRecoveryTarget[], actorId: string, reason: string) {
     const uniqueTargets = [...new Map(targets.map((target) => [this.targetKey(target.entity, target.entityId), target])).values()];
+    // Sort topologically: parents (Department, Patient, AI Model) before children (Visit, Diagnostic, Conclusion, Quality)
+    uniqueTargets.sort((a, b) => (ENTITY_DEPENDENCY_ORDER[a.entity] ?? 99) - (ENTITY_DEPENDENCY_ORDER[b.entity] ?? 99));
     const results: Array<Record<string, unknown>> = [];
     const recreationCache = this.recreation?.createBundleCache();
 
@@ -234,6 +253,31 @@ export class EntityRecoveryService {
     };
   }
 
+  private resolveClusterInfo(entity: RecoverableAuditEntity, entityId: string, snapshot: Snapshot | null): { clusterKey: string; clusterLabel: string } {
+    if (!snapshot) return { clusterKey: entityId, clusterLabel: `${entity} (${entityId.slice(0, 8)})` };
+
+    if (entity === 'Visit') {
+      const visitCode = (snapshot.visitCode as string) || entityId.slice(0, 8);
+      return { clusterKey: entityId, clusterLabel: `Ca khám #${visitCode}` };
+    }
+    if (entity === 'MedicalConclusion' || entity === 'AiDiagnosis' || entity === 'MedicalOrder' || entity === 'MedicalResult') {
+      const visitId = (snapshot.visitId as string) || null;
+      if (visitId) {
+        return { clusterKey: visitId, clusterLabel: `Ca khám (${visitId.slice(0, 8)})` };
+      }
+    }
+    if (entity === 'AiQuality') {
+      const diagnosisId = (snapshot.aiDiagnosisId as string) || null;
+      return { clusterKey: diagnosisId || entityId, clusterLabel: `Đánh giá AI (${entityId.slice(0, 8)})` };
+    }
+    if (entity === 'Appointment' || entity === 'Patient') {
+      const patientId = (snapshot.patientId as string) || entityId;
+      const patientCode = (snapshot.patientCode as string) || patientId.slice(0, 8);
+      return { clusterKey: patientId, clusterLabel: `Hồ sơ BN #${patientCode}` };
+    }
+    return { clusterKey: entityId, clusterLabel: `${entity} (${entityId.slice(0, 8)})` };
+  }
+
   private async recoverOne(
     target: EntityRecoveryTarget,
     actorId: string,
@@ -242,12 +286,6 @@ export class EntityRecoveryService {
   ) {
     const liveSnapshot = await this.loadLiveSnapshot(this.prisma, target.entity, target.entityId);
     if (!liveSnapshot) {
-      // Nếu entity đã bị xóa vĩnh viễn có chủ ý, không cho phép recovery qua luồng này.
-      if (await this.isIntentionallyDeleted(target.entityId)) {
-        throw new ConflictException(
-          `Entity '${target.entity}' (${target.entityId}) đã bị xóa vĩnh viễn có chủ ý. Không thể khôi phục qua luồng entity recovery.`,
-        );
-      }
       if (!this.recreation) throw new ConflictException('Entity recreation service chưa được cấu hình.');
       return this.recreation.recreate(target, actorId, reason, recreationCache);
     }
@@ -319,10 +357,13 @@ export class EntityRecoveryService {
 
     const lightVerification = verifyAuditRowLight(row);
     if (!lightVerification.ok) {
+      const cluster = this.resolveClusterInfo(entity, row.entityId, null);
       return {
         ...base,
+        ...cluster,
         status: 'AUDIT_UNTRUSTED',
         recoverable: false,
+        autoResolvable: false,
         fieldsChanged: this.safeFieldNames(entity, lightVerification.suspiciousFields),
         blockers: ['AUDIT_ROW_INTEGRITY_FAILED'], dependencies: [], recoveryMode: 'AUDIT_BATCH_FIRST',
         message: 'Audit nguồn có dấu hiệu sai lệch. Hãy phục hồi audit batch từ IPFS trước.',
@@ -337,10 +378,13 @@ export class EntityRecoveryService {
       const preview = this.recreation
         ? await this.recreation.previewOne({ entity, entityId: row.entityId }, recreationCache)
         : null;
+      const cluster = this.resolveClusterInfo(entity, row.entityId, null);
       return {
         ...base,
+        ...cluster,
         status: 'MISSING',
         recoverable: Boolean(preview?.recoverable),
+        autoResolvable: Boolean(preview?.recoverable),
         latestTrustedSeq: preview?.sourceSeq ?? base.latestTrustedSeq,
         batchId: preview?.sourceBatchId ?? base.batchId,
         fieldsChanged: [],
@@ -349,13 +393,14 @@ export class EntityRecoveryService {
         recoveryMode: preview?.recoveryMode ?? 'PITR_REQUIRED',
         message: preview?.recoverable
           ? preview.recoveryMode === 'DEPENDENCY_CHAIN'
-            ? 'Bản ghi gốc và entity cha không còn tồn tại, nhưng có đủ snapshot IPFS đã xác minh để khôi phục theo chuỗi khóa ngoại.'
+            ? 'Bản ghi gốc và entity cha không còn tồn tại, nhưng có đủ snapshot IPFS đã xác minh để tự động khôi phục toàn chuỗi.'
             : 'Bản ghi gốc không còn tồn tại nhưng có snapshot IPFS đã xác minh để tạo lại.'
           : `Không thể khôi phục tự động: ${(preview?.blockers ?? ['không có snapshot tin cậy']).join(', ')}.`,
       };
     }
 
     const verification = verifyAuditRow(row);
+    const cluster = this.resolveClusterInfo(entity, row.entityId, liveSnapshot);
 
     if (!this.hasCompleteSnapshot(entity, verification.decryptedAfter)) {
       const partialComparison = this.compareCommittedSnapshotFields(
@@ -381,8 +426,10 @@ export class EntityRecoveryService {
           const proof = completeRow.seq == null ? null : await this.anchor.getInclusionProof(completeRow.seq);
           return {
             ...base,
+            ...cluster,
             status: proof?.verified ? 'TAMPERED' : 'AUDIT_UNTRUSTED',
             recoverable: Boolean(proof?.verified),
+            autoResolvable: Boolean(proof?.verified),
             latestTrustedSeq: completeRow.seq,
             batchId: completeRow.batchId,
             anchoredAt: completeRow.createdAt,
@@ -399,8 +446,10 @@ export class EntityRecoveryService {
       if (row.onChainStatus !== 'ANCHORED' || row.batchId == null) {
         return {
           ...base,
+          ...cluster,
           status: 'AUDIT_UNTRUSTED',
           recoverable: false,
+          autoResolvable: false,
           fieldsChanged: this.safeFieldNames(entity, partialComparison.suspiciousFields),
           blockers: ['LATEST_AUDIT_NOT_ANCHORED', 'SNAPSHOT_INCOMPLETE'], dependencies: [], recoveryMode: 'PITR_REQUIRED',
           message: 'Các trường được audit ghi nhận đang lệch, nhưng snapshot nguồn cũ chưa đầy đủ và chưa được neo.',
@@ -410,8 +459,10 @@ export class EntityRecoveryService {
       const proof = row.seq == null ? null : await this.anchor.getInclusionProof(row.seq);
       return {
         ...base,
+        ...cluster,
         status: proof?.verified ? 'TAMPERED' : 'AUDIT_UNTRUSTED',
         recoverable: false,
+        autoResolvable: false,
         fieldsChanged: this.safeFieldNames(entity, partialComparison.suspiciousFields),
         blockers: proof?.verified ? ['SNAPSHOT_INCOMPLETE'] : ['BLOCKCHAIN_PROOF_FAILED', 'SNAPSHOT_INCOMPLETE'],
         dependencies: [], recoveryMode: 'PITR_REQUIRED',
@@ -431,8 +482,10 @@ export class EntityRecoveryService {
     if (row.onChainStatus !== 'ANCHORED' || row.batchId == null) {
       return {
         ...base,
+        ...cluster,
         status: 'AUDIT_UNTRUSTED',
         recoverable: false,
+        autoResolvable: false,
         fieldsChanged: this.safeFieldNames(entity, comparison.suspiciousFields),
         blockers: ['LATEST_AUDIT_NOT_ANCHORED'], dependencies: [], recoveryMode: 'AUDIT_BATCH_FIRST',
         message: 'Dữ liệu lệch với audit mới nhất nhưng audit này chưa được neo. Mọi sửa/xóa bị chặn cho đến khi xác minh và neo batch.',
@@ -443,8 +496,10 @@ export class EntityRecoveryService {
     if (!proof?.verified) {
       return {
         ...base,
+        ...cluster,
         status: 'AUDIT_UNTRUSTED',
         recoverable: false,
+        autoResolvable: false,
         fieldsChanged: this.safeFieldNames(entity, comparison.suspiciousFields),
         blockers: ['BLOCKCHAIN_PROOF_FAILED'], dependencies: [], recoveryMode: 'AUDIT_BATCH_FIRST',
         message: 'Dữ liệu lệch nhưng audit nguồn chưa xác minh được với blockchain. Hãy kiểm tra batch trước.',
@@ -453,8 +508,10 @@ export class EntityRecoveryService {
 
     return {
       ...base,
+      ...cluster,
       status: 'TAMPERED',
       recoverable: true,
+      autoResolvable: true,
       fieldsChanged: this.safeFieldNames(entity, comparison.suspiciousFields),
       blockers: [], dependencies: [], recoveryMode: 'DIRECT_ENTITY',
       message: 'Dữ liệu hiện tại không khớp bản audit đã được blockchain xác nhận. Mọi sửa/xóa đã bị chặn.',
@@ -695,7 +752,7 @@ export class EntityRecoveryService {
       await client.medicalResult.update({ where: { id: entityId }, data: {
         resultCode: this.string(snapshot, 'resultCode'), orderId, performedById,
         note: this.nullableString(snapshot, 'note'),
-        returnedAt: this.nullableDate(snapshot, 'returnedAt') ?? new Date(),
+        returnedAt: this.nullableDate(snapshot, 'returnedAt'),
       } });
       // Files của kết quả xét nghiệm cực kỳ nhạy cảm — phải khớp 100% snapshot.
       const files = this.resultFiles(snapshot);

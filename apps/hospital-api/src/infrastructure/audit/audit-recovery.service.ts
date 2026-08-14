@@ -535,6 +535,29 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
         throw new BadRequestException('The blockchain checkpoint has no recovery artifact.');
       }
 
+      const batch = await this.prisma.auditBatch.findUnique({ where: { batchId } });
+      if (batch?.status === 'ANCHORED' && batch.fromSeq != null && batch.toSeq != null) {
+        const logsInBatch = await this.prisma.blockchainLogger.findMany({
+          where: { seq: { gte: batch.fromSeq, lte: batch.toSeq }, entryHash: { not: null } },
+          orderBy: { seq: 'asc' },
+        });
+        const expectedCount = batch.leafCount || (batch.toSeq - batch.fromSeq + 1);
+        if (logsInBatch.length === expectedCount) {
+          const isEveryRowIntact = logsInBatch.every((l) => verifyAuditRow({ ...l, createdAt: new Date(l.createdAt) }).ok);
+          const recomputedRoot = computeMerkleRootForAlgorithm(
+            logsInBatch.map((l) => l.entryHash!),
+            batch.algorithmVersion ?? MERKLE_SHA256_STRING_V1,
+          );
+          if (
+            isEveryRowIntact &&
+            rootToBytes32(recomputedRoot).toLowerCase() === rootToBytes32(checkpoint.root).toLowerCase() &&
+            rootToBytes32(batch.merkleRoot).toLowerCase() === rootToBytes32(checkpoint.root).toLowerCase()
+          ) {
+            throw new BadRequestException('The audit batch is already intact and matches the blockchain checkpoint.');
+          }
+        }
+      }
+
       await this.recoverBatchDirectFromChain(batchId, adminId, reason);
 
       await this.prisma.auditRecovery.update({

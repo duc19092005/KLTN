@@ -87,7 +87,7 @@ const REQUIRED_FIELDS: Record<RecreatableAuditEntity, readonly string[]> = {
   MedicalConclusion: ['visitId', 'patientCode', 'doctorId', 'aiDiagnosisId', 'finalDiagnosis', 'treatmentPlan', 'prescription', 'followUpNote', 'doctorNote'],
   AiDiagnosis: ['aiModelId', 'patientId', 'visitId', 'prompt', 'result', 'confidence', 'status', 'reviewedByDoctorId', 'doctorFeedback'],
   MedicalOrder: ['orderId', 'orderCode', 'visitId', 'patientId', 'doctorId', 'targetDepartmentId', 'orderType', 'priority', 'status', 'clinicalNote'],
-  MedicalResult: ['resultId', 'resultCode', 'orderId', 'visitId', 'performedById', 'files', 'fileCount', 'mimeTypes', 'fileSizes', 'status', 'note', 'returnedAt', 'createdAt'],
+  MedicalResult: ['resultId', 'resultCode', 'orderId', 'visitId', 'performedById', 'files', 'fileCount', 'mimeTypes', 'fileSizes', 'note', 'returnedAt', 'createdAt'],
   Appointment: ['appointmentCode', 'patientId', 'departmentId', 'doctorId', 'scheduledAt', 'status', 'doctorStaffId'],
   AiQuality: ['doctorId', 'aiModelId', 'aiDiagnosisId', 'doctorConclusionAboutModel', 'trustablePercent'],
 };
@@ -287,23 +287,51 @@ export class EntityRecreationService {
     blockers: string[],
     cache: EntityRecreationBundleCache,
   ): Promise<{ blockers: string[]; dependencies: EntityRecreationTarget[] }> {
-    if (!blockers.includes('MISSING_VISIT') || (target.entity !== 'MedicalConclusion' && target.entity !== 'AiDiagnosis')) {
-      return { blockers, dependencies: [] };
-    }
-    const visitId = this.nullableString(snapshot, 'visitId');
-    if (!visitId) return { blockers, dependencies: [] };
-    const dependency: EntityRecreationTarget = { entity: 'Visit', entityId: visitId };
-    const preview = await this.previewOne(dependency, cache);
-    if (!preview.recoverable) {
-      return {
-        blockers: blockers.map((blocker) => blocker === 'MISSING_VISIT' ? 'MISSING_VISIT_NOT_RECOVERABLE' : blocker),
-        dependencies: [],
-      };
-    }
-    return {
-      blockers: blockers.filter((blocker) => blocker !== 'MISSING_VISIT'),
-      dependencies: [dependency],
+    let currentBlockers = [...blockers];
+    const dependencies: EntityRecreationTarget[] = [];
+
+    const tryResolve = async (blockerName: string, depEntity: RecreatableAuditEntity, depId: string | null) => {
+      if (!currentBlockers.includes(blockerName) || !depId) return;
+      const dependency: EntityRecreationTarget = { entity: depEntity, entityId: depId };
+      const preview = await this.previewOne(dependency, cache);
+      if (!preview.recoverable) {
+        currentBlockers = currentBlockers.map((b) => (b === blockerName ? `${blockerName}_NOT_RECOVERABLE` : b));
+      } else {
+        currentBlockers = currentBlockers.filter((b) => b !== blockerName);
+        if (!dependencies.some((d) => d.entity === depEntity && d.entityId === depId)) {
+          dependencies.push(dependency);
+        }
+      }
     };
+
+    // 1. Patient dependency
+    await tryResolve('MISSING_PATIENT', 'Patient', this.nullableString(snapshot, 'patientId'));
+
+    // 2. Department dependency
+    await tryResolve('MISSING_DEPARTMENT', 'Department', this.nullableString(snapshot, 'departmentId'));
+    await tryResolve('MISSING_TARGET_DEPARTMENT', 'Department', this.nullableString(snapshot, 'targetDepartmentId'));
+
+    // 3. Staff Profile / Manager dependency
+    await tryResolve('MISSING_DEPARTMENT_MANAGER', 'StaffProfile', this.nullableString(snapshot, 'managerId'));
+    await tryResolve('MISSING_VISIT_STAFF', 'StaffProfile', this.nullableString(snapshot, 'staffId'));
+
+    // 4. Doctor dependency
+    await tryResolve('MISSING_DOCTOR', 'DoctorProfile', this.nullableString(snapshot, 'doctorId'));
+    await tryResolve('MISSING_REVIEWING_DOCTOR', 'DoctorProfile', this.nullableString(snapshot, 'reviewedByDoctorId'));
+
+    // 5. AI Model dependency
+    await tryResolve('MISSING_AI_MODEL', 'AiModelRegistry', this.nullableString(snapshot, 'aiModelId'));
+
+    // 6. Visit dependency
+    await tryResolve('MISSING_VISIT', 'Visit', this.nullableString(snapshot, 'visitId'));
+
+    // 7. Medical Order dependency
+    await tryResolve('MISSING_MEDICAL_ORDER', 'MedicalOrder', this.nullableString(snapshot, 'orderId'));
+
+    // 8. AI Diagnosis dependency
+    await tryResolve('MISSING_AI_DIAGNOSIS', 'AiDiagnosis', this.nullableString(snapshot, 'aiDiagnosisId'));
+
+    return { blockers: currentBlockers, dependencies };
   }
 
   private async inspectBlockers(client: DbClient, target: EntityRecreationTarget, snapshot: Snapshot): Promise<string[]> {
