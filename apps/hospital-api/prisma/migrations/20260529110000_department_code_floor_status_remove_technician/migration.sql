@@ -24,10 +24,10 @@ CREATE INDEX "Department_status_idx" ON "Department"("status");
 -- Retire TECHNICIAN. Existing technician users become LAB_MANAGER.
 UPDATE "User"
 SET "role" = 'LAB_MANAGER'
-WHERE "role" = 'TECHNICIAN';
+WHERE "role"::TEXT = 'TECHNICIAN';
 
 ALTER TYPE "UserRole" RENAME TO "UserRole_old";
-CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'RECEPTIONIST', 'DOCTOR', 'LAB_MANAGER');
+CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'RECEPTIONIST', 'DOCTOR', 'LAB_MANAGER', 'PATIENT');
 ALTER TABLE "User"
   ALTER COLUMN "role" TYPE "UserRole"
   USING "role"::TEXT::"UserRole";

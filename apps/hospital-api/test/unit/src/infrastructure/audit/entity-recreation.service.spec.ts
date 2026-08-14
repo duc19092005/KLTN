@@ -528,7 +528,7 @@ describe('EntityRecreationService', () => {
     records.department.clear();
 
     await expect(service.previewOne({ entity: 'DoctorProfile', entityId: IDS.entity })).resolves.toMatchObject({
-      recoverable: false, blockers: expect.arrayContaining(['MISSING_DEPARTMENT']),
+      recoverable: false, blockers: expect.arrayContaining(['MISSING_DEPARTMENT_NOT_RECOVERABLE']),
     });
     expect(prisma.doctorProfile.create).not.toHaveBeenCalled();
   });
@@ -559,7 +559,7 @@ describe('EntityRecreationService', () => {
 
     const preview = await service.previewOne({ entity: 'AiDiagnosis', entityId: IDS.entity });
     expect(preview.blockers).toEqual(expect.arrayContaining([
-      'MISSING_AI_MODEL', 'MISSING_PATIENT', 'MISSING_VISIT_NOT_RECOVERABLE', 'MISSING_REVIEWING_DOCTOR',
+      'MISSING_AI_MODEL_NOT_RECOVERABLE', 'MISSING_PATIENT_NOT_RECOVERABLE', 'MISSING_VISIT_NOT_RECOVERABLE', 'MISSING_REVIEWING_DOCTOR_NOT_RECOVERABLE',
     ]));
     expect(preview.recoverable).toBe(false);
   });

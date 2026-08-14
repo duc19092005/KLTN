@@ -123,15 +123,17 @@ export class EntityRecreationService {
 
     try {
       // 1. Fast path: check local anchored row in PostgreSQL (0.1ms vs 45 IPFS network downloads)
-      const localRow = await this.prisma.blockchainLogger.findFirst({
-        where: {
-          entity: { in: [target.entity, 'AdministrativeDeletion'] },
-          entityId: target.entityId,
-          batchId: { not: null },
-          onChainStatus: 'ANCHORED',
-        },
-        orderBy: { seq: 'desc' },
-      });
+      const localRow = this.prisma?.blockchainLogger?.findFirst
+        ? await this.prisma.blockchainLogger.findFirst({
+            where: {
+              entity: { in: [target.entity, 'AdministrativeDeletion'] },
+              entityId: target.entityId,
+              batchId: { not: null },
+              onChainStatus: 'ANCHORED',
+            },
+            orderBy: { seq: 'desc' },
+          }).catch(() => null)
+        : null;
 
       let snapshot: Snapshot | null = null;
       let sourceSeq: number | null = null;
@@ -248,22 +250,24 @@ export class EntityRecreationService {
 
   private async resolveTrustedSource(target: EntityRecreationTarget, cache: EntityRecreationBundleCache): Promise<TrustedEntitySource> {
     // 1. Direct indexed batch lookup: check if PostgreSQL already knows the exact batchId (1 query vs 45 IPFS HTTP requests)
-    const localRow = await this.prisma.blockchainLogger.findFirst({
-      where: {
-        entity: { in: [target.entity, 'AdministrativeDeletion'] },
-        entityId: target.entityId,
-        batchId: { not: null },
-        onChainStatus: 'ANCHORED',
-      },
-      orderBy: { seq: 'desc' },
-      select: { batchId: true },
-    });
+    const localRow = this.prisma?.blockchainLogger?.findFirst
+      ? await this.prisma.blockchainLogger.findFirst({
+          where: {
+            entity: { in: [target.entity, 'AdministrativeDeletion'] },
+            entityId: target.entityId,
+            batchId: { not: null },
+            onChainStatus: 'ANCHORED',
+          },
+          orderBy: { seq: 'desc' },
+          select: { batchId: true },
+        }).catch(() => null)
+      : null;
 
-    if (localRow?.batchId) {
+    if (localRow?.batchId && this.prisma?.auditBatch?.findUnique) {
       const batch = await this.prisma.auditBatch.findUnique({
         where: { batchId: localRow.batchId },
         select: { batchId: true, status: true, artifactHash: true, artifactUri: true },
-      });
+      }).catch(() => null);
       if (batch && batch.status === 'ANCHORED' && batch.artifactHash && batch.artifactUri) {
         try {
           let pending = cache.get(batch.batchId);
@@ -291,11 +295,13 @@ export class EntityRecreationService {
     }
 
     // 2. Fallback: scan all anchored batches
-    const batches = await this.prisma.auditBatch.findMany({
-      where: { status: 'ANCHORED', artifactHash: { not: null }, artifactUri: { not: null } },
-      orderBy: [{ toSeq: 'desc' }, { batchId: 'desc' }],
-      select: { batchId: true },
-    });
+    const batches = this.prisma?.auditBatch?.findMany
+      ? await this.prisma.auditBatch.findMany({
+          where: { status: 'ANCHORED', artifactHash: { not: null }, artifactUri: { not: null } },
+          orderBy: [{ toSeq: 'desc' }, { batchId: 'desc' }],
+          select: { batchId: true },
+        }).catch(() => [])
+      : [];
     if (!batches.length) throw new ConflictException('Không có audit artifact đã neo trên blockchain để khôi phục.');
 
     for (const batch of batches) {
