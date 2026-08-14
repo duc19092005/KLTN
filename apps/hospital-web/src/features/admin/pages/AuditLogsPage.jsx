@@ -270,6 +270,7 @@ export default function AuditLogsPage() {
   const [selectedEntityWarnings, setSelectedEntityWarnings] = useState([]);
   const [entityRecoveryReason, setEntityRecoveryReason] = useState('');
   const [recoveringEntities, setRecoveringEntities] = useState(false);
+  const [entityRecoveryFaceOpen, setEntityRecoveryFaceOpen] = useState(false);
 
   const [batchesPage, setBatchesPage] = useState(1);
   const [batchesTotalPages, setBatchesTotalPages] = useState(1);
@@ -634,7 +635,14 @@ export default function AuditLogsPage() {
     }
   };
 
-  const handleEntityRecovery = async () => {
+  const handleEntityRecovery = () => {
+    const selected = entityWarnings.filter((item) => selectedEntityWarnings.includes(`${item.entity}:${item.entityId}`) && item.recoverable);
+    if (!selected.length || entityRecoveryReason.trim().length < 10) return;
+    setEntityRecoveryFaceOpen(true);
+  };
+
+  const handleEntityRecoveryTicket = async (ticket) => {
+    setEntityRecoveryFaceOpen(false);
     const selected = entityWarnings.filter((item) => selectedEntityWarnings.includes(`${item.entity}:${item.entityId}`) && item.recoverable);
     if (!selected.length || entityRecoveryReason.trim().length < 10) return;
     setRecoveringEntities(true);
@@ -642,6 +650,7 @@ export default function AuditLogsPage() {
       const res = await auditService.recoverEntities(
         selected.map(({ entity, entityId }) => ({ entity, entityId })),
         entityRecoveryReason.trim(),
+        ticket,
       );
       const data = res.data || {};
       if (data.failed > 0) {
@@ -1137,6 +1146,17 @@ export default function AuditLogsPage() {
           description="Quét khuôn mặt Admin để cấp quyền thực thi cơ chế tự động đối soát Blockchain & tự sửa chữa Audit Batch bị lệch."
           onSuccess={handleDeepScanTicket}
           onClose={() => setDeepScanFaceOpen(false)}
+        />
+      )}
+
+      {entityRecoveryFaceOpen && (
+        <FaceStepUpModal
+          action="RECOVER_AUDIT_ENTITIES"
+          resourceId={null}
+          title="Quét khuôn mặt Admin để xác nhận khôi phục bản ghi"
+          description="Hệ thống sẽ đối soát snapshot đã xác minh trên Blockchain trước khi ghi đè dữ liệu nghiệp vụ."
+          onSuccess={handleEntityRecoveryTicket}
+          onClose={() => setEntityRecoveryFaceOpen(false)}
         />
       )}
     </DashboardLayout>
