@@ -854,6 +854,10 @@ export class EntityRecoveryService {
     if ((entity === 'StaffProfile' || entity === 'DoctorProfile') && source.status == null) {
       return { ...source, status: live.status };
     }
+    if (entity === 'MedicalResult' && 'status' in source) {
+      const { status: _status, ...rest } = source;
+      return rest;
+    }
     return source;
   }
 
