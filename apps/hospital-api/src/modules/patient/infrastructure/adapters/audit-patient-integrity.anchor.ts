@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
 import { AuditAnchorService } from '../../../../infrastructure/audit/audit-anchor.service';
+import { computeAfterHashV2 } from '../../../../infrastructure/audit/audit-hash.util';
 import {
   PatientIntegrityAnchorPort,
   PatientIntegrityEvaluation,
@@ -70,38 +71,53 @@ export class AuditPatientIntegrityAnchor implements PatientIntegrityAnchorPort {
     const recomputed = patient.dataSalt ? this.audit.recompute(snapshot, patient.dataSalt) : null;
     const dbHash = patient.hash256 || null;
     const dbMatches = recomputed !== null && recomputed === dbHash;
+    const currentAfterHash = computeAfterHashV2('Patient', patient.id, snapshot);
 
-    const latestLog = await this.prisma.blockchainLogger.findFirst({
+    const latestAnchored = await this.prisma.blockchainLogger.findFirst({
       where: { entity: 'Patient', entityId: patient.id, batchId: { not: null } },
       orderBy: { seq: 'desc' },
-      select: { seq: true, dataHash: true, batchId: true },
+      select: { seq: true, afterHash: true, batchId: true },
+    });
+
+    const latestAny = await this.prisma.blockchainLogger.findFirst({
+      where: { entity: 'Patient', entityId: patient.id },
+      orderBy: { seq: 'desc' },
+      select: { seq: true, afterHash: true, batchId: true },
     });
 
     let chainMatches = false;
-    if (latestLog?.seq) {
+    if (latestAnchored?.seq) {
       if (skipChainCheck) {
-        chainMatches = latestLog.dataHash === recomputed;
+        chainMatches = latestAnchored.afterHash === currentAfterHash;
       } else {
         try {
-          const proof = await this.auditAnchor.getInclusionProof(latestLog.seq);
-          if (proof && proof.verified) {
-            chainMatches = latestLog.dataHash === recomputed;
+          const proof = await this.auditAnchor.getInclusionProof(latestAnchored.seq);
+          if (proof?.verified) {
+            chainMatches = latestAnchored.afterHash === currentAfterHash;
           }
         } catch { /* proof verification failed */ }
       }
     }
 
     let status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED';
-    if (!latestLog || !latestLog.batchId) status = 'UNANCHORED';
-    else if (dbMatches && chainMatches) status = 'VERIFIED';
-    else status = 'TAMPERED';
+    if (!latestAny) {
+      status = 'UNANCHORED';
+    } else if (!latestAnchored || (latestAny.seq !== latestAnchored.seq && latestAny.afterHash === currentAfterHash)) {
+      status = dbMatches ? 'UNANCHORED' : 'TAMPERED';
+    } else if (dbMatches && chainMatches) {
+      status = 'VERIFIED';
+    } else {
+      status = 'TAMPERED';
+    }
 
     if (status === 'TAMPERED') {
       await this.auditAnchor.sendTelegramAlert(
         'Phát hiện giả mạo thông tin bệnh nhân',
         `Bệnh nhân: ${patient.fullName} (Mã: ${patient.patientCode}, ID: ${patient.id})\n` +
         `• Hash CSDL: ${dbHash}\n` +
-        `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}`
+        `• Hash Audit đã neo: ${latestAnchored?.afterHash ?? 'Không có'}\n` +
+        `• So khớp DB: ${dbMatches ? 'Khớp' : 'LỆCH'}\n` +
+        `• So khớp Chain: ${chainMatches ? 'Khớp' : 'LỆCH'}`
       );
     }
 

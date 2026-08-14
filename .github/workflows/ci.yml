@@ -2,14 +2,58 @@ name: CI
 
 on:
   pull_request:
-    branches: [main, develop]
+    branches: [main, dev, develop]
   push:
-    branches: [develop]
+    branches: [main, dev, develop]
 
 permissions:
   contents: read
 
 jobs:
+  db-migration-ci:
+    name: Database Migration Check
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: hospital_ci_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: apps/hospital-api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/hospital-api/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Prisma Migration Deployment (Clean Virtual DB)
+        env:
+          DATABASE_URL: "postgresql://postgres:postgrespassword@localhost:5432/hospital_ci_db?schema=public"
+        run: npx prisma migrate deploy
+
+      - name: Verify Migration Status & Schema Sync
+        env:
+          DATABASE_URL: "postgresql://postgres:postgrespassword@localhost:5432/hospital_ci_db?schema=public"
+        run: npx prisma migrate status
+
   backend-ci:
     name: Backend CI
     runs-on: ubuntu-latest

@@ -2,6 +2,16 @@ import { GetAiModelStatsUseCase } from '../../../../../../../src/modules/ai-mode
 import { buildAiQualitySnapshot } from '../../../../../../../src/modules/ai-model/domain/ai-quality-snapshot';
 
 describe('GetAiModelStatsUseCase', () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env.AUDIT_HASH_KEY = 'test-audit-hash-key-00000000000001';
+  });
+
+  afterAll(() => {
+    process.env = { ...originalEnv };
+  });
+
   it('correctly evaluates quality integrity using canonical buildAiQualitySnapshot', async () => {
     const quality = {
       id: 'quality-1',

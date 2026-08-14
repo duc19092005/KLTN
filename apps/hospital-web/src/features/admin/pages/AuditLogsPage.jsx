@@ -270,6 +270,10 @@ export default function AuditLogsPage() {
   const [selectedEntityWarnings, setSelectedEntityWarnings] = useState([]);
   const [entityRecoveryReason, setEntityRecoveryReason] = useState('');
   const [recoveringEntities, setRecoveringEntities] = useState(false);
+  const [entityRecoveryFaceOpen, setEntityRecoveryFaceOpen] = useState(false);
+  const [entityRecoveryAlert, setEntityRecoveryAlert] = useState(null);
+  const [entityRecoveryProgress, setEntityRecoveryProgress] = useState(null);
+  const [entityRecoveryCollapsed, setEntityRecoveryCollapsed] = useState(false);
 
   const [batchesPage, setBatchesPage] = useState(1);
   const [batchesTotalPages, setBatchesTotalPages] = useState(1);
@@ -634,17 +638,94 @@ export default function AuditLogsPage() {
     }
   };
 
-  const handleEntityRecovery = async () => {
+  const handleEntityRecovery = () => {
+    const selected = entityWarnings.filter((item) => selectedEntityWarnings.includes(`${item.entity}:${item.entityId}`) && item.recoverable);
+    if (!selected.length || entityRecoveryReason.trim().length < 10) return;
+    setEntityRecoveryFaceOpen(true);
+  };
+
+  const handleEntityRecoveryTicket = async (ticket) => {
+    setEntityRecoveryFaceOpen(false);
     const selected = entityWarnings.filter((item) => selectedEntityWarnings.includes(`${item.entity}:${item.entityId}`) && item.recoverable);
     if (!selected.length || entityRecoveryReason.trim().length < 10) return;
     setRecoveringEntities(true);
+    setEntityRecoveryCollapsed(false);
+    const now = () => new Date().toLocaleTimeString();
+
+    setEntityRecoveryProgress({
+      active: true,
+      progressPercent: 20,
+      statusMessage: `Đã xác thực Face Step-Up. Bắt đầu đối soát Blockchain cho ${selected.length} thực thể...`,
+      total: selected.length,
+      completed: 0,
+      logs: [
+        `[${now()}] 👤 Xác thực Face Step-Up Admin thành công.`,
+        `[${now()}] 🚀 Bắt đầu khôi phục ${selected.length} thực thể có cảnh báo sai lệch...`,
+        `[${now()}] 🔍 Đang kết nối On-Chain Smart Contract & kiểm tra Merkle Inclusion Proof...`,
+      ],
+      tamperedCount: 0,
+      recoveredCount: 0,
+      failedCount: 0,
+      results: [],
+    });
+
     try {
+      setEntityRecoveryProgress((prev) => prev ? {
+        ...prev,
+        progressPercent: 45,
+        statusMessage: `Đang đối soát ${selected.length} bản ghi với Blockchain Merkle Root...`,
+      } : null);
+
       const res = await auditService.recoverEntities(
         selected.map(({ entity, entityId }) => ({ entity, entityId })),
         entityRecoveryReason.trim(),
+        ticket,
       );
       const data = res.data || {};
-      if (data.failed > 0) {
+      const tamperedResults = (data.results || []).filter((r) => r.tamperDetected === true);
+
+      const newLogs = [];
+      (data.results || []).forEach((item) => {
+        const entLabel = ENTITY_LABELS[item.entity] || item.entity;
+        const idShort = item.entityId ? item.entityId.slice(0, 8) + '…' : 'N/A';
+        if (item.tamperDetected) {
+          newLogs.push(`[${now()}] ⚠️ [CẢNH BÁO CAN THIỆP] ${entLabel} (${idShort}): Audit local bị sửa! Đã tự động tải IPFS Artifact (Lô #${item.batchId}) & khôi phục thành công.`);
+        } else if (item.status === 'RECOVERED' || item.status === 'RECREATED') {
+          newLogs.push(`[${now()}] 🟢 [KHỚP ON-CHAIN] ${entLabel} (${idShort}): Merkle proof hợp lệ 100%. Đã khôi phục từ snapshot chuẩn.`);
+        } else if (item.status === 'SKIPPED') {
+          newLogs.push(`[${now()}] ℹ️ [BỎ QUA] ${entLabel} (${idShort}): Dữ liệu đã khớp audit tin cậy.`);
+        } else if (item.status === 'FAILED') {
+          newLogs.push(`[${now()}] ❌ [THẤT BẠI] ${entLabel} (${idShort}): ${item.message || 'Lỗi không xác định'}`);
+        }
+      });
+
+      newLogs.push(`[${now()}] 🎉 Hoàn tất quy trình: Đã khôi phục ${data.recovered || 0}/${selected.length} thực thể.${tamperedResults.length > 0 ? ` Phát hiện ${tamperedResults.length} bản ghi bị can thiệp trái phép đã cứu qua IPFS.` : ''}`);
+
+      setEntityRecoveryProgress((prev) => ({
+        active: false,
+        progressPercent: 100,
+        statusMessage: tamperedResults.length > 0
+          ? `Hoàn tất! Đã khôi phục ${data.recovered || 0} thực thể (${tamperedResults.length} bản ghi cứu qua IPFS do bị sửa trái phép).`
+          : `Hoàn tất! Đã khôi phục thành công ${data.recovered || 0} thực thể toàn vẹn.`,
+        total: selected.length,
+        completed: selected.length,
+        logs: prev ? [...prev.logs, ...newLogs] : newLogs,
+        tamperedCount: tamperedResults.length,
+        recoveredCount: data.recovered || 0,
+        failedCount: data.failed || 0,
+        results: data.results || [],
+      }));
+
+      if (tamperedResults.length > 0) {
+        setEntityRecoveryAlert({
+          type: 'TAMPER_DETECTED',
+          tamperedCount: tamperedResults.length,
+          recoveredCount: data.recovered || 0,
+          items: tamperedResults,
+        });
+        toast.warning(`Phát hiện ${tamperedResults.length} bản ghi có dấu hiệu bị can thiệp trái phép trong CSDL. Đã tự động đối soát Blockchain và khôi phục an toàn từ IPFS!`);
+      } else if (data.failed > 0) {
+        setEntityRecoveryAlert(null);
         const details = (data.results || [])
           .filter((item) => item.status === 'FAILED' && item.message)
           .slice(0, 3)
@@ -652,15 +733,30 @@ export default function AuditLogsPage() {
           .join(' ');
         toast.error(`Khôi phục ${data.recovered || 0}/${data.requested || selected.length} bản ghi; ${data.failed} bản ghi thất bại.${details ? ` ${details}` : ''}`);
       } else if (data.recovered > 0) {
+        setEntityRecoveryAlert(null);
         toast.success(`Đã khôi phục ${data.recovered} bản ghi từ audit đã xác minh blockchain.`);
       } else {
+        setEntityRecoveryAlert(null);
         toast.success('Dữ liệu đã khớp audit tin cậy, không cần ghi đè.');
       }
       setSelectedEntityWarnings([]);
       setEntityRecoveryReason('');
       await refreshAll();
     } catch (err) {
-      toast.error(err?.response?.data?.message || err.message || 'Khôi phục dữ liệu thất bại.');
+      const errMsg = err?.response?.data?.message || err.message || 'Khôi phục dữ liệu thất bại.';
+      setEntityRecoveryProgress((prev) => ({
+        active: false,
+        progressPercent: 100,
+        statusMessage: `Lỗi khôi phục: ${errMsg}`,
+        total: selected.length,
+        completed: 0,
+        logs: prev ? [...prev.logs, `[${now()}] ❌ LỖI: ${errMsg}`] : [`[${now()}] ❌ LỖI: ${errMsg}`],
+        tamperedCount: 0,
+        recoveredCount: 0,
+        failedCount: selected.length,
+        results: [],
+      }));
+      toast.error(errMsg);
     } finally {
       setRecoveringEntities(false);
     }
@@ -891,6 +987,8 @@ export default function AuditLogsPage() {
               recovering={recoveringEntities}
               onRecover={handleEntityRecovery}
               onRefresh={loadEntityWarnings}
+              alert={entityRecoveryAlert}
+              onDismissAlert={() => setEntityRecoveryAlert(null)}
             />
           </div>
         )}
@@ -1129,6 +1227,173 @@ export default function AuditLogsPage() {
         </div>
       )}
 
+      {/* Floating Entity Recovery Progress Widget (Right Sidebar / Bottom-Right) */}
+      {entityRecoveryProgress && (
+        <div className="fixed bottom-6 right-6 z-50 transition-all duration-300">
+          {entityRecoveryCollapsed ? (
+            <div
+              className={`flex items-center gap-2.5 rounded-2xl border px-3.5 py-2.5 shadow-xl backdrop-blur-md transition-all hover:scale-105 cursor-pointer select-none ${
+                entityRecoveryProgress.tamperedCount > 0
+                  ? 'border-amber-300/90 bg-amber-50/95 dark:border-amber-800 dark:bg-amber-950/95 text-amber-900 dark:text-amber-100'
+                  : 'border-slate-200/90 bg-white/95 dark:border-slate-800 dark:bg-slate-900/95'
+              }`}
+              onClick={() => setEntityRecoveryCollapsed(false)}
+              title="Click để xem chi tiết tiến trình khôi phục thực thể"
+            >
+              <div
+                className={`flex h-7 w-7 items-center justify-center rounded-lg ${
+                  entityRecoveryProgress.active
+                    ? 'bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400 animate-pulse'
+                    : entityRecoveryProgress.tamperedCount > 0
+                    ? 'bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400'
+                    : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400'
+                }`}
+              >
+                {entityRecoveryProgress.tamperedCount > 0 ? (
+                  <ShieldAlert className="h-3.5 w-3.5" />
+                ) : (
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 font-mono text-xs font-bold">
+                <span className="text-slate-500 dark:text-slate-400">Khôi phục:</span>
+                <span className={entityRecoveryProgress.tamperedCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-sky-600 dark:text-sky-400'}>
+                  {entityRecoveryProgress.progressPercent}%
+                </span>
+              </div>
+              {entityRecoveryProgress.tamperedCount > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-rose-100 dark:bg-rose-950/60 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 dark:text-rose-300">
+                  <AlertTriangle className="h-3 w-3" />
+                  {entityRecoveryProgress.tamperedCount} IPFS
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEntityRecoveryCollapsed(false);
+                }}
+                className="ml-1 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                title="Mở rộng"
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEntityRecoveryProgress(null);
+                }}
+                className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950 dark:hover:text-rose-400"
+                title="Tắt"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div className="w-[430px] max-w-[calc(100vw-3rem)] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl dark:border-slate-800 dark:bg-slate-900 transition-all duration-300">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-3">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                      entityRecoveryProgress.active
+                        ? 'bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400 animate-pulse'
+                        : entityRecoveryProgress.tamperedCount > 0
+                        ? 'bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400'
+                        : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400'
+                    }`}
+                  >
+                    {entityRecoveryProgress.tamperedCount > 0 ? (
+                      <ShieldAlert className="h-4 w-4" />
+                    ) : (
+                      <ShieldCheck className="h-4 w-4" />
+                    )}
+                  </div>
+                  <div>
+                    <h5 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                      Khôi phục Thực thể & Đối soát Blockchain
+                      {entityRecoveryProgress.tamperedCount > 0 && (
+                        <span className="rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 px-2 py-0.5 text-[10px] font-bold">
+                          IPFS Fallback
+                        </span>
+                      )}
+                    </h5>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      {entityRecoveryProgress.active ? 'Đang chạy ngầm đối soát...' : 'Đã hoàn tất quá trình'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setEntityRecoveryCollapsed(true)}
+                    className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 cursor-pointer"
+                    title="Thu gọn"
+                  >
+                    <Minimize2 className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEntityRecoveryProgress(null)}
+                    className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 cursor-pointer"
+                    title="Tắt"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Progress status & percentage bar */}
+              <div className="space-y-1.5 mb-3">
+                <div className="flex justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <span className="truncate">{entityRecoveryProgress.statusMessage}</span>
+                  <span className="shrink-0 font-bold ml-2">{entityRecoveryProgress.progressPercent}%</span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                  <div
+                    className={`h-full transition-all duration-300 rounded-full ${
+                      entityRecoveryProgress.tamperedCount > 0
+                        ? 'bg-gradient-to-r from-sky-500 via-amber-500 to-emerald-500'
+                        : 'bg-gradient-to-r from-sky-500 to-emerald-500'
+                    }`}
+                    style={{ width: `${entityRecoveryProgress.progressPercent}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Real-time Terminal Logger */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-slate-400 px-1">
+                  <span className="flex items-center gap-1">
+                    <Activity className="h-3 w-3" />
+                    Nhật ký xử lý (Live Logger)
+                  </span>
+                  <span>{entityRecoveryProgress.logs?.length || 0} dòng</span>
+                </div>
+                <div className="h-40 overflow-y-auto rounded-xl bg-slate-950 p-3 font-mono text-[11px] text-slate-300 space-y-1.5 scrollbar-thin border border-slate-800">
+                  {(entityRecoveryProgress.logs || []).map((log, idx) => (
+                    <div
+                      key={idx}
+                      className={`leading-relaxed break-words ${
+                        log.includes('⚠️') || log.includes('CẢNH BÁO')
+                          ? 'text-amber-400 font-semibold'
+                          : log.includes('❌') || log.includes('LỖI')
+                          ? 'text-rose-400 font-semibold'
+                          : log.includes('🟢') || log.includes('🎉')
+                          ? 'text-emerald-400'
+                          : 'text-slate-300'
+                      }`}
+                    >
+                      {log}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {deepScanFaceOpen && (
         <FaceStepUpModal
           action="DEEP_SCAN_SELF_HEAL"
@@ -1137,6 +1402,17 @@ export default function AuditLogsPage() {
           description="Quét khuôn mặt Admin để cấp quyền thực thi cơ chế tự động đối soát Blockchain & tự sửa chữa Audit Batch bị lệch."
           onSuccess={handleDeepScanTicket}
           onClose={() => setDeepScanFaceOpen(false)}
+        />
+      )}
+
+      {entityRecoveryFaceOpen && (
+        <FaceStepUpModal
+          action="RECOVER_AUDIT_ENTITIES"
+          resourceId={null}
+          title="Quét khuôn mặt Admin để xác nhận khôi phục bản ghi"
+          description="Hệ thống sẽ đối soát snapshot đã xác minh trên Blockchain trước khi ghi đè dữ liệu nghiệp vụ."
+          onSuccess={handleEntityRecoveryTicket}
+          onClose={() => setEntityRecoveryFaceOpen(false)}
         />
       )}
     </DashboardLayout>
@@ -1430,7 +1706,7 @@ function BatchIntegrityBadge({ integrity, isBrokenSeqBatch }) {
   );
 }
 
-function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason, setReason, recovering, onRecover, onRefresh }) {
+function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason, setReason, recovering, onRecover, onRefresh, alert, onDismissAlert }) {
   const [viewMode, setViewMode] = useState('clustered'); // 'clustered' | 'flat'
   const recoverable = warnings.filter((item) => item.recoverable);
   const allSelected = recoverable.length > 0 && recoverable.every((item) => selected.includes(`${item.entity}:${item.entityId}`));
@@ -1516,6 +1792,47 @@ function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason,
 
   return (
     <section className="space-y-4">
+      {/* Tamper Warning Banner if IPFS Recovery occurred */}
+      {alert && alert.type === 'TAMPER_DETECTED' && (
+        <div className="rounded-2xl border border-rose-300 bg-rose-50 p-4.5 dark:border-rose-800 dark:bg-rose-950/60 shadow-xs animate-fadeIn">
+          <div className="flex items-start gap-3.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-600 text-white shadow-xs">
+              <ShieldAlert className="h-5 w-5" />
+            </div>
+            <div className="space-y-1.5 min-w-0 flex-1">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-rose-900 dark:text-rose-200 text-xs sm:text-sm flex items-center gap-1.5">
+                  <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                  Cảnh báo: Phát hiện {alert.tamperedCount} bản ghi audit có dấu hiệu bị can thiệp/sửa đổi bất hợp pháp trong CSDL!
+                </h4>
+                {onDismissAlert && (
+                  <button
+                    type="button"
+                    onClick={onDismissAlert}
+                    className="text-rose-600 hover:text-rose-800 dark:text-rose-400 p-1 cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <p className="text-rose-800 dark:text-rose-300 leading-relaxed text-[11px] sm:text-xs">
+                Khi thực hiện khôi phục, hệ thống đã đối soát trực tiếp với <b>Blockchain Smart Contract</b>, phát hiện audit log trong CSDL bị sai lệch so với On-chain Merkle Root và đã <b>tự động tải bản sao lưu IPFS artifact để phục hồi an toàn 100%</b>.
+              </p>
+              <div className="mt-2 space-y-1 rounded-xl bg-white/70 dark:bg-slate-900/60 p-2.5 border border-rose-200/60 dark:border-rose-900/40">
+                {(alert.items || []).map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-[11px] font-medium text-rose-900 dark:text-rose-200">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-500" />
+                    <span>
+                      <b>{ENTITY_LABELS[item.entity] || item.entity}</b> (Mã ID: <code className="font-mono text-[10px] bg-rose-100 dark:bg-rose-900/50 px-1 py-0.5 rounded">{item.entityId}</code>): Đã tự động cứu qua IPFS (Lô audit #{item.batchId})
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Friendly Guidance Box */}
       <div className="rounded-2xl border border-sky-200/80 bg-gradient-to-r from-sky-50/90 via-indigo-50/40 to-white p-4.5 text-xs text-slate-700 dark:border-sky-900/60 dark:bg-slate-800/80 dark:text-slate-200 shadow-xs">
         <div className="flex items-start gap-3.5">

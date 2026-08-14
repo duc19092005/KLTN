@@ -173,10 +173,9 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
-      const systemAdmin = await this.prisma.user.findFirst({ where: { role: 'ADMIN' }, select: { id: true } });
       for (const bId of targetBatchIds) {
         try {
-          await this.recoverBatchDirectFromChain(bId, systemAdmin?.id ?? '', 'Automated 20-minute Background Watchdog Auto-Healing');
+          await this.recoverBatchDirectFromChain(bId, null, 'Automated 20-minute Background Watchdog Auto-Healing');
           totalHealed += 1;
         } catch (err) {
           console.error(`[WATCHDOG] Failed to auto-heal batch #${bId}:`, err);
@@ -385,7 +384,7 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async recoverBatchDirectFromChain(batchId: number, adminId: string, reason: string) {
+  private async recoverBatchDirectFromChain(batchId: number, adminId: string | null, reason: string) {
     const checkpoint = await this.blockchain.getAuditCheckpoint(batchId);
     if (!checkpoint?.committed || !checkpoint.artifactUri || !checkpoint.artifactHash) {
       throw new Error(`Batch ${batchId} không có checkpoint hợp lệ trên Blockchain.`);
@@ -470,10 +469,15 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
       entity: 'AuditBatch',
       entityId: String(batchId),
       action: 'AUDIT_RECOVERY_EXECUTED',
-      actorId: adminId,
+      actorId: adminId || null,
       before: null,
       after: { batchId, restoredCount: bundle.logs.length, status: 'RECOVERED' },
-      metadata: { batchId, reason, artifactHash: checkpoint.artifactHash },
+      metadata: {
+        batchId,
+        reason,
+        artifactHash: checkpoint.artifactHash,
+        actorType: adminId ? 'ADMIN_USER' : 'SYSTEM_WATCHDOG',
+      },
     });
   }
 
