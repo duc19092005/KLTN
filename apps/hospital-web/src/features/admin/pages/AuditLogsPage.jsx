@@ -692,24 +692,24 @@ export default function AuditLogsPage() {
         {/* Top Metric Cards */}
         <div className="grid gap-4 sm:grid-cols-3">
           <StatCard
-            label="Lô đã neo Blockchain"
+            label="Lô đã chốt Blockchain"
             value={stats.batches}
-            hint="Mỗi lô = 1 Merkle Root trên Ethereum"
+            hint="Dữ liệu gốc được bảo chứng bất biến"
             icon={Layers}
             accentColor="emerald"
           />
           <StatCard
-            label="Trạng thái chuỗi Hash DB"
-            value={stats.isChainOk ? 'Toàn vẹn 100%' : 'Bất thường!'}
-            hint={`${stats.chainLength} Sequence đã nối băm`}
+            label="Trạng thái chuỗi nhật ký"
+            value={stats.isChainOk ? 'An toàn 100%' : 'Phát hiện bất thường!'}
+            hint={`${stats.chainLength} bản ghi đã liên kết an toàn`}
             icon={stats.isChainOk ? ShieldCheck : ShieldAlert}
             color={stats.isChainOk ? 'text-emerald-600' : 'text-rose-600'}
             accentColor={stats.isChainOk ? 'emerald' : 'rose'}
           />
           <StatCard
-            label="Hàng đợi chờ neo"
+            label="Nhật ký mới chờ chốt"
             value={stats.pending}
-            hint="Nhật ký mới chưa chốt vào Merkle batch"
+            hint="Sẽ tự động gom thành lô tiếp theo"
             icon={History}
             color={stats.pending > 0 ? 'text-amber-600' : 'text-slate-700'}
             accentColor={stats.pending > 0 ? 'amber' : 'slate'}
@@ -726,7 +726,7 @@ export default function AuditLogsPage() {
           <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">
             <TabButton
               id="batches"
-              label="Lô Merkle & Checkpoints"
+              label="Lô đã chốt Blockchain"
               icon={Layers}
               count={stats.batches}
               active={activeTab === 'batches'}
@@ -734,7 +734,7 @@ export default function AuditLogsPage() {
             />
             <TabButton
               id="integrity"
-              label="Kiểm tra & Cảnh báo toàn vẹn"
+              label="Kiểm tra & Khôi phục dữ liệu"
               icon={ShieldAlert}
               count={stats.warningsCount > 0 ? stats.warningsCount : (!stats.isChainOk ? '!' : null)}
               badgeColor={stats.warningsCount > 0 || !stats.isChainOk ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-600'}
@@ -743,7 +743,7 @@ export default function AuditLogsPage() {
             />
             <TabButton
               id="pending"
-              label="Hàng đợi chưa neo"
+              label="Nhật ký chờ chốt lô"
               icon={History}
               count={stats.pending}
               badgeColor="bg-amber-500 text-white"
@@ -754,7 +754,7 @@ export default function AuditLogsPage() {
 
           <div className="hidden sm:flex items-center gap-2 text-xs font-semibold text-slate-500">
             <Bot className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-            <span>Watchdog: <b>20 phút / lần</b> (Chạy ngầm 15 lô)</span>
+            <span>Tự động kiểm tra: <b>20 phút / lần</b> (Chạy ngầm đối soát)</span>
           </div>
         </div>
 
@@ -1500,13 +1500,13 @@ function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason,
       <section className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 dark:border-emerald-900 dark:bg-emerald-950/40">
         <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-emerald-800 dark:text-emerald-200">
           <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-          <span>Tất cả dữ liệu Thực thể (Entities) hoàn toàn khớp với mốc Audit tin cậy trên Blockchain</span>
+          <span>Tất cả dữ liệu bệnh viện hiện tại hoàn toàn khớp và an toàn với nhật ký hệ thống</span>
         </div>
         <button
           type="button"
           onClick={onRefresh}
           className="rounded-xl p-2 text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900"
-          title="Quét lại dữ liệu"
+          title="Kiểm tra lại dữ liệu"
         >
           <RefreshCw className="h-4 w-4" />
         </button>
@@ -1515,60 +1515,88 @@ function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason,
   }
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-rose-200 bg-white shadow-sm dark:border-rose-900 dark:bg-slate-900">
-      {/* Header with View Mode Switcher */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rose-100 bg-rose-50 px-6 py-4 dark:border-rose-900 dark:bg-rose-950/40">
-        <div className="flex items-start gap-3">
-          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
-          <div>
-            <h2 className="text-sm font-bold text-rose-950 dark:text-rose-100">
-              Dữ liệu thực thể cần kiểm tra & khôi phục ({warnings.length} bản ghi · {clusters.length} ca bệnh/cụm)
-            </h2>
-            <p className="mt-0.5 text-xs font-semibold text-rose-700 dark:text-rose-300">
-              Hệ thống tự động giải quyết các tầng phụ thuộc (DAG Auto-Resolution) theo chuỗi thực thể.
+    <section className="space-y-4">
+      {/* Friendly Guidance Box */}
+      <div className="rounded-2xl border border-sky-200/80 bg-gradient-to-r from-sky-50/90 via-indigo-50/40 to-white p-4.5 text-xs text-slate-700 dark:border-sky-900/60 dark:bg-slate-800/80 dark:text-slate-200 shadow-xs">
+        <div className="flex items-start gap-3.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-600 text-white shadow-xs">
+            <Info className="h-4 w-4" />
+          </div>
+          <div className="space-y-1 min-w-0">
+            <h4 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
+              💡 Lưu ý về cơ chế kiểm tra & khôi phục
+            </h4>
+            <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[11px] sm:text-xs">
+              Mục này thực hiện <b>đối chiếu nhanh</b> giữa dữ liệu bệnh viện thực tế và bản ghi nhật ký trong cơ sở dữ liệu để tìm ra các ca khám bị chỉnh sửa hoặc vô tình bị xóa.
             </p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-sky-500"></span>
+                <b>Kiểm tra nhanh tại đây:</b> So sánh trực tiếp trong Database để hiển thị ngay tức thì.
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                <b>Đối soát với Blockchain:</b> Mở tab <i>"Lô đã neo Blockchain"</i> ➔ bấm <i>"Scan toàn bộ Batch"</i> để xác thực toàn diện với Smart Contract.
+              </span>
+            </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Mode Switcher */}
-          <div className="inline-flex rounded-xl bg-white p-1 shadow-xs border border-rose-200/80 dark:bg-slate-800 dark:border-slate-700 text-[11px] font-bold">
-            <button
-              type="button"
-              onClick={() => setViewMode('clustered')}
-              className={`rounded-lg px-3 py-1.5 transition-all ${viewMode === 'clustered' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300'}`}
-            >
-              Gom cụm Ca khám ({clusters.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('flat')}
-              className={`rounded-lg px-3 py-1.5 transition-all ${viewMode === 'flat' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300'}`}
-            >
-              Danh sách phẳng ({warnings.length})
-            </button>
-          </div>
-
-          <button type="button" onClick={onRefresh} disabled={loading || recovering} className="rounded-xl p-2 text-rose-700 hover:bg-rose-100 disabled:opacity-50" title="Quét lại dữ liệu">
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
         </div>
       </div>
 
-      {/* CLUSTERED CASE VIEW */}
-      {viewMode === 'clustered' && (
-        <div className="p-6 space-y-4">
-          <div className="flex items-center justify-between gap-3 text-xs font-semibold text-slate-500 pb-2 border-b border-slate-100 dark:border-slate-800">
-            <span>Hiển thị theo từng ca bệnh/lượt khám. Bấm "Khôi phục trọn gói ca này" để tự động giải quyết toàn bộ cây dữ liệu phụ thuộc.</span>
-            <button
-              type="button"
-              onClick={toggleAll}
-              disabled={!recoverable.length || recovering}
-              className="text-sky-600 hover:text-sky-700 font-bold text-xs"
-            >
-              {allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả ca khám'}
+      <div className="overflow-hidden rounded-3xl border border-rose-200 bg-white shadow-sm dark:border-rose-900 dark:bg-slate-900">
+        {/* Header with View Mode Switcher */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rose-100 bg-rose-50 px-6 py-4 dark:border-rose-900 dark:bg-rose-950/40">
+          <div className="flex items-start gap-3">
+            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+            <div>
+              <h2 className="text-sm font-bold text-rose-950 dark:text-rose-100">
+                Dữ liệu cần kiểm tra & khôi phục ({warnings.length} bản ghi · {clusters.length} ca khám)
+              </h2>
+              <p className="mt-0.5 text-xs font-semibold text-rose-700 dark:text-rose-300">
+                Hệ thống tự động liên kết và khôi phục trọn gói theo đúng trình tự (từ Lượt khám, Chỉ định đến Kết quả & Chẩn đoán).
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Mode Switcher */}
+            <div className="inline-flex rounded-xl bg-white p-1 shadow-xs border border-rose-200/80 dark:bg-slate-800 dark:border-slate-700 text-[11px] font-bold">
+              <button
+                type="button"
+                onClick={() => setViewMode('clustered')}
+                className={`rounded-lg px-3 py-1.5 transition-all ${viewMode === 'clustered' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300'}`}
+              >
+                Gom theo Ca khám ({clusters.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('flat')}
+                className={`rounded-lg px-3 py-1.5 transition-all ${viewMode === 'flat' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300'}`}
+              >
+                Danh sách chi tiết ({warnings.length})
+              </button>
+            </div>
+
+            <button type="button" onClick={onRefresh} disabled={loading || recovering} className="rounded-xl p-2 text-rose-700 hover:bg-rose-100 disabled:opacity-50" title="Kiểm tra lại dữ liệu">
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
+        </div>
+
+        {/* CLUSTERED CASE VIEW */}
+        {viewMode === 'clustered' && (
+          <div className="p-6 space-y-4">
+            <div className="flex items-center justify-between gap-3 text-xs font-semibold text-slate-500 pb-2 border-b border-slate-100 dark:border-slate-800">
+              <span>Hiển thị gom gọn theo từng ca khám. Bấm "Chọn trọn gói ca này" để khôi phục toàn bộ thông tin của ca bệnh.</span>
+              <button
+                type="button"
+                onClick={toggleAll}
+                disabled={!recoverable.length || recovering}
+                className="text-sky-600 hover:text-sky-700 font-bold text-xs"
+              >
+                {allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả ca khám'}
+              </button>
+            </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             {clusters.map((cluster) => {
@@ -1767,6 +1795,7 @@ function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason,
           </button>
         </div>
       )}
+      </div>
     </section>
   );
 }
