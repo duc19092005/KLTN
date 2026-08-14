@@ -1087,7 +1087,7 @@ export default function AuditLogsPage() {
         <RecoveryReasonModal
           batch={recoveryTarget}
           reason={recoveryReason}
-          setReason={setReason}
+          setReason={setRecoveryReason}
           onClose={() => { setRecoveryTarget(null); setRecoveryReason(''); }}
           onContinue={() => setRecoveryFaceOpen(true)}
         />
