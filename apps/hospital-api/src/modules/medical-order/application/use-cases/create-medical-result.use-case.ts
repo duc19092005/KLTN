@@ -71,7 +71,7 @@ export class CreateMedicalResultUseCase {
       order.visitId,
       async ({ result, order: updatedOrder, visitTransition }, tx) => {
         const resultSnapshot = buildMedicalResultSnapshot({
-          ...result,
+          ...(result as Record<string, unknown>),
           visitId: order.visitId,
         });
         await this.audit.recordV2(
