@@ -3,6 +3,7 @@ import { PrismaService } from '../../../../infrastructure/prisma/prisma.service'
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
 import { AuditAnchorService } from '../../../../infrastructure/audit/audit-anchor.service';
 import { computeAfterHashV2 } from '../../../../infrastructure/audit/audit-hash.util';
+import { buildAiQualitySnapshot } from '../../domain/ai-quality-snapshot';
 
 @Injectable()
 export class GetAiModelStatsUseCase {
@@ -99,12 +100,7 @@ export class GetAiModelStatsUseCase {
   }
 
   private async evaluateQuality(quality: any) {
-    const snapshot = {
-      doctorId: quality.doctorId,
-      aiModelId: quality.aiModelId,
-      doctorConclusionAboutModel: quality.doctorConclusionAboutModel,
-      trustablePercent: quality.trustablePercent,
-    };
+    const snapshot = buildAiQualitySnapshot(quality);
     const recomputed = quality.dataSalt ? this.audit.recompute(snapshot, quality.dataSalt) : null;
     const dbHash = quality.hash256 || null;
     const dbMatches = recomputed !== null && recomputed === dbHash;

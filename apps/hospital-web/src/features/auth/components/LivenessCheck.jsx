@@ -44,7 +44,7 @@ const generateRandomDirections = (count, { includeCenter = false } = {}) => {
 };
 
 const DIRECTION_INFO = {
-  center: { instruction: 'Nhìn thẳng vào camera, giữ mặt ở giữa kén quét' },
+  center: { instruction: 'Nhìn thẳng vào camera, giữ mặt ở giữa khung quét' },
   left:   { instruction: 'Quay đầu sang TRÁI, giữ trong 1 giây' },
   right:  { instruction: 'Quay đầu sang PHẢI, giữ trong 1 giây' },
   up:     { instruction: 'Ngẩng đầu lên TRÊN, giữ trong 1 giây' },
@@ -179,7 +179,7 @@ export default function LivenessCheck({
 
         if (cancelled) return;
         setStatus('active');
-        setMessage('Vui lòng đưa khuôn mặt vào chính giữa kén quét sinh trắc');
+        setMessage('Vui lòng đưa khuôn mặt vào chính giữa khung quét sinh trắc');
 
         startLoop();
       } catch (err) {
@@ -442,7 +442,7 @@ export default function LivenessCheck({
     setDisplayPassed([]);
     setDisplayProgress(0);
     setStatus('active');
-    setMessage('Vui lòng đưa khuôn mặt vào chính giữa kén quét sinh trắc');
+    setMessage('Vui lòng đưa khuôn mặt vào chính giữa khung quét sinh trắc');
 
     startLoop();
   };
@@ -564,7 +564,7 @@ export default function LivenessCheck({
         {/* Đường góc định vị trang trí chuẩn Medical OS */}
         <div className="absolute inset-4 border border-dashed border-slate-200/50 rounded-xl pointer-events-none opacity-50" />
 
-        {/* Kén Oval quét Camera */}
+        {/* Khung Oval quét Camera */}
         <div className={`relative w-[210px] h-[260px] rounded-[105px/130px] bg-slate-950 flex items-center justify-center transition-colors duration-500 ring-8 ${getRingColorStyle()} z-10`}>
 
           {/* Lớp Mặt nạ chứa camera */}

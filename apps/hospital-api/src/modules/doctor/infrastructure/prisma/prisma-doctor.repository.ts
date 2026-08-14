@@ -41,6 +41,16 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
     return { id: dept.id, type: dept.type };
   }
 
+  async countActiveStaffInDepartment(departmentId: string, excludeStaffId?: string): Promise<number> {
+    return this.prisma.staffProfile.count({
+      where: {
+        departmentId,
+        ...(excludeStaffId ? { id: { not: excludeStaffId } } : {}),
+        user: { status: 'ACTIVE' },
+      },
+    });
+  }
+
   async findDoctorByLicense(licenseNumber: string) {
     return this.prisma.doctorProfile.findUnique({ where: { licenseNumber: licenseNumber.trim() }, select: { id: true } });
   }

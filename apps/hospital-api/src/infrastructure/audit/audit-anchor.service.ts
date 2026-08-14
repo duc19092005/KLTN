@@ -292,7 +292,7 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
       // Allocate a monotonic batchId, reconciling local state with the on-chain counter so we
       // never reuse an id the contract already has (it rejects duplicates).
       const localMax = await this.prisma.auditBatch.aggregate({ _max: { batchId: true } });
-      const onChainLatest = (await this.blockchain.getLatestAuditBatchId()) ?? 0;
+      const onChainLatest = (await this.blockchain.getLatestAuditBatchId(true)) ?? 0;
       const batchId = Math.max(localMax._max.batchId ?? 0, onChainLatest) + 1;
 
       const entryHashes = pending.map((p) => p.entryHash!);
@@ -347,13 +347,14 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
         artifact.artifactUri,
       );
 
-      if (!res.success) {
+      if (!res || !res.success) {
+        const errReason = res && 'error' in res ? (res as any).error : 'Blockchain checkpoint commit failed.';
         await this.prisma.auditBatch.update({
           where: { batchId },
-          data: { status: 'ARTIFACT_READY', error: (res as any).error ?? 'Blockchain checkpoint commit failed.' },
+          data: { status: 'ARTIFACT_READY', error: errReason },
         });
-        this.logger.error(`Batch ${batchId} commit failed: ${(res as any).error}`);
-        return { committed: false, batchId, reason: (res as any).error };
+        this.logger.error(`Batch ${batchId} commit failed: ${errReason}`);
+        return { committed: false, batchId, reason: errReason };
       }
 
       await this.prisma.auditBatch.update({
@@ -380,7 +381,6 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
           data: { batchId, onChainStatus: 'ANCHORED', txHash, blockNumber },
         }),
       ]);
-
       this.logger.log(`Batch ${batchId} anchored: ${pending.length} logs (seq ${fromSeq}-${toSeq}), tx ${txHash}`);
       return { committed: true, batchId, leafCount: pending.length };
     } finally {
@@ -389,8 +389,8 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
   }
 
   private async recoverPendingBatches(): Promise<void> {
-    const pendingBatches = await this.prisma.auditBatch.findMany({
-      where: { status: { in: ['PENDING', 'PREPARING', 'ARTIFACT_READY', 'ON_CHAIN_CONFIRMED'] } },
+    const batches = await this.prisma.auditBatch.findMany({
+      where: { status: { in: ['PENDING', 'PREPARING', 'ARTIFACT_READY', 'ON_CHAIN_CONFIRMED', 'ANCHORED'] } },
       orderBy: { batchId: 'asc' },
       select: {
         batchId: true,
@@ -409,11 +409,19 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
       },
     });
 
-    if (pendingBatches.length === 0) return;
+    if (batches.length === 0) return;
 
-    this.logger.warn(`Found ${pendingBatches.length} pending audit batch(es). Starting recovery check...`);
-    for (const batch of pendingBatches) {
+    for (const batch of batches) {
       try {
+        const localRootBytes32 = rootToBytes32(batch.merkleRoot).toLowerCase();
+        const checkpoint = await this.blockchain.getAuditCheckpoint(batch.batchId);
+        const onChainRoot = checkpoint?.root?.toLowerCase();
+
+        // 1. If batch is already ANCHORED in DB and also committed on-chain with matching root -> all good
+        if (batch.status === 'ANCHORED' && checkpoint?.committed && onChainRoot === localRootBytes32) {
+          continue;
+        }
+
         if (batch.status === 'PENDING') {
           await this.prisma.auditBatch.update({
             where: { batchId: batch.batchId },
@@ -422,7 +430,7 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
           continue;
         }
 
-        if (batch.status === 'PREPARING') {
+        if (batch.status === 'PREPARING' || (!batch.artifactHash && !checkpoint?.committed)) {
           if (batch.fromSeq == null || batch.toSeq == null) throw new Error('Incomplete batch has no sequence range.');
           const logs = await this.loadRecoveryBundleRows(batch.fromSeq, batch.toSeq);
           const artifact = await this.artifacts.createAndUpload({
@@ -441,40 +449,69 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
             where: { batchId: batch.batchId },
             data: { ...artifact, status: 'ARTIFACT_READY', error: null },
           });
-          continue;
+          batch.artifactHash = artifact.artifactHash;
+          batch.artifactUri = artifact.artifactUri;
+          batch.status = 'ARTIFACT_READY';
         }
 
-        const checkpoint = await this.blockchain.getAuditCheckpoint(batch.batchId);
-        const localRootBytes32 = rootToBytes32(batch.merkleRoot).toLowerCase();
-        const onChainRoot = checkpoint?.root?.toLowerCase();
+        // 2. If not yet committed on-chain (e.g. fresh blockchain node or redeployed contract while DB has batch)
+        if (!checkpoint?.committed) {
+          const onChainLatest = (await this.blockchain.getLatestAuditBatchId(true)) ?? 0;
+          if (batch.batchId === onChainLatest + 1) {
+            if (!batch.artifactHash || !batch.artifactUri) {
+              const logs = await this.loadRecoveryBundleRows(batch.fromSeq!, batch.toSeq!);
+              const artifact = await this.artifacts.createAndUpload({
+                schema: 'KLTN_AUDIT_RECOVERY_BUNDLE_V1',
+                batch: {
+                  batchId: batch.batchId,
+                  merkleRoot: batch.merkleRoot,
+                  leafCount: batch.leafCount,
+                  fromSeq: batch.fromSeq!,
+                  toSeq: batch.toSeq!,
+                  algorithmVersion: batch.algorithmVersion,
+                },
+                logs,
+              });
+              batch.artifactHash = artifact.artifactHash;
+              batch.artifactUri = artifact.artifactUri;
+            }
 
-        if (batch.status === 'ARTIFACT_READY' && !checkpoint?.committed) {
-          if (!batch.artifactHash || !batch.artifactUri) throw new Error('Prepared batch is missing artifact metadata.');
-          const result = await this.blockchain.commitAuditCheckpoint(
-            batch.batchId,
-            localRootBytes32,
-            batch.leafCount,
-            batch.artifactHash,
-            batch.artifactUri,
-          );
-          if (!result.success) {
-            const reason = 'error' in result ? result.error : 'Blockchain checkpoint commit failed.';
-            await this.prisma.auditBatch.update({ where: { batchId: batch.batchId }, data: { error: reason } });
+            const result = await this.blockchain.commitAuditCheckpoint(
+              batch.batchId,
+              localRootBytes32,
+              batch.leafCount,
+              batch.artifactHash,
+              batch.artifactUri,
+            );
+            if (!result || !result.success) {
+              const reason = result && 'error' in result ? (result as any).error : 'Blockchain checkpoint commit failed.';
+              await this.prisma.auditBatch.update({ where: { batchId: batch.batchId }, data: { error: reason } });
+              continue;
+            }
+            await this.prisma.$transaction([
+              this.prisma.auditBatch.update({
+                where: { batchId: batch.batchId },
+                data: {
+                  status: 'ANCHORED',
+                  txHash: result.txHash,
+                  blockNumber: result.blockNumber,
+                  anchoredAt: new Date(),
+                  error: null,
+                },
+              }),
+              this.prisma.blockchainLogger.updateMany({
+                where: {
+                  seq: { gte: batch.fromSeq!, lte: batch.toSeq! },
+                },
+                data: { batchId: batch.batchId, onChainStatus: 'ANCHORED' },
+              }),
+            ]);
+            this.logger.log(`✅ [AuditAnchorService] Batch ${batch.batchId} synchronized/committed to on-chain smart contract.`);
             continue;
           }
-          await this.prisma.auditBatch.update({
-            where: { batchId: batch.batchId },
-            data: {
-              status: 'ON_CHAIN_CONFIRMED',
-              txHash: result.txHash,
-              blockNumber: result.blockNumber,
-              anchoredAt: new Date(),
-              error: null,
-            },
-          });
-          continue;
         }
 
+        // 3. If committed on-chain and root matches -> mark ANCHORED in DB
         if (checkpoint?.committed && onChainRoot === localRootBytes32) {
           if (!batch.artifactHash || !batch.artifactUri
             || checkpoint.artifactHash.toLowerCase() !== batch.artifactHash.toLowerCase()
@@ -501,15 +538,17 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
             this.prisma.blockchainLogger.updateMany({
               where: {
                 seq: { gte: batch.fromSeq!, lte: batch.toSeq! },
-                batchId: null,
               },
               data: { batchId: batch.batchId, onChainStatus: 'ANCHORED' },
             }),
           ]);
-          this.logger.warn(`Recovered audit batch ${batch.batchId} from on-chain checkpoint.`);
+          if (batch.status !== 'ANCHORED') {
+            this.logger.warn(`Recovered audit batch ${batch.batchId} from on-chain checkpoint.`);
+          }
           continue;
         }
 
+        // 4. Root mismatch between on-chain and local DB
         if (checkpoint?.committed && onChainRoot !== localRootBytes32) {
           const reason = `Pending batch ${batch.batchId} root mismatch during recovery.`;
           await this.prisma.auditBatch.update({
@@ -519,7 +558,6 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
           await this.sendTelegramAlert('Audit batch recovery root mismatch', reason, batch.fromSeq ?? undefined);
           continue;
         }
-
       } catch (err) {
         this.logger.error(`Failed to recover pending audit batch ${batch.batchId}`, err);
       }

@@ -64,6 +64,7 @@ export interface StaffRepositoryPort {
   findByIdWithStaffRelations(id: string): Promise<any | null>;
   departmentExists(id: string): Promise<boolean>;
   findDepartment(id: string): Promise<{ id: string; type: string } | null>;
+  countActiveStaffInDepartment(departmentId: string, excludeStaffId?: string): Promise<number>;
 
   findUserByUsernameOrEmail(username?: string, email?: string): Promise<{ id: string; username: string; email: string } | null>;
   findStaffByCitizenId(citizenId: string): Promise<{ id: string } | null>;

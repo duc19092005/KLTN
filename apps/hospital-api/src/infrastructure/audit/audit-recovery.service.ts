@@ -175,7 +175,7 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
 
       for (const bId of targetBatchIds) {
         try {
-          await this.recoverBatchDirectFromChain(bId, 'SYSTEM_WATCHDOG', 'Automated 20-minute Background Watchdog Auto-Healing');
+          await this.recoverBatchDirectFromChain(bId, null, 'Automated 20-minute Background Watchdog Auto-Healing');
           totalHealed += 1;
         } catch (err) {
           console.error(`[WATCHDOG] Failed to auto-heal batch #${bId}:`, err);
@@ -384,7 +384,7 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async recoverBatchDirectFromChain(batchId: number, adminId: string, reason: string) {
+  private async recoverBatchDirectFromChain(batchId: number, adminId: string | null, reason: string) {
     const checkpoint = await this.blockchain.getAuditCheckpoint(batchId);
     if (!checkpoint?.committed || !checkpoint.artifactUri || !checkpoint.artifactHash) {
       throw new Error(`Batch ${batchId} không có checkpoint hợp lệ trên Blockchain.`);
@@ -411,12 +411,23 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
       await tx.$executeRaw`SELECT set_config('app.audit_recovery_authorized', 'true', true)`;
       await tx.$executeRaw`SET session_replication_role = 'replica'`;
 
+      const logIds = bundle.logs.map((r) => r.id).filter(Boolean);
       await tx.blockchainLogger.deleteMany({
-        where: { seq: { gte: bundle.batch.fromSeq, lte: bundle.batch.toSeq } },
+        where: {
+          OR: [
+            { seq: { gte: bundle.batch.fromSeq, lte: bundle.batch.toSeq } },
+            { id: { in: logIds } },
+          ],
+        },
       });
 
       for (const row of bundle.logs) {
-        await tx.blockchainLogger.create({ data: this.toCreateInput(row, batchId, null, null) });
+        const input = this.toCreateInput(row, batchId, null, null);
+        await tx.blockchainLogger.upsert({
+          where: { id: row.id },
+          create: input,
+          update: input,
+        });
       }
 
       await tx.$executeRaw`SET session_replication_role = 'origin'`;
@@ -458,10 +469,15 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
       entity: 'AuditBatch',
       entityId: String(batchId),
       action: 'AUDIT_RECOVERY_EXECUTED',
-      actorId: adminId,
+      actorId: adminId || null,
       before: null,
       after: { batchId, restoredCount: bundle.logs.length, status: 'RECOVERED' },
-      metadata: { batchId, reason, artifactHash: checkpoint.artifactHash },
+      metadata: {
+        batchId,
+        reason,
+        artifactHash: checkpoint.artifactHash,
+        actorType: adminId ? 'ADMIN_USER' : 'SYSTEM_WATCHDOG',
+      },
     });
   }
 
@@ -533,6 +549,29 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
       if (!checkpoint?.committed) throw new BadRequestException('The batch has no committed blockchain checkpoint.');
       if (!checkpoint.artifactUri || !checkpoint.artifactHash) {
         throw new BadRequestException('The blockchain checkpoint has no recovery artifact.');
+      }
+
+      const batch = await this.prisma.auditBatch.findUnique({ where: { batchId } });
+      if (batch?.status === 'ANCHORED' && batch.fromSeq != null && batch.toSeq != null) {
+        const logsInBatch = await this.prisma.blockchainLogger.findMany({
+          where: { seq: { gte: batch.fromSeq, lte: batch.toSeq }, entryHash: { not: null } },
+          orderBy: { seq: 'asc' },
+        });
+        const expectedCount = batch.leafCount || (batch.toSeq - batch.fromSeq + 1);
+        if (logsInBatch.length === expectedCount) {
+          const isEveryRowIntact = logsInBatch.every((l) => verifyAuditRow({ ...l, createdAt: new Date(l.createdAt) }).ok);
+          const recomputedRoot = computeMerkleRootForAlgorithm(
+            logsInBatch.map((l) => l.entryHash!),
+            batch.algorithmVersion ?? MERKLE_SHA256_STRING_V1,
+          );
+          if (
+            isEveryRowIntact &&
+            rootToBytes32(recomputedRoot).toLowerCase() === rootToBytes32(checkpoint.root).toLowerCase() &&
+            rootToBytes32(batch.merkleRoot).toLowerCase() === rootToBytes32(checkpoint.root).toLowerCase()
+          ) {
+            throw new BadRequestException('The audit batch is already intact and matches the blockchain checkpoint.');
+          }
+        }
       }
 
       await this.recoverBatchDirectFromChain(batchId, adminId, reason);

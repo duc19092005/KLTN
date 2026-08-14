@@ -4,6 +4,7 @@ import { PATIENT_INTEGRITY_ANCHOR, PatientIntegrityAnchorPort } from '../ports/p
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { AuditAnchorService } from '../../../../infrastructure/audit/audit-anchor.service';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { computeAfterHashV2 } from '../../../../infrastructure/audit/audit-hash.util';
 import { buildMedicalConclusionSnapshot } from '../../../clinical-decision/domain/medical-conclusion-snapshot';
 
 /**
@@ -151,12 +152,13 @@ export class VerifyPatientPublicUseCase {
         : null;
       const dbHash = conclusion.hash256 || null;
       const dbMatches = recomputed !== null && recomputed === dbHash;
+      const currentAfterHash = computeAfterHashV2('MedicalConclusion', conclusion.id, snapshot);
 
       // Find the latest anchored log entry for this conclusion
       const latestLog = await this.prisma.blockchainLogger.findFirst({
         where: { entity: 'MedicalConclusion', entityId: conclusion.id, batchId: { not: null } },
         orderBy: { seq: 'desc' },
-        select: { seq: true, dataHash: true, batchId: true, txHash: true, createdAt: true },
+        select: { seq: true, afterHash: true, batchId: true, txHash: true, createdAt: true },
       });
 
       let chainMatches = false;
@@ -173,11 +175,11 @@ export class VerifyPatientPublicUseCase {
         try {
           const proof = await this.auditAnchor.getInclusionProof(latestLog.seq);
           if (proof && proof.verified) {
-            chainMatches = latestLog.dataHash === recomputed;
+            chainMatches = latestLog.afterHash === currentAfterHash;
             proofDetails = {
               seq: latestLog.seq,
               batchId: latestLog.batchId,
-              entryHash: latestLog.dataHash,
+              afterHash: latestLog.afterHash,
               onChainRoot: proof.onChainRoot,
               proof: proof.proof,
             };

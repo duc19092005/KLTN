@@ -80,6 +80,7 @@ export class AuditController {
   }
 
   @Post('recovery/entities')
+  @RequireFaceStepUp('RECOVER_AUDIT_ENTITIES')
   @ApiOperation({ summary: 'Recover selected business entities from verified encrypted audit snapshots' })
   recoverEntities(@Body() body: RecoverAuditEntitiesDto, @CurrentUser() user: AuthUser) {
     return this.entityRecovery.recoverMany(body.items, user.sub, body.reason.trim());

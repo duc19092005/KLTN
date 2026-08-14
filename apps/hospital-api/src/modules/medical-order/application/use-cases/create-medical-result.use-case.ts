@@ -3,9 +3,7 @@ import { MedicalOrderStatus } from '@prisma/client';
 import { AuthUser } from '../../../../common/types/auth-user.type';
 import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
 import { CreateMedicalResultDto } from '../../dto/medical-order.dto';
-import {
-  buildMedicalResultAuditSnapshot,
-} from '../../domain/medical-result-audit-snapshot';
+import { buildMedicalResultSnapshot } from '../../domain/medical-result-snapshot';
 import { buildMedicalOrderSnapshot } from '../../domain/medical-order-snapshot';
 import { MedicalOrderAccessPolicy } from '../policies/medical-order-access.policy';
 import { MEDICAL_ORDER_REPOSITORY, MedicalOrderRepositoryPort } from '../ports/medical-order.repository.port';
@@ -72,11 +70,10 @@ export class CreateMedicalResultUseCase {
       },
       order.visitId,
       async ({ result, order: updatedOrder, visitTransition }, tx) => {
-        const resultSnapshot = buildMedicalResultAuditSnapshot(
-          result as Parameters<typeof buildMedicalResultAuditSnapshot>[0],
-          order.visitId,
-          MedicalOrderStatus.RESULT_READY,
-        );
+        const resultSnapshot = buildMedicalResultSnapshot({
+          ...(result as Record<string, unknown>),
+          visitId: order.visitId,
+        });
         await this.audit.recordV2(
           {
             entity: 'MedicalResult',

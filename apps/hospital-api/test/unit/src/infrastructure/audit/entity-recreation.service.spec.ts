@@ -105,6 +105,13 @@ const cases: Array<{ entity: RecreatableAuditEntity; snapshot: Snapshot }> = [
       finalDiagnosis: 'Trusted conclusion', treatmentPlan: 'Plan', prescription: null, followUpNote: null, doctorNote: 'Note',
     },
   },
+  {
+    entity: 'AiQuality',
+    snapshot: {
+      doctorId: IDS.doctor, aiModelId: IDS.model, aiDiagnosisId: IDS.diagnosis,
+      doctorConclusionAboutModel: 'Very accurate', trustablePercent: 100,
+    },
+  },
 ];
 
 function buildRow(entity: RecreatableAuditEntity, entityId: string, after: Snapshot): AuditRecoveryBundleRow {
@@ -163,7 +170,7 @@ function buildPermanentDeletionRow(entityId: string, before: Snapshot): AuditRec
 function makeStore(entity: RecreatableAuditEntity, snapshot: Snapshot) {
   const records: Record<string, Map<string, any>> = {
     user: new Map(), department: new Map(), staffProfile: new Map(), doctorProfile: new Map(), patient: new Map(),
-    aiModelRegistry: new Map(), aiDiagnosis: new Map(), medicalConclusion: new Map(), visit: new Map(),
+    aiModelRegistry: new Map(), aiDiagnosis: new Map(), medicalConclusion: new Map(), visit: new Map(), aiQuality: new Map(),
   };
   const targetId = IDS.entity;
 
@@ -185,6 +192,13 @@ function makeStore(entity: RecreatableAuditEntity, snapshot: Snapshot) {
     seed('patient', IDS.patient, { patientCode: 'BN-0001' });
     seed('visit', IDS.visit, { patientId: IDS.patient });
     seed('doctorProfile', IDS.doctor, { staffProfileId: IDS.staff });
+    seed('aiDiagnosis', IDS.diagnosis, { visitId: IDS.visit });
+  }
+  if (entity === 'AiQuality') {
+    seed('patient', IDS.patient, { patientCode: 'BN-0001' });
+    seed('visit', IDS.visit, { patientId: IDS.patient });
+    seed('doctorProfile', IDS.doctor, { staffProfileId: IDS.staff });
+    seed('aiModelRegistry', IDS.model, { modelId: 'model-1' });
     seed('aiDiagnosis', IDS.diagnosis, { visitId: IDS.visit });
   }
 
@@ -514,7 +528,7 @@ describe('EntityRecreationService', () => {
     records.department.clear();
 
     await expect(service.previewOne({ entity: 'DoctorProfile', entityId: IDS.entity })).resolves.toMatchObject({
-      recoverable: false, blockers: expect.arrayContaining(['MISSING_DEPARTMENT']),
+      recoverable: false, blockers: expect.arrayContaining(['MISSING_DEPARTMENT_NOT_RECOVERABLE']),
     });
     expect(prisma.doctorProfile.create).not.toHaveBeenCalled();
   });
@@ -545,7 +559,7 @@ describe('EntityRecreationService', () => {
 
     const preview = await service.previewOne({ entity: 'AiDiagnosis', entityId: IDS.entity });
     expect(preview.blockers).toEqual(expect.arrayContaining([
-      'MISSING_AI_MODEL', 'MISSING_PATIENT', 'MISSING_VISIT_NOT_RECOVERABLE', 'MISSING_REVIEWING_DOCTOR',
+      'MISSING_AI_MODEL_NOT_RECOVERABLE', 'MISSING_PATIENT_NOT_RECOVERABLE', 'MISSING_VISIT_NOT_RECOVERABLE', 'MISSING_REVIEWING_DOCTOR_NOT_RECOVERABLE',
     ]));
     expect(preview.recoverable).toBe(false);
   });
@@ -559,6 +573,23 @@ describe('EntityRecreationService', () => {
     const preview = await service.previewOne({ entity: patientCase.entity, entityId: IDS.entity });
     expect(preview.recoverable).toBe(false);
     expect(preview.blockers.join(' ')).toContain('Không tìm thấy snapshot');
+  });
+
+  it('resolves cascading dependency on AiDiagnosis when AiQuality is missing AiDiagnosis', async () => {
+    const qualityCase = cases.find((item) => item.entity === 'AiQuality')!;
+    const diagnosisCase = cases.find((item) => item.entity === 'AiDiagnosis')!;
+    const { service, records, batchRecovery, sourceRow } = makeStore('AiQuality', qualityCase.snapshot);
+    const diagnosisRow = buildRow('AiDiagnosis', IDS.diagnosis, diagnosisCase.snapshot);
+    batchRecovery.loadVerifiedBundle.mockResolvedValue({
+      batchId: 4, artifactHash: `0x${'a'.repeat(64)}`, artifactUri: 'ipfs://verified', merkleRoot: 'b'.repeat(64),
+      logs: [sourceRow, diagnosisRow],
+    });
+    records.aiDiagnosis.clear();
+
+    const preview = await service.previewOne({ entity: 'AiQuality', entityId: IDS.entity });
+    expect(preview.dependencies).toEqual([{ entity: 'AiDiagnosis', entityId: IDS.diagnosis }]);
+    expect(preview.recoveryMode).toBe('DEPENDENCY_CHAIN');
+    expect(preview.recoverable).toBe(true);
   });
 
   it('rolls back the recreated entity when appending the recovery audit fails', async () => {

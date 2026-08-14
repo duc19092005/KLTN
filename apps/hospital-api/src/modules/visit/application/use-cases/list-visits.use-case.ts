@@ -6,9 +6,8 @@ import { VisitQueryDto } from '../../dto/visit.dto';
 import { VISIT_REPOSITORY, VisitRepositoryPort } from '../ports/visit.repository.port';
 
 /**
- * Lists visits with pagination. Doctors are implicitly scoped to their own
- * visits; other roles may filter by department/staff. Doctors are scoped to
- * their current department so they can pick up WAITING visits assigned there.
+ * Lists visits with pagination. Doctors are scoped to their department so they
+ * can pick up WAITING and active visits in their assigned department queue.
  */
 @Injectable()
 export class ListVisitsUseCase {
@@ -24,7 +23,11 @@ export class ListVisitsUseCase {
     if (user?.role === UserRole.DOCTOR) {
       const doctor = await this.repo.findDoctorStaffByUserId(user.sub);
       departmentId = doctor?.departmentId ?? '__no-doctor-department__';
-      staffId = doctor?.staffId ?? '__no-doctor-staff__';
+      // If no explicit staffId filter was passed in query, allow doctor to view
+      // all department visits (unassigned or assigned to department staff).
+      if (!query.staffId) {
+        staffId = undefined;
+      }
     }
 
     const { items, total } = await this.repo.findManyPaginated(

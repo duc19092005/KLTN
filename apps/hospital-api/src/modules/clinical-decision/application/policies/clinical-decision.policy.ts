@@ -20,7 +20,7 @@ export class ClinicalDecisionPolicy {
     if (!doctor.departmentId || visit.departmentId !== doctor.departmentId) {
       throw new BadRequestException('Bác sĩ chỉ được truy cập lượt khám trong phòng ban của mình.');
     }
-    if (visit.staffId && visit.staffId !== doctor.staffId) {
+    if (visit.staffId && visit.staffId !== doctor.staffId && visit.status !== VisitStatus.WAITING) {
       throw new BadRequestException('Lượt khám này đã được bác sĩ khác phụ trách.');
     }
     return visit;
