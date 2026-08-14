@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, Optional } from '@nestjs/common';
+import { ConflictException, forwardRef, Inject, Injectable, Optional } from '@nestjs/common';
 import {
   AppointmentStatus,
   DepartmentType,
@@ -32,6 +32,7 @@ import {
 } from './audit-verification.util';
 import { canonicalize } from './audit-hash.util';
 import { EntityRecreationBundleCache, EntityRecreationService } from './entity-recreation.service';
+import { AuditRecoveryService } from './audit-recovery.service';
 
 export const RECOVERABLE_AUDIT_ENTITIES = [
   'Patient',
@@ -128,6 +129,7 @@ export class EntityRecoveryService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditLoggerService,
     private readonly anchor: AuditAnchorService,
+    @Optional() @Inject(forwardRef(() => AuditRecoveryService)) private readonly batchRecovery?: AuditRecoveryService,
     @Optional() private readonly recreation?: EntityRecreationService,
   ) {}
 
@@ -318,18 +320,64 @@ export class EntityRecoveryService {
     }
 
     const verification = verifyAuditRow(row);
-    if (!verification.ok) {
-      throw new ConflictException('Audit nguồn không toàn vẹn; phải phục hồi audit batch từ IPFS trước.');
+    let proofVerified = false;
+    if (verification.ok && row.seq != null) {
+      try {
+        const proof = await this.anchor.getInclusionProof(row.seq);
+        proofVerified = Boolean(proof?.verified);
+      } catch {
+        proofVerified = false;
+      }
     }
-    const sourceSnapshot = this.requireCompleteSnapshot(target.entity, verification.decryptedAfter);
-    const proof = await this.anchor.getInclusionProof(row.seq);
-    if (!proof?.verified) {
-      throw new ConflictException('Không xác minh được audit nguồn với Merkle root trên blockchain.');
+
+    let sourceSnapshot: Snapshot;
+    let sourceSeq = row.seq;
+    let sourceBatchId = row.batchId;
+    let isTamperedAudit = false;
+    let recoverySource: 'LOCAL_BLOCKCHAIN_VERIFIED' | 'IPFS_RECOVERED' = 'LOCAL_BLOCKCHAIN_VERIFIED';
+
+    if (verification.ok && proofVerified && verification.decryptedAfter) {
+      // Nhánh 1: Audit log local toàn vẹn và khớp 100% với On-chain Merkle Root
+      sourceSnapshot = this.requireCompleteSnapshot(target.entity, verification.decryptedAfter);
+    } else {
+      // Nhánh 2: Audit log local không khớp hoặc bị sửa đổi (Tampered) -> Tự động fallback qua IPFS
+      isTamperedAudit = true;
+      recoverySource = 'IPFS_RECOVERED';
+
+      if (!this.batchRecovery) {
+        throw new ConflictException('Audit log local có dấu hiệu bị sửa đổi và dịch vụ IPFS recovery chưa sẵn sàng.');
+      }
+
+      const verifiedBundle = await this.batchRecovery.loadVerifiedBundle(row.batchId);
+      const matchingRow = verifiedBundle.logs.find(
+        (l) => l.entity === target.entity && l.entityId === target.entityId && l.seq === row.seq
+      ) || verifiedBundle.logs.find(
+        (l) => l.entity === target.entity && l.entityId === target.entityId
+      );
+
+      if (!matchingRow) {
+        throw new ConflictException(`Không tìm thấy bản ghi ${target.entity} trong IPFS artifact của Batch #${row.batchId}.`);
+      }
+
+      const ipfsVerif = verifyAuditRow(matchingRow as any);
+      if (!ipfsVerif.ok || !ipfsVerif.decryptedAfter) {
+        throw new ConflictException('Không giải mã được snapshot từ IPFS artifact.');
+      }
+
+      sourceSnapshot = this.requireCompleteSnapshot(target.entity, ipfsVerif.decryptedAfter);
+      sourceSeq = matchingRow.seq;
     }
 
     const snapshot = this.effectiveRecoverySnapshot(target.entity, sourceSnapshot, liveSnapshot);
     if (this.snapshotsEqual(snapshot, liveSnapshot)) {
-      return { ...target, status: 'SKIPPED', sourceSeq: row.seq, batchId: row.batchId };
+      return {
+        ...target,
+        status: 'SKIPPED',
+        sourceSeq,
+        batchId: sourceBatchId,
+        source: recoverySource,
+        tamperDetected: isTamperedAudit,
+      };
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -352,14 +400,30 @@ export class EntityRecoveryService {
         entity: target.entity,
         entityId: target.entityId,
         action: 'AUDIT_ENTITY_RECOVERED',
-        actorId,
+        actorId: actorId || null,
         before: current,
         after: restored,
-        metadata: { reason, sourceSeq: row.seq, sourceBatchId: row.batchId },
+        metadata: {
+          reason,
+          sourceSeq,
+          sourceBatchId,
+          source: recoverySource,
+          tamperDetected: isTamperedAudit,
+        },
       }, tx);
     });
 
-    return { ...target, status: 'RECOVERED', sourceSeq: row.seq, batchId: row.batchId };
+    return {
+      ...target,
+      status: 'RECOVERED',
+      sourceSeq,
+      batchId: sourceBatchId,
+      source: recoverySource,
+      tamperDetected: isTamperedAudit,
+      warning: isTamperedAudit
+        ? `Phát hiện audit log của ${target.entity} (${target.entityId}) có dấu hiệu bị can thiệp/sửa đổi bất hợp pháp trong CSDL; hệ thống đã tự động đối soát Blockchain và khôi phục an toàn từ IPFS.`
+        : null,
+    };
   }
 
   private async evaluateRow(
