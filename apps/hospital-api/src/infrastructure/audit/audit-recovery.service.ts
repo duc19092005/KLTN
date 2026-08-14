@@ -411,12 +411,23 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
       await tx.$executeRaw`SELECT set_config('app.audit_recovery_authorized', 'true', true)`;
       await tx.$executeRaw`SET session_replication_role = 'replica'`;
 
+      const logIds = bundle.logs.map((r) => r.id).filter(Boolean);
       await tx.blockchainLogger.deleteMany({
-        where: { seq: { gte: bundle.batch.fromSeq, lte: bundle.batch.toSeq } },
+        where: {
+          OR: [
+            { seq: { gte: bundle.batch.fromSeq, lte: bundle.batch.toSeq } },
+            { id: { in: logIds } },
+          ],
+        },
       });
 
       for (const row of bundle.logs) {
-        await tx.blockchainLogger.create({ data: this.toCreateInput(row, batchId, null, null) });
+        const input = this.toCreateInput(row, batchId, null, null);
+        await tx.blockchainLogger.upsert({
+          where: { id: row.id },
+          create: input,
+          update: input,
+        });
       }
 
       await tx.$executeRaw`SET session_replication_role = 'origin'`;

@@ -1439,6 +1439,21 @@ function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason,
   const toggleOne = (key) => setSelected((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
 
   // Group warnings into clinical case clusters
+  const CLINICAL_ENTITY_ORDER = {
+    Patient: 1,
+    Appointment: 2,
+    Visit: 3,
+    MedicalOrder: 4,
+    MedicalResult: 5,
+    AiDiagnosis: 6,
+    MedicalConclusion: 7,
+    AiQuality: 8,
+    AiModelRegistry: 9,
+    Department: 10,
+    DoctorProfile: 11,
+    StaffProfile: 12,
+  };
+
   const clusters = useMemo(() => {
     const map = new Map();
     for (const item of warnings) {
@@ -1455,12 +1470,25 @@ function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason,
       entry.items.push(item);
       if (item.recoverable) entry.hasRecoverable = true;
     }
+
+    for (const cluster of map.values()) {
+      cluster.items.sort((a, b) => {
+        const orderA = CLINICAL_ENTITY_ORDER[a.entity] || 99;
+        const orderB = CLINICAL_ENTITY_ORDER[b.entity] || 99;
+        return orderA - orderB;
+      });
+    }
+
     return Array.from(map.values());
   }, [warnings]);
 
   const selectCluster = (clusterItems) => {
     const keys = clusterItems.filter((i) => i.recoverable).map((i) => `${i.entity}:${i.entityId}`);
     setSelected((current) => {
+      const allSelected = keys.every((k) => current.includes(k));
+      if (allSelected) {
+        return current.filter((k) => !keys.includes(k));
+      }
       const set = new Set(current);
       keys.forEach((k) => set.add(k));
       return Array.from(set);
@@ -1588,14 +1616,18 @@ function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason,
 
                   {/* Entities in cluster */}
                   <div className="mt-3.5 space-y-2">
-                    {cluster.items.map((item) => {
+                    {cluster.items.map((item, idx) => {
                       const key = `${item.entity}:${item.entityId}`;
                       const isItemChecked = selected.includes(key);
+                      const isChild = item.entity !== 'Visit' && item.entity !== 'Patient' && cluster.items.length > 1;
+
                       return (
                         <div
                           key={key}
                           onClick={() => item.recoverable && toggleOne(key)}
                           className={`flex items-center justify-between gap-2.5 rounded-xl border p-2.5 text-xs transition-all cursor-pointer ${
+                            isChild ? 'ml-3 border-l-2 border-l-sky-400' : ''
+                          } ${
                             isItemChecked
                               ? 'border-sky-200 bg-white dark:border-sky-800 dark:bg-slate-900 shadow-2xs'
                               : 'border-slate-100 bg-slate-50/70 hover:bg-slate-100/80 dark:border-slate-800 dark:bg-slate-800/60'
@@ -1611,6 +1643,7 @@ function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason,
                             />
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
+                                {isChild && <span className="text-slate-400 text-xs font-mono select-none">↳</span>}
                                 <span className="font-bold text-slate-800 dark:text-slate-200">
                                   {ENTITY_LABELS[item.entity] || item.entity}
                                 </span>

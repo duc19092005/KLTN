@@ -253,7 +253,11 @@ export class EntityRecoveryService {
     };
   }
 
-  private resolveClusterInfo(entity: RecoverableAuditEntity, entityId: string, snapshot: Snapshot | null): { clusterKey: string; clusterLabel: string } {
+  private async resolveClusterInfo(
+    entity: RecoverableAuditEntity,
+    entityId: string,
+    snapshot: Snapshot | null,
+  ): Promise<{ clusterKey: string; clusterLabel: string }> {
     if (!snapshot) return { clusterKey: entityId, clusterLabel: `${entity} (${entityId.slice(0, 8)})` };
 
     if (entity === 'Visit') {
@@ -267,8 +271,26 @@ export class EntityRecoveryService {
       }
     }
     if (entity === 'AiQuality') {
+      const visitId = (snapshot.visitId as string) || null;
+      if (visitId) {
+        return { clusterKey: visitId, clusterLabel: `Ca khám (${visitId.slice(0, 8)})` };
+      }
       const diagnosisId = (snapshot.aiDiagnosisId as string) || null;
-      return { clusterKey: diagnosisId || entityId, clusterLabel: `Đánh giá AI (${entityId.slice(0, 8)})` };
+      if (diagnosisId) {
+        const diagRow = await this.prisma.blockchainLogger.findFirst({
+          where: { entity: 'AiDiagnosis', entityId: diagnosisId },
+          orderBy: { seq: 'desc' },
+          select: { afterEncrypted: true, seq: true, action: true, entity: true, entityId: true, createdAt: true },
+        });
+        if (diagRow) {
+          const diagVerif = verifyAuditRow(diagRow as any);
+          if (diagVerif.ok && diagVerif.decryptedAfter && (diagVerif.decryptedAfter as any).visitId) {
+            const diagVisitId = (diagVerif.decryptedAfter as any).visitId as string;
+            return { clusterKey: diagVisitId, clusterLabel: `Ca khám (${diagVisitId.slice(0, 8)})` };
+          }
+        }
+        return { clusterKey: diagnosisId, clusterLabel: `Chẩn đoán AI (${diagnosisId.slice(0, 8)})` };
+      }
     }
     if (entity === 'Appointment' || entity === 'Patient') {
       const patientId = (snapshot.patientId as string) || entityId;
@@ -357,7 +379,7 @@ export class EntityRecoveryService {
 
     const lightVerification = verifyAuditRowLight(row);
     if (!lightVerification.ok) {
-      const cluster = this.resolveClusterInfo(entity, row.entityId, null);
+      const cluster = await this.resolveClusterInfo(entity, row.entityId, null);
       return {
         ...base,
         ...cluster,
@@ -370,7 +392,11 @@ export class EntityRecoveryService {
       };
     }
 
+    const verification = verifyAuditRow(row);
+    const auditSnapshot = verification.ok && verification.decryptedAfter ? (verification.decryptedAfter as Snapshot) : null;
     const liveSnapshot = await this.loadLiveSnapshot(this.prisma, entity, row.entityId);
+    const cluster = await this.resolveClusterInfo(entity, row.entityId, liveSnapshot ?? auditSnapshot);
+
     if (!liveSnapshot) {
       // Entity đã bị xóa vĩnh viễn có chủ ý bởi admin — không phải lỗi integrity, không cảnh báo.
       if (await this.isIntentionallyDeleted(row.entityId)) return null;
@@ -378,7 +404,6 @@ export class EntityRecoveryService {
       const preview = this.recreation
         ? await this.recreation.previewOne({ entity, entityId: row.entityId }, recreationCache)
         : null;
-      const cluster = this.resolveClusterInfo(entity, row.entityId, null);
       return {
         ...base,
         ...cluster,
@@ -398,9 +423,6 @@ export class EntityRecoveryService {
           : `Không thể khôi phục tự động: ${(preview?.blockers ?? ['không có snapshot tin cậy']).join(', ')}.`,
       };
     }
-
-    const verification = verifyAuditRow(row);
-    const cluster = this.resolveClusterInfo(entity, row.entityId, liveSnapshot);
 
     if (!this.hasCompleteSnapshot(entity, verification.decryptedAfter)) {
       const partialComparison = this.compareCommittedSnapshotFields(
