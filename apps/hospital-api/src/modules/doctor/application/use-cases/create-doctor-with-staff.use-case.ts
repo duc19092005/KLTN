@@ -30,6 +30,12 @@ export class CreateDoctorWithStaffUseCase {
     if (dept.type !== 'EXAMINATION' && dept.type !== 'CLINICAL') {
       throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng khám hoặc lâm sàng.');
     }
+    if (dept.type === 'EXAMINATION') {
+      const activeCount = await this.repo.countActiveStaffInDepartment(dto.departmentId);
+      if (activeCount >= 1) {
+        throw new BadRequestException('Phòng khám này đã có 1 bác sĩ phụ trách. Mỗi phòng khám chỉ cho phép duy nhất 1 bác sĩ phụ trách.');
+      }
+    }
 
     if (await this.repo.findUserByUsernameOrEmail(dto.username, dto.email)) {
       throw new ConflictException('Tên đăng nhập hoặc email đã tồn tại.');

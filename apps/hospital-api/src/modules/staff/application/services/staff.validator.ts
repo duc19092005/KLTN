@@ -31,7 +31,11 @@ export class StaffValidator {
    *  - ADMIN         → no department restriction
    * Throws BadRequestException with a Vietnamese message that the UI surfaces directly.
    */
-  async assertDepartmentRoleCompatible(role: UserRole, departmentId: string | null | undefined): Promise<void> {
+  async assertDepartmentRoleCompatible(
+    role: UserRole,
+    departmentId: string | null | undefined,
+    excludeStaffId?: string,
+  ): Promise<void> {
     if (!departmentId) return; // departmentId is optional
     const dept = await this.repo.findDepartment(departmentId);
     if (!dept) throw new NotFoundException('Không tìm thấy phòng ban.');
@@ -43,8 +47,7 @@ export class StaffValidator {
       ADMIN: [],
     };
     const allowed = map[role] || [];
-    if (allowed.length === 0) return; // ADMIN: skip
-    if (!allowed.includes(dept.type)) {
+    if (allowed.length > 0 && !allowed.includes(dept.type)) {
       const human: Record<UserRole, string> = {
         RECEPTIONIST: 'Nhân sự chỉ thuộc các phòng ban không phải phòng khám.',
         DOCTOR: 'Bác sĩ chỉ thuộc phòng khám.',
@@ -52,6 +55,13 @@ export class StaffValidator {
         ADMIN: '',
       } as Record<UserRole, string>;
       throw new BadRequestException(human[role] || 'Vai trò không phù hợp với loại phòng ban.');
+    }
+
+    if (dept.type === 'EXAMINATION') {
+      const activeCount = await this.repo.countActiveStaffInDepartment(departmentId, excludeStaffId);
+      if (activeCount >= 1) {
+        throw new BadRequestException('Phòng khám này đã có 1 bác sĩ/nhân viên phụ trách. Mỗi phòng khám chỉ cho phép duy nhất 1 nhân sự phụ trách.');
+      }
     }
   }
 

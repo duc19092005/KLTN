@@ -5,6 +5,7 @@ import { DOCTOR_INTEGRITY_ANCHOR, DoctorIntegrityAnchorPort } from '../ports/doc
 import { buildUnifiedDoctorSnapshot } from '../../domain/doctor-snapshot';
 import { EntityRecoveryService } from '../../../../infrastructure/audit/entity-recovery.service';
 
+
 /**
  * Updates a doctor (+ nested staff, + clinical room) then unified-anchors with
  * a before-snapshot. Behavior copied verbatim from the former DoctorService.update().
@@ -41,6 +42,12 @@ export class UpdateDoctorUseCase {
       }
       if (dept.type !== 'EXAMINATION' && dept.type !== 'CLINICAL') {
         throw new BadRequestException('Bác sĩ chỉ có thể được gán vào phòng khám hoặc lâm sàng.');
+      }
+      if (dept.type === 'EXAMINATION') {
+        const activeCount = await this.repo.countActiveStaffInDepartment(targetDepartmentId, existing.staffProfileId);
+        if (activeCount >= 1) {
+          throw new BadRequestException('Phòng khám này đã có 1 bác sĩ phụ trách. Mỗi phòng khám chỉ cho phép duy nhất 1 bác sĩ phụ trách.');
+        }
       }
     }
 

@@ -173,9 +173,10 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
+      const systemAdmin = await this.prisma.user.findFirst({ where: { role: 'ADMIN' }, select: { id: true } });
       for (const bId of targetBatchIds) {
         try {
-          await this.recoverBatchDirectFromChain(bId, 'SYSTEM_WATCHDOG', 'Automated 20-minute Background Watchdog Auto-Healing');
+          await this.recoverBatchDirectFromChain(bId, systemAdmin?.id ?? '', 'Automated 20-minute Background Watchdog Auto-Healing');
           totalHealed += 1;
         } catch (err) {
           console.error(`[WATCHDOG] Failed to auto-heal batch #${bId}:`, err);

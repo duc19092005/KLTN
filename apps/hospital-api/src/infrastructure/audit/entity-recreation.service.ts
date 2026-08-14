@@ -352,6 +352,7 @@ export class EntityRecreationService {
     if ((entity === 'StaffProfile' || entity === 'DoctorProfile') && snapshot.status === UserStatus.DELETE) snapshot.status = UserStatus.INACTIVE;
     if (entity === 'AiModelRegistry' && snapshot.status === OperationalStatus.DELETE) snapshot.status = OperationalStatus.INACTIVE;
     if (entity === 'AiModelRegistry') delete snapshot.isDeleted;
+    if (entity === 'MedicalResult') delete snapshot.status;
     return snapshot;
   }
 
@@ -689,7 +690,7 @@ export class EntityRecreationService {
         id: target.entityId, resultCode: this.string(snapshot, 'resultCode'), orderId: this.string(snapshot, 'orderId'),
         performedById: this.nullableString(snapshot, 'performedById'),
         note: this.nullableString(snapshot, 'note'),
-        returnedAt: this.nullableDate(snapshot, 'returnedAt') ?? new Date(),
+        returnedAt: this.nullableDate(snapshot, 'returnedAt'),
         createdAt: this.nullableDate(snapshot, 'createdAt') ?? new Date(),
       } });
       const files = this.resultFiles(snapshot);
@@ -947,9 +948,9 @@ export class EntityRecreationService {
       const entry = file as Record<string, unknown>;
       const fileName = typeof entry.fileName === 'string' && entry.fileName ? entry.fileName : `file-${index + 1}`;
       const originalName = typeof entry.originalName === 'string' && entry.originalName ? entry.originalName : fileName;
-      const mimeType = typeof entry.mimeType === 'string' && entry.mimeType ? entry.mimeType : 'application/octet-stream';
+      const mimeType = typeof entry.mimeType === 'string' && entry.mimeType ? entry.mimeType : null;
       const size = typeof entry.size === 'number' && Number.isFinite(entry.size) ? entry.size : 0;
-      const storageProvider = typeof entry.storageProvider === 'string' && entry.storageProvider ? entry.storageProvider : 'CLOUDINARY';
+      const storageProvider = typeof entry.storageProvider === 'string' && entry.storageProvider ? entry.storageProvider : null;
       return {
         fileName,
         originalName,
