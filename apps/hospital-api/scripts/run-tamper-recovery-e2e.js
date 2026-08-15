@@ -28,6 +28,7 @@ const run = (args) => {
   if (result.status !== 0) process.exit(result.status || 1);
 };
 
+const extraArgs = process.argv.slice(2);
 run(['prisma', 'db', 'push', '--skip-generate', '--accept-data-loss']);
 run([
   'jest',
@@ -35,4 +36,5 @@ run([
   './test/jest-integration.json',
   'test/integration/tamper-recovery/tamper-recovery.integration-spec.ts',
   '--runInBand',
+  ...extraArgs,
 ]);

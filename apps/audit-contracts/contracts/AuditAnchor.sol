@@ -25,6 +25,8 @@ contract AuditAnchor {
         bytes32 artifactHash;
         string artifactUri;
         uint256 leafCount;
+        uint256 fromSeq;
+        uint256 toSeq;
         uint256 timestamp;
         bool committed;
     }
@@ -40,6 +42,8 @@ contract AuditAnchor {
         bytes32 artifactHash,
         string artifactUri,
         uint256 leafCount,
+        uint256 fromSeq,
+        uint256 toSeq,
         uint256 timestamp
     );
 
@@ -62,12 +66,16 @@ contract AuditAnchor {
     /// @param batchId Monotonic batch identifier assigned off-chain.
     /// @param merkleRoot Merkle root over the batch's leaves.
     /// @param leafCount Number of leaves included.
+    /// @param fromSeq Starting sequence number (inclusive).
+    /// @param toSeq Ending sequence number (inclusive).
     /// @param artifactHash SHA-256 hash of the encrypted IPFS artifact bytes.
     /// @param artifactUri Content-addressed IPFS URI for recovery.
     function commitCheckpoint(
         uint256 batchId,
         bytes32 merkleRoot,
         uint256 leafCount,
+        uint256 fromSeq,
+        uint256 toSeq,
         bytes32 artifactHash,
         string calldata artifactUri
     ) external onlyWriter {
@@ -75,6 +83,7 @@ contract AuditAnchor {
         require(artifactHash != bytes32(0), "AuditAnchor: empty artifact hash");
         require(bytes(artifactUri).length > 0, "AuditAnchor: empty artifact uri");
         require(leafCount > 0, "AuditAnchor: empty batch");
+        require(fromSeq > 0 && toSeq >= fromSeq, "AuditAnchor: invalid sequence range");
         require(!checkpoints[batchId].committed, "AuditAnchor: batch already committed");
         require(batchId == latestBatchId + 1, "AuditAnchor: non-sequential batch");
 
@@ -83,6 +92,8 @@ contract AuditAnchor {
             artifactHash: artifactHash,
             artifactUri: artifactUri,
             leafCount: leafCount,
+            fromSeq: fromSeq,
+            toSeq: toSeq,
             timestamp: block.timestamp,
             committed: true
         });
@@ -90,18 +101,18 @@ contract AuditAnchor {
         latestBatchId = batchId;
         totalBatches += 1;
 
-        emit CheckpointCommitted(batchId, merkleRoot, artifactHash, artifactUri, leafCount, block.timestamp);
-    }
-
-    /// @notice Solidity-side canonical leaf hash. Matches backend MERKLE_SHA256_BYTES32_V2.
-    function hashLeaf(bytes32 entryHash) public pure returns (bytes32) {
-        return sha256(abi.encodePacked(LEAF_DOMAIN, entryHash));
+        emit CheckpointCommitted(batchId, merkleRoot, artifactHash, artifactUri, leafCount, fromSeq, toSeq, block.timestamp);
     }
 
     /// @notice Solidity-side canonical pair hash. Sorted pairs keep proofs order-independent.
     function hashPair(bytes32 a, bytes32 b) public pure returns (bytes32) {
         (bytes32 lo, bytes32 hi) = a <= b ? (a, b) : (b, a);
         return sha256(abi.encodePacked(NODE_DOMAIN, lo, hi));
+    }
+
+    /// @notice Solidity-side leaf hash.
+    function hashLeaf(bytes32 leaf) public pure returns (bytes32) {
+        return sha256(abi.encodePacked(LEAF_DOMAIN, leaf));
     }
 
     /// @notice Verify that entryHash belongs to an anchored canonical Merkle root.
@@ -127,6 +138,8 @@ contract AuditAnchor {
         bytes32 artifactHash;
         string artifactUri;
         uint256 leafCount;
+        uint256 fromSeq;
+        uint256 toSeq;
         uint256 timestamp;
         bool committed;
     }
@@ -140,12 +153,14 @@ contract AuditAnchor {
             bytes32 artifactHash,
             string memory artifactUri,
             uint256 leafCount,
+            uint256 fromSeq,
+            uint256 toSeq,
             uint256 timestamp,
             bool committed
         )
     {
         Checkpoint storage cp = checkpoints[batchId];
-        return (cp.merkleRoot, cp.artifactHash, cp.artifactUri, cp.leafCount, cp.timestamp, cp.committed);
+        return (cp.merkleRoot, cp.artifactHash, cp.artifactUri, cp.leafCount, cp.fromSeq, cp.toSeq, cp.timestamp, cp.committed);
     }
 
     /// @notice Fetch a range of batch checkpoints for audit recovery and DB synchronization.
@@ -173,6 +188,8 @@ contract AuditAnchor {
                 artifactHash: cp.artifactHash,
                 artifactUri: cp.artifactUri,
                 leafCount: cp.leafCount,
+                fromSeq: cp.fromSeq,
+                toSeq: cp.toSeq,
                 timestamp: cp.timestamp,
                 committed: cp.committed
             });

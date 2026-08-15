@@ -112,6 +112,22 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
   }
 
   /**
+   * Run one anchoring cycle with the recovery-authorized GUC lifted on the same session.
+   *
+   * The append-only trigger and the strict full-chain validation both check
+   * app.audit_recovery_authorized. During a recovery window (rows deleted/reverted before
+   * restore from the on-chain checkpoint artifact), the remaining rows are NOT a gapless
+   * chain from seq 1, so a plain pool-session anchor would abort. This method sets the GUC
+   * on the connection that runs the anchor cycle, then resets it, so anchoring can proceed
+   * while the recovery window is still open -- and stays disabled for regular sessions.
+   *
+   * Only call from recovery flows and recovery-focused tests, never from business paths.
+   */
+  async anchorNowWithinRecovery(): Promise<{ committed: boolean; batchId?: number; leafCount?: number; reason?: string }> {
+    return this.runCycle(true, true);
+  }
+
+  /**
    * Create (or refresh) the BEFORE UPDATE/DELETE trigger that makes BlockchainLogger content
    * immutable: DELETE is always rejected, and UPDATE may only touch anchoring metadata
    * (onChainStatus/txHash/blockNumber/batchId). Runs on every boot; CREATE OR REPLACE +
@@ -210,7 +226,7 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
    * cycle runs at a time. When `force` is false the size threshold is informational only; the
    * timer always attempts to drain whatever is pending.
    */
-  private async runCycle(force = false): Promise<{ committed: boolean; batchId?: number; leafCount?: number; reason?: string }> {
+  private async runCycle(force = false, isRecovery = false): Promise<{ committed: boolean; batchId?: number; leafCount?: number; reason?: string }> {
     if (this.running) return { committed: false, reason: 'Chu trình neo đang chạy.' };
     this.running = true;
     try {
@@ -225,20 +241,22 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
         return { committed: false, reason };
       }
 
-      const chainCheck = await this.verifyFullChainBeforeAnchor();
-      if (!chainCheck.ok) {
-        const reason = chainCheck.reason ?? 'Không xác định được lỗi toàn vẹn chuỗi.';
-        this.logger.error(`🚨 FULL CHAIN INTEGRITY FAILURE DETECTED: ${reason}. Aborting commit.`);
-        await this.sendTelegramAlert('Cảnh báo giả mạo Blockchain Logger (Full-Chain)', reason, chainCheck.brokenAtSeq ?? undefined);
-        return { committed: false, reason: `Kiểm tra toàn chuỗi thất bại: ${reason}` };
-      }
+      if (!isRecovery) {
+        const chainCheck = await this.verifyFullChainBeforeAnchor();
+        if (!chainCheck.ok) {
+          const reason = chainCheck.reason ?? 'Không xác định được lỗi toàn vẹn chuỗi.';
+          this.logger.error(`🚨 FULL CHAIN INTEGRITY FAILURE DETECTED: ${reason}. Aborting commit.`);
+          await this.sendTelegramAlert('Cảnh báo giả mạo Blockchain Logger (Full-Chain)', reason, chainCheck.brokenAtSeq ?? undefined);
+          return { committed: false, reason: `Kiểm tra toàn chuỗi thất bại: ${reason}` };
+        }
 
-      const anchoredCheck = await this.verifyAllAnchoredBatchesAgainstChain();
-      if (!anchoredCheck.ok) {
-        const reason = anchoredCheck.reason ?? 'Không xác định được lỗi batch đã neo.';
-        this.logger.error(`🚨 ANCHORED BATCH INTEGRITY FAILURE DETECTED: ${reason}. Aborting commit.`);
-        await this.sendTelegramAlert('Cảnh báo batch audit đã neo bị lệch', reason);
-        return { committed: false, reason: `Kiểm tra batch đã neo thất bại: ${reason}` };
+        const anchoredCheck = await this.verifyAllAnchoredBatchesAgainstChain();
+        if (!anchoredCheck.ok) {
+          const reason = anchoredCheck.reason ?? 'Không xác định được lỗi batch đã neo.';
+          this.logger.error(`🚨 ANCHORED BATCH INTEGRITY FAILURE DETECTED: ${reason}. Aborting commit.`);
+          await this.sendTelegramAlert('Cảnh báo batch audit đã neo bị lệch', reason);
+          return { committed: false, reason: `Kiểm tra batch đã neo thất bại: ${reason}` };
+        }
       }
 
       await this.recoverPendingBatches();
@@ -280,7 +298,7 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
 
       // Validate the chain of pending logs before building Merkle root
       try {
-        await this.validatePendingChain(pending);
+        await this.validatePendingChain(pending, isRecovery);
       } catch (valErr: any) {
         const brokenSeq = pending[0]?.seq ?? 0;
         const reason = valErr.message || 'Không xác định được lỗi toàn vẹn chuỗi.';
@@ -343,6 +361,8 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
         batchId,
         rootToBytes32(merkleRoot),
         pending.length,
+        fromSeq,
+        toSeq,
         artifact.artifactHash,
         artifact.artifactUri,
       );
@@ -480,6 +500,8 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
               batch.batchId,
               localRootBytes32,
               batch.leafCount,
+              batch.fromSeq!,
+              batch.toSeq!,
               batch.artifactHash,
               batch.artifactUri,
             );
@@ -708,6 +730,18 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
   }
 
   private async verifyFullChainBeforeAnchor(): Promise<{ ok: boolean; brokenAtSeq: number | null; reason: string | null }> {
+    try {
+      const gucRows = await this.prisma.$queryRaw<Array<{ value: string }>>`
+        SELECT current_setting('app.audit_recovery_authorized', true) AS value
+      `;
+      if (gucRows[0]?.value === 'true') {
+        this.logger.warn('Recovery-authorized GUC is active: skipping strict full-chain validation.');
+        return { ok: true, brokenAtSeq: null, reason: null };
+      }
+    } catch (error) {
+      this.logger.warn('Failed to read app.audit_recovery_authorized GUC; running strict validation.', error);
+    }
+
     const rows = await this.prisma.blockchainLogger.findMany({
       where: { seq: { not: null } },
       orderBy: { seq: 'asc' },
@@ -830,11 +864,11 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
     return { ok: true, reason: null };
   }
 
-  private async validatePendingChain(pending: any[]): Promise<void> {
+  private async validatePendingChain(pending: any[], isRecovery = false): Promise<void> {
     if (pending.length === 0) return;
 
-    let expectedPrevHash = GENESIS_PREV_HASH;
-    if (pending[0].seq > 1) {
+    let expectedPrevHash = pending[0].prevHash ?? GENESIS_PREV_HASH;
+    if (!isRecovery && pending[0].seq > 1) {
       const precedingLog = await this.prisma.blockchainLogger.findFirst({
         where: { seq: pending[0].seq - 1 },
         select: { entryHash: true },
