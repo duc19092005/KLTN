@@ -30,7 +30,10 @@ import { buildAiQualitySnapshot } from '../src/modules/ai-model/domain/ai-qualit
 import { buildMedicalConclusionSnapshot } from '../src/modules/clinical-decision/domain/medical-conclusion-snapshot';
 
 async function seed() {
-  console.log('🌱 Starting full Hospital & Clinical Flow Seed with V2 Audit Logging...');
+  console.log('================================================================================');
+  console.log('🏥 KHỞI TẠO DỮ LIỆU ĐẦY ĐỦ LUỒNG CHẨN ĐOÁN LÂM SÀNG & TỰ ĐỘNG NEO BLOCKCHAIN');
+  console.log('================================================================================\n');
+
   const app = await NestFactory.createApplicationContext(AppModule, {
     logger: ['error', 'warn', 'log'],
   });
@@ -39,36 +42,53 @@ async function seed() {
   const audit = app.get(AuditLoggerService);
   const anchor = app.get(AuditAnchorService);
 
-  const passwordHash = await bcrypt.hash('Hospital@123', 10);
+  const defaultPassword = 'Hospital@123';
+  const passwordHash = await bcrypt.hash(defaultPassword, 10);
   const rawInviteToken = process.env.SEED_ADMIN_INVITE_TOKEN || 'admin-bootstrap-token';
   const inviteToken = `sha256:${crypto.createHash('sha256').update(rawInviteToken).digest('hex')}`;
 
-  // -------------------------------------------------------------
-  // 1. Seed Admin User
-  // -------------------------------------------------------------
-  const admin = await prisma.user.upsert({
-    where: { username: 'admin' },
-    update: { role: UserRole.ADMIN, status: UserStatus.ACTIVE, firstLogin: false },
-    create: {
-      username: 'admin',
-      email: 'admin@hospital.local',
-      role: UserRole.ADMIN,
-      status: UserStatus.ACTIVE,
-      firstLogin: false,
-      passwordHash,
-      inviteToken,
-      adminProfile: {
-        create: {
-          adminUserName: 'admin',
+  // ---------------------------------------------------------------------------------
+  // 1. KIỂM TRA TÀI KHOẢN ADMIN THỰC TẾ TRONG DATABASE
+  // ---------------------------------------------------------------------------------
+  console.log('🔍 [Bước 1/6] Kiểm tra tài khoản Quản trị viên (Admin) trong DB...');
+  let admin = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { role: UserRole.ADMIN },
+        { adminProfile: { isNot: null } },
+        { username: 'admin' },
+      ],
+    },
+    include: { adminProfile: true },
+  });
+
+  if (!admin) {
+    admin = await prisma.user.create({
+      data: {
+        username: 'admin',
+        email: 'admin@hospital.local',
+        role: UserRole.ADMIN,
+        status: UserStatus.ACTIVE,
+        firstLogin: false,
+        passwordHash,
+        inviteToken,
+        adminProfile: {
+          create: {
+            adminUserName: 'admin',
+          },
         },
       },
-    },
-  });
-  console.log('👤 Admin user ready:', admin.username);
+      include: { adminProfile: true },
+    });
+    console.log(`   ➕ Tạo mới tài khoản Admin mặc định: "${admin.username}" (ID: ${admin.id})`);
+  } else {
+    console.log(`   ✅ Đã phát hiện tài khoản Admin có sẵn trong DB: "${admin.username || admin.email}" (ID: ${admin.id})`);
+  }
 
-  // -------------------------------------------------------------
-  // 2. Seed 3 Departments (Hành chính / Tiếp đón, Khám bệnh, Xét nghiệm)
-  // -------------------------------------------------------------
+  // ---------------------------------------------------------------------------------
+  // 2. KHỞI TẠO 3 PHÒNG BAN CHUẨN QUY TRÌNH BỆNH VIỆN
+  // ---------------------------------------------------------------------------------
+  console.log('\n🏢 [Bước 2/6] Khởi tạo & Đối soát 3 Phòng ban chức năng...');
   const departmentsData = [
     {
       departmentCode: 'PB-RECEP',
@@ -76,7 +96,7 @@ async function seed() {
       floor: '1',
       type: DepartmentType.CLINICAL,
       canReceiveOrders: false,
-      description: 'Tiếp nhận bệnh nhân, tạo hồ sơ và phân luồng khám bệnh ban đầu.',
+      description: 'Tiếp nhận bệnh nhân, tạo hồ sơ y tế, cấp số thứ tự và phân luồng khám bệnh ban đầu.',
     },
     {
       departmentCode: 'PB-CLINIC',
@@ -84,7 +104,7 @@ async function seed() {
       floor: '2',
       type: DepartmentType.CLINICAL,
       canReceiveOrders: false,
-      description: 'Khám lâm sàng, chẩn đoán ban đầu và chỉ định cận lâm sàng.',
+      description: 'Khám lâm sàng, chẩn đoán ban đầu, chỉ định cận lâm sàng và kê đơn kết luận điều trị.',
     },
     {
       departmentCode: 'PB-LAB',
@@ -92,7 +112,7 @@ async function seed() {
       floor: '3',
       type: DepartmentType.CLINICAL,
       canReceiveOrders: true,
-      description: 'Thực hiện xét nghiệm máu, sinh hóa, miễn dịch và trả kết quả.',
+      description: 'Tiếp nhận y lệnh, thực hiện xét nghiệm huyết học, sinh hóa, miễn dịch và trả kết quả.',
     },
   ];
 
@@ -119,16 +139,19 @@ async function seed() {
         before: null,
         after: buildDepartmentSnapshot(dept),
       });
-      console.log(`🏢 Seeded Department: ${dept.name} (${dept.departmentCode})`);
+      console.log(`   ➕ Đã tạo và ghi log Audit V2 cho Phòng ban: ${dept.name} (${dept.departmentCode})`);
+    } else {
+      console.log(`   ✅ Phòng ban đã tồn tại: ${dept.name} (${dept.departmentCode})`);
     }
     deptMap.set(item.departmentCode, dept);
   }
 
-  // -------------------------------------------------------------
-  // 3. Seed 3 Staff Roles (Lễ tân, Bác sĩ Nội, Kỹ thuật viên Xét nghiệm)
-  // -------------------------------------------------------------
+  // ---------------------------------------------------------------------------------
+  // 3. KHỞI TẠO 3 NHÂN SỰ ĐẠI DIỆN 3 VAI TRÒ
+  // ---------------------------------------------------------------------------------
+  console.log('\n👥 [Bước 3/6] Khởi tạo & Đối soát 3 Nhân sự đại diện các vai trò...');
 
-  // 3.1 Receptionist (Tiếp tân tại PB-RECEP)
+  // 3.1 Lễ tân (Receptionist)
   let recepUser = await prisma.user.findUnique({ where: { username: 'receptionist' } });
   if (!recepUser) {
     recepUser = await prisma.user.create({
@@ -155,7 +178,7 @@ async function seed() {
       gender: 'FEMALE',
       citizenId: '079195000001',
       birthDate: new Date('1995-04-12'),
-      address: '123 Cách Mạng Tháng 8, Q.3, TP.HCM',
+      address: '123 Cách Mạng Tháng 8, Phường 5, Quận 3, TP.HCM',
       avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2',
       employeeCode: 'NV-RECEP-001',
       position: 'Nhân viên tiếp đón & điều phối bệnh nhân',
@@ -172,10 +195,12 @@ async function seed() {
       before: null,
       after: buildStaffSnapshot(recepStaff),
     });
-    console.log(`👩‍💼 Seeded Receptionist: ${recepStaff.fullName}`);
+    console.log(`   ➕ Đã tạo Lễ tân: ${recepStaff.fullName} (${recepStaff.employeeCode})`);
+  } else {
+    console.log(`   ✅ Đã tìm thấy Lễ tân: ${recepStaff.fullName} (${recepStaff.employeeCode})`);
   }
 
-  // 3.2 Doctor (Bác sĩ Nội tại PB-CLINIC)
+  // 3.2 Bác sĩ Nội khoa (Doctor)
   let doctorUser = await prisma.user.findUnique({ where: { username: 'doctor_noi' } });
   if (!doctorUser) {
     doctorUser = await prisma.user.create({
@@ -202,10 +227,10 @@ async function seed() {
       gender: 'MALE',
       citizenId: '079185000002',
       birthDate: new Date('1985-08-20'),
-      address: '456 Nguyễn Đình Chiểu, Q.1, TP.HCM',
+      address: '456 Nguyễn Đình Chiểu, Phường Đa Kao, Quận 1, TP.HCM',
       avatarUrl: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d',
       employeeCode: 'BS-NOI-001',
-      position: 'Bác sĩ điều trị Nội khoa',
+      position: 'Bác sĩ điều trị Nội khoa Tổng quát',
     };
     const integrity = audit.hashSnapshot(buildStaffSnapshot(staffData));
     doctorStaff = await prisma.staffProfile.create({
@@ -242,10 +267,12 @@ async function seed() {
       before: null,
       after: buildUnifiedDoctorSnapshot({ ...doctorProfile, staffProfile: doctorStaff }),
     });
-    console.log(`👨‍⚕️ Seeded Doctor: ${doctorStaff.fullName} (${doctorProfile.licenseNumber})`);
+    console.log(`   ➕ Đã tạo Bác sĩ: ${doctorStaff.fullName} (CCHND: ${doctorProfile.licenseNumber})`);
+  } else {
+    console.log(`   ✅ Đã tìm thấy Bác sĩ: ${doctorStaff.fullName} (CCHND: ${doctorProfile.licenseNumber})`);
   }
 
-  // 3.3 Lab Technician (Kỹ thuật viên tại PB-LAB)
+  // 3.3 Kỹ thuật viên Xét nghiệm (Lab Tech / Lab Manager)
   let labUser = await prisma.user.findUnique({ where: { username: 'lab_tech' } });
   if (!labUser) {
     labUser = await prisma.user.create({
@@ -272,7 +299,7 @@ async function seed() {
       gender: 'MALE',
       citizenId: '079190000003',
       birthDate: new Date('1990-11-05'),
-      address: '789 Lý Thường Kiệt, Q.10, TP.HCM',
+      address: '789 Lý Thường Kiệt, Phường 11, Quận 10, TP.HCM',
       avatarUrl: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54',
       employeeCode: 'KTV-LAB-001',
       position: 'Kỹ thuật viên trưởng Khoa Xét nghiệm',
@@ -290,12 +317,15 @@ async function seed() {
       before: null,
       after: buildStaffSnapshot(labStaff),
     });
-    console.log(`🔬 Seeded Lab Technician: ${labStaff.fullName}`);
+    console.log(`   ➕ Đã tạo Kỹ thuật viên Xét nghiệm: ${labStaff.fullName} (${labStaff.employeeCode})`);
+  } else {
+    console.log(`   ✅ Đã tìm thấy Kỹ thuật viên: ${labStaff.fullName} (${labStaff.employeeCode})`);
   }
 
-  // -------------------------------------------------------------
-  // 4. Seed AI Model Registry
-  // -------------------------------------------------------------
+  // ---------------------------------------------------------------------------------
+  // 4. KHỞI TẠO MÔ HÌNH AI CHẨN ĐOÁN
+  // ---------------------------------------------------------------------------------
+  console.log('\n🤖 [Bước 4/6] Khởi tạo & Đối soát Mô hình AI Chẩn đoán...');
   let aiModel = await prisma.aiModelRegistry.findFirst({ where: { modelName: 'Dengue Diagnostic AI Model' } });
   if (!aiModel) {
     const modelData = {
@@ -323,13 +353,17 @@ async function seed() {
       before: null,
       after: buildAiModelSnapshot(aiModel),
     });
-    console.log(`🤖 Seeded AI Model: ${aiModel.modelName}`);
+    console.log(`   ➕ Đã đăng ký Mô hình AI: ${aiModel.modelName} (Phiên bản: ${aiModel.modelVersion})`);
+  } else {
+    console.log(`   ✅ Mô hình AI đã tồn tại: ${aiModel.modelName} (Phiên bản: ${aiModel.modelVersion})`);
   }
 
-  // -------------------------------------------------------------
-  // 5. Seed Full Clinical Workflow
-  // (Lễ tân -> Bệnh nhân -> Ca khám -> Y lệnh xét nghiệm -> Trả KQ -> AI chẩn đoán & đánh giá -> Bác sĩ Kết luận)
-  // -------------------------------------------------------------
+  // ---------------------------------------------------------------------------------
+  // 5. THỰC THI TOÀN BỘ CHU TRÌNH LÂM SÀNG 6 BƯỚC VỚI PROMPT VÀ KẾT QUẢ ĐẦY ĐỦ
+  // ---------------------------------------------------------------------------------
+  console.log('\n🩺 [Bước 5/6] Thực thi trọn vẹn Luồng Chẩn đoán Lâm sàng 6 bước...');
+
+  // Bước 5.1: Tiếp tân tiếp đón & Tạo hồ sơ bệnh nhân
   let patient = await prisma.patient.findUnique({ where: { patientCode: 'BN-2026-0001' } });
   if (!patient) {
     const patientData = {
@@ -355,9 +389,12 @@ async function seed() {
       before: null,
       after: buildPatientSnapshot(patient),
     });
-    console.log(`🏥 [Step 1: Receptionist] Created Patient: ${patient.fullName} (${patient.patientCode})`);
+    console.log(`   👉 [5.1 - Lễ tân] Đã tạo Bệnh nhân: ${patient.fullName} (${patient.patientCode})`);
+  } else {
+    console.log(`   ✅ [5.1 - Lễ tân] Bệnh nhân đã tồn tại: ${patient.fullName} (${patient.patientCode})`);
   }
 
+  // Bước 5.2: Lễ tân tạo lượt khám và chuyển đến Bác sĩ Nội
   let visit = await prisma.visit.findUnique({ where: { visitCode: 'LK-2026-0001' } });
   if (!visit) {
     const visitData = {
@@ -378,9 +415,12 @@ async function seed() {
       before: null,
       after: buildVisitSnapshot(visit),
     });
-    console.log(`📋 [Step 2: Receptionist] Registered Visit: ${visit.visitCode} at ${deptMap.get('PB-CLINIC').name}`);
+    console.log(`   👉 [5.2 - Lễ tân] Đăng ký Lượt khám: ${visit.visitCode} tại ${deptMap.get('PB-CLINIC').name}`);
+  } else {
+    console.log(`   ✅ [5.2 - Lễ tân] Lượt khám đã tồn tại: ${visit.visitCode}`);
   }
 
+  // Bước 5.3: Bác sĩ khám lâm sàng & Tạo y lệnh xét nghiệm gửi Khoa Xét nghiệm
   let medicalOrder = await prisma.medicalOrder.findUnique({ where: { orderCode: 'ORD-2026-0001' } });
   if (!medicalOrder) {
     const orderData = {
@@ -391,7 +431,7 @@ async function seed() {
       targetDepartmentId: deptMap.get('PB-LAB').id,
       orderType: 'XÉT NGHIỆM HUYẾT HỌC & MIỄN DỊCH',
       priority: 'URGENT',
-      clinicalNote: 'Bệnh nhân sốt cao liên tục 3 ngày, đau nhức cơ khớp, nghi ngờ nhiễm Dengue. Yêu cầu: Tổng phân tích tế bào máu ngoại vi + Dengue NS1 Ag nhanh.',
+      clinicalNote: 'Bệnh nhân sốt cao liên tục 3 ngày (39°C), đau nhức cơ khớp và hốc mắt. Chỉ định khẩn: Tổng phân tích tế bào máu ngoại vi + Test nhanh Dengue NS1 Ag.',
       status: MedicalOrderStatus.RESULT_READY,
     };
     medicalOrder = await prisma.medicalOrder.create({ data: orderData });
@@ -403,16 +443,19 @@ async function seed() {
       before: null,
       after: buildMedicalOrderSnapshot(medicalOrder),
     });
-    console.log(`🩺 [Step 3: Doctor] Created Medical Order: ${medicalOrder.orderCode} sent to ${deptMap.get('PB-LAB').name}`);
+    console.log(`   👉 [5.3 - Bác sĩ] Chỉ định Y lệnh xét nghiệm: ${medicalOrder.orderCode} gửi ${deptMap.get('PB-LAB').name}`);
+  } else {
+    console.log(`   ✅ [5.3 - Bác sĩ] Y lệnh xét nghiệm đã tồn tại: ${medicalOrder.orderCode}`);
   }
 
+  // Bước 5.4: Kỹ thuật viên Khoa Xét nghiệm nhận mẫu, chạy xét nghiệm và trả kết quả kèm file đính kèm
   let medicalResult = await prisma.medicalResult.findUnique({ where: { resultCode: 'RES-2026-0001' } });
   if (!medicalResult) {
     const resultData = {
       resultCode: 'RES-2026-0001',
       orderId: medicalOrder.id,
       performedById: labUser.id,
-      note: 'Tiểu cầu (PLT) giảm: 102 G/L (Bình thường: 150-450). Bạch cầu (WBC): 3.1 G/L. Hct: 43.5%. Dengue NS1 Ag: DƯƠNG TÍNH (+).',
+      note: 'Tiểu cầu (PLT) giảm thấp: 102 G/L (Ngưỡng chuẩn: 150-450). Bạch cầu (WBC): 3.1 G/L. Hct: 43.5% (Cô đặc máu nhẹ). Dengue NS1 Ag: DƯƠNG TÍNH (+).',
       returnedAt: new Date(),
       files: {
         create: [
@@ -449,26 +492,56 @@ async function seed() {
       before: null,
       after: buildMedicalResultSnapshot({ ...medicalResult, visitId: visit.id }),
     });
-    console.log(`🧪 [Step 4: Lab Tech] Performed & Returned Result: ${medicalResult.resultCode} (with 2 attached files)`);
+    console.log(`   👉 [5.4 - Xét nghiệm] Đã trả Kết quả xét nghiệm: ${medicalResult.resultCode} (Kèm 2 files đính kèm PDF & PNG)`);
+  } else {
+    console.log(`   ✅ [5.4 - Xét nghiệm] Kết quả xét nghiệm đã tồn tại: ${medicalResult.resultCode}`);
   }
 
+  // Bước 5.5: Mô hình AI phân tích dữ liệu với Prompt & Bác sĩ đánh giá chất lượng AI
   let aiDiag = await prisma.aiDiagnosis.findFirst({ where: { visitId: visit.id } });
   if (!aiDiag) {
+    const clinicalPrompt = `[THÔNG TIN BỆNH NHÂN & LÂM SÀNG]
+- Bệnh nhân: Nguyễn Văn An (34 tuổi, Nam)
+- Lý do khám: Sốt cao liên tục ngày 3 (39.2°C), đau mỏi cơ, nhức 2 hốc mắt, mệt lả.
+- Dấu hiệu sinh tồn: Mạch 88 lần/phút, Huyết áp 115/75 mmHg, Nhiệt độ 38.8°C, SpO2 98%.
+
+[KẾT QUẢ CẬN LÂM SÀNG]
+- Tiểu cầu (PLT): 102 G/L (Giảm mạnh)
+- Bạch cầu (WBC): 3.1 G/L (Giảm)
+- Hct: 43.5% (Dấu hiệu cô đặc máu)
+- Dengue NS1 Ag: DƯƠNG TÍNH (+)
+
+[YÊU CẦU ĐÁNH GIÁ AI]
+1. Đưa ra chẩn đoán xác định và phân giai đoạn bệnh.
+2. Cảnh báo nguy cơ biến chứng và hướng xử trí.`;
+
+    const aiDiagnosisResult = {
+      primaryDiagnosis: 'Sốt xuất huyết Dengue ngày thứ 3 có dấu hiệu cảnh báo (ICD-10: A97.1)',
+      diseaseStage: 'Giai đoạn nguy hiểm (Critical Phase: Ngày 3 - Ngày 7)',
+      riskLevel: 'MEDIUM_HIGH',
+      warningSigns: [
+        'Tiểu cầu giảm nhanh 102 G/L',
+        'Hct tăng 43.5% có nguy cơ thoát huyết tương',
+        'Bạch cầu giảm 3.1 G/L',
+      ],
+      recommendations: {
+        hydration: 'Bù dịch sớm bằng Oresol 245 uống rải rác trong ngày (1.5 - 2 lít). Nếu không uống được hoặc nôn ói, chỉ định truyền tĩnh mạch Ringer Lactate.',
+        antipyretic: 'Hạ sốt an toàn bằng Paracetamol 500mg (cách 6h), TUYỆT ĐỐI KHÔNG dùng Aspirin hoặc Ibuprofen.',
+        monitoring: 'Theo dõi sát tri giác, mạch, huyết áp và kiểm tra công thức máu mỗi 12-24h.',
+      },
+      confidence: 0.96,
+    };
+
     const diagData = {
       aiModelId: aiModel.id,
       patientId: patient.id,
       visitId: visit.id,
-      prompt: 'Phân tích công thức máu: PLT 102 G/L, WBC 3.1 G/L, Hct 43.5%, Dengue NS1 (+), sốt ngày 3.',
-      result: JSON.stringify({
-        primaryDiagnosis: 'Sốt xuất huyết Dengue ngày thứ 3 có dấu hiệu cảnh báo',
-        riskLevel: 'MEDIUM_HIGH',
-        recommendation: 'Theo dõi sát dấu hiệu cảnh báo, bù dịch đường uống/truyền tĩnh mạch, kiểm tra tiểu cầu mỗi 12-24h.',
-        confidence: 0.96,
-      }),
+      prompt: clinicalPrompt,
+      result: JSON.stringify(aiDiagnosisResult),
       confidence: 0.96,
       status: 'DOCTOR_REVIEWED',
       reviewedByDoctorId: doctorProfile.id,
-      doctorFeedback: 'Đồng thuận với gợi ý chẩn đoán của AI. Dữ liệu khớp triệu chứng lâm sàng.',
+      doctorFeedback: 'Đồng thuận với gợi ý chẩn đoán của AI. Dữ liệu phân tích khớp hoàn toàn với triệu chứng lâm sàng và cận lâm sàng.',
     };
     aiDiag = await prisma.aiDiagnosis.create({ data: diagData });
     await audit.recordV2({
@@ -479,13 +552,13 @@ async function seed() {
       before: null,
       after: buildAiDiagnosisSnapshot(aiDiag),
     });
-    console.log(`🤖 [Step 5: AI Engine] Generated Diagnosis (Confidence: 96%)`);
+    console.log(`   👉 [5.5a - AI Engine] Sinh chẩn đoán AI: "Sốt xuất huyết Dengue ngày 3" (Độ tin cậy: 96%)`);
 
     const qualityData = {
       doctorId: doctorProfile.id,
       aiModelId: aiModel.id,
       aiDiagnosisId: aiDiag.id,
-      doctorConclusionAboutModel: 'Mô hình phát hiện chính xác dấu hiệu cảnh báo hạ tiểu cầu ở giai đoạn nguy hiểm ngày thứ 3.',
+      doctorConclusionAboutModel: 'Mô hình phát hiện chính xác dấu hiệu cảnh báo hạ tiểu cầu ở giai đoạn nguy hiểm ngày thứ 3, đề xuất phác đồ bù dịch hợp lý.',
       trustablePercent: 96.0,
     };
     const integrityQuality = audit.hashSnapshot(qualityData);
@@ -500,9 +573,12 @@ async function seed() {
       before: null,
       after: buildAiQualitySnapshot(aiQuality),
     });
-    console.log(`⭐ [Step 5b: Doctor] Rated AI Diagnosis Quality: 96%`);
+    console.log(`   👉 [5.5b - Bác sĩ] Đã đánh giá chất lượng Mô hình AI: 96.0% (Đạt tiêu chuẩn xuất sắc)`);
+  } else {
+    console.log(`   ✅ [5.5 - AI & Đánh giá] Chẩn đoán AI và đánh giá chất lượng đã tồn tại`);
   }
 
+  // Bước 5.6: Bác sĩ kết luận ca khám, kê đơn thuốc và hoàn tất ca khám
   let conclusion = await prisma.medicalConclusion.findUnique({ where: { visitId: visit.id } });
   if (!conclusion) {
     const conclusionData = {
@@ -511,8 +587,8 @@ async function seed() {
       aiDiagnosisId: aiDiag?.id || null,
       finalDiagnosis: 'Sốt xuất huyết Dengue có dấu hiệu cảnh báo ngày thứ 3 (Mã ICD-10: A97.1)',
       treatmentPlan: 'Bù dịch Ringer Lactate đường uống và truyền tĩnh mạch theo phác đồ Bộ Y Tế. Theo dõi sát mạch, huyết áp, tri giác và tiểu cầu mỗi 12h.',
-      prescription: '1. Paracetamol 500mg (Hộp 20 viên): Uống 1 viên khi sốt >= 38.5°C, cách ít nhất 6 giờ, không quá 4 viên/ngày.\n2. Oresol 245 (Gói 10 gói): Pha 1 gói trong 200ml nước đun sôi để nguội, uống rải rác trong ngày.',
-      followUpNote: 'Tái khám ngay tại khoa cấp cứu nếu xuất hiện đau bụng nhiều, nôn ói liên tục, chảy máu chân răng/cam hoặc mệt lả.',
+      prescription: '1. Paracetamol 500mg (Hộp 20 viên): Uống 1 viên khi sốt >= 38.5°C, cách ít nhất 6 giờ, không quá 4 viên/ngày.\n2. Oresol 245 (Hộp 10 gói): Pha 1 gói trong 200ml nước đun sôi để nguội, uống rải rác trong ngày.',
+      followUpNote: 'Tái khám ngay tại khoa Cấp cứu nếu xuất hiện đau bụng nhiều, nôn ói liên tục, chảy máu chân răng/cam hoặc mệt lả.',
       doctorNote: 'Bệnh nhân tỉnh táo, tiếp xúc tốt, chưa ghi nhận xuất huyết dưới da tự phát.',
       concludedAt: new Date(),
     };
@@ -534,26 +610,32 @@ async function seed() {
       before: null,
       after: buildMedicalConclusionSnapshot({ ...conclusion, visit: { patient } }),
     });
-    console.log(`✅ [Step 6: Doctor] Concluded Visit & Prescribed Treatment for Patient: ${patient.fullName}`);
+    console.log(`   👉 [5.6 - Bác sĩ] Hoàn tất Kết luận Điều trị & Đơn thuốc cho Bệnh nhân: ${patient.fullName}`);
+  } else {
+    console.log(`   ✅ [5.6 - Bác sĩ] Kết luận ca khám đã tồn tại`);
   }
 
-  // -------------------------------------------------------------
-  // 6. Anchor All Seed Logs to Blockchain Checkpoint
-  // -------------------------------------------------------------
-  console.log('🔗 Sealing and Anchoring all Seed Logs to Blockchain & IPFS...');
+  // ---------------------------------------------------------------------------------
+  // 6. TỰ ĐỘNG CHUẨN HÓA CHUỖI HASH VÀ NEO LÊN SMART CONTRACT TRÊN BLOCKCHAIN
+  // ---------------------------------------------------------------------------------
+  console.log('\n🔗 [Bước 6/6] Tự động chuẩn hóa chuỗi băm và neo dữ liệu lên Smart Contract & IPFS...');
   await anchor.rechainLocalBlockchainLogger();
   const anchorResult = await anchor.anchorNowWithinRecovery();
+
   if (anchorResult.committed) {
-    console.log(`🎉 Batch #${anchorResult.batchId} ANCHORED & COMMITTED ON-CHAIN successfully with ${anchorResult.leafCount} audit records!`);
+    console.log(`\n🎉 THÀNH CÔNG! Batch #${anchorResult.batchId} đã được NEO & XÁC THỰC TRÊN BLOCKCHAIN với ${anchorResult.leafCount} bản ghi audit logs!`);
   } else {
-    console.log(`ℹ️ Anchor status: ${anchorResult.reason || 'No unanchored records'}`);
+    console.log(`\nℹ️ Trạng thái neo Blockchain: ${anchorResult.reason || 'Tất cả bản ghi đã được neo trước đó'}`);
   }
 
-  console.log('\n🌟 [SEED COMPLETED] System is fully configured with 3 Departments, All Staff Roles, AI Model, and Completed Clinical Flow!');
+  console.log('\n================================================================================');
+  console.log('🌟 [HOÀN TẤT SEED DATA] HỆ THỐNG ĐÃ CÓ ĐẦY ĐỦ 3 PHÒNG BAN, NHÂN SỰ & LUỒNG KHÁM!');
+  console.log('================================================================================\n');
+
   await app.close();
 }
 
 seed().catch((err) => {
-  console.error('❌ Seed failed:', err);
+  console.error('\n❌ Seed thất bại với lỗi:', err);
   process.exit(1);
 });
