@@ -571,6 +571,20 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
     if (this.runningBatches.has(batchId)) throw new ConflictException('This audit batch is already being recovered.');
     this.runningBatches.add(batchId);
 
+    // Ensure AuditBatch placeholder exists if the batch was completely wiped from local DB
+    await this.prisma.auditBatch.upsert({
+      where: { batchId },
+      create: {
+        batchId,
+        merkleRoot: 'PENDING_RECOVERY',
+        leafCount: 0,
+        fromSeq: 0,
+        toSeq: 0,
+        status: 'PENDING',
+      },
+      update: {},
+    });
+
     const recovery = await this.prisma.auditRecovery.create({
       data: { batchId, requestedById: adminId, reason: reason.trim() },
     });

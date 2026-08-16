@@ -2071,6 +2071,101 @@ describeIntegration('Audit tamper and recovery integration', () => {
     expect(cp4.toSeq).toBe(13);
   });
 
+  it('recovers multiple missing on-chain batches without UNIQUE(seq) conflict when local DB contains new unanchored or conflicting rows (Deep Scan self-healing scenario)', async () => {
+    const admin = await prisma.user.create({
+      data: {
+        username: `deepscan-admin-${Date.now()}`,
+        email: `deepscan-${Date.now()}@test.local`,
+        role: 'ADMIN', status: 'ACTIVE', firstLogin: false,
+      },
+    });
+
+    // 1. Create and anchor Batch 1 (2 logs) and Batch 2 (2 logs) to Blockchain & IPFS
+    const p1 = await prisma.patient.create({
+      data: {
+        patientCode: `BN-DS-1-${Date.now()}`,
+        fullName: 'DeepScan Patient 1',
+        gender: 'MALE', birthDate: new Date('1990-01-01'), phone: '0901111111',
+      },
+    });
+    await audit.recordV2({ entity: 'Patient', entityId: p1.id, action: 'CREATE', actorId: admin.id, after: { fullName: p1.fullName } });
+    await audit.recordV2({ entity: 'Patient', entityId: p1.id, action: 'UPDATE', actorId: admin.id, after: { fullName: 'P1 Updated' } });
+    const b1 = await anchor.anchorNow();
+    expect(b1.committed).toBe(true);
+
+    const p2 = await prisma.patient.create({
+      data: {
+        patientCode: `BN-DS-2-${Date.now()}`,
+        fullName: 'DeepScan Patient 2',
+        gender: 'FEMALE', birthDate: new Date('1992-02-02'), phone: '0902222222',
+      },
+    });
+    await audit.recordV2({ entity: 'Patient', entityId: p2.id, action: 'CREATE', actorId: admin.id, after: { fullName: p2.fullName } });
+    await audit.recordV2({ entity: 'Patient', entityId: p2.id, action: 'UPDATE', actorId: admin.id, after: { fullName: 'P2 Updated' } });
+    const b2 = await anchor.anchorNow();
+    expect(b2.committed).toBe(true);
+
+    // 2. SIMULATE LOCAL DB WIPE / TRUNCATE:
+    // Both Batch 1 and Batch 2 are completely wiped from local DB (AuditBatch + BlockchainLogger),
+    // but their checkpoints and artifacts REMAIN PERMANENTLY on Blockchain & IPFS.
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.audit_recovery_authorized', 'true', true)`;
+      await tx.blockchainLogger.deleteMany({ where: { batchId: { in: [b1.batchId!, b2.batchId!] } } });
+      await tx.auditBatch.deleteMany({ where: { batchId: { in: [b1.batchId!, b2.batchId!] } } });
+    });
+
+    // 3. Insert a NEW unanchored local row in DB that takes seq = 1 with a DIFFERENT id
+    const newLocalPatient = await prisma.patient.create({
+      data: {
+        patientCode: `BN-DS-NEW-${Date.now()}`,
+        fullName: 'New Local Patient Occupying Seq 1',
+        gender: 'MALE', birthDate: new Date('1995-05-05'), phone: '0903333333',
+      },
+    });
+    const collidingLog = await audit.recordV2({
+      entity: 'Patient',
+      entityId: newLocalPatient.id,
+      action: 'CREATE',
+      actorId: admin.id,
+      after: { fullName: newLocalPatient.fullName },
+    });
+    expect(collidingLog.seq).toBe(1); // Occupies seq 1 with a new ID!
+
+    // 4. Trigger recovery of Batch 1 and Batch 2 from on-chain checkpoints
+    // In previous versions, this threw "Unique constraint failed on the fields: (seq)"!
+    const rec1 = await batchRecovery.recover(b1.batchId!, admin.id, 'Deep scan recovery of Batch 1');
+    expect(rec1.status).toBe('RECOVERED');
+    expect(rec1.restoredCount).toBe(2);
+
+    const rec2 = await batchRecovery.recover(b2.batchId!, admin.id, 'Deep scan recovery of Batch 2');
+    expect(rec2.status).toBe('RECOVERED');
+    expect(rec2.restoredCount).toBe(2);
+
+    // 5. Verify all restored records exist in BlockchainLogger with valid, non-colliding sequence numbers
+    const batch1Logs = await prisma.blockchainLogger.findMany({
+      where: { batchId: b1.batchId! },
+      orderBy: { seq: 'asc' },
+    });
+    expect(batch1Logs).toHaveLength(2);
+
+    const batch2Logs = await prisma.blockchainLogger.findMany({
+      where: { batchId: b2.batchId! },
+      orderBy: { seq: 'asc' },
+    });
+    expect(batch2Logs).toHaveLength(2);
+
+    // 6. Verify AuditBatch records are ANCHORED with valid fromSeq and toSeq pointing to their logs
+    const dbBatch1 = await prisma.auditBatch.findUniqueOrThrow({ where: { batchId: b1.batchId! } });
+    expect(dbBatch1.status).toBe('ANCHORED');
+    expect(dbBatch1.fromSeq).toBe(batch1Logs[0].seq);
+    expect(dbBatch1.toSeq).toBe(batch1Logs[1].seq);
+
+    const dbBatch2 = await prisma.auditBatch.findUniqueOrThrow({ where: { batchId: b2.batchId! } });
+    expect(dbBatch2.status).toBe('ANCHORED');
+    expect(dbBatch2.fromSeq).toBe(batch2Logs[0].seq);
+    expect(dbBatch2.toSeq).toBe(batch2Logs[1].seq);
+  });
+
   async function seedTrustedPatientChange() {
     const admin = await prisma.user.create({
       data: {
