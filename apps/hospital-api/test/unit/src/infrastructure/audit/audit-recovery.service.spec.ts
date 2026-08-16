@@ -86,7 +86,7 @@ describe('AuditRecoveryService verified IPFS reader', () => {
     };
     const prisma = { auditBatch: { findUnique: jest.fn().mockResolvedValue(batch) } };
     const blockchain = { getAuditCheckpoint: jest.fn().mockResolvedValue({
-      committed: true, root: rootToBytes32(root), leafCount: 1,
+      committed: true, root: rootToBytes32(root), leafCount: 1, fromSeq: 1, toSeq: 1,
       artifactUri: uploaded.artifactUri, artifactHash: uploaded.artifactHash,
     }) };
     const service = new AuditRecoveryService(prisma as never, blockchain as never, artifacts, {} as never, {} as never);

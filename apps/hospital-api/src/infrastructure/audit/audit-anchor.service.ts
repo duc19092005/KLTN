@@ -41,6 +41,10 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
   private readonly contractVersion = 'AUDIT_ANCHOR_CHECKPOINT_V2';
   private readonly onChainRootCache = new Map<number, string>();
 
+  clearCache(): void {
+    this.onChainRootCache.clear();
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly blockchain: BlockchainService,
@@ -128,61 +132,66 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
   }
 
   /**
-   * Re-chains all local unanchored rows in BlockchainLogger to ensure prevHash continuity.
-   * If any unanchored log has a broken prevHash or was seeded with old/mismatched hashes,
-   * this method repairs prevHash and recalculates entryHash under recovery authorization.
+   * Repair only the contiguous unanchored suffix. Anchored rows are immutable evidence
+   * and are never updated. If the trusted prefix is incomplete, recovery must run first.
    */
   async rechainLocalBlockchainLogger(): Promise<{ recomputed: number; total: number }> {
     const rows = await this.prisma.blockchainLogger.findMany({
       where: { seq: { not: null } },
       orderBy: { seq: 'asc' },
     });
-
     if (rows.length === 0) return { recomputed: 0, total: 0 };
 
+    const firstUnanchoredIndex = rows.findIndex((row) => row.onChainStatus !== 'ANCHORED' || row.batchId == null);
+    if (firstUnanchoredIndex < 0) return { recomputed: 0, total: rows.length };
+
+    const predecessor = firstUnanchoredIndex > 0 ? rows[firstUnanchoredIndex - 1] : null;
+    if (predecessor && (predecessor.onChainStatus !== 'ANCHORED' || predecessor.batchId == null)) {
+      throw new Error('AUDIT_CHAIN_RECOVERY_REQUIRED: unanchored suffix has no trusted predecessor.');
+    }
+    const expectedFirstSeq = predecessor ? predecessor.seq! + 1 : 1;
+    if (rows[firstUnanchoredIndex].seq !== expectedFirstSeq) {
+      throw new Error(`AUDIT_CHAIN_RECOVERY_REQUIRED: expected unanchored seq ${expectedFirstSeq}, got ${rows[firstUnanchoredIndex].seq}.`);
+    }
+
+    let currentPrev = predecessor?.entryHash ?? GENESIS_PREV_HASH;
     let recomputed = 0;
-    let currentPrev = GENESIS_PREV_HASH;
-
     await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('blockchain_logger_chain'))`;
       await tx.$executeRaw`SELECT set_config('app.audit_recovery_authorized', 'true', true)`;
-
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const expectedPrev = i === 0 ? GENESIS_PREV_HASH : currentPrev;
-
-        let needsUpdate = false;
-        let newEntryHash = row.entryHash;
-
-        if (row.prevHash !== expectedPrev) {
-          needsUpdate = true;
+      for (let index = firstUnanchoredIndex; index < rows.length; index += 1) {
+        const row = rows[index];
+        if (row.onChainStatus === 'ANCHORED' && row.batchId != null) {
+          throw new Error(`AUDIT_CHAIN_RECOVERY_REQUIRED: anchored row seq ${row.seq} appears after an unanchored suffix.`);
         }
-
-        // For unanchored rows, recompute entryHash with the corrected prevHash
-        if (row.onChainStatus !== 'ANCHORED' || !row.batchId) {
-          const freshHash = this.recomputeEntryHashForRow(row, expectedPrev);
-          if (freshHash !== row.entryHash || needsUpdate) {
-            newEntryHash = freshHash;
-            needsUpdate = true;
-          }
+        const expectedSeq = expectedFirstSeq + index - firstUnanchoredIndex;
+        if (row.seq !== expectedSeq) {
+          throw new Error(`AUDIT_CHAIN_RECOVERY_REQUIRED: expected seq ${expectedSeq}, got ${row.seq}.`);
         }
-
-        if (needsUpdate) {
+        const newEntryHash = this.recomputeEntryHashForRow(row, currentPrev);
+        if (row.prevHash !== currentPrev || row.entryHash !== newEntryHash) {
           await tx.blockchainLogger.update({
             where: { id: row.id },
-            data: {
-              prevHash: expectedPrev,
-              entryHash: newEntryHash,
-            },
+            data: { prevHash: currentPrev, entryHash: newEntryHash },
           });
-          recomputed++;
+          recomputed += 1;
         }
-
-        currentPrev = newEntryHash || row.entryHash || GENESIS_PREV_HASH;
+        currentPrev = newEntryHash;
       }
     });
 
-    this.logger.log(`Re-chained ${recomputed}/${rows.length} rows in BlockchainLogger.`);
+    this.logger.log(`Re-chained ${recomputed}/${rows.length - firstUnanchoredIndex} unanchored rows.`);
     return { recomputed, total: rows.length };
+  }
+
+  async getLatestCheckpointBatchId(): Promise<number | null> {
+    return this.blockchain.getLatestAuditBatchId(true);
+  }
+
+  async getCheckpointSequenceRange(batchId: number): Promise<{ fromSeq: number; toSeq: number } | null> {
+    const checkpoint = await this.blockchain.getAuditCheckpoint(batchId);
+    if (!checkpoint?.committed) return null;
+    return { fromSeq: checkpoint.fromSeq, toSeq: checkpoint.toSeq };
   }
 
   /**
@@ -581,6 +590,7 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
               }),
               this.prisma.blockchainLogger.updateMany({
                 where: {
+                  batchId: null,
                   seq: { gte: batch.fromSeq!, lte: batch.toSeq! },
                 },
                 data: { batchId: batch.batchId, onChainStatus: 'ANCHORED' },
@@ -617,6 +627,7 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
             }),
             this.prisma.blockchainLogger.updateMany({
               where: {
+                batchId: null,
                 seq: { gte: batch.fromSeq!, lte: batch.toSeq! },
               },
               data: { batchId: batch.batchId, onChainStatus: 'ANCHORED' },
