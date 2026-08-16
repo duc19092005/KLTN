@@ -227,48 +227,50 @@ describe('AuditAnchor', function () {
 
   it('commits and reads a root as owner', async function () {
     const root = rootForThreeLeaves();
-    await expect(anchor.commitCheckpoint(1, root, 3, artifactHash, artifactUri)).to.emit(anchor, 'CheckpointCommitted');
+    await expect(anchor.commitCheckpoint(1, root, 3, 1, 3, artifactHash, artifactUri)).to.emit(anchor, 'CheckpointCommitted');
     expect(await anchor.getRoot(1)).to.equal(root);
     expect(await anchor.latestBatchId()).to.equal(1);
     expect(await anchor.totalBatches()).to.equal(1);
 
-    const [cpRoot, cpArtifactHash, cpArtifactUri, leafCount, , committed] = await anchor.getCheckpoint(1);
+    const [cpRoot, cpArtifactHash, cpArtifactUri, leafCount, fromSeq, toSeq, , committed] = await anchor.getCheckpoint(1);
     expect(cpRoot).to.equal(root);
     expect(cpArtifactHash).to.equal(artifactHash);
     expect(cpArtifactUri).to.equal(artifactUri);
     expect(leafCount).to.equal(3);
+    expect(fromSeq).to.equal(1);
+    expect(toSeq).to.equal(3);
     expect(committed).to.equal(true);
   });
 
   it('commits a root as authorized relayer', async function () {
     await identity.addRelayer(relayer.address);
     const root = rootForThreeLeaves();
-    await expect(anchor.connect(relayer).commitCheckpoint(1, root, 3, artifactHash, artifactUri)).to.emit(anchor, 'CheckpointCommitted');
+    await expect(anchor.connect(relayer).commitCheckpoint(1, root, 3, 1, 3, artifactHash, artifactUri)).to.emit(anchor, 'CheckpointCommitted');
     expect(await anchor.getRoot(1)).to.equal(root);
   });
 
   it('rejects duplicate batch commit', async function () {
     const root = rootForThreeLeaves();
-    await anchor.commitCheckpoint(1, root, 3, artifactHash, artifactUri);
-    await expect(anchor.commitCheckpoint(1, root, 3, artifactHash, artifactUri)).to.be.revertedWith('AuditAnchor: batch already committed');
+    await anchor.commitCheckpoint(1, root, 3, 1, 3, artifactHash, artifactUri);
+    await expect(anchor.commitCheckpoint(1, root, 3, 1, 3, artifactHash, artifactUri)).to.be.revertedWith('AuditAnchor: batch already committed');
   });
 
   it('rejects empty root / empty batch', async function () {
     const root = rootForThreeLeaves();
-    await expect(anchor.commitCheckpoint(1, ethers.ZeroHash, 4, artifactHash, artifactUri)).to.be.revertedWith('AuditAnchor: empty root');
-    await expect(anchor.commitCheckpoint(1, root, 4, ethers.ZeroHash, artifactUri)).to.be.revertedWith('AuditAnchor: empty artifact hash');
-    await expect(anchor.commitCheckpoint(1, root, 4, artifactHash, '')).to.be.revertedWith('AuditAnchor: empty artifact uri');
-    await expect(anchor.commitCheckpoint(1, root, 0, artifactHash, artifactUri)).to.be.revertedWith('AuditAnchor: empty batch');
+    await expect(anchor.commitCheckpoint(1, ethers.ZeroHash, 4, 1, 4, artifactHash, artifactUri)).to.be.revertedWith('AuditAnchor: empty root');
+    await expect(anchor.commitCheckpoint(1, root, 4, 1, 4, ethers.ZeroHash, artifactUri)).to.be.revertedWith('AuditAnchor: empty artifact hash');
+    await expect(anchor.commitCheckpoint(1, root, 4, 1, 4, artifactHash, '')).to.be.revertedWith('AuditAnchor: empty artifact uri');
+    await expect(anchor.commitCheckpoint(1, root, 0, 1, 0, artifactHash, artifactUri)).to.be.revertedWith('AuditAnchor: empty batch');
   });
 
   it('rejects non-sequential batch ids', async function () {
-    await expect(anchor.commitCheckpoint(2, rootForThreeLeaves(), 3, artifactHash, artifactUri)).to.be.revertedWith(
+    await expect(anchor.commitCheckpoint(2, rootForThreeLeaves(), 3, 1, 3, artifactHash, artifactUri)).to.be.revertedWith(
       'AuditAnchor: non-sequential batch',
     );
   });
 
   it('rejects non-writer commit', async function () {
-    await expect(anchor.connect(other).commitCheckpoint(1, rootForThreeLeaves(), 3, artifactHash, artifactUri)).to.be.revertedWith(
+    await expect(anchor.connect(other).commitCheckpoint(1, rootForThreeLeaves(), 3, 1, 3, artifactHash, artifactUri)).to.be.revertedWith(
       'AuditAnchor: caller is not writer',
     );
   });
@@ -287,7 +289,7 @@ describe('AuditAnchor', function () {
     expect(await anchor.hashPair(leafA, leafB)).to.equal(pairAB);
     expect(await anchor.hashPair(leafC, leafC)).to.equal(pairCC);
 
-    await anchor.commitCheckpoint(1, root, 3, artifactHash, artifactUri);
+    await anchor.commitCheckpoint(1, root, 3, 1, 3, artifactHash, artifactUri);
 
     expect(await anchor.verifyProof(1, entryA, [leafB, pairCC])).to.equal(true);
     expect(await anchor.verifyProof(1, entryB, [leafA, pairCC])).to.equal(true);
@@ -300,7 +302,7 @@ describe('AuditAnchor', function () {
     const pairAB = '0xd364921803de82bee9d8be064cab3febadddd3be6cfb01f76c295d78772f2cbf';
     const root = '0x5f591b089c3b297deae0b31b1aeff9527c3c576102d1c7806044a4bd8bf46816';
 
-    await anchor.commitCheckpoint(1, root, 3, artifactHash, artifactUri);
+    await anchor.commitCheckpoint(1, root, 3, 1, 3, artifactHash, artifactUri);
 
     expect(await anchor.verifyProof(1, entryC, [entryC, pairAB])).to.equal(false);
     expect(await anchor.verifyProof(1, entryA, [entryC, pairAB])).to.equal(false);
@@ -314,17 +316,21 @@ describe('AuditAnchor', function () {
   it('queries a range of checkpoints via getCheckpointsRange', async function () {
     const root1 = rootForThreeLeaves();
     const root2 = `0x${'e'.repeat(64)}`;
-    await anchor.commitCheckpoint(1, root1, 3, artifactHash, artifactUri);
-    await anchor.commitCheckpoint(2, root2, 5, artifactHash, 'ipfs://bafybeigtwo');
+    await anchor.commitCheckpoint(1, root1, 3, 1, 3, artifactHash, artifactUri);
+    await anchor.commitCheckpoint(2, root2, 5, 4, 8, artifactHash, 'ipfs://bafybeigtwo');
 
     const range = await anchor.getCheckpointsRange(1, 2);
     expect(range.length).to.equal(2);
     expect(range[0].batchId).to.equal(1n);
     expect(range[0].merkleRoot).to.equal(root1);
     expect(range[0].artifactUri).to.equal(artifactUri);
+    expect(range[0].fromSeq).to.equal(1n);
+    expect(range[0].toSeq).to.equal(3n);
     expect(range[1].batchId).to.equal(2n);
     expect(range[1].merkleRoot).to.equal(root2);
     expect(range[1].artifactUri).to.equal('ipfs://bafybeigtwo');
+    expect(range[1].fromSeq).to.equal(4n);
+    expect(range[1].toSeq).to.equal(8n);
 
     const empty = await anchor.getCheckpointsRange(10, 20);
     expect(empty.length).to.equal(0);

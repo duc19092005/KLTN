@@ -183,19 +183,42 @@ export class IpfsArtifactService {
   }
 
   private async kuboAdd(apiUrl: string, bytes: Buffer, fileName: string, authEnv: string): Promise<string> {
-    const form = new FormData();
-    form.append('file', new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' }), fileName);
-    const response = await fetch(`${apiUrl.replace(/\/$/, '')}/api/v0/add?pin=true&cid-version=1`, {
-      method: 'POST',
-      headers: this.authHeadersFromValue(process.env[authEnv]),
-      body: form,
-    });
-    if (!response.ok) throw new Error(`IPFS add failed with HTTP ${response.status}.`);
-    const text = await response.text();
-    const lastLine = text.trim().split(/\r?\n/).at(-1);
-    const parsed = lastLine ? (JSON.parse(lastLine) as { Hash?: unknown }) : null;
-    if (!parsed || typeof parsed.Hash !== 'string') throw new Error('IPFS add response is missing CID.');
-    return parsed.Hash;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    try {
+      const form = new FormData();
+      form.append('file', new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' }), fileName);
+      const response = await fetch(`${apiUrl.replace(/\/$/, '')}/api/v0/add?pin=true&cid-version=1`, {
+        method: 'POST',
+        headers: this.authHeadersFromValue(process.env[authEnv]),
+        body: form,
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`IPFS add failed with HTTP ${response.status}.`);
+
+      let text = '';
+      if (response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+          const { value, done } = await reader.read();
+          if (value) text += decoder.decode(value, { stream: !done });
+          if (done || (text.includes('Hash') && text.includes('}'))) {
+            try { await reader.cancel(); } catch {}
+            break;
+          }
+        }
+      } else {
+        text = await response.text();
+      }
+
+      const lastLine = text.trim().split(/\r?\n/).at(-1);
+      const parsed = lastLine ? (JSON.parse(lastLine) as { Hash?: unknown }) : null;
+      if (!parsed || typeof parsed.Hash !== 'string') throw new Error('IPFS add response is missing CID.');
+      return parsed.Hash;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private requiredApiUrl(name: string): string {

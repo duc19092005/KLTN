@@ -68,10 +68,10 @@ export class BlockchainService implements OnModuleInit {
   ];
 
   private readonly auditAnchorAbi = [
-    'function commitCheckpoint(uint256 batchId, bytes32 merkleRoot, uint256 leafCount, bytes32 artifactHash, string artifactUri) external',
+    'function commitCheckpoint(uint256 batchId, bytes32 merkleRoot, uint256 leafCount, uint256 fromSeq, uint256 toSeq, bytes32 artifactHash, string artifactUri) external',
     'function getRoot(uint256 batchId) external view returns (bytes32)',
-    'function getCheckpoint(uint256 batchId) external view returns (bytes32 merkleRoot, bytes32 artifactHash, string artifactUri, uint256 leafCount, uint256 timestamp, bool committed)',
-    'function getCheckpointsRange(uint256 fromBatchId, uint256 toBatchId) external view returns (tuple(uint256 batchId, bytes32 merkleRoot, bytes32 artifactHash, string artifactUri, uint256 leafCount, uint256 timestamp, bool committed)[] items)',
+    'function getCheckpoint(uint256 batchId) external view returns (bytes32 merkleRoot, bytes32 artifactHash, string artifactUri, uint256 leafCount, uint256 fromSeq, uint256 toSeq, uint256 timestamp, bool committed)',
+    'function getCheckpointsRange(uint256 fromBatchId, uint256 toBatchId) external view returns (tuple(uint256 batchId, bytes32 merkleRoot, bytes32 artifactHash, string artifactUri, uint256 leafCount, uint256 fromSeq, uint256 toSeq, uint256 timestamp, bool committed)[] items)',
     'function latestBatchId() external view returns (uint256)',
     'function totalBatches() external view returns (uint256)',
     'function owner() external view returns (address)',
@@ -398,6 +398,8 @@ export class BlockchainService implements OnModuleInit {
     batchId: number,
     merkleRootBytes32: string,
     leafCount: number,
+    fromSeq: number,
+    toSeq: number,
     artifactHashBytes32: string,
     artifactUri: string,
   ): Promise<{ success: boolean; txHash: string; blockNumber: number } | null> {
@@ -412,6 +414,8 @@ export class BlockchainService implements OnModuleInit {
           batchId,
           merkleRootBytes32,
           leafCount,
+          fromSeq,
+          toSeq,
           artifactHashBytes32,
           artifactUri,
         );
@@ -433,10 +437,12 @@ export class BlockchainService implements OnModuleInit {
     batchId: number,
     merkleRootBytes32: string,
     leafCount: number,
+    fromSeq: number,
+    toSeq: number,
     artifactHashBytes32: string,
     artifactUri: string,
   ): Promise<{ success: boolean; txHash: string; blockNumber: number } | null> {
-    return this.commitAuditCheckpointOnChain(batchId, merkleRootBytes32, leafCount, artifactHashBytes32, artifactUri);
+    return this.commitAuditCheckpointOnChain(batchId, merkleRootBytes32, leafCount, fromSeq, toSeq, artifactHashBytes32, artifactUri);
   }
 
   async getAuditRoot(batchId: number): Promise<string | null> {
@@ -457,17 +463,21 @@ export class BlockchainService implements OnModuleInit {
     artifactHash: string;
     artifactUri: string;
     leafCount: number;
+    fromSeq: number;
+    toSeq: number;
     timestamp: number;
     committed: boolean;
   } | null> {
     if (!this.auditAnchor) return null;
     try {
-      const [root, artifactHash, artifactUri, leafCount, timestamp, committed] = await this.auditAnchor.getCheckpoint(batchId);
+      const [root, artifactHash, artifactUri, leafCount, fromSeq, toSeq, timestamp, committed] = await this.auditAnchor.getCheckpoint(batchId);
       return {
         root,
         artifactHash,
         artifactUri,
         leafCount: Number(leafCount),
+        fromSeq: Number(fromSeq),
+        toSeq: Number(toSeq),
         timestamp: Number(timestamp),
         committed: Boolean(committed),
       };
@@ -482,6 +492,8 @@ export class BlockchainService implements OnModuleInit {
     artifactHash: string;
     artifactUri: string;
     leafCount: number;
+    fromSeq: number;
+    toSeq: number;
     timestamp: number;
     committed: boolean;
   }>> {
@@ -494,6 +506,8 @@ export class BlockchainService implements OnModuleInit {
         artifactHash: String(item.artifactHash),
         artifactUri: String(item.artifactUri),
         leafCount: Number(item.leafCount),
+        fromSeq: Number(item.fromSeq),
+        toSeq: Number(item.toSeq),
         timestamp: Number(item.timestamp),
         committed: Boolean(item.committed),
       }));
@@ -508,6 +522,8 @@ export class BlockchainService implements OnModuleInit {
     artifactHash: string;
     artifactUri: string;
     leafCount: number;
+    fromSeq: number;
+    toSeq: number;
     timestamp: number;
     committed: boolean;
   }>> {

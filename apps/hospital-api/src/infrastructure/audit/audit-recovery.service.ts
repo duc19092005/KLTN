@@ -1,4 +1,5 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit, forwardRef, Inject, Optional } from '@nestjs/common';
+import { EntityRecoveryService } from './entity-recovery.service';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
@@ -6,7 +7,7 @@ import { AuditArtifactService, AuditRecoveryBundleRow } from './audit-artifact.s
 import { AuditAnchorService } from './audit-anchor.service';
 import { AuditLoggerService } from './audit-logger.service';
 import { computeMerkleRootForAlgorithm, MERKLE_SHA256_STRING_V1, rootToBytes32 } from './merkle.util';
-import { verifyAuditRow } from './audit-verification.util';
+import { verifyAuditRow, verifyAuditRowLight } from './audit-verification.util';
 
 export interface VerifiedAuditRecoveryBundle {
   batchId: number;
@@ -39,6 +40,7 @@ export interface WatchdogState {
   nextRunAt: string | null;
   lastScannedBatches: number;
   lastHealedBatches: number;
+  lastErrors: string[];
   statusMessage: string;
 }
 
@@ -54,6 +56,7 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
     nextRunAt: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
     lastScannedBatches: 0,
     lastHealedBatches: 0,
+    lastErrors: [],
     statusMessage: 'Tự động chạy ngầm mỗi 20 phút (phân đoạn 15 lô / lượt).',
   };
 
@@ -73,6 +76,9 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
     private readonly artifacts: AuditArtifactService,
     private readonly anchor: AuditAnchorService,
     private readonly audit: AuditLoggerService,
+    @Inject(forwardRef(() => EntityRecoveryService))
+    @Optional()
+    private readonly entityRecovery?: EntityRecoveryService,
   ) {}
 
   onModuleInit() {
@@ -109,6 +115,7 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
 
     let totalScanned = 0;
     let totalHealed = 0;
+    const errors: string[] = [];
 
     try {
       const latestOnChain = await this.blockchain.getLatestAuditBatchId();
@@ -153,11 +160,31 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
 
           if (local.fromSeq != null && local.toSeq != null) {
             const logsInBatch = await this.prisma.blockchainLogger.findMany({
-              where: { seq: { gte: local.fromSeq, lte: local.toSeq }, entryHash: { not: null } },
-              select: { seq: true, entryHash: true },
+              where: { batchId: local.batchId, seq: { gte: local.fromSeq, lte: local.toSeq }, entryHash: { not: null } },
+              select: {
+                id: true,
+                seq: true,
+                prevHash: true,
+                entryHash: true,
+                actorId: true,
+                action: true,
+                entity: true,
+                entityId: true,
+                dataHash: true,
+                dataSalt: true,
+                beforeHash: true,
+                afterHash: true,
+                diffHash: true,
+                hashVersion: true,
+                beforeEncrypted: true,
+                afterEncrypted: true,
+                diffJson: true,
+                fieldsChanged: true,
+                createdAt: true,
+              },
             });
             const expectedCount = Number(cp.leafCount) || local.leafCount || (local.toSeq - local.fromSeq + 1);
-            if (logsInBatch.length !== expectedCount) {
+            if (logsInBatch.length !== expectedCount || !logsInBatch.every((l) => verifyAuditRowLight(l).ok)) {
               targetBatchIds.push(cp.batchId);
               continue;
             }
@@ -169,6 +196,9 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
               targetBatchIds.push(cp.batchId);
               continue;
             }
+          } else {
+            targetBatchIds.push(cp.batchId);
+            continue;
           }
         }
       }
@@ -178,16 +208,25 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
           await this.recoverBatchDirectFromChain(bId, null, 'Automated 20-minute Background Watchdog Auto-Healing');
           totalHealed += 1;
         } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          errors.push(`Batch #${bId}: ${message}`);
           console.error(`[WATCHDOG] Failed to auto-heal batch #${bId}:`, err);
         }
       }
 
       this.watchdogState.lastScannedBatches = totalScanned;
       this.watchdogState.lastHealedBatches = totalHealed;
-      this.watchdogState.statusMessage = totalHealed > 0
-        ? `[WATCHDOG 20m] Đã tự động phát hiện và khôi phục thành công ${totalHealed} lô bị sai lệch!`
-        : `[WATCHDOG 20m] Tất cả ${totalScanned} lô trên Blockchain và DB local đều toàn vẹn 100%.`;
+      this.watchdogState.lastErrors = errors;
+      this.watchdogState.statusMessage = errors.length > 0
+        ? `[WATCHDOG 20m] Khôi phục chưa hoàn tất: ${errors.length} lô lỗi, ${totalHealed} lô đã phục hồi.`
+        : totalHealed > 0
+          ? `[WATCHDOG 20m] Đã tự động phát hiện và khôi phục thành công ${totalHealed} lô bị sai lệch!`
+          : `[WATCHDOG 20m] Tất cả ${totalScanned} lô trên Blockchain và DB local đều toàn vẹn 100%.`;
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      errors.push(message);
+      this.watchdogState.lastErrors = errors;
+      this.watchdogState.statusMessage = `[WATCHDOG 20m] Quét thất bại: ${message}`;
       console.error('[WATCHDOG SWEEP ERROR]', err);
     }
 
@@ -302,9 +341,29 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
         let isLogsIntact = true;
         if (local.fromSeq != null && local.toSeq != null) {
           const logsInBatch = await this.prisma.blockchainLogger.findMany({
-            where: { seq: { gte: local.fromSeq, lte: local.toSeq }, entryHash: { not: null } },
+            where: { batchId: local.batchId, seq: { gte: local.fromSeq, lte: local.toSeq }, entryHash: { not: null } },
             orderBy: { seq: 'asc' },
-            select: { seq: true, entryHash: true },
+            select: {
+              id: true,
+              seq: true,
+              prevHash: true,
+              entryHash: true,
+              actorId: true,
+              action: true,
+              entity: true,
+              entityId: true,
+              dataHash: true,
+              dataSalt: true,
+              beforeHash: true,
+              afterHash: true,
+              diffHash: true,
+              hashVersion: true,
+              beforeEncrypted: true,
+              afterEncrypted: true,
+              diffJson: true,
+              fieldsChanged: true,
+              createdAt: true,
+            },
           });
 
           const expectedCount = Number(cp.leafCount) || local.leafCount || (local.toSeq - local.fromSeq + 1);
@@ -312,15 +371,24 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
             isLogsIntact = false;
             this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} bị THIẾU DỮ LIỆU LOG (DB local có ${logsInBatch.length}/${expectedCount} logs).`);
           } else {
-            const recomputedRoot = computeMerkleRootForAlgorithm(
-              logsInBatch.map((l) => l.entryHash!),
-              local.algorithmVersion ?? MERKLE_SHA256_STRING_V1,
-            );
-            if (rootToBytes32(recomputedRoot).toLowerCase() !== rootToBytes32(cp.root).toLowerCase()) {
+            const isEveryRowVerified = logsInBatch.every((l) => verifyAuditRowLight(l).ok);
+            if (!isEveryRowVerified) {
               isLogsIntact = false;
-              this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} bị SỬA ĐỔI MÃ HASH TRONG LOGS (Merkle Root tính lại không khớp với Blockchain).`);
+              this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} có bản ghi log bị sửa đổi hoặc hỏng mã băm.`);
+            } else {
+              const recomputedRoot = computeMerkleRootForAlgorithm(
+                logsInBatch.map((l) => l.entryHash!),
+                local.algorithmVersion ?? MERKLE_SHA256_STRING_V1,
+              );
+              if (rootToBytes32(recomputedRoot).toLowerCase() !== rootToBytes32(cp.root).toLowerCase()) {
+                isLogsIntact = false;
+                this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} bị SỬA ĐỔI MÃ HASH TRONG LOGS (Merkle Root tính lại không khớp với Blockchain).`);
+              }
             }
           }
+        } else {
+          isLogsIntact = false;
+          this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} thiếu fromSeq/toSeq trong DB local.`);
         }
 
         if (!isHeaderMatch || !isLogsIntact) {
@@ -335,14 +403,14 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
 
       if (targetBatchIds.length === 0) {
         this.pushLog('✅ [Pass 1] Tất cả các Audit Batches trên DB local đều khớp 100% với Blockchain!');
-        this.deepScanState.progressPercent = 80;
+        this.deepScanState.progressPercent = 60;
       } else {
         this.pushLog(`🔧 [Pass 2] Khởi chạy khôi phục tự động cho ${targetBatchIds.length} batch(es)...`);
         
         const totalTargets = targetBatchIds.length;
         for (let idx = 0; idx < totalTargets; idx++) {
           const bId = targetBatchIds[idx];
-          const pct = Math.floor(20 + ((idx + 1) / totalTargets) * 60);
+          const pct = Math.floor(20 + ((idx + 1) / totalTargets) * 40);
           this.deepScanState.progressPercent = pct;
           this.pushLog(`📥 Đang tải IPFS Artifact cho Batch #${bId} từ Blockchain...`);
 
@@ -358,14 +426,41 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
-      this.deepScanState.progressPercent = 90;
+      this.deepScanState.progressPercent = 75;
       this.pushLog('🧹 Đang quét kiểm tra các Entity nghiệp vụ bị ảnh hưởng...');
 
+      if (this.entityRecovery) {
+        try {
+          const warnings = await this.entityRecovery.listWarnings(200);
+          const recoverable = warnings.items.filter((w) => w.recoverable);
+          if (recoverable.length > 0) {
+            this.pushLog(`🔧 [Pass 3] Tự động phục hồi ${recoverable.length} thực thể nghiệp vụ bị lệch/bị xóa...`);
+            const entityRes = await this.entityRecovery.recoverMany(
+              recoverable.map((w) => ({ entity: w.entity, entityId: w.entityId })),
+              adminId,
+              'Deep-Scan Automated Clinical Entity Healing',
+            );
+            recoveredEntitiesCount = entityRes.recovered;
+            this.pushLog(`🟢 Đã tự động phục hồi thành công ${entityRes.recovered} thực thể nghiệp vụ!`);
+          } else {
+            this.pushLog('✅ Tất cả thực thể nghiệp vụ đều toàn vẹn 100%!');
+          }
+        } catch (entityErr) {
+          const errStr = entityErr instanceof Error ? entityErr.message : String(entityErr);
+          errors.push(`Entity recovery: ${errStr}`);
+          this.pushLog(`⚠️ Không thể hoàn tất tự động phục hồi entity: ${errStr}`);
+        }
+      }
+
       this.deepScanState.progressPercent = 100;
-      this.deepScanState.statusMessage = recoveredBatchesCount > 0
-        ? `Đã tự động sửa chữa thành công ${recoveredBatchesCount} audit batch(es).`
-        : 'Tất cả Audit Batches đều an toàn và toàn vẹn 100%.';
-      this.pushLog(`🎉 Hoàn tất 100%! Đã quét ${scannedCount} batches, tự động sửa chữa ${recoveredBatchesCount} batches.`);
+      this.deepScanState.statusMessage = errors.length > 0
+        ? `Đối soát hoàn tất một phần: ${errors.length} lỗi cần xử lý.`
+        : recoveredBatchesCount > 0
+          ? `Đã tự động sửa chữa thành công ${recoveredBatchesCount} audit batch(es).`
+          : 'Tất cả Audit Batches đều an toàn và toàn vẹn 100%.';
+      this.pushLog(errors.length > 0
+        ? `⚠️ Hoàn tất đối soát với ${errors.length} lỗi; không đánh dấu thành công toàn phần.`
+        : `🎉 Hoàn tất 100%! Đã quét ${scannedCount} batches, tự động sửa chữa ${recoveredBatchesCount} batches.`);
 
       this.deepScanState.result = {
         scannedBatches: scannedCount,
@@ -395,31 +490,50 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
       checkpoint.artifactUri,
       checkpoint.artifactHash,
     );
-
-    this.validateBundle(bundle.logs, {
-      batchId,
-      merkleRoot: bundle.batch.merkleRoot,
-      fromSeq: bundle.batch.fromSeq,
-      toSeq: bundle.batch.toSeq,
-      leafCount: bundle.batch.leafCount,
-      algorithmVersion: bundle.batch.algorithmVersion,
-      onChainRoot: checkpoint.root,
-      onChainLeafCount: checkpoint.leafCount,
-    });
+    const expected = this.expectedBundleMetadata(bundle, checkpoint, batchId);
+    this.validateBundle(bundle.logs, expected);
 
     await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('blockchain_logger_chain'))`;
       await tx.$executeRaw`SELECT set_config('app.audit_recovery_authorized', 'true', true)`;
-      await tx.$executeRaw`SET session_replication_role = 'replica'`;
+      await tx.$executeRaw`SET LOCAL session_replication_role = 'replica'`;
 
-      const logIds = bundle.logs.map((r) => r.id).filter(Boolean);
-      await tx.blockchainLogger.deleteMany({
+      const artifactIds = bundle.logs.map((row) => row.id);
+      const artifactSequences = bundle.logs.map((row) => row.seq);
+      const localCandidates = await tx.blockchainLogger.findMany({
         where: {
           OR: [
-            { seq: { gte: bundle.batch.fromSeq, lte: bundle.batch.toSeq } },
-            { id: { in: logIds } },
+            { seq: { in: artifactSequences } },
+            { id: { in: artifactIds } },
+            { batchId },
           ],
         },
+        select: { id: true, seq: true, entryHash: true, batchId: true },
       });
+      const artifactBySeq = new Map(bundle.logs.map((row) => [row.seq, row]));
+      const artifactById = new Map(bundle.logs.map((row) => [row.id, row]));
+      const exactRows = new Set<string>();
+      const conflicts: typeof localCandidates = [];
+
+      for (const local of localCandidates) {
+        const bySeq = local.seq == null ? undefined : artifactBySeq.get(local.seq);
+        const byId = artifactById.get(local.id);
+        const artifactRow = bySeq ?? byId;
+        const isExact = Boolean(
+          artifactRow
+          && local.id === artifactRow.id
+          && local.seq === artifactRow.seq
+          && local.entryHash === artifactRow.entryHash,
+        );
+        if (isExact) exactRows.add(local.id);
+        else conflicts.push(local);
+      }
+
+      if (conflicts.length > 0) {
+        await tx.blockchainLogger.deleteMany({
+          where: { id: { in: conflicts.map((row) => row.id) } },
+        });
+      }
 
       for (const row of bundle.logs) {
         const input = this.toCreateInput(row, batchId, null, null);
@@ -430,55 +544,140 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
         });
       }
 
-      await tx.$executeRaw`SET session_replication_role = 'origin'`;
-
       await tx.auditBatch.upsert({
         where: { batchId },
         create: {
           batchId,
-          merkleRoot: bundle.batch.merkleRoot,
-          leafCount: bundle.batch.leafCount,
-          fromSeq: bundle.batch.fromSeq,
-          toSeq: bundle.batch.toSeq,
-          algorithmVersion: bundle.batch.algorithmVersion,
+          merkleRoot: expected.merkleRoot,
+          leafCount: expected.leafCount,
+          fromSeq: expected.fromSeq,
+          toSeq: expected.toSeq,
+          algorithmVersion: expected.algorithmVersion,
           contractVersion: 'AUDIT_ANCHOR_CHECKPOINT_V2',
           artifactHash: checkpoint.artifactHash,
           artifactUri: checkpoint.artifactUri,
-          artifactCid: checkpoint.artifactUri.slice('ipfs://'.length),
+          artifactCid: checkpoint.artifactUri.startsWith('ipfs://')
+            ? checkpoint.artifactUri.slice('ipfs://'.length)
+            : null,
           status: 'ANCHORED',
+          anchoredAt: new Date(checkpoint.timestamp * 1000),
           recoveredAt: new Date(),
           error: null,
         },
         update: {
-          merkleRoot: bundle.batch.merkleRoot,
-          leafCount: bundle.batch.leafCount,
-          fromSeq: bundle.batch.fromSeq,
-          toSeq: bundle.batch.toSeq,
-          algorithmVersion: bundle.batch.algorithmVersion,
+          merkleRoot: expected.merkleRoot,
+          leafCount: expected.leafCount,
+          fromSeq: expected.fromSeq,
+          toSeq: expected.toSeq,
+          algorithmVersion: expected.algorithmVersion,
+          contractVersion: 'AUDIT_ANCHOR_CHECKPOINT_V2',
           artifactHash: checkpoint.artifactHash,
           artifactUri: checkpoint.artifactUri,
-          artifactCid: checkpoint.artifactUri.slice('ipfs://'.length),
+          artifactCid: checkpoint.artifactUri.startsWith('ipfs://')
+            ? checkpoint.artifactUri.slice('ipfs://'.length)
+            : null,
           status: 'ANCHORED',
+          anchoredAt: new Date(checkpoint.timestamp * 1000),
           recoveredAt: new Date(),
           error: null,
         },
       });
+
+      const restored = await tx.blockchainLogger.findMany({
+        where: { batchId, seq: { gte: expected.fromSeq, lte: expected.toSeq } },
+        orderBy: { seq: 'asc' },
+        select: {
+          id: true,
+          seq: true,
+          prevHash: true,
+          entryHash: true,
+          actorId: true,
+          action: true,
+          entity: true,
+          entityId: true,
+          dataHash: true,
+          dataSalt: true,
+          beforeHash: true,
+          afterHash: true,
+          diffHash: true,
+          hashVersion: true,
+          beforeEncrypted: true,
+          afterEncrypted: true,
+          diffJson: true,
+          fieldsChanged: true,
+          createdAt: true,
+        },
+      });
+      if (restored.length !== bundle.logs.length) {
+        throw new Error(`Batch ${batchId} restore count mismatch.`);
+      }
+      for (let index = 0; index < restored.length; index += 1) {
+        const local = restored[index];
+        const artifact = bundle.logs[index];
+        if (local.id !== artifact.id || local.seq !== artifact.seq || local.entryHash !== artifact.entryHash) {
+          throw new Error(`Batch ${batchId} immutable membership mismatch at seq ${artifact.seq}.`);
+        }
+        if (!verifyAuditRowLight(local).ok) {
+          throw new Error(`Batch ${batchId} restored row ${artifact.seq} failed hash verification.`);
+        }
+      }
+      const restoredRoot = computeMerkleRootForAlgorithm(
+        restored.map((row) => row.entryHash!),
+        expected.algorithmVersion,
+      );
+      if (rootToBytes32(restoredRoot).toLowerCase() !== rootToBytes32(checkpoint.root).toLowerCase()) {
+        throw new Error(`Batch ${batchId} restored Merkle root does not match its checkpoint.`);
+      }
     });
 
-    await this.audit.recordV2({
-      entity: 'AuditBatch',
-      entityId: String(batchId),
-      action: 'AUDIT_RECOVERY_EXECUTED',
-      actorId: adminId || null,
-      before: null,
-      after: { batchId, restoredCount: bundle.logs.length, status: 'RECOVERED' },
-      metadata: {
-        batchId,
-        reason,
-        artifactHash: checkpoint.artifactHash,
-        actorType: adminId ? 'ADMIN_USER' : 'SYSTEM_WATCHDOG',
-      },
-    });
+    try {
+      await this.audit.recordV2({
+        entity: 'AuditBatch',
+        entityId: String(batchId),
+        action: 'AUDIT_RECOVERY_EXECUTED',
+        actorId: adminId || null,
+        before: null,
+        after: { batchId, restoredCount: bundle.logs.length, status: 'RECOVERED' },
+        metadata: {
+          batchId,
+          reason,
+          artifactHash: checkpoint.artifactHash,
+          actorType: adminId ? 'ADMIN_USER' : 'SYSTEM_WATCHDOG',
+        },
+      });
+    } catch (auditError) {
+      console.error(`[AUDIT RECOVERY] Batch #${batchId} restored but recovery event append failed:`, auditError);
+    }
+  }
+
+  private expectedBundleMetadata(
+    bundle: { batch: { batchId: number; merkleRoot: string; fromSeq: number; toSeq: number; leafCount: number; algorithmVersion: string } },
+    checkpoint: { root: string; fromSeq: number; toSeq: number; leafCount: number },
+    expectedBatchId = bundle.batch.batchId,
+  ) {
+    if (bundle.batch.batchId !== expectedBatchId) {
+      throw new BadRequestException('Recovery bundle batch id does not match the requested checkpoint.');
+    }
+    if (
+      bundle.batch.fromSeq !== checkpoint.fromSeq
+      || bundle.batch.toSeq !== checkpoint.toSeq
+      || bundle.batch.leafCount !== checkpoint.leafCount
+    ) {
+      throw new BadRequestException('Recovery bundle metadata does not match the blockchain checkpoint.');
+    }
+    if (rootToBytes32(bundle.batch.merkleRoot).toLowerCase() !== rootToBytes32(checkpoint.root).toLowerCase()) {
+      throw new BadRequestException('Recovery bundle root does not match the blockchain checkpoint.');
+    }
+    return {
+      batchId: bundle.batch.batchId,
+      merkleRoot: bundle.batch.merkleRoot,
+      fromSeq: bundle.batch.fromSeq,
+      toSeq: bundle.batch.toSeq,
+      leafCount: bundle.batch.leafCount,
+      algorithmVersion: bundle.batch.algorithmVersion,
+      onChainRoot: checkpoint.root,
+      onChainLeafCount: checkpoint.leafCount,
+    };
   }
 
   /**
@@ -496,28 +695,17 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('The blockchain checkpoint has no recovery artifact.');
     }
 
+    if (batch?.merkleRoot && rootToBytes32(batch.merkleRoot).toLowerCase() !== rootToBytes32(checkpoint.root).toLowerCase()) {
+      throw new BadRequestException('Local audit batch Merkle root does not match the blockchain checkpoint.');
+    }
+
     const bundle = await this.artifacts.downloadAndDecrypt(
       batchId,
       checkpoint.artifactUri,
       checkpoint.artifactHash,
     );
 
-    const merkleRoot = batch?.merkleRoot ?? bundle.batch.merkleRoot;
-    const fromSeq = batch?.fromSeq ?? bundle.batch.fromSeq;
-    const toSeq = batch?.toSeq ?? bundle.batch.toSeq;
-    const leafCount = batch?.leafCount ?? bundle.batch.leafCount;
-    const algorithmVersion = batch?.algorithmVersion ?? bundle.batch.algorithmVersion;
-
-    this.validateBundle(bundle.logs, {
-      batchId,
-      merkleRoot,
-      fromSeq,
-      toSeq,
-      leafCount,
-      algorithmVersion,
-      onChainRoot: checkpoint.root,
-      onChainLeafCount: checkpoint.leafCount,
-    });
+    this.validateBundle(bundle.logs, this.expectedBundleMetadata(bundle, checkpoint, batchId));
 
     return {
       batchId,
@@ -539,6 +727,20 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
     if (!Number.isSafeInteger(batchId) || batchId <= 0) throw new BadRequestException('Invalid audit batch id.');
     if (this.runningBatches.has(batchId)) throw new ConflictException('This audit batch is already being recovered.');
     this.runningBatches.add(batchId);
+
+    // Ensure AuditBatch placeholder exists if the batch was completely wiped from local DB
+    await this.prisma.auditBatch.upsert({
+      where: { batchId },
+      create: {
+        batchId,
+        merkleRoot: 'PENDING_RECOVERY',
+        leafCount: 0,
+        fromSeq: 0,
+        toSeq: 0,
+        status: 'PENDING',
+      },
+      update: {},
+    });
 
     const recovery = await this.prisma.auditRecovery.create({
       data: { batchId, requestedById: adminId, reason: reason.trim() },

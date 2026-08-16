@@ -401,10 +401,21 @@ export default function AuditLogsPage() {
           setDeepScanProgress(state);
           if (!state.active) {
             setDeepScanPolling(false);
+            const errors = Array.isArray(state.result?.errors) ? state.result.errors : [];
+            const recovered = Number(state.result?.recoveredBatches || 0);
+            const outcome = errors.length === 0 ? 'SUCCESS' : recovered > 0 ? 'PARTIAL' : 'FAILED';
+            setDeepScanProgress({ ...state, outcome });
+            if (outcome === 'SUCCESS') {
+              toast.success(state.statusMessage || 'Đối soát hoàn tất, toàn bộ batch đều hợp lệ.');
+            } else if (outcome === 'PARTIAL') {
+              toast.warning(`Đối soát hoàn tất một phần: đã phục hồi ${recovered} batch, còn ${errors.length} lỗi.`);
+            } else {
+              toast.error(`Đối soát thất bại: ${errors[0] || 'Không thể khôi phục batch từ artifact đã neo.'}`);
+            }
             refreshAll();
             setTimeout(() => {
               setDeepScanProgress(null);
-            }, 5000);
+            }, 15000);
           }
         } catch (err) {
           console.error('Deep scan polling error:', err);
@@ -416,7 +427,7 @@ export default function AuditLogsPage() {
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [deepScanPolling, refreshAll]);
+  }, [deepScanPolling, refreshAll, toast]);
 
   useEffect(() => {
     loadPendingQueue();
@@ -1128,7 +1139,11 @@ export default function AuditLogsPage() {
                 className={`flex h-7 w-7 items-center justify-center rounded-lg ${
                   deepScanProgress.active
                     ? 'bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400 animate-pulse'
-                    : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400'
+                    : deepScanProgress.outcome === 'FAILED'
+                      ? 'bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-400'
+                      : deepScanProgress.outcome === 'PARTIAL'
+                        ? 'bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400'
+                        : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400'
                 }`}
               >
                 <Activity className="h-3.5 w-3.5" />
@@ -1168,7 +1183,11 @@ export default function AuditLogsPage() {
                     className={`flex h-8 w-8 items-center justify-center rounded-lg ${
                       deepScanProgress.active
                         ? 'bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400 animate-pulse'
-                        : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400'
+                        : deepScanProgress.outcome === 'FAILED'
+                          ? 'bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-400'
+                          : deepScanProgress.outcome === 'PARTIAL'
+                            ? 'bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400'
+                            : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400'
                     }`}
                   >
                     <Activity className="h-4 w-4" />
@@ -1178,7 +1197,13 @@ export default function AuditLogsPage() {
                       Đối soát Blockchain & Tự sửa chữa
                     </h5>
                     <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                      {deepScanProgress.active ? 'Đang chạy ngầm...' : 'Đã hoàn thành đối soát'}
+                      {deepScanProgress.active
+                        ? 'Đang chạy ngầm...'
+                        : deepScanProgress.outcome === 'FAILED'
+                          ? 'FAILED · Cần can thiệp'
+                          : deepScanProgress.outcome === 'PARTIAL'
+                            ? 'PARTIAL · Chưa khôi phục hết'
+                            : 'SUCCESS · Đã xác minh toàn bộ'}
                     </p>
                   </div>
                 </div>
@@ -1209,7 +1234,13 @@ export default function AuditLogsPage() {
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                   <div
-                    className="h-full bg-gradient-to-r from-sky-500 to-emerald-500 transition-all duration-300 rounded-full"
+                    className={`h-full transition-all duration-300 rounded-full ${
+                      deepScanProgress.outcome === 'FAILED'
+                        ? 'bg-rose-500'
+                        : deepScanProgress.outcome === 'PARTIAL'
+                          ? 'bg-amber-500'
+                          : 'bg-gradient-to-r from-sky-500 to-emerald-500'
+                    }`}
                     style={{ width: `${deepScanProgress.progressPercent}%` }}
                   />
                 </div>

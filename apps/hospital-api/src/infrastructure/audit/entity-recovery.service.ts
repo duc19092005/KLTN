@@ -130,7 +130,7 @@ export class EntityRecoveryService {
     private readonly audit: AuditLoggerService,
     private readonly anchor: AuditAnchorService,
     @Optional() @Inject(forwardRef(() => AuditRecoveryService)) private readonly batchRecovery?: AuditRecoveryService,
-    @Optional() private readonly recreation?: EntityRecreationService,
+    @Optional() @Inject(forwardRef(() => EntityRecreationService)) private readonly recreation?: EntityRecreationService,
   ) {}
 
   async previewMany(targets: EntityRecoveryTarget[]) {

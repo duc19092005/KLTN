@@ -22,6 +22,9 @@ function createPrismaMock() {
       }),
       findMany: jest.fn(async () => rows),
     },
+    auditBatch: {
+      aggregate: jest.fn().mockResolvedValue({ _max: { toSeq: null } }),
+    },
   };
   return {
     rows,
@@ -29,6 +32,7 @@ function createPrismaMock() {
     prisma: {
       $transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(client)),
       blockchainLogger: client.blockchainLogger,
+      auditBatch: client.auditBatch,
     },
   };
 }
@@ -60,7 +64,14 @@ describe('AuditLoggerService V2', () => {
       providers: [
         AuditLoggerService,
         { provide: PrismaService, useValue: prismaMock.prisma },
-        { provide: AuditAnchorService, useValue: { sendTelegramAlert: jest.fn() } },
+        {
+          provide: AuditAnchorService,
+          useValue: {
+            sendTelegramAlert: jest.fn(),
+            getLatestCheckpointBatchId: jest.fn().mockResolvedValue(0),
+            getCheckpointSequenceRange: jest.fn().mockResolvedValue(null),
+          },
+        },
       ],
     }).compile();
 

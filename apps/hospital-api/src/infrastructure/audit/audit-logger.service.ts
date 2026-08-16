@@ -177,13 +177,20 @@ export class AuditLoggerService {
   ) {
     await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('blockchain_logger_chain'))`;
 
-    // 1. Find the current chain tail to derive seq + prevHash.
+    // 1. Derive the chain tail only after proving local history covers every on-chain checkpoint.
     const tail = await client.blockchainLogger.findFirst({
       where: { seq: { not: null } },
       orderBy: { seq: 'desc' },
       select: { seq: true, entryHash: true },
     });
-    const seq = (tail?.seq ?? 0) + 1;
+    const highWater = await this.getTrustedSequenceHighWater(client);
+    if (tail == null && highWater > 0) {
+      throw new Error(`AUDIT_CHAIN_RECOVERY_REQUIRED: local audit history is empty but blockchain is anchored through seq ${highWater}.`);
+    }
+    if ((tail?.seq ?? 0) < highWater) {
+      throw new Error(`AUDIT_CHAIN_RECOVERY_REQUIRED: local chain ends at seq ${tail?.seq ?? 0}, below anchored seq ${highWater}.`);
+    }
+    const seq = Math.max(tail?.seq ?? 0, highWater) + 1;
     const eventId = randomUUID();
     const prevHash = tail?.entryHash ?? GENESIS_PREV_HASH;
     const createdAt = new Date();
@@ -252,7 +259,14 @@ export class AuditLoggerService {
       orderBy: { seq: 'desc' },
       select: { seq: true, entryHash: true },
     });
-    const seq = (tail?.seq ?? 0) + 1;
+    const highWater = await this.getTrustedSequenceHighWater(client);
+    if (tail == null && highWater > 0) {
+      throw new Error(`AUDIT_CHAIN_RECOVERY_REQUIRED: local audit history is empty but blockchain is anchored through seq ${highWater}.`);
+    }
+    if ((tail?.seq ?? 0) < highWater) {
+      throw new Error(`AUDIT_CHAIN_RECOVERY_REQUIRED: local chain ends at seq ${tail?.seq ?? 0}, below anchored seq ${highWater}.`);
+    }
+    const seq = Math.max(tail?.seq ?? 0, highWater) + 1;
     const eventId = randomUUID();
     const prevHash = tail?.entryHash ?? GENESIS_PREV_HASH;
     const createdAt = new Date();
@@ -332,6 +346,16 @@ export class AuditLoggerService {
     return client.blockchainLogger.create({
       data: data as Prisma.BlockchainLoggerUncheckedCreateInput,
     });
+  }
+
+  private async getTrustedSequenceHighWater(client: Prisma.TransactionClient): Promise<number> {
+    const local = client.auditBatch?.aggregate
+      ? await client.auditBatch.aggregate({ where: { status: 'ANCHORED' }, _max: { toSeq: true } })
+      : { _max: { toSeq: null } };
+    const latestBatchId = (await this.anchor.getLatestCheckpointBatchId()) ?? 0;
+    if (latestBatchId <= 0) return local._max.toSeq ?? 0;
+    const checkpoint = await this.anchor.getCheckpointSequenceRange(latestBatchId);
+    return Math.max(local._max.toSeq ?? 0, checkpoint?.toSeq ?? 0);
   }
 
   private auditTier(entity: string, action: string): 'A' | 'B' {

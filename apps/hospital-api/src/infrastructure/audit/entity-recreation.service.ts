@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, forwardRef, Inject, Optional } from '@nestjs/common';
 import {
   AppointmentStatus,
   DepartmentType,
@@ -97,7 +97,9 @@ export class EntityRecreationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditLoggerService,
-    private readonly recovery: AuditRecoveryService,
+    @Optional()
+    @Inject(forwardRef(() => AuditRecoveryService))
+    private readonly recovery?: AuditRecoveryService,
   ) {}
 
   createBundleCache(): EntityRecreationBundleCache {
@@ -278,7 +280,7 @@ export class EntityRecreationService {
           const verified = await pending;
           const rows = [...verified.logs].sort((left, right) => right.seq - left.seq);
           for (const row of rows) {
-            const snapshot = this.snapshotFromRow(row, target);
+            const snapshot = this.snapshotFromRow(row, target, verified.logs);
             if (snapshot) {
               return {
                 snapshot,
@@ -320,7 +322,7 @@ export class EntityRecreationService {
 
       const rows = [...verified.logs].sort((left, right) => right.seq - left.seq);
       for (const row of rows) {
-        const snapshot = this.snapshotFromRow(row, target);
+        const snapshot = this.snapshotFromRow(row, target, verified.logs);
         if (!snapshot) continue;
         return {
           snapshot,
@@ -333,7 +335,7 @@ export class EntityRecreationService {
     throw new ConflictException('Không tìm thấy snapshot đầy đủ của entity trong các artifact IPFS đã xác minh.');
   }
 
-  private snapshotFromRow(row: AuditRecoveryBundleRow, target: EntityRecreationTarget): Snapshot | null {
+  private snapshotFromRow(row: AuditRecoveryBundleRow, target: EntityRecreationTarget, bundleLogs?: AuditRecoveryBundleRow[]): Snapshot | null {
     if (row.entityId !== target.entityId) return null;
     const verification = verifyAuditRow({ ...row, createdAt: new Date(row.createdAt) });
     if (!verification.ok) return null;
@@ -348,8 +350,57 @@ export class EntityRecreationService {
 
     const after = this.asObject(verification.decryptedAfter);
     const before = this.asObject(verification.decryptedBefore);
-    const candidate = after ?? before;
+    let candidate = after ?? before;
+
+    // Fallback synthesis: If partial snapshot, synthesize with other logs or diffJson
+    if (candidate && !this.hasCompleteSnapshot(target.entity, candidate)) {
+      candidate = this.synthesizeCompleteSnapshot(target.entity, candidate, row, bundleLogs);
+    }
+
     return candidate && this.hasCompleteSnapshot(target.entity, candidate) ? candidate : null;
+  }
+
+  private synthesizeCompleteSnapshot(
+    entity: RecreatableAuditEntity,
+    candidate: Snapshot,
+    row: AuditRecoveryBundleRow,
+    bundleLogs?: AuditRecoveryBundleRow[],
+  ): Snapshot {
+    const synthesized: Snapshot = { ...candidate };
+
+    // Merge only values that actually exist in authenticated rows for the same entity.
+    // Recovery must never invent business values: if required fields remain absent,
+    // hasCompleteSnapshot() rejects the artifact and the caller reports PITR_REQUIRED.
+    if (bundleLogs && Array.isArray(bundleLogs)) {
+      const peerRows = bundleLogs
+        .filter((peer) => peer.entityId === row.entityId && peer.entity === entity)
+        .sort((left, right) => left.seq - right.seq);
+      for (const peer of peerRows) {
+        const verification = verifyAuditRow({ ...peer, createdAt: new Date(peer.createdAt) });
+        if (!verification.ok) continue;
+        const peerSnapshot = this.asObject(verification.decryptedAfter)
+          ?? this.asObject(verification.decryptedBefore);
+        if (!peerSnapshot) continue;
+        for (const [field, value] of Object.entries(peerSnapshot)) {
+          if (synthesized[field] === undefined && value !== undefined) {
+            synthesized[field] = value;
+          }
+        }
+      }
+    }
+
+    if (row.diffJson && typeof row.diffJson === 'object') {
+      const changes = (row.diffJson as { changes?: Array<{ field?: string; before?: unknown; after?: unknown }> }).changes;
+      if (Array.isArray(changes)) {
+        for (const change of changes) {
+          if (!change.field || synthesized[change.field] !== undefined) continue;
+          const value = change.after !== '[REDACTED]' ? change.after : change.before;
+          if (value !== undefined && value !== '[REDACTED]') synthesized[change.field] = value;
+        }
+      }
+    }
+
+    return synthesized;
   }
 
   private normalizeForRecreation(entity: RecreatableAuditEntity, source: Snapshot): Snapshot {
