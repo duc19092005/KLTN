@@ -1,4 +1,5 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit, forwardRef, Inject, Optional } from '@nestjs/common';
+import { EntityRecoveryService } from './entity-recovery.service';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
@@ -6,7 +7,7 @@ import { AuditArtifactService, AuditRecoveryBundleRow } from './audit-artifact.s
 import { AuditAnchorService } from './audit-anchor.service';
 import { AuditLoggerService } from './audit-logger.service';
 import { computeMerkleRootForAlgorithm, MERKLE_SHA256_STRING_V1, rootToBytes32 } from './merkle.util';
-import { verifyAuditRow } from './audit-verification.util';
+import { verifyAuditRow, verifyAuditRowLight } from './audit-verification.util';
 
 export interface VerifiedAuditRecoveryBundle {
   batchId: number;
@@ -73,6 +74,9 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
     private readonly artifacts: AuditArtifactService,
     private readonly anchor: AuditAnchorService,
     private readonly audit: AuditLoggerService,
+    @Inject(forwardRef(() => EntityRecoveryService))
+    @Optional()
+    private readonly entityRecovery?: EntityRecoveryService,
   ) {}
 
   onModuleInit() {
@@ -154,10 +158,30 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
           if (local.fromSeq != null && local.toSeq != null) {
             const logsInBatch = await this.prisma.blockchainLogger.findMany({
               where: { seq: { gte: local.fromSeq, lte: local.toSeq }, entryHash: { not: null } },
-              select: { seq: true, entryHash: true },
+              select: {
+                id: true,
+                seq: true,
+                prevHash: true,
+                entryHash: true,
+                actorId: true,
+                action: true,
+                entity: true,
+                entityId: true,
+                dataHash: true,
+                dataSalt: true,
+                beforeHash: true,
+                afterHash: true,
+                diffHash: true,
+                hashVersion: true,
+                beforeEncrypted: true,
+                afterEncrypted: true,
+                diffJson: true,
+                fieldsChanged: true,
+                createdAt: true,
+              },
             });
             const expectedCount = Number(cp.leafCount) || local.leafCount || (local.toSeq - local.fromSeq + 1);
-            if (logsInBatch.length !== expectedCount) {
+            if (logsInBatch.length !== expectedCount || !logsInBatch.every((l) => verifyAuditRowLight(l).ok)) {
               targetBatchIds.push(cp.batchId);
               continue;
             }
@@ -169,6 +193,9 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
               targetBatchIds.push(cp.batchId);
               continue;
             }
+          } else {
+            targetBatchIds.push(cp.batchId);
+            continue;
           }
         }
       }
@@ -180,6 +207,12 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
         } catch (err) {
           console.error(`[WATCHDOG] Failed to auto-heal batch #${bId}:`, err);
         }
+      }
+
+      if (totalHealed > 0) {
+        try {
+          await this.anchor.rechainLocalBlockchainLogger();
+        } catch {}
       }
 
       this.watchdogState.lastScannedBatches = totalScanned;
@@ -304,7 +337,27 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
           const logsInBatch = await this.prisma.blockchainLogger.findMany({
             where: { seq: { gte: local.fromSeq, lte: local.toSeq }, entryHash: { not: null } },
             orderBy: { seq: 'asc' },
-            select: { seq: true, entryHash: true },
+            select: {
+              id: true,
+              seq: true,
+              prevHash: true,
+              entryHash: true,
+              actorId: true,
+              action: true,
+              entity: true,
+              entityId: true,
+              dataHash: true,
+              dataSalt: true,
+              beforeHash: true,
+              afterHash: true,
+              diffHash: true,
+              hashVersion: true,
+              beforeEncrypted: true,
+              afterEncrypted: true,
+              diffJson: true,
+              fieldsChanged: true,
+              createdAt: true,
+            },
           });
 
           const expectedCount = Number(cp.leafCount) || local.leafCount || (local.toSeq - local.fromSeq + 1);
@@ -312,15 +365,24 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
             isLogsIntact = false;
             this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} bị THIẾU DỮ LIỆU LOG (DB local có ${logsInBatch.length}/${expectedCount} logs).`);
           } else {
-            const recomputedRoot = computeMerkleRootForAlgorithm(
-              logsInBatch.map((l) => l.entryHash!),
-              local.algorithmVersion ?? MERKLE_SHA256_STRING_V1,
-            );
-            if (rootToBytes32(recomputedRoot).toLowerCase() !== rootToBytes32(cp.root).toLowerCase()) {
+            const isEveryRowVerified = logsInBatch.every((l) => verifyAuditRowLight(l).ok);
+            if (!isEveryRowVerified) {
               isLogsIntact = false;
-              this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} bị SỬA ĐỔI MÃ HASH TRONG LOGS (Merkle Root tính lại không khớp với Blockchain).`);
+              this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} có bản ghi log bị sửa đổi hoặc hỏng mã băm.`);
+            } else {
+              const recomputedRoot = computeMerkleRootForAlgorithm(
+                logsInBatch.map((l) => l.entryHash!),
+                local.algorithmVersion ?? MERKLE_SHA256_STRING_V1,
+              );
+              if (rootToBytes32(recomputedRoot).toLowerCase() !== rootToBytes32(cp.root).toLowerCase()) {
+                isLogsIntact = false;
+                this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} bị SỬA ĐỔI MÃ HASH TRONG LOGS (Merkle Root tính lại không khớp với Blockchain).`);
+              }
             }
           }
+        } else {
+          isLogsIntact = false;
+          this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} thiếu fromSeq/toSeq trong DB local.`);
         }
 
         if (!isHeaderMatch || !isLogsIntact) {
@@ -335,14 +397,14 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
 
       if (targetBatchIds.length === 0) {
         this.pushLog('✅ [Pass 1] Tất cả các Audit Batches trên DB local đều khớp 100% với Blockchain!');
-        this.deepScanState.progressPercent = 80;
+        this.deepScanState.progressPercent = 60;
       } else {
         this.pushLog(`🔧 [Pass 2] Khởi chạy khôi phục tự động cho ${targetBatchIds.length} batch(es)...`);
         
         const totalTargets = targetBatchIds.length;
         for (let idx = 0; idx < totalTargets; idx++) {
           const bId = targetBatchIds[idx];
-          const pct = Math.floor(20 + ((idx + 1) / totalTargets) * 60);
+          const pct = Math.floor(20 + ((idx + 1) / totalTargets) * 40);
           this.deepScanState.progressPercent = pct;
           this.pushLog(`📥 Đang tải IPFS Artifact cho Batch #${bId} từ Blockchain...`);
 
@@ -358,8 +420,37 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
-      this.deepScanState.progressPercent = 90;
+      // Re-chain local rows to ensure gapless prevHash continuity
+      try {
+        await this.anchor.rechainLocalBlockchainLogger();
+      } catch {
+        // Advisory re-chaining
+      }
+
+      this.deepScanState.progressPercent = 75;
       this.pushLog('🧹 Đang quét kiểm tra các Entity nghiệp vụ bị ảnh hưởng...');
+
+      if (this.entityRecovery) {
+        try {
+          const warnings = await this.entityRecovery.listWarnings(200);
+          const recoverable = warnings.items.filter((w) => w.recoverable);
+          if (recoverable.length > 0) {
+            this.pushLog(`🔧 [Pass 3] Tự động phục hồi ${recoverable.length} thực thể nghiệp vụ bị lệch/bị xóa...`);
+            const entityRes = await this.entityRecovery.recoverMany(
+              recoverable.map((w) => ({ entity: w.entity, entityId: w.entityId })),
+              adminId,
+              'Deep-Scan Automated Clinical Entity Healing',
+            );
+            recoveredEntitiesCount = entityRes.recovered;
+            this.pushLog(`🟢 Đã tự động phục hồi thành công ${entityRes.recovered} thực thể nghiệp vụ!`);
+          } else {
+            this.pushLog('✅ Tất cả thực thể nghiệp vụ đều toàn vẹn 100%!');
+          }
+        } catch (entityErr) {
+          const errStr = entityErr instanceof Error ? entityErr.message : String(entityErr);
+          this.pushLog(`⚠️ Không thể hoàn tất tự động phục hồi entity: ${errStr}`);
+        }
+      }
 
       this.deepScanState.progressPercent = 100;
       this.deepScanState.statusMessage = recoveredBatchesCount > 0
