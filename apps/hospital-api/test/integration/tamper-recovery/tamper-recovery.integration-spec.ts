@@ -10,6 +10,9 @@ import { EntityRecoveryService } from '../../../src/infrastructure/audit/entity-
 import { EntityRecreationService } from '../../../src/infrastructure/audit/entity-recreation.service';
 import { IpfsArtifactService } from '../../../src/infrastructure/audit/ipfs-artifact.service';
 import { buildPatientSnapshot } from '../../../src/modules/patient/domain/patient-snapshot';
+import { buildDepartmentSnapshot } from '../../../src/modules/department/domain/department-snapshot';
+import { buildUnifiedDoctorSnapshot } from '../../../src/modules/doctor/domain/doctor-snapshot';
+import { buildAiModelSnapshot } from '../../../src/modules/ai-model/domain/ai-model-snapshot';
 import { buildAiDiagnosisSnapshot } from '../../../src/modules/clinical-decision/domain/ai-diagnosis-snapshot';
 import { buildStaffSnapshot } from '../../../src/modules/staff/domain/staff-snapshot';
 import { buildMedicalOrderSnapshot } from '../../../src/modules/medical-order/domain/medical-order-snapshot';
@@ -2164,6 +2167,288 @@ describeIntegration('Audit tamper and recovery integration', () => {
     expect(dbBatch2.status).toBe('ANCHORED');
     expect(dbBatch2.fromSeq).toBe(batch2Logs[0].seq);
     expect(dbBatch2.toSeq).toBe(batch2Logs[1].seq);
+  });
+
+  it('22. End-to-End Clinical Lifecycle: Seed full 3-dept clinical flow, tamper/edit fields & hard delete records, verify drift detection, recover seamlessly without missing-data error, and confirm post-recovery clean state', async () => {
+    // ---------------------------------------------------------------------------------
+    // 1. SEED FULL 3-DEPARTMENT CLINICAL WORKFLOW
+    // ---------------------------------------------------------------------------------
+    const admin = await prisma.user.create({
+      data: {
+        username: `clinic-e2e-admin-${Date.now()}`,
+        email: `clinic-admin-${Date.now()}@hospital.local`,
+        role: 'ADMIN', status: 'ACTIVE', firstLogin: false,
+      },
+    });
+
+    // 1.1 Departments
+    const deptRecep = await prisma.department.create({
+      data: {
+        departmentCode: `PB-REC-${Date.now()}`,
+        name: `Phòng Tiếp Đón & Đăng Ký Khám ${Date.now()}`,
+        floor: '1', type: 'CLINICAL', canReceiveOrders: false, status: 'ACTIVE',
+      },
+    });
+    await audit.recordV2({ entity: 'Department', entityId: deptRecep.id, action: 'CREATE', actorId: admin.id, after: buildDepartmentSnapshot(deptRecep) });
+
+    const deptClinic = await prisma.department.create({
+      data: {
+        departmentCode: `PB-CLI-${Date.now()}`,
+        name: `Phòng Khám Nội Tổng Quát ${Date.now()}`,
+        floor: '2', type: 'CLINICAL', canReceiveOrders: false, status: 'ACTIVE',
+      },
+    });
+    await audit.recordV2({ entity: 'Department', entityId: deptClinic.id, action: 'CREATE', actorId: admin.id, after: buildDepartmentSnapshot(deptClinic) });
+
+    const deptLab = await prisma.department.create({
+      data: {
+        departmentCode: `PB-LAB-${Date.now()}`,
+        name: `Khoa Xét Nghiệm & Huyết Học ${Date.now()}`,
+        floor: '3', type: 'CLINICAL', canReceiveOrders: true, status: 'ACTIVE',
+      },
+    });
+    await audit.recordV2({ entity: 'Department', entityId: deptLab.id, action: 'CREATE', actorId: admin.id, after: buildDepartmentSnapshot(deptLab) });
+
+    // 1.2 Staff & Doctor
+    const recepUser = await prisma.user.create({
+      data: { username: `recep-${Date.now()}`, role: 'RECEPTIONIST', status: 'ACTIVE', firstLogin: false },
+    });
+    const recepStaff = await prisma.staffProfile.create({
+      data: {
+        userId: recepUser.id, departmentId: deptRecep.id, fullName: 'Trần Thị Mai',
+        phone: '0901000001', gender: 'FEMALE', citizenId: `${Date.now()}`.slice(-12).padStart(12, '1'),
+        birthDate: new Date('1995-04-12'), employeeCode: `NV-REC-${Date.now()}`, avatarUrl: 'https://avatar.url/1',
+      },
+    });
+    await audit.recordV2({ entity: 'StaffProfile', entityId: recepStaff.id, action: 'CREATE', actorId: admin.id, after: buildStaffSnapshot(recepStaff) });
+
+    const doctorUser = await prisma.user.create({
+      data: { username: `doc-${Date.now()}`, role: 'DOCTOR', status: 'ACTIVE', firstLogin: false },
+    });
+    const doctorStaff = await prisma.staffProfile.create({
+      data: {
+        userId: doctorUser.id, departmentId: deptClinic.id, fullName: 'BS. CKI Nguyễn Văn Hoàng',
+        phone: '0902000002', gender: 'MALE', citizenId: `${Date.now()}`.slice(-12).padStart(12, '2'),
+        birthDate: new Date('1985-08-20'), employeeCode: `BS-NOI-${Date.now()}`, avatarUrl: 'https://avatar.url/2',
+      },
+    });
+    await audit.recordV2({ entity: 'StaffProfile', entityId: doctorStaff.id, action: 'CREATE', actorId: admin.id, after: buildStaffSnapshot(doctorStaff) });
+
+    const doctorProfile = await prisma.doctorProfile.create({
+      data: {
+        staffProfileId: doctorStaff.id, specialty: 'GENERAL_INTERNAL_MEDICINE',
+        licenseNumber: `CCHND-${Date.now()}`, qualification: 'BS CKI Nội Tổng Quát', yearsExperience: 12,
+      },
+    });
+    await audit.recordV2({ entity: 'DoctorProfile', entityId: doctorProfile.id, action: 'CREATE', actorId: admin.id, after: buildUnifiedDoctorSnapshot({ ...doctorProfile, staffProfile: doctorStaff }) });
+
+    const labUser = await prisma.user.create({
+      data: { username: `lab-${Date.now()}`, role: 'LAB_MANAGER', status: 'ACTIVE', firstLogin: false },
+    });
+    const labStaff = await prisma.staffProfile.create({
+      data: {
+        userId: labUser.id, departmentId: deptLab.id, fullName: 'KTV. Lê Văn Hùng',
+        phone: '0903000003', gender: 'MALE', citizenId: `${Date.now()}`.slice(-12).padStart(12, '3'),
+        birthDate: new Date('1990-11-05'), employeeCode: `KTV-LAB-${Date.now()}`, avatarUrl: 'https://avatar.url/3',
+        labSpecialty: 'LABORATORY',
+      },
+    });
+    await audit.recordV2({ entity: 'StaffProfile', entityId: labStaff.id, action: 'CREATE', actorId: admin.id, after: buildStaffSnapshot(labStaff) });
+
+    // 1.3 AI Model Registry
+    const aiModel = await prisma.aiModelRegistry.create({
+      data: {
+        modelName: `Dengue Diagnostic AI Model ${Date.now()}`,
+        modelVersion: '1.0.0', type: 'API', provider: 'Hospital Clinical AI Engine',
+        recommendedSpecialty: 'GENERAL_INTERNAL_MEDICINE', ipHashEncrypted: 'enc-hash-1', ipHashPlain: 'plain-hash-1',
+        status: 'ACTIVE', createdBy: admin.id,
+      },
+    });
+    await audit.recordV2({ entity: 'AiModelRegistry', entityId: aiModel.id, action: 'CREATE', actorId: admin.id, after: buildAiModelSnapshot(aiModel) });
+
+    // 1.4 Clinical Flow Execution
+    const patient = await prisma.patient.create({
+      data: {
+        patientCode: `BN-${Date.now()}`, fullName: 'Nguyễn Văn An', gender: 'MALE',
+        birthDate: new Date('1990-05-15'), citizenId: `${Date.now()}`.slice(-12).padStart(12, '4'),
+        phone: '0901234567', address: '123 Nguyễn Trãi, Q.5, TP.HCM',
+      },
+    });
+    const patientIntegrity = audit.hashSnapshot(buildPatientSnapshot(patient));
+    await prisma.patient.update({ where: { id: patient.id }, data: { hash256: patientIntegrity.hash, dataSalt: patientIntegrity.salt } });
+    await audit.recordV2({ entity: 'Patient', entityId: patient.id, action: 'CREATE', actorId: recepUser.id, after: buildPatientSnapshot(patient) });
+
+    const visit = await prisma.visit.create({
+      data: {
+        visitCode: `LK-${Date.now()}`, patientId: patient.id, departmentId: deptClinic.id,
+        staffId: recepStaff.id, status: 'IN_PROGRESS', source: 'WALK_IN',
+      },
+    });
+    await audit.recordV2({ entity: 'Visit', entityId: visit.id, action: 'CREATE', actorId: recepUser.id, after: buildVisitSnapshot(visit) });
+
+    const medicalOrder = await prisma.medicalOrder.create({
+      data: {
+        orderCode: `ORD-${Date.now()}`, visitId: visit.id, patientId: patient.id,
+        doctorId: doctorProfile.id, targetDepartmentId: deptLab.id, orderType: 'LAB_TEST',
+        priority: 'URGENT', clinicalNote: 'Bệnh nhân sốt cao ngày 3, xét nghiệm công thức máu và Dengue NS1.',
+        status: 'RESULT_READY',
+      },
+    });
+    await audit.recordV2({ entity: 'MedicalOrder', entityId: medicalOrder.id, action: 'CREATE', actorId: doctorUser.id, after: buildMedicalOrderSnapshot(medicalOrder) });
+
+    const medicalResult = await prisma.medicalResult.create({
+      data: {
+        resultCode: `RES-${Date.now()}`, orderId: medicalOrder.id, performedById: labUser.id,
+        note: 'Tiểu cầu (PLT) giảm thấp: 102 G/L. Dengue NS1 Ag: DƯƠNG TÍNH (+).',
+        files: {
+          create: [
+            {
+              fileName: 'phieu_xet_nghiem.pdf', originalName: 'Phieu_Ket_Qua.pdf',
+              mimeType: 'application/pdf', size: 1450000, storageProvider: 'CLOUDINARY',
+              url: 'https://cloudinary.com/pdf1', sha256: 'sha256-pdf-file',
+            },
+          ],
+        },
+      },
+      include: { files: true },
+    });
+    await audit.recordV2({ entity: 'MedicalResult', entityId: medicalResult.id, action: 'CREATE', actorId: labUser.id, after: buildMedicalResultSnapshot({ ...medicalResult, visitId: visit.id }) });
+
+    const aiDiag = await prisma.aiDiagnosis.create({
+      data: {
+        aiModelId: aiModel.id, patientId: patient.id, visitId: visit.id,
+        prompt: 'Sốt cao ngày 3, PLT 102 G/L, Dengue NS1 (+)',
+        result: JSON.stringify({ primaryDiagnosis: 'Sốt xuất huyết Dengue ngày thứ 3 có dấu hiệu cảnh báo', confidence: 0.96 }),
+        confidence: 0.96, status: 'DOCTOR_REVIEWED', reviewedByDoctorId: doctorProfile.id,
+        doctorFeedback: 'Đồng thuận với gợi ý của AI.',
+      },
+    });
+    await audit.recordV2({ entity: 'AiDiagnosis', entityId: aiDiag.id, action: 'CREATE', actorId: doctorUser.id, after: buildAiDiagnosisSnapshot(aiDiag) });
+
+    const qualityData = {
+      doctorId: doctorProfile.id, aiModelId: aiModel.id, aiDiagnosisId: aiDiag.id,
+      doctorConclusionAboutModel: 'Mô hình nhận diện chính xác dấu hiệu cảnh báo hạ tiểu cầu.', trustablePercent: 96.0,
+    };
+    const qualityIntegrity = audit.hashSnapshot(qualityData);
+    const aiQuality = await prisma.aiQuality.create({
+      data: { ...qualityData, hash256: qualityIntegrity.hash, dataSalt: qualityIntegrity.salt },
+    });
+    await audit.recordV2({ entity: 'AiQuality', entityId: aiQuality.id, action: 'AI_MODEL_RATED', actorId: doctorUser.id, after: buildAiQualitySnapshot(aiQuality) });
+
+    const conclusionData = {
+      visitId: visit.id, doctorId: doctorProfile.id, aiDiagnosisId: aiDiag.id,
+      finalDiagnosis: 'Sốt xuất huyết Dengue có dấu hiệu cảnh báo ngày thứ 3 (Mã ICD-10: A97.1)',
+      treatmentPlan: 'Bù dịch Ringer Lactate đường uống và truyền tĩnh mạch theo phác đồ Bộ Y Tế.',
+      prescription: 'Paracetamol 500mg, Oresol 245', followUpNote: 'Tái khám ngay nếu có dấu hiệu cảnh báo nguy hiểm.',
+      doctorNote: 'Bệnh nhân tỉnh táo, chưa xuất huyết tự phát.',
+    };
+    const conclusionIntegrity = audit.hashSnapshot({ ...conclusionData, patientCode: patient.patientCode });
+    const conclusion = await prisma.medicalConclusion.create({
+      data: { ...conclusionData, hash256: conclusionIntegrity.hash, dataSalt: conclusionIntegrity.salt },
+    });
+    await audit.recordV2({ entity: 'MedicalConclusion', entityId: conclusion.id, action: 'CREATE', actorId: doctorUser.id, after: buildMedicalConclusionSnapshot({ ...conclusion, visit: { patient } }) });
+
+    // 1.5 Ensure all clinical flow logs are anchored to Blockchain & IPFS
+    const unanchoredCount = await prisma.blockchainLogger.count({ where: { batchId: null } });
+    if (unanchoredCount > 0) {
+      await anchor.rechainLocalBlockchainLogger();
+      await anchor.anchorNowWithinRecovery();
+    }
+    const totalAnchored = await prisma.blockchainLogger.count({ where: { onChainStatus: 'ANCHORED' } });
+    expect(totalAnchored).toBeGreaterThanOrEqual(10);
+
+    // ---------------------------------------------------------------------------------
+    // 2. TAMPER & EDIT DATA IN DATABASE (SỬA DỮ LIỆU)
+    // ---------------------------------------------------------------------------------
+    await prisma.patient.update({
+      where: { id: patient.id },
+      data: { fullName: 'Hacker Tampered Patient Name', phone: '0999999999' },
+    });
+
+    await prisma.medicalConclusion.update({
+      where: { id: conclusion.id },
+      data: { finalDiagnosis: 'Hacker Forged Diagnosis (Cảm cúm thông thường)' },
+    });
+
+    // ---------------------------------------------------------------------------------
+    // 3. VERIFY ENTITY DRIFT DETECTION (HỆ THỐNG PHÁT HIỆN LỆCH 100%)
+    // ---------------------------------------------------------------------------------
+    const warningsAfterTamper = await entityRecovery.listWarnings();
+    const patientWarning = warningsAfterTamper.items.find((w) => w.entity === 'Patient' && w.entityId === patient.id);
+    expect(patientWarning).toBeDefined();
+    expect(patientWarning?.status).toBe('TAMPERED');
+
+    const conclusionWarning = warningsAfterTamper.items.find((w) => w.entity === 'MedicalConclusion' && w.entityId === conclusion.id);
+    expect(conclusionWarning).toBeDefined();
+    expect(conclusionWarning?.status).toBe('TAMPERED');
+
+    // ---------------------------------------------------------------------------------
+    // 4. HARD DELETE RECORDS FROM DATABASE (XÓA DỮ LIỆU)
+    // ---------------------------------------------------------------------------------
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.audit_recovery_authorized', 'true', true)`;
+      await tx.medicalConclusion.delete({ where: { id: conclusion.id } });
+      await tx.aiQuality.delete({ where: { id: aiQuality.id } });
+    });
+
+    // Detect that deleted entities are flagged as missing/tampered in warnings
+    const warningsAfterDelete = await entityRecovery.listWarnings();
+    const deletedConclusionWarning = warningsAfterDelete.items.find((w) => w.entity === 'MedicalConclusion' && w.entityId === conclusion.id);
+    expect(deletedConclusionWarning).toBeDefined();
+    expect(['MISSING', 'TAMPERED']).toContain(deletedConclusionWarning?.status);
+
+    const deletedQualityWarning = warningsAfterDelete.items.find((w) => w.entity === 'AiQuality' && w.entityId === aiQuality.id);
+    expect(deletedQualityWarning).toBeDefined();
+    expect(['MISSING', 'TAMPERED']).toContain(deletedQualityWarning?.status);
+
+    // ---------------------------------------------------------------------------------
+    // 5. PREVIEW & EXECUTE RECOVERY (CHO CHỌN VÀ KHÔI PHỤC, KHÔNG BÁO LỖI THIẾU DATA)
+    // ---------------------------------------------------------------------------------
+    const preview = await entityRecovery.previewMany([
+      { entity: 'Patient', entityId: patient.id },
+      { entity: 'MedicalConclusion', entityId: conclusion.id },
+      { entity: 'AiQuality', entityId: aiQuality.id },
+    ]);
+    expect(preview.items).toHaveLength(3);
+    expect(preview.items.every((p) => p.recoverable)).toBe(true);
+
+    const recResult = await entityRecovery.recoverMany(
+      [
+        { entity: 'Patient', entityId: patient.id },
+        { entity: 'MedicalConclusion', entityId: conclusion.id },
+        { entity: 'AiQuality', entityId: aiQuality.id },
+      ],
+      admin.id,
+      'Admin requested full clinical recovery after tampering & hard delete',
+    );
+    expect(recResult.failed).toBe(0);
+    expect(recResult.recovered).toBe(3);
+
+    // ---------------------------------------------------------------------------------
+    // 6. POST-RECOVERY VERIFICATION (SAU PHỤC HỒI CÒN BÁO LỆCH KHÔNG?)
+    // ---------------------------------------------------------------------------------
+    const warningsPostRecovery = await entityRecovery.listWarnings();
+    const postPatientWarning = warningsPostRecovery.items.find((w) => w.entity === 'Patient' && w.entityId === patient.id);
+    expect(postPatientWarning).toBeUndefined(); // Warning is completely GONE!
+
+    const postConclusionWarning = warningsPostRecovery.items.find((w) => w.entity === 'MedicalConclusion' && w.entityId === conclusion.id);
+    expect(postConclusionWarning).toBeUndefined(); // Warning is completely GONE!
+
+    const postQualityWarning = warningsPostRecovery.items.find((w) => w.entity === 'AiQuality' && w.entityId === aiQuality.id);
+    expect(postQualityWarning).toBeUndefined(); // Warning is completely GONE!
+
+    // Verify DB records match original pristine clinical values
+    await expect(entityRecovery.assertTrusted('Patient', patient.id)).resolves.not.toThrow();
+    await expect(entityRecovery.assertTrusted('MedicalConclusion', conclusion.id)).resolves.not.toThrow();
+    await expect(entityRecovery.assertTrusted('AiQuality', aiQuality.id)).resolves.not.toThrow();
+
+    const restoredPatient = await prisma.patient.findUniqueOrThrow({ where: { id: patient.id } });
+    expect(restoredPatient.fullName).toBe('Nguyễn Văn An'); // Restored!
+    expect(restoredPatient.phone).toBe('0901234567');
+
+    const restoredConclusion = await prisma.medicalConclusion.findUniqueOrThrow({ where: { id: conclusion.id } });
+    expect(restoredConclusion.finalDiagnosis).toBe('Sốt xuất huyết Dengue có dấu hiệu cảnh báo ngày thứ 3 (Mã ICD-10: A97.1)');
+    expect(restoredConclusion.treatmentPlan).toContain('Bù dịch Ringer Lactate');
   });
 
   async function seedTrustedPatientChange() {
