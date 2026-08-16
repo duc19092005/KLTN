@@ -22,6 +22,9 @@ function createPrismaMock() {
       }),
       findMany: jest.fn(async () => rows),
     },
+    auditBatch: {
+      aggregate: jest.fn().mockResolvedValue({ _max: { toSeq: null } }),
+    },
   };
   return {
     rows,
@@ -29,6 +32,7 @@ function createPrismaMock() {
     prisma: {
       $transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(client)),
       blockchainLogger: client.blockchainLogger,
+      auditBatch: client.auditBatch,
     },
   };
 }

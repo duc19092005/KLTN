@@ -183,7 +183,9 @@ export class AuditLoggerService {
       orderBy: { seq: 'desc' },
       select: { seq: true, entryHash: true },
     });
-    const maxBatch = await client.auditBatch.aggregate({ _max: { toSeq: true } });
+    const maxBatch = client.auditBatch?.aggregate
+      ? await client.auditBatch.aggregate({ _max: { toSeq: true } })
+      : { _max: { toSeq: null } };
     const seq = Math.max(tail?.seq ?? 0, maxBatch._max.toSeq ?? 0) + 1;
     const eventId = randomUUID();
     const prevHash = tail?.entryHash ?? GENESIS_PREV_HASH;
@@ -253,7 +255,9 @@ export class AuditLoggerService {
       orderBy: { seq: 'desc' },
       select: { seq: true, entryHash: true },
     });
-    const maxBatch = await client.auditBatch.aggregate({ _max: { toSeq: true } });
+    const maxBatch = client.auditBatch?.aggregate
+      ? await client.auditBatch.aggregate({ _max: { toSeq: true } })
+      : { _max: { toSeq: null } };
     const seq = Math.max(tail?.seq ?? 0, maxBatch._max.toSeq ?? 0) + 1;
     const eventId = randomUUID();
     const prevHash = tail?.entryHash ?? GENESIS_PREV_HASH;

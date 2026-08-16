@@ -411,11 +411,39 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
       await tx.$executeRaw`SELECT set_config('app.audit_recovery_authorized', 'true', true)`;
       await tx.$executeRaw`SET session_replication_role = 'replica'`;
 
+      // Check if any sequence in bundle.logs collides with a different batch in DB
+      const collidingRows = await tx.blockchainLogger.findMany({
+        where: {
+          seq: { gte: bundle.batch.fromSeq, lte: bundle.batch.toSeq },
+          batchId: { not: null, notIn: [batchId] },
+        },
+        select: { id: true, seq: true, batchId: true },
+      });
+
+      let mappedFromSeq = bundle.batch.fromSeq;
+      let mappedToSeq = bundle.batch.toSeq;
+
+      if (collidingRows.length > 0) {
+        const maxTail = await tx.blockchainLogger.findFirst({
+          where: { seq: { not: null } },
+          orderBy: { seq: 'desc' },
+          select: { seq: true },
+        });
+        const maxBatch = await tx.auditBatch.aggregate({ _max: { toSeq: true } });
+        const startSeq = Math.max(maxTail?.seq ?? 0, maxBatch._max.toSeq ?? 0) + 1;
+        mappedFromSeq = startSeq;
+        mappedToSeq = startSeq + bundle.logs.length - 1;
+
+        for (let i = 0; i < bundle.logs.length; i++) {
+          bundle.logs[i].seq = startSeq + i;
+        }
+      }
+
       const logIds = bundle.logs.map((r) => r.id).filter(Boolean);
       await tx.blockchainLogger.deleteMany({
         where: {
           OR: [
-            { seq: { gte: bundle.batch.fromSeq, lte: bundle.batch.toSeq } },
+            { batchId },
             { id: { in: logIds } },
           ],
         },
@@ -438,8 +466,8 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
           batchId,
           merkleRoot: bundle.batch.merkleRoot,
           leafCount: bundle.batch.leafCount,
-          fromSeq: bundle.batch.fromSeq,
-          toSeq: bundle.batch.toSeq,
+          fromSeq: mappedFromSeq,
+          toSeq: mappedToSeq,
           algorithmVersion: bundle.batch.algorithmVersion,
           contractVersion: 'AUDIT_ANCHOR_CHECKPOINT_V2',
           artifactHash: checkpoint.artifactHash,
@@ -452,8 +480,8 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
         update: {
           merkleRoot: bundle.batch.merkleRoot,
           leafCount: bundle.batch.leafCount,
-          fromSeq: bundle.batch.fromSeq,
-          toSeq: bundle.batch.toSeq,
+          fromSeq: mappedFromSeq,
+          toSeq: mappedToSeq,
           algorithmVersion: bundle.batch.algorithmVersion,
           artifactHash: checkpoint.artifactHash,
           artifactUri: checkpoint.artifactUri,

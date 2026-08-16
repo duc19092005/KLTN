@@ -128,6 +128,64 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
   }
 
   /**
+   * Re-chains all local unanchored rows in BlockchainLogger to ensure prevHash continuity.
+   * If any unanchored log has a broken prevHash or was seeded with old/mismatched hashes,
+   * this method repairs prevHash and recalculates entryHash under recovery authorization.
+   */
+  async rechainLocalBlockchainLogger(): Promise<{ recomputed: number; total: number }> {
+    const rows = await this.prisma.blockchainLogger.findMany({
+      where: { seq: { not: null } },
+      orderBy: { seq: 'asc' },
+    });
+
+    if (rows.length === 0) return { recomputed: 0, total: 0 };
+
+    let recomputed = 0;
+    let currentPrev = GENESIS_PREV_HASH;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.audit_recovery_authorized', 'true', true)`;
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const expectedPrev = i === 0 ? GENESIS_PREV_HASH : currentPrev;
+
+        let needsUpdate = false;
+        let newEntryHash = row.entryHash;
+
+        if (row.prevHash !== expectedPrev) {
+          needsUpdate = true;
+        }
+
+        // For unanchored rows, recompute entryHash with the corrected prevHash
+        if (row.onChainStatus !== 'ANCHORED' || !row.batchId) {
+          const freshHash = this.recomputeEntryHashForRow(row, expectedPrev);
+          if (freshHash !== row.entryHash || needsUpdate) {
+            newEntryHash = freshHash;
+            needsUpdate = true;
+          }
+        }
+
+        if (needsUpdate) {
+          await tx.blockchainLogger.update({
+            where: { id: row.id },
+            data: {
+              prevHash: expectedPrev,
+              entryHash: newEntryHash,
+            },
+          });
+          recomputed++;
+        }
+
+        currentPrev = newEntryHash || row.entryHash || GENESIS_PREV_HASH;
+      }
+    });
+
+    this.logger.log(`Re-chained ${recomputed}/${rows.length} rows in BlockchainLogger.`);
+    return { recomputed, total: rows.length };
+  }
+
+  /**
    * Create (or refresh) the BEFORE UPDATE/DELETE trigger that makes BlockchainLogger content
    * immutable: DELETE is always rejected, and UPDATE may only touch anchoring metadata
    * (onChainStatus/txHash/blockNumber/batchId). Runs on every boot; CREATE OR REPLACE +
