@@ -411,11 +411,15 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
       await tx.$executeRaw`SELECT set_config('app.audit_recovery_authorized', 'true', true)`;
       await tx.$executeRaw`SET session_replication_role = 'replica'`;
 
-      // Check if any sequence in bundle.logs collides with a different batch in DB
+      const logIds = bundle.logs.map((r) => r.id).filter(Boolean);
+      const targetSeqList = bundle.logs.map((r) => r.seq);
+
+      // Check if any sequence in bundle.logs collides with an existing row in DB with a different ID
+      // (whether anchored to another batch or an unanchored pending log)
       const collidingRows = await tx.blockchainLogger.findMany({
         where: {
-          seq: { gte: bundle.batch.fromSeq, lte: bundle.batch.toSeq },
-          batchId: { not: null, notIn: [batchId] },
+          seq: { in: targetSeqList },
+          id: { notIn: logIds },
         },
         select: { id: true, seq: true, batchId: true },
       });
@@ -439,7 +443,6 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
-      const logIds = bundle.logs.map((r) => r.id).filter(Boolean);
       await tx.blockchainLogger.deleteMany({
         where: {
           OR: [
