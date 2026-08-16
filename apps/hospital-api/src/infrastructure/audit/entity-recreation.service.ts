@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, forwardRef, Inject, Optional } from '@nestjs/common';
 import {
   AppointmentStatus,
   DepartmentType,
@@ -97,7 +97,9 @@ export class EntityRecreationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditLoggerService,
-    private readonly recovery: AuditRecoveryService,
+    @Optional()
+    @Inject(forwardRef(() => AuditRecoveryService))
+    private readonly recovery?: AuditRecoveryService,
   ) {}
 
   createBundleCache(): EntityRecreationBundleCache {
