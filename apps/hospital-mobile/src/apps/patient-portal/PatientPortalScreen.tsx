@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
 import { Animated, Alert, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { passwordPatientLogin, requestPatientOtp, resendPatientOtp, verifyPatientOtp, changePatientPassword, PatientOtpLoginResponse } from '../../shared/api/patientAuthClient';
@@ -73,29 +74,37 @@ function validateProfileForm(form: ProfileForm): ProfileFormErrors {
   return errors;
 }
 
-function loadStoredSession(): PatientOtpLoginResponse | null {
+async function loadStoredSession(): Promise<PatientOtpLoginResponse | null> {
   try {
-    if (typeof localStorage === 'undefined') return null;
-    const raw = localStorage.getItem(PATIENT_SESSION_STORAGE_KEY);
+    const raw = Platform.OS === 'web'
+      ? typeof localStorage === 'undefined' ? null : localStorage.getItem(PATIENT_SESSION_STORAGE_KEY)
+      : await SecureStore.getItemAsync(PATIENT_SESSION_STORAGE_KEY);
     return raw ? (JSON.parse(raw) as PatientOtpLoginResponse) : null;
   } catch {
     return null;
   }
 }
 
-function persistSession(session: PatientOtpLoginResponse) {
+async function persistSession(session: PatientOtpLoginResponse) {
   try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(PATIENT_SESSION_STORAGE_KEY, JSON.stringify(session));
+    const serialized = JSON.stringify(session);
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(PATIENT_SESSION_STORAGE_KEY, serialized);
+    } else {
+      await SecureStore.setItemAsync(PATIENT_SESSION_STORAGE_KEY, serialized);
     }
   } catch {
     // Ignore storage failures; the in-memory session still works for this run.
   }
 }
 
-function clearStoredSession() {
+async function clearStoredSession() {
   try {
-    if (typeof localStorage !== 'undefined') localStorage.removeItem(PATIENT_SESSION_STORAGE_KEY);
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') localStorage.removeItem(PATIENT_SESSION_STORAGE_KEY);
+    } else {
+      await SecureStore.deleteItemAsync(PATIENT_SESSION_STORAGE_KEY);
+    }
   } catch {
     // Ignore storage failures.
   }
@@ -117,7 +126,7 @@ export function PatientPortalScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [resendAfterSeconds, setResendAfterSeconds] = useState(0);
   const [otpExpiresAt, setOtpExpiresAt] = useState('');
-  const [session, setSession] = useState<PatientOtpLoginResponse | null>(() => loadStoredSession());
+  const [session, setSession] = useState<PatientOtpLoginResponse | null>(null);
   const [selectedPatientId, setSelectedPatientId] = useState('');
   const [visits, setVisits] = useState<PatientVisitSummary[]>([]);
   const [profileDetails, setProfileDetails] = useState<PatientSummary[]>([]);
@@ -138,6 +147,20 @@ export function PatientPortalScreen() {
   const [profileForm, setProfileForm] = useState<ProfileForm>({ fullName: '', gender: 'MALE', birthDate: '', citizenId: '', address: '', insuranceNumber: '', emergencyContact: '' });
   const [profileFormErrors, setProfileFormErrors] = useState<ProfileFormErrors>({});
   const [creatingProfileFromBooking, setCreatingProfileFromBooking] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    void loadStoredSession().then((storedSession) => {
+      if (!mounted) return;
+      setSession(storedSession);
+      if (storedSession) {
+        setPhone(storedSession.user?.phoneNormalized || storedSession.user?.phone || storedSession.patients[0]?.phone || '');
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (session && step === 'phone') setStep('dashboard');
@@ -255,7 +278,7 @@ export function PatientPortalScreen() {
     try {
       const response = await passwordPatientLogin(phone, password);
       setSession(response);
-      persistSession(response);
+      await persistSession(response);
       setPassword('');
       setConfirmPassword('');
       setStep('dashboard');
@@ -311,7 +334,7 @@ export function PatientPortalScreen() {
     try {
       const response = await verifyPatientOtp(phone, otp);
       setSession(response);
-      persistSession(response);
+      await persistSession(response);
       setStep(response.requirePasswordSetup ? 'passwordSetup' : 'profiles');
       if (response.requirePasswordSetup) showInfo('Vui lòng tạo mật khẩu trước khi xem hồ sơ bệnh nhân.');
     } catch (verifyError) {
@@ -337,7 +360,7 @@ export function PatientPortalScreen() {
     try {
       const response = await verifyPatientOtp(phone, otp, password);
       setSession(response);
-      persistSession(response);
+      await persistSession(response);
       setPassword('');
       setConfirmPassword('');
       setMessage('Đã thiết lập mật khẩu. Bạn có thể xem hồ sơ bệnh nhân.');
@@ -483,7 +506,7 @@ export function PatientPortalScreen() {
       const patient = await createPatientProfile(session.accessToken, { ...profileForm, phone: normalizePhone(phone) });
       const nextSession = { ...session, patients: [...session.patients, { ...patient, phone: patient.contactPhone || patient.phone || phone }] };
       setSession(nextSession);
-      persistSession(nextSession);
+      await persistSession(nextSession);
       setSelectedPatientId(patient.id);
       setProfileForm({ fullName: '', gender: 'MALE', birthDate: '', citizenId: '', address: '', insuranceNumber: '', emergencyContact: '' });
       showSuccess('Đã tạo hồ sơ bệnh nhân.');
@@ -632,7 +655,7 @@ export function PatientPortalScreen() {
     setResendAfterSeconds(0);
     setOtpExpiresAt('');
     setSession(null);
-    clearStoredSession();
+    void clearStoredSession();
     setSelectedPatientId('');
     setVisits([]);
     setVisitDetail(null);
