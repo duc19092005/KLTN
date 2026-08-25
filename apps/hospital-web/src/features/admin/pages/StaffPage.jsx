@@ -644,7 +644,7 @@ function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editi
     .map((department) => ({ value: department.id, label: department.name }));
 
   const selectAddress = (suggestion) => {
-    setForm({ ...form, address: suggestion.displayName || suggestion.display_name });
+    setForm((prev) => ({ ...prev, address: suggestion.displayName || suggestion.display_name }));
     setAddressSuggestions([]);
     setAddressSearched(false);
     setAddressDropdownOpen(false);
@@ -668,15 +668,18 @@ function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editi
       if (!EMAIL_REGEX.test(value)) return 'Email phải đúng định dạng và không chứa dấu/ký tự đặc biệt lạ.';
     }
     if (field === 'phone' && !VN_PHONE_REGEX.test(value)) return 'Số điện thoại Việt Nam phải gồm 10 số và đúng đầu số.';
-    if (field === 'citizenId' && !VN_CITIZEN_ID_REGEX.test(value)) return 'CCCD phải gồm đúng 12 chữ số.';
-    if (field === 'birthDate' && !isValidBirthDate(value)) return `Ngày sinh phải là dd/mm/yyyy, từ năm ${MIN_BIRTH_YEAR} và không lớn hơn hôm nay.`;
+    if (field === 'citizenId') {
+      if (!value) return 'Vui lòng nhập CCCD/CMND.';
+      if (!/^\d{12}$/.test(value)) return 'CCCD phải gồm đúng 12 chữ số.';
+    }
+    if (field === 'birthDate' && !value) return 'Vui lòng chọn ngày sinh.';
     if (field === 'position') {
       if (!value.trim()) return 'Vui lòng nhập chức danh.';
-      if (value.length > MAX_POSITION_LENGTH) return `Chức danh không được vượt quá ${MAX_POSITION_LENGTH} ký tự.`;
+      if (value.trim().length > MAX_POSITION_LENGTH) return `Chức danh không được vượt quá ${MAX_POSITION_LENGTH} ký tự.`;
     }
     if (field === 'address') {
       if (!value.trim()) return 'Vui lòng nhập địa chỉ.';
-      if (value.length > MAX_ADDRESS_LENGTH) return `Địa chỉ không được vượt quá ${MAX_ADDRESS_LENGTH} ký tự.`;
+      if (value.trim().length > MAX_ADDRESS_LENGTH) return `Địa chỉ không được vượt quá ${MAX_ADDRESS_LENGTH} ký tự.`;
     }
     return '';
   };
@@ -740,17 +743,17 @@ function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editi
 
         <div className="p-6 sm:p-8 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Select label="Loại nhân sự" value={form.role} onChange={(v) => setForm({ ...form, role: v })} options={[{ value: 'RECEPTIONIST', label: 'Lễ tân' }, { value: 'LAB_MANAGER', label: 'Kỹ thuật viên cận lâm sàng' }]} required disabled={Boolean(editingStaff)} />
-            <Input label="Họ tên" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: onlyVietnameseNameChars(v) })} onBlur={() => validateField('fullName')} error={fieldErrors.fullName} placeholder="Nguyễn Văn A" pattern="[A-Za-zÀ-ỹ\\s]+" maxLength={MAX_FULL_NAME_LENGTH} required />
-            <AvatarUpload value={form.avatarUrl} onChange={(url) => setForm({ ...form, avatarUrl: url })} uploadFn={staffService.uploadAvatar} ringTone="cyan" />
-            <Input label="Tên đăng nhập" value={form.username} onChange={(v) => setForm({ ...form, username: onlyUsernameChars(v) })} onBlur={() => validateField('username')} error={fieldErrors.username} placeholder="nguyenvana01" pattern="[a-z0-9]+" maxLength={MAX_USERNAME_LENGTH} required disabled={Boolean(editingStaff)} />
-            <Input label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} onBlur={handleEmailBlur} error={fieldErrors.email} placeholder="example@gmail.com" type="text" inputMode="email" pattern="[a-z0-9._%\\-]+@[a-z0-9.\\-]+\\.[a-z]{2,}" required />
-            <Input label="Số điện thoại" value={form.phone} onChange={(v) => setForm({ ...form, phone: onlyDigits(v).slice(0, 10) })} onBlur={() => validateField('phone')} error={fieldErrors.phone} placeholder="0xxxxxxxxx" inputMode="numeric" maxLength={10} pattern="0[0-9]{9}" required />
-            <Input label="CCCD/CMND" value={form.citizenId} onChange={(v) => setForm({ ...form, citizenId: onlyDigits(v).slice(0, 12) })} onBlur={() => validateField('citizenId')} error={fieldErrors.citizenId} placeholder="12 chữ số CCCD" inputMode="numeric" maxLength={12} pattern="[0-9]{12}" required />
-            <DateInput label="Ngày sinh" value={form.birthDate} onChange={(v) => setForm({ ...form, birthDate: v })} onBlur={(nextValue) => validateField('birthDate', nextValue)} error={fieldErrors.birthDate} required />
-            <Select label="Giới tính" value={form.gender} onChange={(v) => setForm({ ...form, gender: v })} options={['Nam', 'Nữ']} empty="Chọn giới tính" required />
-            <Select label="Phòng ban" value={form.departmentId} onChange={(v) => setForm({ ...form, departmentId: v })} options={departmentOptions} empty="Chưa gán phòng ban" />
-            <Input label="Chức danh" value={form.position} onChange={(v) => setForm({ ...form, position: limitPosition(v) })} onBlur={() => validateField('position')} error={fieldErrors.position} placeholder="Lễ tân, KTV xét nghiệm..." maxLength={MAX_POSITION_LENGTH} required />
+            <Select label="Loại nhân sự" value={form.role} onChange={(v) => setForm((prev) => ({ ...prev, role: v }))} options={[{ value: 'RECEPTIONIST', label: 'Lễ tân' }, { value: 'LAB_MANAGER', label: 'Kỹ thuật viên cận lâm sàng' }]} required disabled={Boolean(editingStaff)} />
+            <Input label="Họ tên" value={form.fullName} onChange={(v) => setForm((prev) => ({ ...prev, fullName: onlyVietnameseNameChars(v) }))} onBlur={() => validateField('fullName')} error={fieldErrors.fullName} placeholder="Nguyễn Văn A" pattern="[A-Za-zÀ-ỹ\\s]+" maxLength={MAX_FULL_NAME_LENGTH} required />
+            <AvatarUpload value={form.avatarUrl} onChange={(url) => setForm((prev) => ({ ...prev, avatarUrl: url }))} uploadFn={staffService.uploadAvatar} ringTone="cyan" />
+            <Input label="Tên đăng nhập" value={form.username} onChange={(v) => setForm((prev) => ({ ...prev, username: onlyUsernameChars(v) }))} onBlur={() => validateField('username')} error={fieldErrors.username} placeholder="nguyenvana01" pattern="[a-z0-9]+" maxLength={MAX_USERNAME_LENGTH} required disabled={Boolean(editingStaff)} />
+            <Input label="Email" value={form.email} onChange={(v) => setForm((prev) => ({ ...prev, email: v }))} onBlur={handleEmailBlur} error={fieldErrors.email} placeholder="example@gmail.com" type="text" inputMode="email" pattern="[a-z0-9._%\\-]+@[a-z0-9.\\-]+\\.[a-z]{2,}" required />
+            <Input label="Số điện thoại" value={form.phone} onChange={(v) => setForm((prev) => ({ ...prev, phone: onlyDigits(v).slice(0, 10) }))} onBlur={() => validateField('phone')} error={fieldErrors.phone} placeholder="0xxxxxxxxx" inputMode="numeric" maxLength={10} pattern="0[0-9]{9}" required />
+            <Input label="CCCD/CMND" value={form.citizenId} onChange={(v) => setForm((prev) => ({ ...prev, citizenId: onlyDigits(v).slice(0, 12) }))} onBlur={() => validateField('citizenId')} error={fieldErrors.citizenId} placeholder="12 chữ số CCCD" inputMode="numeric" maxLength={12} pattern="[0-9]{12}" required />
+            <DateInput label="Ngày sinh" value={form.birthDate} onChange={(v) => setForm((prev) => ({ ...prev, birthDate: v }))} onBlur={(nextValue) => validateField('birthDate', nextValue)} error={fieldErrors.birthDate} required />
+            <Select label="Giới tính" value={form.gender} onChange={(v) => setForm((prev) => ({ ...prev, gender: v }))} options={['Nam', 'Nữ']} empty="Chọn giới tính" required />
+            <Select label="Phòng ban" value={form.departmentId} onChange={(v) => setForm((prev) => ({ ...prev, departmentId: v }))} options={departmentOptions} empty="Chưa gán phòng ban" />
+            <Input label="Chức danh" value={form.position} onChange={(v) => setForm((prev) => ({ ...prev, position: limitPosition(v) }))} onBlur={() => validateField('position')} error={fieldErrors.position} placeholder="Lễ tân, KTV xét nghiệm..." maxLength={MAX_POSITION_LENGTH} required />
             <AddressInput
               label="Địa chỉ"
               value={form.address}
