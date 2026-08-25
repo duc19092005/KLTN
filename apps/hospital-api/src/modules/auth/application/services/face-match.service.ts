@@ -3,7 +3,7 @@ import { User } from '@prisma/client';
 import { AUTH_REPOSITORY, AuthRepositoryPort } from '../ports/auth.repository.port';
 import { ENCRYPTION_PORT, EncryptionPort } from '../ports/encryption.port';
 import { AUTH_CHAIN_GATEWAY, AuthChainGatewayPort } from '../ports/auth-chain-gateway.port';
-import { hashToBytes32 } from '../../../../infrastructure/audit/audit-hash.util';
+import { hashToBytes32 } from '../../../../infrastructure/audit';
 import { FACE_MAX_FAILED_ATTEMPTS, FACE_LOCKOUT_MS } from '../../domain/auth.constants';
 import { computeFaceHash, euclideanDistance, getFaceMatchThreshold, validateFaceDescriptorSet } from '../../domain/face.util';
 

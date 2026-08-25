@@ -1,8 +1,8 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { OperationalStatus, UserStatus } from '@prisma/client';
-import { AuditLoggerService } from '../../infrastructure/audit/audit-logger.service';
+import { AuditLoggerService } from '../../infrastructure/audit';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
-import { EntityRecoveryService } from '../../infrastructure/audit/entity-recovery.service';
+import { EntityRecoveryService } from '../../infrastructure/audit';
 import { buildAiModelSnapshot } from '../../modules/ai-model/domain/ai-model-snapshot';
 import { buildDepartmentSnapshot } from '../../modules/department/domain/department-snapshot';
 import { buildStaffSnapshot } from '../../modules/staff/domain/staff-snapshot';

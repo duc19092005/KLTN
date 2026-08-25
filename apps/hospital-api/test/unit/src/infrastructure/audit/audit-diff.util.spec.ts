@@ -1,4 +1,4 @@
-import { buildAuditDiff, classifyAuditField, toDisplayAuditDiff } from '../../../../../src/infrastructure/audit/audit-diff.util';
+import { buildAuditDiff, classifyAuditField, toDisplayAuditDiff } from '../../../../../src/infrastructure/audit';
 
 describe('audit-diff.util', () => {
   it('builds a field-level diff for StaffProfile fullName', () => {

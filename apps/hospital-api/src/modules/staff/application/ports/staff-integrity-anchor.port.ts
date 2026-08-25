@@ -1,4 +1,4 @@
-import { AuditAction } from '../../../../infrastructure/audit/audit-logger.service';
+import { AuditAction } from '../../../../infrastructure/audit';
 import { Prisma } from '@prisma/client';
 
 /** DI token for the Staff integrity anchor port. */

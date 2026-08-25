@@ -6,7 +6,7 @@ import { StaffValidator } from '../services/staff.validator';
 import { buildStaffSnapshot } from '../../domain/staff-snapshot';
 import { DOCTOR_REANCHOR, DoctorReanchorPort } from '../../../doctor/application/ports/doctor-reanchor.port';
 import { buildUnifiedDoctorSnapshot } from '../../../doctor/domain/doctor-snapshot';
-import { EntityRecoveryService } from '../../../../infrastructure/audit/entity-recovery.service';
+import { EntityRecoveryService } from '../../../../infrastructure/audit';
 
 /**
  * Sets a staff account status (lock/unlock) and re-anchors. Behavior copied

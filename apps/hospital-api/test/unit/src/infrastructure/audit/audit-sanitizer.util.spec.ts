@@ -1,4 +1,4 @@
-import { sanitizeAuditPayload } from '../../../../../src/infrastructure/audit/audit-sanitizer.util';
+import { sanitizeAuditPayload } from '../../../../../src/infrastructure/audit';
 
 describe('audit-sanitizer.util', () => {
   it('redacts patient PII while preserving safe identifiers and status metadata', () => {

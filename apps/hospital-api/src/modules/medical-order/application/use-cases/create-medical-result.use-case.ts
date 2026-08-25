@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { MedicalOrderStatus } from '@prisma/client';
 import { AuthUser } from '../../../../common/types/auth-user.type';
-import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { AuditLoggerService } from '../../../../infrastructure/audit';
 import { CreateMedicalResultDto } from '../../dto/medical-order.dto';
 import { buildMedicalResultSnapshot } from '../../domain/medical-result-snapshot';
 import { buildMedicalOrderSnapshot } from '../../domain/medical-order-snapshot';

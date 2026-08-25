@@ -27,8 +27,7 @@ These architectural choices are **final** for this project. Do NOT ask the user 
 - **Biometrics:** InsightFace + Euclidean-distance matching (no YOLO / SAM / other CV stacks).
 - **Frontend:** React + Vite + Tailwind (cyan-600 "Hospital OS" design system).
 - **Blockchain:** Solidity + Hardhat + Ethers.js v6 — used for audit / integrity checkpoints ONLY.
-- **Audit backup:** IPFS stores encrypted audit recovery artifacts only; it is not the primary business database backup.
-- **Audit journal:** PostgreSQL transaction + audit outbox is the source of truth; Kafka is a replay/journal layer after DB commit, not a replacement for DB transactions.
+- **Audit journal:** PostgreSQL transaction + BlockchainLogger is the source of truth; IPFS stores encrypted recovery artifacts, and blockchain provides immutable Merkle checkpoints.
 
 > Some generic community skills (e.g. `@database-design`) may suggest "ask which DB/ORM" or "consider SQLite". Ignore that guidance here — the stack above is locked. Use those skills only for their schema-modeling / indexing / optimization value.
 
@@ -75,7 +74,7 @@ A full-stack hospital management platform featuring:
 - State machine for visit lifecycle: `WAITING → IN_PROGRESS → WAITING_TEST_RESULT → WAITING_CONCLUSION → COMPLETED` (+ `CANCELLED`)
 - Modular architecture: each domain has its own module (patient, visit, department, staff, etc.)
 - ConfigModule with `.env` for environment management
-- Transactional audit outbox: business write and audit row must commit together; Kafka publishes/replays after DB commit.
+- Transactional audit logging: business write and audit row commit together in the same PostgreSQL transaction.
 - Audit recovery uses `BlockchainLogger.beforeEncrypted/afterEncrypted`, IPFS encrypted artifacts, and blockchain Merkle checkpoints.
 
 ---
@@ -113,17 +112,16 @@ A full-stack hospital management platform featuring:
 
 ---
 
-### Audit / IPFS / Kafka Recovery
+### Audit / IPFS / Database Recovery
 **Directory:** `apps/hospital-api/src/infrastructure/audit/`
 **Skills to use:**
 - `@hospital-management-system` — audit invariants and recovery rules
 - `@security-audit` — tamper/recovery threat model
 - `@blockchain-developer` — checkpoint contract behavior
-- `@postgresql` — outbox, transactional consistency, PITR assumptions
+- `@postgresql` — transactional consistency, PITR assumptions
 
 **Current audit flow:**
-- Business mutations write `BlockchainLogger` and `AuditOutbox` in the same PostgreSQL transaction.
-- Kafka is a durable post-commit journal/replay layer. Do not write Kafka before a business transaction commits.
+- Business mutations write `BlockchainLogger` directly within the PostgreSQL transaction.
 - Tier A audit logs anchor immediately; Tier B logs anchor by batch.
 - Each audit row stores redacted display snapshots (`beforeJson`, `afterJson`, `fieldsChanged`) and encrypted recovery snapshots (`beforeEncrypted`, `afterEncrypted`).
 - `beforeHash`/`afterHash` verify decrypted plaintext snapshots. `entryHash` links the audit row into the hash chain. Merkle root anchors a batch on-chain.
@@ -163,7 +161,6 @@ A full-stack hospital management platform featuring:
 **Key services:**
 - PostgreSQL database container
 - Redis for caching/sessions
-- Kafka for audit replay/journal where configured
 - AWS S3 private for medical files/results/PDFs/images
 - Cloudinary for staff/doctor avatars and legacy-compatible avatar URLs
 - IPFS is external/cloud or test-local depending on environment; do not require IPFS in production Docker Compose unless explicitly requested
@@ -182,7 +179,7 @@ A full-stack hospital management platform featuring:
 | Database schema change | `@database-design` | `@postgresql`, `@nestjs-expert` |
 | Frontend page/component | `@react-best-practices` | `@frontend-design`, `@ui-ux-designer` |
 | Smart contract | `@blockchain-developer` | `@solidity-security` |
-| Audit/Kafka/IPFS/recovery | `@hospital-management-system` | `@security-audit`, `@blockchain-developer`, `@postgresql` |
+| Audit/IPFS/recovery | `@hospital-management-system` | `@security-audit`, `@blockchain-developer`, `@postgresql` |
 | Authentication/Security | `@auth-implementation-patterns` | `@nestjs-expert`, `@security-audit` |
 | Bug fixing | `@debugger` | `@error-detective`, `@systematic-debugging` |
 | Code review | `@code-reviewer` | `@code-review-excellence`, `@clean-code` |

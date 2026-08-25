@@ -9,7 +9,7 @@ import {
 } from '../ports/clinical-decision.repository.port';
 import { AI_PROVIDER_GATEWAY, AiProviderGatewayPort } from '../ports/ai-provider-gateway.port';
 import { MEDICAL_IMAGE_ATTACHMENT, MedicalImageAttachmentPort } from '../ports/medical-image-attachment.port';
-import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { AuditLoggerService } from '../../../../infrastructure/audit';
 import { buildAiDiagnosisSnapshot } from '../../domain/ai-diagnosis-snapshot';
 
 /**

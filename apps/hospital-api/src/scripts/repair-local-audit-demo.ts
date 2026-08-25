@@ -1,9 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { PrismaService } from '../infrastructure/prisma/prisma.service';
-import { AuditLoggerService } from '../infrastructure/audit/audit-logger.service';
-import { AuditAnchorService } from '../infrastructure/audit/audit-anchor.service';
-import { AuditRecoveryService } from '../infrastructure/audit/audit-recovery.service';
+import { AuditLoggerService } from '../infrastructure/audit';
+import { AuditAnchorService } from '../infrastructure/audit';
+import { AuditRecoveryService } from '../infrastructure/audit';
 
 async function main() {
   const app = await NestFactory.createApplicationContext(AppModule);

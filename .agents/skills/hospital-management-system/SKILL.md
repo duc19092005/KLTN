@@ -19,10 +19,7 @@ These rules override any older wording in this skill or old docs:
 - New medical files/results/PDFs/images use private S3 storage. Cloudinary is only for staff/doctor avatars and legacy-compatible avatar URLs.
 - Blockchain is for audit checkpoints only: Merkle root, artifact hash, artifact URI, leaf count, timestamp/committed metadata.
 - Never put patient PII, diagnosis text, prescriptions, files, encrypted snapshots, decrypted snapshots, AES keys, API keys, or private keys on-chain.
-- `BlockchainLogger` stores redacted display snapshots (`beforeJson`, `afterJson`, `fieldsChanged`) and encrypted recovery snapshots (`beforeEncrypted`, `afterEncrypted`).
-- IPFS stores encrypted audit recovery artifacts only. The decrypted artifact contains audit batch rows, including `beforeEncrypted` and `afterEncrypted`.
-- PostgreSQL business transaction + `BlockchainLogger` + audit outbox is the correctness boundary. Kafka is post-commit replay/journal and must be idempotent by `eventId`.
-- Entity recovery restores one selected business entity from the latest trusted anchored `afterEncrypted` snapshot.
+- PostgreSQL business transaction + `BlockchainLogger` is the correctness boundary. All audit records commit atomically with business operations.
 - If DB audit rows are tampered/missing, recover the audit batch from IPFS first, verify `artifactHash`, hash chain, and Merkle root, then run entity recovery.
 - If DB and IPFS trusted copies are unavailable, use PostgreSQL PITR/WAL or DB backup. IPFS is not a full business database backup.
 - Normal entity soft-delete/restore/permanent-delete does not require face step-up under the latest rule; audit history recovery remains sensitive and follows the configured recovery authorization/step-up flow.
@@ -122,7 +119,6 @@ If you are doing any of the following, you are violating the project guidelines:
 - **Never** store new medical files/results in Cloudinary; use private S3 storage metadata/object keys and signed URLs after authorization.
 - **Never** expose `beforeEncrypted`, `afterEncrypted`, decrypted snapshots, AES keys, IPFS artifact plaintext, or sensitive patient fields to frontend/API responses.
 - **Never** trust an audit row for entity recovery unless it belongs to an anchored batch and verifies against blockchain.
-- **Never** publish Kafka before the PostgreSQL business transaction commits.
 - **Never** directly modify a Visit state in the database without going through the designated state-transition methods (which enforce business logic).
 - **Never** hardcode role checks inside controllers; rely on the NestJS Auth Guards.
 
@@ -137,6 +133,5 @@ When asked to review code, you MUST mentally check off these items before approv
 - [ ] **Audit Triggers**: Are modifications generating the appropriate `BlockchainLogger` entry?
 - [ ] **Audit Recovery**: Does entity recovery use only anchored and verified `afterEncrypted`, and does batch recovery verify IPFS `artifactHash`, hash chain, and Merkle root?
 - [ ] **Audit Privacy**: Are encrypted/decrypted snapshots, keys, and IPFS artifact contents hidden from API/UI responses?
-- [ ] **Outbox/Kafka**: Is Kafka used only after DB commit with idempotent replay?
 - [ ] **AI Approval**: Is there a hard boundary preventing AI from automatically fulfilling a Doctor's role?
 - [ ] **Storage Integrity**: Are medical files stored as private S3 objects, while Cloudinary is limited to avatars/legacy-compatible avatar URLs?

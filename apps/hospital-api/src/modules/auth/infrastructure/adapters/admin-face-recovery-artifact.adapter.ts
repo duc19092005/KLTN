@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { IpfsArtifactService } from '../../../../infrastructure/audit/ipfs-artifact.service';
-import { hashToBytes32 } from '../../../../infrastructure/audit/audit-hash.util';
+import { IpfsArtifactService } from '../../../../infrastructure/audit';
+import { hashToBytes32 } from '../../../../infrastructure/audit';
 import { EncryptionService } from '../../../encryption/services/encryption.service';
 import { FaceRecoveryCheckpoint } from '../../application/ports/auth-chain-gateway.port';
 import {

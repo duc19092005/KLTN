@@ -5,7 +5,7 @@ import {
   ClinicalDecisionRepositoryPort,
 } from '../ports/clinical-decision.repository.port';
 import { ClinicalDecisionPolicy } from '../policies/clinical-decision.policy';
-import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { AuditLoggerService } from '../../../../infrastructure/audit';
 import { buildAiDiagnosisSnapshot } from '../../domain/ai-diagnosis-snapshot';
 
 /**

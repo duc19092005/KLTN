@@ -1,10 +1,10 @@
 import { Test } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
-import { AuditLoggerService } from '../../../../../src/infrastructure/audit/audit-logger.service';
-import { AuditAnchorService } from '../../../../../src/infrastructure/audit/audit-anchor.service';
+import { AuditLoggerService } from '../../../../../src/infrastructure/audit';
+import { AuditAnchorService } from '../../../../../src/infrastructure/audit';
 import { PrismaService } from '../../../../../src/infrastructure/prisma/prisma.service';
-import { AUDIT_ENTRY_V2 } from '../../../../../src/infrastructure/audit/audit-hash.util';
-import { buildAuditEncryptionAad, decryptAuditSnapshot } from '../../../../../src/infrastructure/audit/audit-encryption.util';
+import { AUDIT_ENTRY_V2 } from '../../../../../src/infrastructure/audit';
+import { buildAuditEncryptionAad, decryptAuditSnapshot } from '../../../../../src/infrastructure/audit';
 
 function createPrismaMock() {
   const rows: any[] = [];

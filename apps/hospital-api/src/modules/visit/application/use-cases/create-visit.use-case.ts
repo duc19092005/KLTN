@@ -3,7 +3,7 @@ import { CreateVisitDto } from '../../dto/visit.dto';
 import { VISIT_REPOSITORY, VisitRepositoryPort } from '../ports/visit.repository.port';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { NotificationService } from '../../../notification/services/notification.service';
-import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { AuditLoggerService } from '../../../../infrastructure/audit';
 import { buildPatientSnapshot } from '../../../patient/domain/patient-snapshot';
 import { AuthUser } from '../../../../common/types/auth-user.type';
 import { buildVisitSnapshot } from '../../domain/visit-snapshot';

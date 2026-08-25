@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
-import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
-import { AuditAnchorService } from '../../../../infrastructure/audit/audit-anchor.service';
+import { AuditLoggerService } from '../../../../infrastructure/audit';
+import { AuditAnchorService } from '../../../../infrastructure/audit';
 import {
   DoctorAnchorAction,
   DoctorIntegrityAnchorPort,
   DoctorIntegrityEvaluation,
 } from '../../application/ports/doctor-integrity-anchor.port';
 import { buildUnifiedDoctorSnapshot } from '../../domain/doctor-snapshot';
-import { computeAfterHashV2 } from '../../../../infrastructure/audit/audit-hash.util';
+import { computeAfterHashV2 } from '../../../../infrastructure/audit';
 import { Prisma } from '@prisma/client';
 
 /**

@@ -4,7 +4,7 @@ import { CreateMedicalOrderDto } from '../../dto/medical-order.dto';
 import { MEDICAL_ORDER_REPOSITORY, MedicalOrderRepositoryPort } from '../ports/medical-order.repository.port';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { NotificationService } from '../../../notification/services/notification.service';
-import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { AuditLoggerService } from '../../../../infrastructure/audit';
 import { buildVisitSnapshot } from '../../../visit/domain/visit-snapshot';
 
 /**

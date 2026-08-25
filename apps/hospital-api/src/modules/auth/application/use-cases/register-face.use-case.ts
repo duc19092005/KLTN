@@ -4,7 +4,7 @@ import { ENCRYPTION_PORT, EncryptionPort } from '../ports/encryption.port';
 import { AUTH_CHAIN_GATEWAY, AuthChainGatewayPort } from '../ports/auth-chain-gateway.port';
 import { SECURITY_EVENT_LOGGER, SecurityEventLoggerPort } from '../ports/security-event-logger.port';
 import { AuthUserLookupService } from '../services/auth-user-lookup.service';
-import { hashToBytes32 } from '../../../../infrastructure/audit/audit-hash.util';
+import { hashToBytes32 } from '../../../../infrastructure/audit';
 import { FACE_MODEL_VERSION } from '../../domain/auth.constants';
 import { computeFaceHash, validateFaceDescriptorSet } from '../../domain/face.util';
 import {

@@ -3,7 +3,7 @@ import { OperationalStatus } from '@prisma/client';
 import { AI_MODEL_INTEGRITY_ANCHOR, AiModelIntegrityAnchorPort } from '../ports/ai-model-integrity-anchor.port';
 import { AI_MODEL_REPOSITORY, AiModelRepositoryPort } from '../ports/ai-model.repository.port';
 import { buildAiModelSnapshot } from '../../domain/ai-model-snapshot';
-import { EntityRecoveryService } from '../../../../infrastructure/audit/entity-recovery.service';
+import { EntityRecoveryService } from '../../../../infrastructure/audit';
 
 /** Changes AI model visibility without deleting it. INACTIVE remains list-visible. */
 @Injectable()

@@ -2,9 +2,9 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { PATIENT_REPOSITORY, PatientRepositoryPort } from '../ports/patient.repository.port';
 import { PATIENT_INTEGRITY_ANCHOR, PatientIntegrityAnchorPort } from '../ports/patient-integrity-anchor.port';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
-import { AuditAnchorService } from '../../../../infrastructure/audit/audit-anchor.service';
-import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
-import { computeAfterHashV2 } from '../../../../infrastructure/audit/audit-hash.util';
+import { AuditAnchorService } from '../../../../infrastructure/audit';
+import { AuditLoggerService } from '../../../../infrastructure/audit';
+import { computeAfterHashV2 } from '../../../../infrastructure/audit';
 import { buildMedicalConclusionSnapshot } from '../../../clinical-decision/domain/medical-conclusion-snapshot';
 
 /**

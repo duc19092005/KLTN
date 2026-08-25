@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
-import { AuditAnchorService } from '../infrastructure/audit/audit-anchor.service';
+import { AuditAnchorService } from '../infrastructure/audit';
 
 async function main() {
   console.log('Bootstrapping NestJS context...');

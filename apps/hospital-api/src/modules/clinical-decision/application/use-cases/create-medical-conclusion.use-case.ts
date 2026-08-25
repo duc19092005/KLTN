@@ -10,7 +10,7 @@ import {
   MedicalConclusionIntegrityAnchorPort,
 } from '../ports/medical-conclusion-integrity-anchor.port';
 import { buildMedicalConclusionSnapshot } from '../../domain/medical-conclusion-snapshot';
-import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { AuditLoggerService } from '../../../../infrastructure/audit';
 import { buildVisitSnapshot } from '../../../visit/domain/visit-snapshot';
 
 /**

@@ -1,7 +1,7 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { UserRole, VisitStatus } from '@prisma/client';
 import { AuthUser } from '../../../../common/types/auth-user.type';
-import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { AuditLoggerService } from '../../../../infrastructure/audit';
 import { VisitTransitionPolicy } from '../policies/visit-transition.policy';
 import { VISIT_REPOSITORY, VisitRepositoryPort } from '../ports/visit.repository.port';
 import { buildVisitSnapshot } from '../../domain/visit-snapshot';

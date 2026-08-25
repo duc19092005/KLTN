@@ -9,7 +9,7 @@ import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { BlockchainService } from '../../infrastructure/blockchain/blockchain.service';
 import { CHECK_ENTITY_INTEGRITY_KEY, CheckEntityIntegrityOptions } from '../decorators/check-entity-integrity.decorator';
-import { computeMerkleRootForAlgorithm, MERKLE_SHA256_STRING_V1, rootToBytes32 } from '../../infrastructure/audit/merkle.util';
+import { computeMerkleRootForAlgorithm, MERKLE_SHA256_STRING_V1, rootToBytes32 } from '../../infrastructure/audit';
 
 @Injectable()
 export class EntityIntegrityGuard implements CanActivate {

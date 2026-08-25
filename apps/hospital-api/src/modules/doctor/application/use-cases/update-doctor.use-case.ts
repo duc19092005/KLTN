@@ -3,7 +3,7 @@ import { UpdateDoctorDto } from '../../dto/doctor.dto';
 import { DOCTOR_REPOSITORY, DoctorRepositoryPort } from '../ports/doctor.repository.port';
 import { DOCTOR_INTEGRITY_ANCHOR, DoctorIntegrityAnchorPort } from '../ports/doctor-integrity-anchor.port';
 import { buildUnifiedDoctorSnapshot } from '../../domain/doctor-snapshot';
-import { EntityRecoveryService } from '../../../../infrastructure/audit/entity-recovery.service';
+import { EntityRecoveryService } from '../../../../infrastructure/audit';
 
 
 /**

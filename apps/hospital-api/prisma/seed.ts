@@ -2,8 +2,8 @@ import '../src/config/load-env';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
-import { AuditLoggerService } from '../src/infrastructure/audit/audit-logger.service';
-import { AuditAnchorService } from '../src/infrastructure/audit/audit-anchor.service';
+import { AuditLoggerService } from '../src/infrastructure/audit';
+import { AuditAnchorService } from '../src/infrastructure/audit';
 import {
   DepartmentType,
   LabSpecialty,

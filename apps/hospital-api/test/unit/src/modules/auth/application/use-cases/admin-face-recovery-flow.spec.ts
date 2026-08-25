@@ -4,7 +4,7 @@ import { AdminFaceRecoveryArtifactAdapter } from '../../../../../../../src/modul
 import { AdminFaceRecoveryRestoreUseCase } from '../../../../../../../src/modules/auth/application/use-cases/admin-face-recovery-restore.use-case';
 import { RegisterFaceUseCase } from '../../../../../../../src/modules/auth/application/use-cases/register-face.use-case';
 import { computeFaceHash } from '../../../../../../../src/modules/auth/domain/face.util';
-import { hashToBytes32 } from '../../../../../../../src/infrastructure/audit/audit-hash.util';
+import { hashToBytes32 } from '../../../../../../../src/infrastructure/audit';
 
 const USER_ID = 'admin-face-recovery-test';
 const WALLET = '0x1000000000000000000000000000000000000001';

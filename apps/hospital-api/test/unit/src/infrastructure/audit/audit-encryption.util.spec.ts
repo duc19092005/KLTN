@@ -1,12 +1,12 @@
 import { randomBytes } from 'crypto';
-import { canonicalize } from '../../../../../src/infrastructure/audit/audit-hash.util';
+import { canonicalize } from '../../../../../src/infrastructure/audit';
 import {
   buildAuditEncryptionAad,
   decryptAuditSnapshot,
   encryptAuditSnapshot,
   getAuditEncryptionKey,
   getAuditEncryptionKeyId,
-} from '../../../../../src/infrastructure/audit/audit-encryption.util';
+} from '../../../../../src/infrastructure/audit';
 
 describe('audit-encryption.util', () => {
   const key = Buffer.from('11'.repeat(32), 'hex');

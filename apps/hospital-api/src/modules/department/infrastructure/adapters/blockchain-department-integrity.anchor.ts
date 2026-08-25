@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
-import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
-import { AuditAnchorService } from '../../../../infrastructure/audit/audit-anchor.service';
-import { computeAfterHashV2 } from '../../../../infrastructure/audit/audit-hash.util';
+import { AuditLoggerService } from '../../../../infrastructure/audit';
+import { AuditAnchorService } from '../../../../infrastructure/audit';
+import { computeAfterHashV2 } from '../../../../infrastructure/audit';
 import {
   DepartmentAnchorAction,
   DepartmentIntegrityAnchorPort,
