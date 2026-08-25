@@ -75,7 +75,7 @@ describe('CreateMedicalResultUseCase audit integrity', () => {
       }),
     };
     const notificationService = { createNotification: jest.fn().mockResolvedValue(undefined) };
-    const useCase = new CreateMedicalResultUseCase(repo as any, accessPolicy as any, audit as any, notificationService as any);
+    const useCase = new CreateMedicalResultUseCase(repo as any, accessPolicy as any, audit as any, notificationService as any, { assertManyTrusted: jest.fn().mockResolvedValue([]), assertTrusted: jest.fn().mockResolvedValue(undefined) } as any);
     return { useCase, repo, audit, tx };
   }
 

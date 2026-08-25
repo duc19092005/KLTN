@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AiModelRegistry, MedicalOrderStatus, Prisma, VisitStatus } from '@prisma/client';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import {
+  ClinicalDecisionBeforeWriteHook,
   ClinicalDecisionRepositoryPort,
   ClinicalDoctor,
   ClinicalVisitAuditSnapshot,
@@ -135,8 +136,10 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
   async createAiDiagnosis(
     data: CreateAiDiagnosisData,
     afterWrite?: (diagnosis: unknown, tx: Prisma.TransactionClient) => Promise<void>,
+    beforeWrite?: ClinicalDecisionBeforeWriteHook,
   ): Promise<unknown> {
     return this.prisma.$transaction(async (tx) => {
+      await beforeWrite?.(tx);
       const diagnosis = await tx.aiDiagnosis.create({
         data: {
           aiModelId: data.aiModelId,
@@ -176,8 +179,10 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
     reviewedByDoctorId: string,
     doctorFeedback: string | null,
     afterWrite?: (before: unknown, after: unknown, tx: Prisma.TransactionClient) => Promise<void>,
+    beforeWrite?: ClinicalDecisionBeforeWriteHook,
   ): Promise<unknown> {
     return this.prisma.$transaction(async (tx) => {
+      await beforeWrite?.(tx);
       const before = await tx.aiDiagnosis.findUniqueOrThrow({ where: { id } });
       const after = await tx.aiDiagnosis.update({
         where: { id },
@@ -213,8 +218,10 @@ export class PrismaClinicalDecisionRepository implements ClinicalDecisionReposit
       visitAfter: ClinicalVisitAuditSnapshot | null,
       tx: Prisma.TransactionClient,
     ) => Promise<void>,
+    beforeWrite?: ClinicalDecisionBeforeWriteHook,
   ): Promise<unknown> {
     return this.prisma.$transaction(async (tx) => {
+      await beforeWrite?.(tx);
       const conclusion = await tx.medicalConclusion.upsert({
         where: { visitId: data.visitId },
         create: {

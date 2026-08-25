@@ -8,6 +8,7 @@ import { AuditAnchorService } from './anchoring/audit-anchor.service';
 import { AuditRecoveryService } from './recovery/audit-recovery.service';
 import { EntityRecoveryService } from './recovery/entity-recovery.service';
 import { EntityRecreationService } from './recovery/entity-recreation.service';
+import { ClinicalAuditTrustService } from './recovery/clinical-audit-trust.service';
 
 /**
  * Global module exposing the tamper-evident audit infrastructure to every feature module:
@@ -30,6 +31,7 @@ import { EntityRecreationService } from './recovery/entity-recreation.service';
     AuditRecoveryService,
     EntityRecoveryService,
     EntityRecreationService,
+    ClinicalAuditTrustService,
   ],
   exports: [
     AuditLoggerService,
@@ -38,6 +40,7 @@ import { EntityRecreationService } from './recovery/entity-recreation.service';
     AuditRecoveryService,
     EntityRecoveryService,
     EntityRecreationService,
+    ClinicalAuditTrustService,
     IpfsArtifactService,
   ],
 })

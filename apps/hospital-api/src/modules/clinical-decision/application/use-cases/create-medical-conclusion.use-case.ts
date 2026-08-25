@@ -10,7 +10,7 @@ import {
   MedicalConclusionIntegrityAnchorPort,
 } from '../ports/medical-conclusion-integrity-anchor.port';
 import { buildMedicalConclusionSnapshot } from '../../domain/medical-conclusion-snapshot';
-import { AuditLoggerService } from '../../../../infrastructure/audit';
+import { AuditLoggerService, ClinicalAuditTrustService } from '../../../../infrastructure/audit';
 import { buildVisitSnapshot } from '../../../visit/domain/visit-snapshot';
 
 /**
@@ -29,6 +29,7 @@ export class CreateMedicalConclusionUseCase {
     @Inject(MEDICAL_CONCLUSION_INTEGRITY_ANCHOR) private readonly integrity: MedicalConclusionIntegrityAnchorPort,
     private readonly policy: ClinicalDecisionPolicy,
     private readonly audit: AuditLoggerService,
+    private readonly clinicalTrust: ClinicalAuditTrustService,
   ) {}
 
   async execute(dto: CreateMedicalConclusionDto, doctorUserId: string) {
@@ -86,6 +87,13 @@ export class CreateMedicalConclusionUseCase {
             tx,
           );
         }
+      },
+      async (tx) => {
+        await this.clinicalTrust.assertManyTrusted([
+          { entity: 'Visit', entityId: visit!.id },
+          { entity: 'Patient', entityId: visit!.patientId },
+          ...(dto.aiDiagnosisId ? [{ entity: 'AiDiagnosis' as const, entityId: dto.aiDiagnosisId }] : []),
+        ], tx);
       },
     );
 

@@ -9,7 +9,7 @@ import {
 } from '../ports/clinical-decision.repository.port';
 import { AI_PROVIDER_GATEWAY, AiProviderGatewayPort } from '../ports/ai-provider-gateway.port';
 import { MEDICAL_IMAGE_ATTACHMENT, MedicalImageAttachmentPort } from '../ports/medical-image-attachment.port';
-import { AuditLoggerService } from '../../../../infrastructure/audit';
+import { AuditLoggerService, ClinicalAuditTrustService } from '../../../../infrastructure/audit';
 import { buildAiDiagnosisSnapshot } from '../../domain/ai-diagnosis-snapshot';
 
 /**
@@ -27,6 +27,7 @@ export class GenerateAiAnalysisUseCase {
     private readonly promptBuilder: ClinicalPromptBuilder,
     private readonly policy: ClinicalDecisionPolicy,
     private readonly audit: AuditLoggerService,
+    private readonly clinicalTrust: ClinicalAuditTrustService,
   ) {}
 
   async execute(dto: GenerateAiAnalysisDto, doctorUserId: string) {
@@ -76,6 +77,11 @@ export class GenerateAiAnalysisUseCase {
         entity: 'AiDiagnosis', entityId: (diagnosis as { id: string }).id, action: 'CREATE',
         actorId: doctorUserId, before: null, after: buildAiDiagnosisSnapshot(diagnosis),
       }, tx);
+    }, async (tx) => {
+      await this.clinicalTrust.assertManyTrusted([
+        { entity: 'Visit', entityId: fullVisit.id },
+        { entity: 'Patient', entityId: fullVisit.patientId },
+      ], tx);
     });
   }
 }

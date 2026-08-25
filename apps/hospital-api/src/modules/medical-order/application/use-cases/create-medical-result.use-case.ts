@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { MedicalOrderStatus } from '@prisma/client';
 import { AuthUser } from '../../../../common/types/auth-user.type';
-import { AuditLoggerService } from '../../../../infrastructure/audit';
+import { AuditLoggerService, ClinicalAuditTrustService } from '../../../../infrastructure/audit';
 import { CreateMedicalResultDto } from '../../dto/medical-order.dto';
 import { buildMedicalResultSnapshot } from '../../domain/medical-result-snapshot';
 import { buildMedicalOrderSnapshot } from '../../domain/medical-order-snapshot';
@@ -21,6 +21,7 @@ export class CreateMedicalResultUseCase {
     private readonly accessPolicy: MedicalOrderAccessPolicy,
     private readonly audit: AuditLoggerService,
     private readonly notificationService: NotificationService,
+    private readonly clinicalTrust: ClinicalAuditTrustService,
   ) {}
 
   async execute(orderId: string, dto: CreateMedicalResultDto, user: AuthUser, demoMode = false): Promise<unknown> {
@@ -118,6 +119,12 @@ export class CreateMedicalResultUseCase {
             tx,
           );
         }
+      },
+      async (tx) => {
+        await this.clinicalTrust.assertManyTrusted([
+          { entity: 'MedicalOrder', entityId: orderId },
+          { entity: 'Visit', entityId: order.visitId },
+        ], tx);
       },
     );
 

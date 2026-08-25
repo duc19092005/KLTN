@@ -5,7 +5,7 @@ import {
   ClinicalDecisionRepositoryPort,
 } from '../ports/clinical-decision.repository.port';
 import { ClinicalDecisionPolicy } from '../policies/clinical-decision.policy';
-import { AuditLoggerService } from '../../../../infrastructure/audit';
+import { AuditLoggerService, ClinicalAuditTrustService } from '../../../../infrastructure/audit';
 import { buildAiDiagnosisSnapshot } from '../../domain/ai-diagnosis-snapshot';
 
 /**
@@ -18,6 +18,7 @@ export class ReviewAiDiagnosisUseCase {
     @Inject(CLINICAL_DECISION_REPOSITORY) private readonly repo: ClinicalDecisionRepositoryPort,
     private readonly policy: ClinicalDecisionPolicy,
     private readonly audit: AuditLoggerService,
+    private readonly clinicalTrust: ClinicalAuditTrustService,
   ) {}
 
   async execute(id: string, dto: ReviewAiDiagnosisDto, doctorUserId: string) {
@@ -33,6 +34,11 @@ export class ReviewAiDiagnosisUseCase {
         entity: 'AiDiagnosis', entityId: id, action: 'UPDATE', actorId: doctorUserId,
         before: buildAiDiagnosisSnapshot(before), after: buildAiDiagnosisSnapshot(after),
       }, tx);
+    }, async (tx) => {
+      await this.clinicalTrust.assertManyTrusted([
+        { entity: 'AiDiagnosis', entityId: id },
+        { entity: 'Visit', entityId: diagnosis.visit!.id },
+      ], tx);
     });
   }
 }

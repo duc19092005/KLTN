@@ -33,6 +33,7 @@ describe('CreateMedicalConclusionUseCase integration rules', () => {
       integrity as any,
       new ClinicalDecisionPolicy(),
       audit as any,
+      { assertManyTrusted: jest.fn().mockResolvedValue([]), assertTrusted: jest.fn().mockResolvedValue(undefined) } as any,
     );
     return { useCase, repo, integrity, audit };
   }

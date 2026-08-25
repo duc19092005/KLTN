@@ -96,6 +96,8 @@ export type OrderStatusUpdatedHook = (
   tx: Prisma.TransactionClient,
 ) => Promise<void>;
 
+export type MedicalOrderBeforeWriteHook = (tx: Prisma.TransactionClient) => Promise<void>;
+
 export type CreateResultCommand = {
   orderId: string;
   performedById: string;
@@ -149,19 +151,30 @@ export interface MedicalOrderRepositoryPort {
   departmentExists(id: string): Promise<boolean>;
 
   /** Atomic: generate unique order code, create order, transition visit to WAITING_TEST_RESULT (with retry). */
-  createOrderWithVisitTransition(command: CreateOrderCommand, onCreated?: OrderCreatedHook): Promise<unknown>;
+  createOrderWithVisitTransition(
+    command: CreateOrderCommand,
+    onCreated?: OrderCreatedHook,
+    beforeWrite?: MedicalOrderBeforeWriteHook,
+  ): Promise<unknown>;
 
   findAll(filter: OrderListFilter): Promise<unknown[]>;
 
   findOrderForManage(id: string): Promise<({ id: string } & OrderForAccess & { status: MedicalOrderStatus; visitId: string; orderType: string }) | null>;
 
-  updateStatus(id: string, status: MedicalOrderStatus, completedAt?: Date, afterWrite?: OrderStatusUpdatedHook): Promise<unknown>;
+  updateStatus(
+    id: string,
+    status: MedicalOrderStatus,
+    completedAt?: Date,
+    afterWrite?: OrderStatusUpdatedHook,
+    beforeWrite?: MedicalOrderBeforeWriteHook,
+  ): Promise<unknown>;
 
   /** Atomic: create result+files, set order RESULT_READY, and transition visit to WAITING_CONCLUSION when all ready. */
   createResultWithTransitions(
     command: CreateResultCommand,
     visitId: string,
     afterWrite?: (payload: CreateResultTransactionPayload, tx: Prisma.TransactionClient) => Promise<void>,
+    beforeWrite?: MedicalOrderBeforeWriteHook,
   ): Promise<unknown>;
 
   findResultFileWithOrder(fileId: string): Promise<ResultFileWithOrder>;
