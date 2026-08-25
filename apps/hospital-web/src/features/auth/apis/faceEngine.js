@@ -29,18 +29,19 @@ import Human from '@vladmandic/human';
 // Negative yaw  = face turning left
 // Positive pitch = face tilting up
 // Negative pitch = face tilting down
-// Thresholds determined empirically; ±0.25 rad ≈ ±14°.
+// Thresholds optimized for natural gentle head movements (±0.15 rad ≈ ±8.6°).
 
 const DIR_THRESHOLDS = {
-  YAW:   0.22, // radians — min absolute yaw to count as left/right
-  PITCH: 0.20, // radians — min absolute pitch to count as up/down
+  YAW:   0.15, // radians — min absolute yaw to count as left/right (~8.6°)
+  PITCH: 0.14, // radians — min absolute pitch to count as up/down (~8.0°)
 };
 
 // Distance guard: iris-based distance in metres from camera.
 // human returns face.distance in metres when iris model is enabled.
+// Broadened to accommodate typical desk & laptop camera distances (0.2m - 1.1m).
 const DISTANCE = {
-  TOO_FAR:   0.65, // metres > this → user is too far
-  TOO_CLOSE: 0.20, // metres < this → user is too close
+  TOO_FAR:   1.10, // metres > this → user is too far
+  TOO_CLOSE: 0.15, // metres < this → user is too close
 };
 
 // ─── Human config ─────────────────────────────────────────────────────────────
@@ -71,7 +72,7 @@ const humanConfig = {
       maxDetected: 1,
       skipFrames: 0,    // liveness loop — never skip
       skipTime: 0,
-      minConfidence: 0.3,
+      minConfidence: 0.2, // increased sensitivity for quick face acquisition
     },
     mesh: {
       enabled: true,    // required for rotation.angle + gesture
