@@ -157,7 +157,7 @@ export interface MedicalOrderRepositoryPort {
     beforeWrite?: MedicalOrderBeforeWriteHook,
   ): Promise<unknown>;
 
-  findAll(filter: OrderListFilter): Promise<unknown[]>;
+  findAll(filter: OrderListFilter, skip: number, take: number): Promise<{ items: unknown[]; total: number }>;
 
   findOrderForManage(id: string): Promise<({ id: string } & OrderForAccess & { status: MedicalOrderStatus; visitId: string; orderType: string }) | null>;
 

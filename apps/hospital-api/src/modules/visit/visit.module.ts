@@ -9,6 +9,8 @@ import { UpdateVisitStatusUseCase } from './application/use-cases/update-visit-s
 import { SuggestDepartmentsUseCase } from './application/use-cases/suggest-departments.use-case';
 import { VISIT_REPOSITORY } from './application/ports/visit.repository.port';
 import { PrismaVisitRepository } from './infrastructure/prisma/prisma-visit.repository';
+import { VISIT_INTEGRITY_ANCHOR } from './application/ports/visit-integrity-anchor.port';
+import { BlockchainVisitIntegrityAnchor } from './infrastructure/adapters/blockchain-visit-integrity.anchor';
 
 @Module({
   imports: [PrismaModule],
@@ -21,7 +23,8 @@ import { PrismaVisitRepository } from './infrastructure/prisma/prisma-visit.repo
     SuggestDepartmentsUseCase,
     VisitTransitionPolicy,
     { provide: VISIT_REPOSITORY, useClass: PrismaVisitRepository },
+    { provide: VISIT_INTEGRITY_ANCHOR, useClass: BlockchainVisitIntegrityAnchor },
   ],
-  exports: [VisitService],
+  exports: [VisitService, VISIT_INTEGRITY_ANCHOR],
 })
 export class VisitModule {}

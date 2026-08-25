@@ -44,6 +44,9 @@ export async function ensureBlockchainLoggerAppendOnlyTrigger(prisma: PrismaServ
            NEW."patientId"          IS DISTINCT FROM OLD."patientId"          OR
            NEW."aiModelRegistryId"  IS DISTINCT FROM OLD."aiModelRegistryId"  OR
            NEW."medicalConclusionId" IS DISTINCT FROM OLD."medicalConclusionId" OR
+           NEW."visitId"             IS DISTINCT FROM OLD."visitId"             OR
+           NEW."medicalOrderId"      IS DISTINCT FROM OLD."medicalOrderId"      OR
+           NEW."medicalResultId"     IS DISTINCT FROM OLD."medicalResultId"     OR
            NEW."aiQualityId"        IS DISTINCT FROM OLD."aiQualityId"        OR
            NEW."seq"                IS DISTINCT FROM OLD."seq"                OR
            NEW."prevHash"           IS DISTINCT FROM OLD."prevHash"           OR

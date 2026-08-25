@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { ClinicalDecisionController } from './controllers/clinical-decision.controller';
 import { ClinicalDecisionService } from './services/clinical-decision.service';
 import { ClinicalDecisionPolicy } from './application/policies/clinical-decision.policy';
@@ -16,8 +16,10 @@ import { PrismaClinicalDecisionRepository } from './infrastructure/prisma/prisma
 import { HttpAiProviderGateway } from './infrastructure/adapters/http-ai-provider.gateway';
 import { S3MedicalImageAttachmentAdapter } from './infrastructure/adapters/s3-medical-image-attachment.adapter';
 import { BlockchainMedicalConclusionIntegrityAnchor } from './infrastructure/adapters/blockchain-medical-conclusion-integrity.anchor';
+import { VisitModule } from '../visit/visit.module';
 
 @Module({
+  imports: [VisitModule],
   controllers: [ClinicalDecisionController],
   providers: [
     ClinicalDecisionService,

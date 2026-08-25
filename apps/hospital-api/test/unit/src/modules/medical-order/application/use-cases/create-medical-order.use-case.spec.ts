@@ -1,4 +1,4 @@
-import { CreateMedicalOrderUseCase } from '../../../../../../../src/modules/medical-order/application/use-cases/create-medical-order.use-case';
+﻿import { CreateMedicalOrderUseCase } from '../../../../../../../src/modules/medical-order/application/use-cases/create-medical-order.use-case';
 
 describe('CreateMedicalOrderUseCase audit transaction', () => {
   function makeUseCase(auditFails = false) {
@@ -41,23 +41,20 @@ describe('CreateMedicalOrderUseCase audit transaction', () => {
     };
     const prisma = { staffProfile: { findMany: jest.fn().mockResolvedValue([]) } };
     const notifications = { createNotification: jest.fn() };
-    const audit = {
-      recordV2: jest.fn().mockImplementation(async () => {
-        if (auditFails) throw new Error('audit failed');
-      }),
-    };
+    const orderIntegrity = { anchorChange: jest.fn().mockImplementation(async () => { if (auditFails) throw new Error('audit failed'); }) };
+    const visitIntegrity = { anchorChange: jest.fn().mockResolvedValue(undefined) };
     return {
-      useCase: new CreateMedicalOrderUseCase(repo as never, prisma as never, notifications as never, audit as never, { assertManyTrusted: jest.fn().mockResolvedValue([]), assertTrusted: jest.fn().mockResolvedValue(undefined) } as any),
+      useCase: new CreateMedicalOrderUseCase(repo as never, orderIntegrity as never, visitIntegrity as never, prisma as never, notifications as never, { assertManyTrusted: jest.fn().mockResolvedValue([]), assertTrusted: jest.fn().mockResolvedValue(undefined) } as any),
       repo,
-      audit,
+      orderIntegrity,
       tx,
     };
   }
 
   it('records the order audit through the repository transaction callback', async () => {
-    const { useCase, audit, tx } = makeUseCase();
+    const { useCase, orderIntegrity, tx } = makeUseCase();
     await useCase.execute({ visitId: 'visit-1', targetDepartmentId: 'lab-1', orderType: 'LAB_TEST' } as never, 'doctor-user-1');
-    expect(audit.recordV2).toHaveBeenCalledWith(expect.objectContaining({ entity: 'MedicalOrder', action: 'CREATE' }), tx);
+    expect(orderIntegrity.anchorChange).toHaveBeenCalledWith(expect.objectContaining({ id: 'order-1' }), 'CREATE', 'doctor-user-1', null, tx);
   });
 
   it('propagates audit failure so order creation can rollback', async () => {
@@ -67,3 +64,4 @@ describe('CreateMedicalOrderUseCase audit transaction', () => {
     ).rejects.toThrow('audit failed');
   });
 });
+

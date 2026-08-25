@@ -9,6 +9,7 @@ import { medicalOrderService } from '../../medical-order/apis/medicalOrderServic
 import { LAB_MANAGER_NAV_ITEMS, labManagerRouteFor } from '../constants/navigation';
 import { getMedicalOrderStatus, MEDICAL_ORDER_STATUS } from '../constants/medicalOrderStatus';
 import { FileSpreadsheet, Search, Filter, UploadCloud, Download, CheckCircle2, AlertCircle, FileText, X, ArrowRight } from 'lucide-react';
+import BlockchainStatusBadge from '../../../shared/components/BlockchainStatusBadge';
 
 function getItems(data) {
   return Array.isArray(data) ? data : data?.items || [];
@@ -190,6 +191,7 @@ function OrderTable({ orders, onOpen, onStatusChange }) {
             <th className="px-6 py-3.5">Bệnh nhân</th>
             <th className="px-6 py-3.5">Loại chỉ định</th>
             <th className="px-6 py-3.5">Trạng thái</th>
+            <th className="px-6 py-3.5">Độ tin cậy dữ liệu</th>
             <th className="px-6 py-3.5 text-right">Thao tác</th>
           </tr>
         </thead>
@@ -229,6 +231,9 @@ function OrderRow({ order, onOpen, onStatusChange }) {
       </td>
       <td className="whitespace-nowrap px-6 py-4">
         <StatusBadge status={order.status} />
+      </td>
+      <td className="whitespace-nowrap px-6 py-4">
+        <BlockchainStatusBadge status={order.blockchainStatus} size="xs" />
       </td>
       <td className="px-6 py-4 text-right">
         <div className="flex justify-end gap-2">

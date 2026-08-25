@@ -21,26 +21,28 @@ describe('CreateVisitUseCase audit transaction', () => {
     const prisma = { staffProfile: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]) } };
     const notifications = { createNotification: jest.fn() };
     const clinicalTrust = { assertTrusted: jest.fn().mockResolvedValue(undefined) };
-    const audit = {
-      recordV2: jest.fn().mockImplementation(async () => {
+    const integrity = {
+      anchorChange: jest.fn().mockImplementation(async () => {
         if (auditFails) throw new Error('audit failed');
       }),
     };
+    const audit = { recordV2: jest.fn().mockResolvedValue(undefined) };
     return {
-      useCase: new CreateVisitUseCase(repo as never, prisma as never, notifications as never, audit as never, clinicalTrust as never),
+      useCase: new CreateVisitUseCase(repo as never, integrity as never, prisma as never, notifications as never, audit as never, clinicalTrust as never),
       repo,
       audit,
+      integrity,
       tx,
     };
   }
 
-  it('writes the Visit audit row through the repository transaction callback', async () => {
-    const { useCase, audit, tx } = makeUseCase();
+  it('writes the Visit integrity row through the repository transaction callback', async () => {
+    const { useCase, integrity, tx } = makeUseCase();
     await useCase.execute({ patientId: 'patient-1', departmentId: 'department-1' } as never, {
       sub: 'reception-1',
       role: 'RECEPTIONIST',
     } as never);
-    expect(audit.recordV2).toHaveBeenCalledWith(expect.objectContaining({ entity: 'Visit', action: 'CREATE' }), tx);
+    expect(integrity.anchorChange).toHaveBeenCalledWith(expect.objectContaining({ id: 'visit-1' }), 'CREATE', 'reception-1', null, tx);
   });
 
   it('registers a Patient audit callback for inline patient creation', async () => {
