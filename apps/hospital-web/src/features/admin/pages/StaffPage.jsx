@@ -772,7 +772,7 @@ function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editi
   if (typeof document === 'undefined' || !document.body) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-md" onClick={onClose} />
       <form onSubmit={handleSubmit} noValidate className="relative z-10 w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white shadow-2xl border border-slate-200 space-y-6 overflow-hidden">
         
@@ -1004,9 +1004,9 @@ function Select({ label, value, onChange, options, empty, required, disabled = f
 function DeleteStaffModal({ staff, busy, onCancel, onConfirm }) {
   const isActive = staff?.user?.status === 'ACTIVE';
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={busy ? undefined : onCancel} />
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={busy ? undefined : onCancel} />
       <div className="relative z-10 w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="border-b border-slate-100 p-6">
           <div className="flex items-center gap-2 text-rose-600">
@@ -1063,6 +1063,7 @@ function DeleteStaffModal({ staff, busy, onCancel, onConfirm }) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
