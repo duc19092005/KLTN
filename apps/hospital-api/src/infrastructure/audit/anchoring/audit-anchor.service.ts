@@ -550,6 +550,9 @@ export class AuditAnchorService implements OnModuleInit, OnModuleDestroy, OnAppl
       patientId: row.patientId,
       aiModelRegistryId: row.aiModelRegistryId,
       medicalConclusionId: row.medicalConclusionId,
+      visitId: row.visitId,
+      medicalOrderId: row.medicalOrderId,
+      medicalResultId: row.medicalResultId,
       aiQualityId: row.aiQualityId,
       createdAt: row.createdAt.toISOString(),
     }));

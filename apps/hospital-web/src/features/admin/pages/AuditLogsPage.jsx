@@ -1975,8 +1975,8 @@ function EntityRecoveryPanel({
     MedicalOrder: 4,
     MedicalResult: 5,
     AiDiagnosis: 6,
-    MedicalConclusion: 7,
-    AiQuality: 8,
+    AiQuality: 7,
+    MedicalConclusion: 8,
     AiModelRegistry: 9,
     Department: 10,
     DoctorProfile: 11,
@@ -2143,7 +2143,7 @@ function EntityRecoveryPanel({
                 Dữ liệu cần kiểm tra & khôi phục ({warnings.length} bản ghi · {clusters.length} ca khám)
               </h2>
               <p className="mt-0.5 text-xs font-semibold text-rose-700 dark:text-rose-300">
-                Hệ thống tự động liên kết và khôi phục trọn gói theo đúng trình tự y tế (Lượt khám ➔ Chỉ định ➔ Kết quả ➔ Chẩn đoán).
+                Hệ thống tự động liên kết và khôi phục trọn gói theo đúng trình tự y tế (Lượt khám ➔ Chỉ định ➔ Kết quả ➔ Chẩn đoán AI* ➔ Đánh giá AI* ➔ Kết luận y khoa).
               </p>
             </div>
           </div>
@@ -2295,7 +2295,7 @@ function EntityRecoveryPanel({
                                 className="h-3.5 w-3.5 accent-sky-600 cursor-pointer"
                               />
                               <div className="min-w-0">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   {isChild && <span className="text-slate-400 text-xs font-mono select-none">↳</span>}
                                   <span className="font-bold text-slate-800 dark:text-slate-200">
                                     {ENTITY_LABELS[item.entity] || item.entity}
@@ -2303,6 +2303,11 @@ function EntityRecoveryPanel({
                                   <span className="text-[10px] font-mono text-slate-400">
                                     {shortHash(item.entityId)}
                                   </span>
+                                  {['AiDiagnosis', 'AiQuality'].includes(item.entity) && (
+                                    <span className="rounded-md bg-purple-50 border border-purple-200 px-1.5 py-0.2 text-[9px] font-bold text-purple-700 dark:bg-purple-950 dark:border-purple-800 dark:text-purple-300">
+                                      Tùy chọn AI
+                                    </span>
+                                  )}
                                 </div>
                                 <p className="text-[10px] text-slate-500 truncate max-w-xs mt-0.5">
                                   {item.message}

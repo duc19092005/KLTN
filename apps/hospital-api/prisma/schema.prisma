@@ -381,6 +381,11 @@ model Visit {
   medicalOrders   MedicalOrder[]
   aiDiagnoses     AiDiagnosis[]
   finalConclusion MedicalConclusion?
+  blockchainLogs  BlockchainLogger[]
+
+  // Tamper-evidence: local salted hash, with change history anchored by Merkle batch.
+  hash256  String?
+  dataSalt String?
 
   @@index([patientId])
   @@index([departmentId])
@@ -451,7 +456,12 @@ model MedicalOrder {
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 
-  results MedicalResult[]
+  results        MedicalResult[]
+  blockchainLogs BlockchainLogger[]
+
+  // Tamper-evidence: local salted hash, with change history anchored by Merkle batch.
+  hash256  String?
+  dataSalt String?
 
   @@index([visitId])
   @@index([patientId])
@@ -475,7 +485,12 @@ model MedicalResult {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  files MedicalResultFile[]
+  files          MedicalResultFile[]
+  blockchainLogs BlockchainLogger[]
+
+  // Tamper-evidence: local salted hash, with change history anchored by Merkle batch.
+  hash256  String?
+  dataSalt String?
 
   @@index([orderId])
   @@index([performedById])
@@ -711,6 +726,15 @@ model BlockchainLogger {
   medicalConclusionId String?
   medicalConclusion   MedicalConclusion? @relation(fields: [medicalConclusionId], references: [id])
 
+  visitId String?
+  visit   Visit?  @relation(fields: [visitId], references: [id], onDelete: SetNull)
+
+  medicalOrderId String?
+  medicalOrder   MedicalOrder? @relation(fields: [medicalOrderId], references: [id], onDelete: SetNull)
+
+  medicalResultId String?
+  medicalResult   MedicalResult? @relation(fields: [medicalResultId], references: [id], onDelete: SetNull)
+
   aiQualityId String?
   aiQuality   AiQuality? @relation(fields: [aiQualityId], references: [id])
 
@@ -725,6 +749,9 @@ model BlockchainLogger {
   @@index([patientId])
   @@index([aiModelRegistryId])
   @@index([medicalConclusionId])
+  @@index([visitId])
+  @@index([medicalOrderId])
+  @@index([medicalResultId])
   @@index([aiQualityId])
   @@index([batchId])
   @@index([onChainStatus])
@@ -767,18 +794,18 @@ model AuditBatch {
 
 /// Operational evidence for face-gated recovery. No artifact plaintext is stored here.
 model AuditRecovery {
-  id            String                  @id @default(uuid())
+  id            String     @id @default(uuid())
   batchId       Int
-  batch         AuditBatch              @relation("AuditRecoveryBatch", fields: [batchId], references: [batchId], onDelete: Restrict)
+  batch         AuditBatch @relation("AuditRecoveryBatch", fields: [batchId], references: [batchId], onDelete: Restrict)
   requestedById String
-  requestedBy   User                    @relation("AuditRecoveryRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  requestedBy   User       @relation("AuditRecoveryRequester", fields: [requestedById], references: [id], onDelete: Restrict)
   reason        String
-  status        String                  @default("STARTED") // STARTED | COMPLETED | FAILED | REJECTED
-  restoredCount Int                     @default(0)
+  status        String     @default("STARTED") // STARTED | COMPLETED | FAILED | REJECTED
+  restoredCount Int        @default(0)
   artifactHash  String?
   merkleRoot    String?
   failureReason String?
-  createdAt     DateTime  @default(now())
+  createdAt     DateTime   @default(now())
   completedAt   DateTime?
 
   @@index([batchId, createdAt])
@@ -791,7 +818,6 @@ model AuditRecovery {
 /// session, irreversible or money-touching operations demand a fresh biometric scan at the moment
 /// of the action so a hijacked or unattended session cannot trigger them.
 ///
-
 
 model RefreshToken {
   id     String @id @default(uuid())

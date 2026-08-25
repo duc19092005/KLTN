@@ -1,10 +1,13 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { MedicalOrderStatus } from '@prisma/client';
 import { AuthUser } from '../../../../common/types/auth-user.type';
-import { AuditLoggerService, ClinicalAuditTrustService } from '../../../../infrastructure/audit';
-import { buildMedicalOrderSnapshot } from '../../domain/medical-order-snapshot';
+import { ClinicalAuditTrustService } from '../../../../infrastructure/audit';
 import { MedicalOrderAccessPolicy } from '../policies/medical-order-access.policy';
 import { MEDICAL_ORDER_REPOSITORY, MedicalOrderRepositoryPort } from '../ports/medical-order.repository.port';
+import {
+  MEDICAL_ORDER_INTEGRITY_ANCHOR,
+  MedicalOrderIntegrityAnchorPort,
+} from '../ports/medical-integrity-anchor.port';
 
 /**
  * LAB_MANAGER/ADMIN updates an order status. LAB_MANAGER must be the real
@@ -19,7 +22,7 @@ export class UpdateMedicalOrderStatusUseCase {
   constructor(
     @Inject(MEDICAL_ORDER_REPOSITORY) private readonly repo: MedicalOrderRepositoryPort,
     private readonly accessPolicy: MedicalOrderAccessPolicy,
-    private readonly audit: AuditLoggerService,
+    @Inject(MEDICAL_ORDER_INTEGRITY_ANCHOR) private readonly orderIntegrity: MedicalOrderIntegrityAnchorPort,
     private readonly clinicalTrust: ClinicalAuditTrustService,
   ) {}
 
@@ -42,17 +45,11 @@ export class UpdateMedicalOrderStatusUseCase {
     const completedAt =
       status === MedicalOrderStatus.RESULT_READY || status === MedicalOrderStatus.CANCELLED ? new Date() : undefined;
     return this.repo.updateStatus(id, status, completedAt, async (updatedOrder, tx) => {
-      await this.audit.recordV2(
-        {
-          entity: 'MedicalOrder',
-          entityId: id,
-          action: 'UPDATE',
-          actorId: user.sub,
-          before: { orderId: order.id, visitId: order.visitId, status: order.status },
-          after: buildMedicalOrderSnapshot(updatedOrder),
-          metadata: { schema: 'KLTN_MEDICAL_ORDER_STATUS_AUDIT_V2', field: 'status', from: order.status, to: status },
-          onChainStatus: 'PENDING',
-        },
+      await this.orderIntegrity.anchorChange(
+        updatedOrder,
+        'UPDATE',
+        user.sub,
+        { orderId: order.id, visitId: order.visitId, status: order.status },
         tx,
       );
     }, async (tx) => {

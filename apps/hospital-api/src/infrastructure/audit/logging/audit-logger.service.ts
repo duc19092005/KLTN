@@ -33,6 +33,9 @@ const FK_FIELD: Record<string, string> = {
   Patient: 'patientId',
   AiModelRegistry: 'aiModelRegistryId',
   MedicalConclusion: 'medicalConclusionId',
+  Visit: 'visitId',
+  MedicalOrder: 'medicalOrderId',
+  MedicalResult: 'medicalResultId',
   AiQuality: 'aiQualityId',
 };
 

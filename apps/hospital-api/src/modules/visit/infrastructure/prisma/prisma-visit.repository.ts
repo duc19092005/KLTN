@@ -35,6 +35,8 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
         source: true,
         checkInAt: true,
         completedAt: true,
+        hash256: true,
+        dataSalt: true,
       },
     });
   }

@@ -10,8 +10,11 @@ import {
   MedicalConclusionIntegrityAnchorPort,
 } from '../ports/medical-conclusion-integrity-anchor.port';
 import { buildMedicalConclusionSnapshot } from '../../domain/medical-conclusion-snapshot';
-import { AuditLoggerService, ClinicalAuditTrustService } from '../../../../infrastructure/audit';
-import { buildVisitSnapshot } from '../../../visit/domain/visit-snapshot';
+import { ClinicalAuditTrustService } from '../../../../infrastructure/audit';
+import {
+  VISIT_INTEGRITY_ANCHOR,
+  VisitIntegrityAnchorPort,
+} from '../../../visit/application/ports/visit-integrity-anchor.port';
 
 /**
  * Doctor finalizes a visit with a MedicalConclusion. Behavior copied verbatim
@@ -28,7 +31,7 @@ export class CreateMedicalConclusionUseCase {
     @Inject(CLINICAL_DECISION_REPOSITORY) private readonly repo: ClinicalDecisionRepositoryPort,
     @Inject(MEDICAL_CONCLUSION_INTEGRITY_ANCHOR) private readonly integrity: MedicalConclusionIntegrityAnchorPort,
     private readonly policy: ClinicalDecisionPolicy,
-    private readonly audit: AuditLoggerService,
+    @Inject(VISIT_INTEGRITY_ANCHOR) private readonly visitIntegrity: VisitIntegrityAnchorPort,
     private readonly clinicalTrust: ClinicalAuditTrustService,
   ) {}
 
@@ -73,17 +76,11 @@ export class CreateMedicalConclusionUseCase {
         await this.integrity.anchorChange(savedConclusion, 'CREATE', doctorUserId, null, tx);
 
         if (visitAfter) {
-          await this.audit.recordV2(
-            {
-              entity: 'Visit',
-              entityId: visitAfter.id,
-              action: 'UPDATE',
-              actorId: doctorUserId,
-              before: { visitId: visitAfter.id, status: visit!.status },
-              after: buildVisitSnapshot(visitAfter),
-              metadata: { schema: 'KLTN_VISIT_STATUS_AUDIT_V2' },
-              onChainStatus: 'PENDING',
-            },
+          await this.visitIntegrity.anchorChange(
+            visitAfter,
+            'UPDATE',
+            doctorUserId,
+            { visitId: visitAfter.id, status: visit!.status },
             tx,
           );
         }

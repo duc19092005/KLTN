@@ -7,7 +7,9 @@ import AuditHistoryChanges from './AuditHistoryChanges';
 const STATUS_TONE = {
   VERIFIED: { label: 'Xác thực khớp với blockchain', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
   TAMPERED: { label: 'CẢNH BÁO: Dữ liệu đã bị sửa đổi!', cls: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500' },
+  PENDING_ANCHOR: { label: 'Đang chờ neo on-chain', cls: 'bg-yellow-50 text-yellow-700 border-yellow-200', dot: 'bg-yellow-500' },
   UNANCHORED: { label: 'Chưa được neo trên blockchain', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
+  VERIFICATION_UNAVAILABLE: { label: 'Tạm thời chưa xác minh được blockchain', cls: 'bg-slate-50 text-slate-600 border-slate-200', dot: 'bg-slate-400' },
 };
 
 const ACTION_LABEL = {

@@ -57,6 +57,18 @@ export class MedicalOrderQueryDto {
   @IsOptional()
   @IsUUID()
   targetDepartmentId?: string;
+
+  @ApiPropertyOptional({ default: 1, minimum: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  page?: number;
+
+  @ApiPropertyOptional({ default: 10, description: 'Cố định tối đa 10 phiếu trên mỗi trang.' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  limit?: number;
 }
 
 export class UpdateMedicalOrderStatusDto {

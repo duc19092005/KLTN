@@ -113,7 +113,7 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
     throw new BadRequestException('Không thể tạo mã phiếu chỉ định duy nhất.');
   }
 
-  async findAll(filter: OrderListFilter): Promise<unknown[]> {
+  async findAll(filter: OrderListFilter, skip: number, take: number): Promise<{ items: unknown[]; total: number }> {
     const where: Prisma.MedicalOrderWhereInput = {
       ...(filter.status ? { status: filter.status } : {}),
       ...(filter.visitId ? { visitId: filter.visitId } : {}),
@@ -121,11 +121,17 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
       ...(filter.doctorId ? { doctorId: filter.doctorId } : {}),
     };
 
-    return this.prisma.medicalOrder.findMany({
-      where,
-      include: this.includeRelations(),
-      orderBy: [{ status: 'asc' }, { orderedAt: 'desc' }],
-    });
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.medicalOrder.findMany({
+        where,
+        include: this.includeRelations(),
+        orderBy: [{ status: 'asc' }, { orderedAt: 'desc' }],
+        skip,
+        take,
+      }),
+      this.prisma.medicalOrder.count({ where }),
+    ]);
+    return { items, total };
   }
 
   async findOrderForManage(id: string) {
@@ -275,7 +281,7 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
       patient: true,
       doctor: { include: { staffProfile: { include: { department: true } } } },
       targetDepartment: true,
-      results: { include: { files: true, performedBy: { select: { id: true, username: true, email: true, role: true } } }, orderBy: { returnedAt: 'desc' } },
+      results: { include: { files: true, order: { select: { visitId: true } }, performedBy: { select: { id: true, username: true, email: true, role: true } } }, orderBy: { returnedAt: 'desc' } },
     } as const;
   }
 

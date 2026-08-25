@@ -1,14 +1,21 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { MedicalOrderStatus } from '@prisma/client';
 import { AuthUser } from '../../../../common/types/auth-user.type';
-import { AuditLoggerService, ClinicalAuditTrustService } from '../../../../infrastructure/audit';
+import { ClinicalAuditTrustService } from '../../../../infrastructure/audit';
 import { CreateMedicalResultDto } from '../../dto/medical-order.dto';
-import { buildMedicalResultSnapshot } from '../../domain/medical-result-snapshot';
-import { buildMedicalOrderSnapshot } from '../../domain/medical-order-snapshot';
 import { MedicalOrderAccessPolicy } from '../policies/medical-order-access.policy';
 import { MEDICAL_ORDER_REPOSITORY, MedicalOrderRepositoryPort } from '../ports/medical-order.repository.port';
 import { NotificationService } from '../../../notification/services/notification.service';
-import { buildVisitSnapshot } from '../../../visit/domain/visit-snapshot';
+import {
+  MEDICAL_ORDER_INTEGRITY_ANCHOR,
+  MEDICAL_RESULT_INTEGRITY_ANCHOR,
+  MedicalOrderIntegrityAnchorPort,
+  MedicalResultIntegrityAnchorPort,
+} from '../ports/medical-integrity-anchor.port';
+import {
+  VISIT_INTEGRITY_ANCHOR,
+  VisitIntegrityAnchorPort,
+} from '../../../visit/application/ports/visit-integrity-anchor.port';
 
 /**
  * LAB_MANAGER returns a result for an order in their department during an
@@ -19,7 +26,9 @@ export class CreateMedicalResultUseCase {
   constructor(
     @Inject(MEDICAL_ORDER_REPOSITORY) private readonly repo: MedicalOrderRepositoryPort,
     private readonly accessPolicy: MedicalOrderAccessPolicy,
-    private readonly audit: AuditLoggerService,
+    @Inject(MEDICAL_ORDER_INTEGRITY_ANCHOR) private readonly orderIntegrity: MedicalOrderIntegrityAnchorPort,
+    @Inject(MEDICAL_RESULT_INTEGRITY_ANCHOR) private readonly resultIntegrity: MedicalResultIntegrityAnchorPort,
+    @Inject(VISIT_INTEGRITY_ANCHOR) private readonly visitIntegrity: VisitIntegrityAnchorPort,
     private readonly notificationService: NotificationService,
     private readonly clinicalTrust: ClinicalAuditTrustService,
   ) {}
@@ -71,51 +80,28 @@ export class CreateMedicalResultUseCase {
       },
       order.visitId,
       async ({ result, order: updatedOrder, visitTransition }, tx) => {
-        const resultSnapshot = buildMedicalResultSnapshot({
-          ...(result as Record<string, unknown>),
-          visitId: order.visitId,
-        });
-        await this.audit.recordV2(
-          {
-            entity: 'MedicalResult',
-            entityId: resultSnapshot.resultId,
-            action: 'CREATE',
-            actorId: user.sub,
-            before: null,
-            after: resultSnapshot,
-            metadata: { schema: 'KLTN_MEDICAL_RESULT_AUDIT_V2' },
-            onChainStatus: 'PENDING',
-          },
+        await this.resultIntegrity.anchorChange(
+          { ...(result as Record<string, unknown>), visitId: order.visitId },
+          'CREATE',
+          user.sub,
+          null,
           tx,
         );
 
-        const orderSnapshot = buildMedicalOrderSnapshot(updatedOrder as Parameters<typeof buildMedicalOrderSnapshot>[0]);
-        await this.audit.recordV2(
-          {
-            entity: 'MedicalOrder',
-            entityId: orderId,
-            action: 'UPDATE',
-            actorId: user.sub,
-            before: { orderId, visitId: order.visitId, status: order.status },
-            after: orderSnapshot,
-            metadata: { schema: 'KLTN_MEDICAL_ORDER_STATUS_AUDIT_V2' },
-            onChainStatus: 'PENDING',
-          },
+        await this.orderIntegrity.anchorChange(
+          updatedOrder,
+          'UPDATE',
+          user.sub,
+          { orderId, visitId: order.visitId, status: order.status },
           tx,
         );
 
         if (visitTransition) {
-          await this.audit.recordV2(
-            {
-              entity: 'Visit',
-              entityId: visitTransition.visit.id,
-              action: 'UPDATE',
-              actorId: user.sub,
-              before: { visitId: visitTransition.visit.id, status: visitTransition.previousStatus },
-              after: buildVisitSnapshot(visitTransition.visit),
-              metadata: { schema: 'KLTN_VISIT_STATUS_AUDIT_V2' },
-              onChainStatus: 'PENDING',
-            },
+          await this.visitIntegrity.anchorChange(
+            visitTransition.visit,
+            'UPDATE',
+            user.sub,
+            { visitId: visitTransition.visit.id, status: visitTransition.previousStatus },
             tx,
           );
         }

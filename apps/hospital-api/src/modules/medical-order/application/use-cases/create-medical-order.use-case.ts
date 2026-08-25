@@ -1,24 +1,22 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+﻿import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { VisitStatus } from '@prisma/client';
 import { CreateMedicalOrderDto } from '../../dto/medical-order.dto';
 import { MEDICAL_ORDER_REPOSITORY, MedicalOrderRepositoryPort } from '../ports/medical-order.repository.port';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { NotificationService } from '../../../notification/services/notification.service';
-import { AuditLoggerService, ClinicalAuditTrustService } from '../../../../infrastructure/audit';
-import { buildVisitSnapshot } from '../../../visit/domain/visit-snapshot';
+import { ClinicalAuditTrustService } from '../../../../infrastructure/audit';
+import { MEDICAL_ORDER_INTEGRITY_ANCHOR, MedicalOrderIntegrityAnchorPort } from '../ports/medical-integrity-anchor.port';
+import { VISIT_INTEGRITY_ANCHOR, VisitIntegrityAnchorPort } from '../../../visit/application/ports/visit-integrity-anchor.port';
 
-/**
- * Doctor creates a lab/imaging order for a visit in their examination
- * department. The issued MedicalOrder still stores DoctorProfile.id for
- * medical accountability, while Visit ownership uses StaffProfile.id.
- */
+/** Doctor creates a lab/imaging order and atomically transitions the Visit. */
 @Injectable()
 export class CreateMedicalOrderUseCase {
   constructor(
     @Inject(MEDICAL_ORDER_REPOSITORY) private readonly repo: MedicalOrderRepositoryPort,
+    @Inject(MEDICAL_ORDER_INTEGRITY_ANCHOR) private readonly orderIntegrity: MedicalOrderIntegrityAnchorPort,
+    @Inject(VISIT_INTEGRITY_ANCHOR) private readonly visitIntegrity: VisitIntegrityAnchorPort,
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
-    private readonly audit: AuditLoggerService,
     private readonly clinicalTrust: ClinicalAuditTrustService,
   ) {}
 
@@ -34,11 +32,9 @@ export class CreateMedicalOrderUseCase {
     if (visit.staffId && visit.staffId !== currentDoctor.staffId) {
       throw new BadRequestException('Lượt khám này đã được bác sĩ khác phụ trách.');
     }
-
     if (([VisitStatus.COMPLETED, VisitStatus.CANCELLED] as string[]).includes(visit.status)) {
       throw new BadRequestException('Không thể tạo thêm chỉ định cho lượt khám đã hoàn tất hoặc đã hủy.');
     }
-
     if (dto.targetDepartmentId) {
       const department = await this.repo.findOrderDepartment(dto.targetDepartmentId);
       if (!department) throw new NotFoundException('Không tìm thấy phòng ban nhận chỉ định.');
@@ -60,38 +56,8 @@ export class CreateMedicalOrderUseCase {
         clinicalNote: dto.clinicalNote?.trim() || undefined,
       },
       async (order, visitAfter, tx) => {
-        await this.audit.recordV2({
-          entity: 'MedicalOrder',
-          entityId: order.id,
-          action: 'CREATE',
-          actorId: doctorUserId,
-          before: null,
-          after: {
-            orderId: order.id,
-            orderCode: order.orderCode,
-            visitId: order.visitId,
-            patientId: order.patientId,
-            doctorId: order.doctorId,
-            targetDepartmentId: order.targetDepartmentId,
-            orderType: order.orderType,
-            priority: order.priority,
-            status: order.status,
-            clinicalNote: order.clinicalNote ?? null,
-          },
-          metadata: { schema: 'KLTN_MEDICAL_ORDER_CREATE_AUDIT_V2' },
-          onChainStatus: 'PENDING',
-        }, tx);
-
-        await this.audit.recordV2({
-          entity: 'Visit',
-          entityId: visitAfter.id,
-          action: 'UPDATE',
-          actorId: doctorUserId,
-          before: { visitId: visitAfter.id, status: visit.status },
-          after: buildVisitSnapshot(visitAfter),
-          metadata: { schema: 'KLTN_VISIT_STATUS_AUDIT_V2' },
-          onChainStatus: 'PENDING',
-        }, tx);
+        await this.orderIntegrity.anchorChange(order, 'CREATE', doctorUserId, null, tx);
+        await this.visitIntegrity.anchorChange(visitAfter, 'UPDATE', doctorUserId, { visitId: visitAfter.id, status: visit.status }, tx);
       },
       async (tx) => {
         await this.clinicalTrust.assertManyTrusted([
@@ -105,18 +71,9 @@ export class CreateMedicalOrderUseCase {
       const order = result as any;
       if (order && order.targetDepartmentId) {
         const managers = await this.prisma.staffProfile.findMany({
-          where: {
-            departmentId: order.targetDepartmentId,
-            user: {
-              role: 'LAB_MANAGER',
-              status: 'ACTIVE',
-            },
-          },
-          select: {
-            userId: true,
-          },
+          where: { departmentId: order.targetDepartmentId, user: { role: 'LAB_MANAGER', status: 'ACTIVE' } },
+          select: { userId: true },
         });
-
         for (const manager of managers) {
           await this.notificationService.createNotification(
             manager.userId,
@@ -128,7 +85,6 @@ export class CreateMedicalOrderUseCase {
     } catch (err) {
       console.error('Failed to send medical order notifications:', err);
     }
-
     return result;
   }
 }

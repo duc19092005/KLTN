@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { AuditLoggerService } from '../../../../infrastructure/audit';
-import { AuditAnchorService } from '../../../../infrastructure/audit';
+import { AuditAnchorService, AuditPageIntegrityService } from '../../../../infrastructure/audit';
 import { computeAfterHashV2 } from '../../../../infrastructure/audit';
 import {
   AiModelAnchorAction,
@@ -21,6 +21,7 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
     private readonly prisma: PrismaService,
     private readonly audit: AuditLoggerService,
     private readonly auditAnchor: AuditAnchorService,
+    private readonly pageIntegrity?: AuditPageIntegrityService,
   ) {}
 
   async anchorChange(
@@ -125,6 +126,41 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
       storedHash: dbHash,
       onChainHash: latestAnchored?.afterHash ?? null,
     };
+  }
+
+  async evaluateMany(models: any[]): Promise<IntegrityEvaluation[]> {
+    const prepared = models.map((model) => {
+      const snapshot = buildAiModelSnapshot(model);
+      const recomputedHash = model.dataSalt ? this.audit.recompute(snapshot, model.dataSalt) : null;
+      const storedHash = model.hash256 || null;
+      return {
+        model,
+        target: {
+          id: model.id,
+          entity: 'AiModelRegistry',
+          entityId: model.id,
+          currentAfterHash: computeAfterHashV2('AiModelRegistry', model.id, snapshot),
+          storedHash,
+          recomputedHash,
+          dbMatches: recomputedHash !== null && recomputedHash === storedHash,
+        },
+      };
+    });
+    const verified = await this.pageIntegrity!.evaluate(prepared.map(({ target }) => target));
+    return prepared.map(({ model }) => {
+      const result = verified.get(model.id)!;
+      return {
+        id: model.id,
+        modelName: model.modelName,
+        modelVersion: model.modelVersion,
+        status: result.status,
+        dbMatches: result.dbMatches,
+        chainMatches: result.chainMatches,
+        recomputedHash: result.recomputedHash,
+        storedHash: result.storedHash,
+        onChainHash: result.onChainHash,
+      };
+    });
   }
 
   history(id?: string) {

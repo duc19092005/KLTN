@@ -1,10 +1,14 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { UserRole, VisitStatus } from '@prisma/client';
 import { AuthUser } from '../../../../common/types/auth-user.type';
-import { AuditLoggerService, ClinicalAuditTrustService } from '../../../../infrastructure/audit';
+import { ClinicalAuditTrustService } from '../../../../infrastructure/audit';
 import { VisitTransitionPolicy } from '../policies/visit-transition.policy';
 import { VISIT_REPOSITORY, VisitRepositoryPort } from '../ports/visit.repository.port';
 import { buildVisitSnapshot } from '../../domain/visit-snapshot';
+import {
+  VISIT_INTEGRITY_ANCHOR,
+  VisitIntegrityAnchorPort,
+} from '../ports/visit-integrity-anchor.port';
 
 /**
  * Direct status transition workflow for PATCH /visits/:id/status.
@@ -16,7 +20,7 @@ export class UpdateVisitStatusUseCase {
   constructor(
     @Inject(VISIT_REPOSITORY) private readonly repo: VisitRepositoryPort,
     private readonly transitionPolicy: VisitTransitionPolicy,
-    private readonly auditLogger: AuditLoggerService,
+    @Inject(VISIT_INTEGRITY_ANCHOR) private readonly integrity: VisitIntegrityAnchorPort,
     private readonly clinicalTrust: ClinicalAuditTrustService,
   ) {}
 
@@ -54,15 +58,13 @@ export class UpdateVisitStatusUseCase {
       completedAt,
       assignedStaffId,
       async (updatedVisit, tx) => {
-        await this.auditLogger.recordV2({
-          entity: 'Visit',
-          entityId: id,
-          action: 'UPDATE',
-          actorId: user?.sub ?? null,
-          before: previousSnapshot,
-          after: buildVisitSnapshot(updatedVisit),
-          metadata: { schema: 'KLTN_VISIT_STATUS_AUDIT_V3', field: 'status', from: visit.status, to: status },
-        }, tx);
+        await this.integrity.anchorChange(
+          updatedVisit,
+          'UPDATE',
+          user?.sub ?? null,
+          previousSnapshot,
+          tx,
+        );
       },
       async (tx) => {
         await this.clinicalTrust.assertManyTrusted([

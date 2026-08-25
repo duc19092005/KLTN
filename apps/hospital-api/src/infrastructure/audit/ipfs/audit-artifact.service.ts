@@ -33,6 +33,9 @@ export interface AuditRecoveryBundleRow {
   patientId: string | null;
   aiModelRegistryId: string | null;
   medicalConclusionId: string | null;
+  visitId: string | null;
+  medicalOrderId: string | null;
+  medicalResultId: string | null;
   aiQualityId: string | null;
   createdAt: string;
 }
