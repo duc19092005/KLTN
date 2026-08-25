@@ -790,9 +790,9 @@ function DepartmentHistory({ departmentId }) {
 function DeleteDepartmentModal({ department, busy, onCancel, onConfirm }) {
   const isActive = department.status === 'ACTIVE';
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={busy ? undefined : onCancel} />
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={busy ? undefined : onCancel} />
       <div className="relative z-10 w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="border-b border-slate-100 p-6">
           <div className="flex items-center gap-2 text-rose-600">
@@ -849,7 +849,8 @@ function DeleteDepartmentModal({ department, busy, onCancel, onConfirm }) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -907,7 +908,7 @@ function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing, stru
   if (typeof document === 'undefined' || !document.body) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fadeIn">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-fadeIn">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <form onSubmit={handleSubmit} noValidate className="relative z-10 w-full max-w-xl rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
         <div className="flex items-start justify-between">

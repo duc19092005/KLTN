@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { doctorService } from '../apis/doctorService';
 import { useToast } from '../../../providers/ToastProvider';
@@ -89,9 +90,9 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
   const audit = detail?.audit || {};
   const tone = STATUS_TONE[audit.status] || STATUS_TONE.UNANCHORED;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" />
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 flex max-h-[92vh] w-full max-w-[1120px] flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
         {/* Header */}
         <div className="shrink-0 border-b border-slate-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -130,23 +131,29 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
             <LoadingIndicator size="lg" label="Đang tải dữ liệu bác sĩ..." />
           ) : activeTab === 'info' ? (
             <div className="space-y-6">
-              {/* Blockchain verification card — single unified hash */}
-              <div className={`rounded-2xl border p-5 shadow-sm space-y-4 ${audit.status === 'VERIFIED' ? 'bg-emerald-50/60 border-emerald-100' : audit.status === 'TAMPERED' ? 'bg-rose-50/60 border-rose-100 animate-pulse' : 'bg-amber-50/60 border-amber-100'}`}>
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black ${tone.cls}`}>
-                    <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
-                    Trạng thái: {tone.label}
-                  </span>
-                  <span className="text-[11px] font-black uppercase text-cyan-700 tracking-wider">
-                    Xác thực bằng hợp đồng thông minh Solidity
-                  </span>
+              {/* Blockchain Seal Banner */}
+              <div className={`p-4 rounded-2xl border ${tone.cls} flex flex-col md:flex-row items-start md:items-center justify-between gap-4`}>
+                <div className="flex items-center gap-3">
+                  <span className={`w-3 h-3 rounded-full ${tone.dot} shrink-0 animate-pulse`} />
+                  <div>
+                    <h4 className="font-black text-sm">{tone.label}</h4>
+                    <p className="text-xs opacity-80 mt-0.5">Dữ liệu hồ sơ này được mã hóa và bảo chứng toàn vẹn trên mạng Ethereum/Sepolia.</p>
+                  </div>
                 </div>
+                <div className="bg-white/80 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-inherit text-xs font-mono">
+                  Lô neo: #{audit.batchId ?? 'N/A'}
+                </div>
+              </div>
 
-                <div className="bg-white p-4 rounded-xl border border-slate-100 space-y-2 mt-3">
-                  <strong className="block text-slate-900 font-bold border-b pb-1 text-sm">Xác thực toàn vẹn dữ liệu (Danh tính + Chuyên môn)</strong>
-                  <div className="space-y-1.5 text-xs">
-                    <HashRow label="Trạng thái" value={audit.chainMatches ? 'Khớp với blockchain' : audit.onChainHash ? 'Mâu thuẫn' : 'Chưa neo'} match={audit.chainMatches} />
-                    <HashRow label="Hash trong CSDL" value={audit.storedHash} match={audit.dbMatches} />
+              {/* Hashes Debug/Verification Panel */}
+              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm space-y-3">
+                <h4 className="text-sm font-black text-slate-900 border-b pb-2 tracking-wide uppercase">Chi tiết băm & toàn vẹn</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div className="space-y-1">
+                    <HashRow label="Hash lưu trong CSDL" value={audit.dbHash} match={audit.dbMatches} />
+                    <HashRow label="Salt mã hóa" value={audit.dataSalt} />
+                  </div>
+                  <div className="space-y-1">
                     <HashRow label="Hash trên chuỗi" value={audit.onChainHash} match={audit.chainMatches} />
                     <HashRow label="Hash tính lại" value={audit.recomputedHash} match={audit.dbMatches && audit.chainMatches} />
                   </div>
@@ -226,7 +233,8 @@ export default function DoctorDetailModal({ doctorId, onClose }) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

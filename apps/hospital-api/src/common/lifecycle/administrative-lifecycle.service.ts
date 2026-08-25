@@ -23,16 +23,13 @@ export class AdministrativeLifecycleService {
   async softDelete(entity: LifecycleEntity, id: string, actorId: string) {
     const current = await this.find(entity, id);
     if (!current) throw new NotFoundException('Không tìm thấy bản ghi.');
-    await this.entityRecovery.assertTrusted(this.auditEntity(entity), id);
-    if (this.statusOf(entity, current) === 'DELETE') throw new ConflictException('Bản ghi đã được xóa trước đó.');
-
     const curr: any = current;
-    // Also assert trust of paired entity if exists
-    if (entity === 'staff' && curr.doctorProfile) {
-      await this.entityRecovery.assertTrusted('DoctorProfile', curr.doctorProfile.id);
-    } else if (entity === 'doctors' && curr.staffProfileId) {
-      await this.entityRecovery.assertTrusted('StaffProfile', curr.staffProfileId);
-    }
+    const isDoctorStaff = entity === 'staff' && Boolean(curr.doctorProfile);
+    const auditEntityName = isDoctorStaff ? 'DoctorProfile' : this.auditEntity(entity);
+    const auditEntityId = isDoctorStaff ? curr.doctorProfile.id : id;
+
+    await this.entityRecovery.assertTrusted(auditEntityName, auditEntityId);
+    if (this.statusOf(entity, current) === 'DELETE') throw new ConflictException('Bản ghi đã được xóa trước đó.');
 
     const now = new Date();
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -40,24 +37,18 @@ export class AdministrativeLifecycleService {
         deletedAt: now, deletedBy: actorId, restoredAt: null,
       });
       const aft: any = after;
-      const afterSnapshot = this.snapshot(entity, after);
-      const { salt, hash } = this.audit.hashSnapshot(afterSnapshot);
-      await this.updateIntegrityHash(tx, entity, id, hash, salt);
-      await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'DELETE', actorId, before: this.snapshot(entity, current), after: afterSnapshot }, tx);
 
-      // Synchronize paired DoctorProfile / StaffProfile entity so neither drifts
-      if (entity === 'staff' && curr.doctorProfile) {
+      if (isDoctorStaff) {
         const doctorBefore = buildUnifiedDoctorSnapshot({ ...curr.doctorProfile, staffProfile: curr });
         const doctorAfter = buildUnifiedDoctorSnapshot({ ...curr.doctorProfile, staffProfile: aft });
         const { salt: docSalt, hash: docHash } = this.audit.hashSnapshot(doctorAfter);
         await tx.doctorProfile.update({ where: { id: curr.doctorProfile.id }, data: { hash256: docHash, dataSalt: docSalt } });
         await this.audit.recordV2({ entity: 'DoctorProfile', entityId: curr.doctorProfile.id, action: 'DELETE', actorId, before: doctorBefore, after: doctorAfter }, tx);
-      } else if (entity === 'doctors' && curr.staffProfileId) {
-        const staffBefore = buildStaffSnapshot(curr.staffProfile);
-        const staffAfter = buildStaffSnapshot(aft.staffProfile);
-        const { salt: staffSalt, hash: staffHash } = this.audit.hashSnapshot(staffAfter);
-        await tx.staffProfile.update({ where: { id: curr.staffProfileId }, data: { hash256: staffHash, dataSalt: staffSalt } });
-        await this.audit.recordV2({ entity: 'StaffProfile', entityId: curr.staffProfileId, action: 'DELETE', actorId, before: staffBefore, after: staffAfter }, tx);
+      } else {
+        const afterSnapshot = this.snapshot(entity, after);
+        const { salt, hash } = this.audit.hashSnapshot(afterSnapshot);
+        await this.updateIntegrityHash(tx, entity, id, hash, salt);
+        await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'DELETE', actorId, before: this.snapshot(entity, current), after: afterSnapshot }, tx);
       }
 
       return after;
@@ -68,15 +59,12 @@ export class AdministrativeLifecycleService {
   async restore(entity: LifecycleEntity, id: string, actorId: string) {
     const current = await this.find(entity, id);
     if (!current || this.statusOf(entity, current) !== 'DELETE') throw new NotFoundException('Không tìm thấy bản ghi đã xóa.');
-    await this.entityRecovery.assertTrusted(this.auditEntity(entity), id);
-
     const curr: any = current;
-    // Also assert trust of paired entity if exists
-    if (entity === 'staff' && curr.doctorProfile) {
-      await this.entityRecovery.assertTrusted('DoctorProfile', curr.doctorProfile.id);
-    } else if (entity === 'doctors' && curr.staffProfileId) {
-      await this.entityRecovery.assertTrusted('StaffProfile', curr.staffProfileId);
-    }
+    const isDoctorStaff = entity === 'staff' && Boolean(curr.doctorProfile);
+    const auditEntityName = isDoctorStaff ? 'DoctorProfile' : this.auditEntity(entity);
+    const auditEntityId = isDoctorStaff ? curr.doctorProfile.id : id;
+
+    await this.entityRecovery.assertTrusted(auditEntityName, auditEntityId);
 
     const deletedAt = this.deletedAtOf(entity, current);
     if (!deletedAt || Date.now() - deletedAt.getTime() > RESTORE_WINDOW_MS) {
@@ -88,24 +76,18 @@ export class AdministrativeLifecycleService {
         deletedAt: null, deletedBy: null, restoredAt: now,
       });
       const aft: any = after;
-      const afterSnapshot = this.snapshot(entity, after);
-      const { salt, hash } = this.audit.hashSnapshot(afterSnapshot);
-      await this.updateIntegrityHash(tx, entity, id, hash, salt);
-      await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'RESTORE', actorId, before: this.snapshot(entity, current), after: afterSnapshot }, tx);
 
-      // Synchronize paired DoctorProfile / StaffProfile entity on restore
-      if (entity === 'staff' && curr.doctorProfile) {
+      if (isDoctorStaff) {
         const doctorBefore = buildUnifiedDoctorSnapshot({ ...curr.doctorProfile, staffProfile: curr });
         const doctorAfter = buildUnifiedDoctorSnapshot({ ...curr.doctorProfile, staffProfile: aft });
         const { salt: docSalt, hash: docHash } = this.audit.hashSnapshot(doctorAfter);
         await tx.doctorProfile.update({ where: { id: curr.doctorProfile.id }, data: { hash256: docHash, dataSalt: docSalt } });
         await this.audit.recordV2({ entity: 'DoctorProfile', entityId: curr.doctorProfile.id, action: 'RESTORE', actorId, before: doctorBefore, after: doctorAfter }, tx);
-      } else if (entity === 'doctors' && curr.staffProfileId) {
-        const staffBefore = buildStaffSnapshot(curr.staffProfile);
-        const staffAfter = buildStaffSnapshot(aft.staffProfile);
-        const { salt: staffSalt, hash: staffHash } = this.audit.hashSnapshot(staffAfter);
-        await tx.staffProfile.update({ where: { id: curr.staffProfileId }, data: { hash256: staffHash, dataSalt: staffSalt } });
-        await this.audit.recordV2({ entity: 'StaffProfile', entityId: curr.staffProfileId, action: 'RESTORE', actorId, before: staffBefore, after: staffAfter }, tx);
+      } else {
+        const afterSnapshot = this.snapshot(entity, after);
+        const { salt, hash } = this.audit.hashSnapshot(afterSnapshot);
+        await this.updateIntegrityHash(tx, entity, id, hash, salt);
+        await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'RESTORE', actorId, before: this.snapshot(entity, current), after: afterSnapshot }, tx);
       }
     });
     return { restored: true, id, status: 'INACTIVE', restoredAt: now };
