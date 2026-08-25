@@ -1,4 +1,4 @@
-﻿-- Add local tamper-evidence columns to the clinical workflow entities.
+-- Add local tamper-evidence columns to the clinical workflow entities.
 ALTER TABLE "Visit" ADD COLUMN "hash256" TEXT, ADD COLUMN "dataSalt" TEXT;
 ALTER TABLE "MedicalOrder" ADD COLUMN "hash256" TEXT, ADD COLUMN "dataSalt" TEXT;
 ALTER TABLE "MedicalResult" ADD COLUMN "hash256" TEXT, ADD COLUMN "dataSalt" TEXT;
