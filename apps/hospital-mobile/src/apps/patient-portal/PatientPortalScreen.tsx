@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
-import { Animated, Alert, Image, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Animated, Alert, Image, Keyboard, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
 import { passwordPatientLogin, requestPatientOtp, resendPatientOtp, verifyPatientOtp, changePatientPassword, PatientOtpLoginResponse } from '../../shared/api/patientAuthClient';
@@ -289,6 +289,7 @@ export function PatientPortalScreen() {
       await persistSession(response);
       setPassword('');
       setConfirmPassword('');
+      Keyboard.dismiss();
       setStep('dashboard');
     } catch (loginError) {
       showError(getFriendlyError(loginError, 'Số điện thoại hoặc mật khẩu không hợp lệ.'));
@@ -343,6 +344,7 @@ export function PatientPortalScreen() {
       const response = await verifyPatientOtp(phone, otp);
       setSession(response);
       await persistSession(response);
+      Keyboard.dismiss();
       setStep(response.requirePasswordSetup ? 'passwordSetup' : 'profiles');
       if (response.requirePasswordSetup) showInfo('Vui lòng tạo mật khẩu trước khi xem hồ sơ bệnh nhân.');
     } catch (verifyError) {
@@ -372,6 +374,7 @@ export function PatientPortalScreen() {
       setPassword('');
       setConfirmPassword('');
       setMessage('Đã thiết lập mật khẩu. Bạn có thể xem hồ sơ bệnh nhân.');
+      Keyboard.dismiss();
       setStep('dashboard');
     } catch (setupError) {
       setError(setupError instanceof Error ? setupError.message : 'Không thiết lập được mật khẩu.');
@@ -654,6 +657,7 @@ export function PatientPortalScreen() {
   };
 
   const reset = () => {
+    Keyboard.dismiss();
     setStep('phone');
     setOtp('');
     setPassword('');
@@ -674,11 +678,12 @@ export function PatientPortalScreen() {
   const resendDisabled = busy || resendAfterSeconds > 0;
   const showAuthenticatedTabs = Boolean(session && ['dashboard', 'notifications', 'profiles', 'visits', 'detail', 'account', 'createProfile', 'booking'].includes(step));
   const activeTab = step === 'account' ? 'account' : step === 'notifications' ? 'notifications' : step === 'profiles' || step === 'visits' || step === 'detail' ? 'features' : 'home';
+  const shouldAvoidKeyboard = ['phone', 'passwordLogin', 'otp', 'passwordSetup', 'changePassword', 'createProfile', 'booking'].includes(step);
 
   return (
-    <KeyboardAvoidingView style={styles.keyboardAvoiding} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
+    <KeyboardAvoidingView style={styles.keyboardAvoiding} behavior={shouldAvoidKeyboard ? (Platform.OS === 'ios' ? 'padding' : 'height') : undefined} keyboardVerticalOffset={shouldAvoidKeyboard && Platform.OS === 'ios' ? insets.top : 0}>
       <View style={styles.portalShell}>
-        <ScrollView style={styles.portalScroll} contentContainerStyle={[styles.content, { paddingTop: spacing.screen, paddingBottom: showAuthenticatedTabs ? insets.bottom + 104 : Math.max(spacing.screen, insets.bottom + 24) }, showAuthenticatedTabs && styles.contentWithTabs]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.portalScroll} contentContainerStyle={[styles.content, { paddingTop: spacing.screen, paddingBottom: showAuthenticatedTabs ? insets.bottom + 104 : Math.max(spacing.screen, insets.bottom + 24) }, showAuthenticatedTabs && styles.contentWithTabs]} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'} showsVerticalScrollIndicator={false}>
         {!showAuthenticatedTabs ? <View style={styles.statusSpacer} /> : null}
 
 
@@ -2082,10 +2087,10 @@ function formatBytes(size: number) {
 
 const styles = StyleSheet.create({
   keyboardAvoiding: { flex: 1 },
-  portalShell: { flex: 1, backgroundColor: colors.background },
+  portalShell: { flex: 1, minHeight: 1, backgroundColor: colors.background },
   portalScroll: { flex: 1, backgroundColor: colors.background },
-  content: { flexGrow: 1, paddingHorizontal: spacing.screen, gap: 18, backgroundColor: colors.background },
-  contentWithTabs: { paddingTop: 0 },
+  content: { paddingHorizontal: spacing.screen, gap: 18, backgroundColor: colors.background },
+  contentWithTabs: { minHeight: '100%', paddingTop: 0 },
   statusSpacer: { height: 10 },
   feedbackWrap: { position: 'absolute', top: 14, left: 18, right: 18, zIndex: 30, elevation: 30 },
   feedbackCard: { position: 'relative', borderRadius: 18, shadowColor: '#0f172a', shadowOpacity: 0.14, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 10 },
