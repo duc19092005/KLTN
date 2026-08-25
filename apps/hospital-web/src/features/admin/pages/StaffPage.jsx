@@ -11,7 +11,7 @@ import { staffService } from '../apis/staffService';
 import StaffDetailModal from '../components/StaffDetailModal';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { Calendar, ExternalLink, MapPin, Search, Trash2, X, Plus, Filter, Users, UserCheck, CheckSquare, Square, Sparkles, Eye, EyeOff, Pencil, FlaskConical, ShieldCheck } from 'lucide-react';
+import { Calendar, ExternalLink, MapPin, Search, Trash2, X, Plus, Filter, Users, UserCheck, CheckSquare, Square, Sparkles, Eye, EyeOff, Pencil, FlaskConical, ShieldCheck, Building2 } from 'lucide-react';
 
 const emptyStaff = { username: '', email: '', fullName: '', avatarUrl: '', departmentId: '', phone: '', gender: '', citizenId: '', birthDate: '', address: '', position: '', role: 'LAB_MANAGER' };
 const statusTone = { ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200/80', INACTIVE: 'bg-amber-50 text-amber-700 border-amber-200/80', PENDING: 'bg-amber-50 text-amber-700 border-amber-200/80' };
@@ -205,6 +205,19 @@ export default function StaffPage() {
     if (form.address.length > MAX_ADDRESS_LENGTH) {
       toast.error(`Địa chỉ không được vượt quá ${MAX_ADDRESS_LENGTH} ký tự.`);
       return;
+    }
+    if (form.departmentId) {
+      const selectedDept = departments.find((d) => d.id === form.departmentId);
+      if (selectedDept) {
+        if (form.role === 'LAB_MANAGER' && !['LABORATORY', 'IMAGING'].includes(selectedDept.type)) {
+          toast.error('Kỹ thuật viên chỉ được gán vào phòng ban Kỹ thuật (Xét nghiệm, Chẩn đoán hình ảnh).');
+          return;
+        }
+        if (form.role === 'RECEPTIONIST' && !['ADMINISTRATIVE'].includes(selectedDept.type)) {
+          toast.error('Nhân viên Lễ tân chỉ được gán vào phòng ban Hành chính / Tiếp đón.');
+          return;
+        }
+      }
     }
     setBusy(true);
     try {
@@ -639,9 +652,29 @@ function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editi
     };
   }, [form.address, addressTouched]);
 
-  const departmentOptions = departments
-    .filter((department) => department.type !== 'EXAMINATION')
-    .map((department) => ({ value: department.id, label: department.name }));
+  const isTech = form.role === 'LAB_MANAGER';
+  const isReceptionist = form.role === 'RECEPTIONIST';
+
+  const departmentOptions = useMemo(() => {
+    return departments
+      .filter((department) => {
+        if (isTech) return ['LABORATORY', 'IMAGING'].includes(department.type);
+        if (isReceptionist) return ['ADMINISTRATIVE'].includes(department.type);
+        return department.type !== 'EXAMINATION';
+      })
+      .map((department) => {
+        let typeBadge = '';
+        if (department.type === 'LABORATORY') typeBadge = 'Xét nghiệm';
+        else if (department.type === 'IMAGING') typeBadge = 'CĐHA';
+        else if (department.type === 'ADMINISTRATIVE') typeBadge = 'Hành chính / Lễ tân';
+        else typeBadge = department.type;
+
+        return {
+          value: department.id,
+          label: `${department.name} (${department.departmentCode || 'PB'} • ${typeBadge})`,
+        };
+      });
+  }, [departments, form.role, isTech, isReceptionist]);
 
   const selectAddress = (suggestion) => {
     setForm((prev) => ({ ...prev, address: suggestion.displayName || suggestion.display_name }));
@@ -743,7 +776,28 @@ function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editi
 
         <div className="p-6 sm:p-8 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Select label="Loại nhân sự" value={form.role} onChange={(v) => setForm((prev) => ({ ...prev, role: v }))} options={[{ value: 'RECEPTIONIST', label: 'Lễ tân' }, { value: 'LAB_MANAGER', label: 'Kỹ thuật viên cận lâm sàng' }]} required disabled={Boolean(editingStaff)} />
+            <Select
+              label="Loại nhân sự"
+              value={form.role}
+              onChange={(v) => {
+                setForm((prev) => {
+                  const nextRole = v;
+                  const currentDept = departments.find((d) => d.id === prev.departmentId);
+                  let nextDeptId = prev.departmentId;
+                  if (currentDept) {
+                    if (nextRole === 'LAB_MANAGER' && !['LABORATORY', 'IMAGING'].includes(currentDept.type)) {
+                      nextDeptId = '';
+                    } else if (nextRole === 'RECEPTIONIST' && !['ADMINISTRATIVE'].includes(currentDept.type)) {
+                      nextDeptId = '';
+                    }
+                  }
+                  return { ...prev, role: nextRole, departmentId: nextDeptId };
+                });
+              }}
+              options={[{ value: 'RECEPTIONIST', label: 'Lễ tân' }, { value: 'LAB_MANAGER', label: 'Kỹ thuật viên cận lâm sàng' }]}
+              required
+              disabled={Boolean(editingStaff)}
+            />
             <Input label="Họ tên" value={form.fullName} onChange={(v) => setForm((prev) => ({ ...prev, fullName: onlyVietnameseNameChars(v) }))} onBlur={() => validateField('fullName')} error={fieldErrors.fullName} placeholder="Nguyễn Văn A" pattern="[A-Za-zÀ-ỹ\\s]+" maxLength={MAX_FULL_NAME_LENGTH} required />
             <AvatarUpload value={form.avatarUrl} onChange={(url) => setForm((prev) => ({ ...prev, avatarUrl: url }))} uploadFn={staffService.uploadAvatar} ringTone="cyan" />
             <Input label="Tên đăng nhập" value={form.username} onChange={(v) => setForm((prev) => ({ ...prev, username: onlyUsernameChars(v) }))} onBlur={() => validateField('username')} error={fieldErrors.username} placeholder="nguyenvana01" pattern="[a-z0-9]+" maxLength={MAX_USERNAME_LENGTH} required disabled={Boolean(editingStaff)} />
@@ -752,14 +806,45 @@ function StaffModal({ departments, form, setForm, onSubmit, onClose, busy, editi
             <Input label="CCCD/CMND" value={form.citizenId} onChange={(v) => setForm((prev) => ({ ...prev, citizenId: onlyDigits(v).slice(0, 12) }))} onBlur={() => validateField('citizenId')} error={fieldErrors.citizenId} placeholder="12 chữ số CCCD" inputMode="numeric" maxLength={12} pattern="[0-9]{12}" required />
             <DateInput label="Ngày sinh" value={form.birthDate} onChange={(v) => setForm((prev) => ({ ...prev, birthDate: v }))} onBlur={(nextValue) => validateField('birthDate', nextValue)} error={fieldErrors.birthDate} required />
             <Select label="Giới tính" value={form.gender} onChange={(v) => setForm((prev) => ({ ...prev, gender: v }))} options={['Nam', 'Nữ']} empty="Chọn giới tính" required />
-            <Select label="Phòng ban" value={form.departmentId} onChange={(v) => setForm((prev) => ({ ...prev, departmentId: v }))} options={departmentOptions} empty="Chưa gán phòng ban" />
+            
+            <div className="space-y-1.5">
+              <Select
+                label="Phòng ban"
+                value={form.departmentId}
+                onChange={(v) => setForm((prev) => ({ ...prev, departmentId: v }))}
+                options={departmentOptions}
+                empty={
+                  departmentOptions.length === 0
+                    ? (isTech ? 'Chưa có phòng ban Kỹ thuật (Xét nghiệm/CĐHA)' : 'Chưa có phòng ban Lễ tân / Hành chính')
+                    : 'Chưa gán phòng ban'
+                }
+              />
+              <div className="flex items-center gap-1.5 px-1">
+                {isTech ? (
+                  <>
+                    <FlaskConical className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                    <span className="text-[11px] font-medium text-slate-500">
+                      Kỹ thuật viên chỉ thuộc phòng <span className="font-bold text-indigo-700">Xét nghiệm / CĐHA</span>
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Building2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                    <span className="text-[11px] font-medium text-slate-500">
+                      Lễ tân chỉ thuộc phòng <span className="font-bold text-emerald-700">Hành chính / Tiếp đón</span>
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
             <Input label="Chức danh" value={form.position} onChange={(v) => setForm((prev) => ({ ...prev, position: limitPosition(v) }))} onBlur={() => validateField('position')} error={fieldErrors.position} placeholder="Lễ tân, KTV xét nghiệm..." maxLength={MAX_POSITION_LENGTH} required />
             <AddressInput
               label="Địa chỉ"
               value={form.address}
               onChange={(v) => {
                 setAddressTouched(true);
-                setForm({ ...form, address: limitAddress(v) });
+                setForm((prev) => ({ ...prev, address: limitAddress(v) }));
               }}
               onBlur={handleAddressBlur}
               onFocus={handleAddressFocus}
