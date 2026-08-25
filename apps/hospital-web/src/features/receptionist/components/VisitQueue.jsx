@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
+import BlockchainStatusBadge from '../../../shared/components/BlockchainStatusBadge';
 import { visitService } from '../apis/visitService';
 import { VISIT_STATUS, getVisitStatus } from '../constants/visitStatus';
 import { useToast } from '../../../providers/ToastProvider';
@@ -149,14 +150,14 @@ export default function VisitQueue({ refreshTrigger }) {
                 onClick={() => setStatusFilter(tab.status)}
                 className={`inline-flex items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 py-2 text-xs font-bold transition-all ${
                   statusFilter === tab.status
-                    ? 'border-sky-600 bg-sky-600 text-white shadow-xs'
+                    ? 'border-sky-600 bg-sky-600 text-white shadow-sm'
                     : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 <span>{tab.label}</span>
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
-                    statusFilter === tab.status ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                    statusFilter === tab.status ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
                   }`}
                 >
                   {tab.count}
@@ -177,6 +178,7 @@ export default function VisitQueue({ refreshTrigger }) {
                     <th className="px-6 py-3.5">Mã lượt</th>
                     <th className="px-6 py-3.5">Phòng khám / Bác sĩ</th>
                     <th className="px-6 py-3.5">Trạng thái</th>
+                    <th className="px-6 py-3.5">Độ tin cậy dữ liệu</th>
                     <th className="px-6 py-3.5">Giờ tiếp nhận</th>
                     <th className="px-6 py-3.5 text-right">Thao tác</th>
                   </tr>
@@ -241,6 +243,9 @@ function VisitRow({ visit, onOpen }) {
       <td className="px-6 py-4">
         <StatusBadge status={status} />
       </td>
+      <td className="px-6 py-4">
+        <BlockchainStatusBadge status={visit.blockchainStatus} size="xs" />
+      </td>
       <td className="px-6 py-4 text-xs font-medium text-slate-500">
         {getVisitTime(visit)
           ? new Date(getVisitTime(visit)).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
@@ -270,6 +275,10 @@ function VisitCard({ visit, onOpen }) {
       <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 text-xs font-semibold text-slate-600 space-y-1">
         <p><span className="font-bold text-slate-800">Mã lượt:</span> {visit.visitCode}</p>
         <p><span className="font-bold text-slate-800">Phòng khám:</span> {getVisitDepartmentName(visit)}</p>
+        <div className="pt-1 flex items-center justify-between">
+          <span className="font-bold text-slate-800">Độ tin cậy:</span>
+          <BlockchainStatusBadge status={visit.blockchainStatus} size="xs" />
+        </div>
       </div>
       <button
         type="button"
@@ -303,6 +312,7 @@ function VisitDetailModal({ visit, busyId, onCancel, onClose }) {
                 {visit.visitCode}
               </span>
               <StatusBadge status={status} />
+              <BlockchainStatusBadge status={visit.blockchainStatus} size="xs" />
             </div>
             <h2 className="text-xl font-bold text-slate-900">{visit.patient?.fullName || 'N/A'}</h2>
             <p className="mt-0.5 text-xs font-semibold text-sky-600">Mã bệnh nhân: {visit.patient?.patientCode || 'N/A'}</p>
