@@ -1,5 +1,5 @@
 /**
- * Landing Editorial — Bright White Theme & Smooth Scroll Engine
+ * Landing Editorial — Pristine White Medical Theme & Smooth Scroll Engine
  */
 
 html {
@@ -18,8 +18,7 @@ html {
   --le-outline: #e2e8f0;
   --le-accent-green: #059669;
 
-  --le-serif: "Noto Serif", "Times New Roman", serif;
-  --le-sans: "Be Vietnam Pro", Inter, system-ui, sans-serif;
+  --le-sans: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
   font-family: var(--le-sans);
   color: var(--le-on-surface);
@@ -28,39 +27,34 @@ html {
   text-rendering: optimizeLegibility;
 }
 
-.landing-editorial .le-display {
-  font-family: var(--le-serif);
-  letter-spacing: -0.015em;
-  font-weight: 600;
-}
-
-.landing-editorial .material-symbols-outlined {
-  font-family: "Material Symbols Outlined", sans-serif;
-  font-weight: normal;
-  font-style: normal;
-  font-size: 24px;
-  line-height: 1;
-  display: inline-block;
-  vertical-align: middle;
-  -webkit-font-smoothing: antialiased;
-}
-
 .landing-editorial [id] {
-  scroll-margin-top: 6rem;
+  scroll-margin-top: 5.5rem;
 }
 
-/* Bright Soft Shadows */
-.landing-editorial .card-bright {
+/* Pristine White Card Shadows */
+.landing-editorial .card-white-elevation {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.05);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.landing-editorial .card-bright:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 20px 40px -15px rgba(2, 132, 199, 0.12);
-  transform: translateY(-2px);
+.landing-editorial .card-white-elevation:hover {
+  border-color: rgba(186, 230, 253, 0.9);
+  box-shadow: 0 16px 36px -8px rgba(2, 132, 199, 0.08);
+  transform: translateY(-3px);
+}
+
+/* Subtle Shimmer Effect */
+@keyframes shimmerGlow {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.6) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: shimmerGlow 3s infinite;
 }
 
 /* Smooth Bidirectional Scroll Reveal Animations */
@@ -73,23 +67,23 @@ html {
 }
 
 .landing-editorial .reveal-up {
-  transform: translate3d(0, 28px, 0);
+  transform: translate3d(0, 24px, 0);
 }
 
 .landing-editorial .reveal-left {
-  transform: translate3d(-28px, 0, 0);
+  transform: translate3d(-24px, 0, 0);
 }
 
 .landing-editorial .reveal-right {
-  transform: translate3d(28px, 0, 0);
+  transform: translate3d(24px, 0, 0);
 }
 
 .landing-editorial .reveal-fade {
-  transform: translate3d(0, 12px, 0);
+  transform: translate3d(0, 10px, 0);
 }
 
 .landing-editorial .reveal-scale {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 
 .landing-editorial .reveal.is-visible {
