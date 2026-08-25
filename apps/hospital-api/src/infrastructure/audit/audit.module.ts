@@ -5,6 +5,7 @@ import { IpfsArtifactService } from './ipfs/ipfs-artifact.service';
 import { AuditArtifactService } from './ipfs/audit-artifact.service';
 import { AuditLoggerService } from './logging/audit-logger.service';
 import { AuditAnchorService } from './anchoring/audit-anchor.service';
+import { AuditPageIntegrityService } from './anchoring/audit-page-integrity.service';
 import { AuditRecoveryService } from './recovery/audit-recovery.service';
 import { EntityRecoveryService } from './recovery/entity-recovery.service';
 import { EntityRecreationService } from './recovery/entity-recreation.service';
@@ -25,6 +26,7 @@ import { ClinicalAuditTrustService } from './recovery/clinical-audit-trust.servi
   providers: [
     AuditLoggerService,
     AuditAnchorService,
+    AuditPageIntegrityService,
     AuditRecoveryCryptoService,
     IpfsArtifactService,
     AuditArtifactService,
@@ -36,6 +38,7 @@ import { ClinicalAuditTrustService } from './recovery/clinical-audit-trust.servi
   exports: [
     AuditLoggerService,
     AuditAnchorService,
+    AuditPageIntegrityService,
     AuditArtifactService,
     AuditRecoveryService,
     EntityRecoveryService,

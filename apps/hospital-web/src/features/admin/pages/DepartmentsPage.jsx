@@ -31,6 +31,7 @@ const BLOCKCHAIN_TONE = {
   TAMPERED: { label: 'CẢNH BÁO: Dữ liệu đã bị sửa đổi!', cls: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500' },
   PENDING_ANCHOR: { label: 'Đang chờ neo on-chain', cls: 'bg-sky-50 text-sky-700 border-sky-200', dot: 'bg-sky-500' },
   UNANCHORED: { label: 'Chưa được neo trên blockchain', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
+  VERIFICATION_UNAVAILABLE: { label: 'Tạm thời chưa xác minh được blockchain', cls: 'bg-slate-50 text-slate-600 border-slate-200', dot: 'bg-slate-400' },
 };
 const MAX_DEPARTMENT_CODE_LENGTH = 10;
 const MAX_DEPARTMENT_NAME_LENGTH = 50;

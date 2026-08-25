@@ -13,7 +13,9 @@ export class ListStaffUseCase {
   ) {}
 
   async execute(query: StaffQueryDto) {
-    const { page, limit, skip } = getPagination(query);
+    const { page, limit: requestedLimit } = getPagination(query);
+    const limit = Math.min(requestedLimit, 10);
+    const skip = (page - 1) * limit;
     const { items, total } = await this.repo.findManyPaginated(
       {
         employeeCode: query.employeeCode,
@@ -32,36 +34,36 @@ export class ListStaffUseCase {
       limit,
     );
 
-    const validatedItems = await Promise.all(
-      items.map(async (staff: any) => {
-        let integrityEval;
-        try {
-          integrityEval = await this.integrity.evaluate(staff, true);
-        } catch (err) {
-          integrityEval = {
-            status: 'UNANCHORED',
-            dbMatches: false,
-            chainMatches: false,
-            onChainHash: null,
-            storedHash: null,
-            recomputedHash: null,
-          };
-        }
-
-        return {
-          ...staff,
-          blockchainStatus: integrityEval.status,
-          audit: {
-            status: integrityEval.status,
-            dbMatches: integrityEval.dbMatches,
-            chainMatches: integrityEval.chainMatches,
-            onChainHash: integrityEval.onChainHash,
-            storedHash: integrityEval.storedHash,
-            recomputedHash: integrityEval.recomputedHash,
-          },
-        };
-      })
-    );
+    let evaluations;
+    try {
+      evaluations = await this.integrity.evaluateMany(items);
+    } catch {
+      evaluations = items.map((staff: any) => ({
+        id: staff.id,
+        status: 'VERIFICATION_UNAVAILABLE' as const,
+        dbMatches: false,
+        chainMatches: false,
+        onChainHash: null,
+        storedHash: staff.hash256 ?? null,
+        recomputedHash: null,
+      }));
+    }
+    const byId = new Map<string, (typeof evaluations)[number]>(evaluations.map((evaluation) => [evaluation.id, evaluation]));
+    const validatedItems = items.map((staff: any) => {
+      const integrityEval = byId.get(staff.id)!;
+      return {
+        ...staff,
+        blockchainStatus: integrityEval.status,
+        audit: {
+          status: integrityEval.status,
+          dbMatches: integrityEval.dbMatches,
+          chainMatches: integrityEval.chainMatches,
+          onChainHash: integrityEval.onChainHash,
+          storedHash: integrityEval.storedHash,
+          recomputedHash: integrityEval.recomputedHash,
+        },
+      };
+    });
 
     return paginated(validatedItems, total, page, limit);
   }

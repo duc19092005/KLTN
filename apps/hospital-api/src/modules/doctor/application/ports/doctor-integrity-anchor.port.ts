@@ -8,7 +8,7 @@ export type DoctorIntegrityEvaluation = {
   staffProfileId: string;
   specialty: string;
   licenseNumber: string;
-  status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR';
+  status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR' | 'VERIFICATION_UNAVAILABLE';
   dbMatches: boolean;
   chainMatches: boolean;
   recomputedHash: string | null;
@@ -31,6 +31,7 @@ export interface DoctorIntegrityAnchorPort {
     tx?: Prisma.TransactionClient,
   ): Promise<void>;
   evaluate(doctor: any, skipChainCheck?: boolean): Promise<DoctorIntegrityEvaluation>;
+  evaluateMany(doctors: any[]): Promise<DoctorIntegrityEvaluation[]>;
   history(id?: string): Promise<unknown>;
 }
 import { Prisma } from '@prisma/client';
