@@ -1,5 +1,5 @@
 import { ConflictException } from '@nestjs/common';
-import { EntityRecoveryService } from '../../../../../src/infrastructure/audit/entity-recovery.service';
+import { EntityRecoveryService } from '../../../../../src/infrastructure/audit';
 import {
   AUDIT_ENTRY_V2,
   canonicalize,
@@ -9,9 +9,9 @@ import {
   computeDiffHashV2,
   computeEntryHashV2,
   GENESIS_PREV_HASH,
-} from '../../../../../src/infrastructure/audit/audit-hash.util';
-import { buildAuditDiff } from '../../../../../src/infrastructure/audit/audit-diff.util';
-import { buildAuditEncryptionAad, encryptAuditSnapshot } from '../../../../../src/infrastructure/audit/audit-encryption.util';
+} from '../../../../../src/infrastructure/audit';
+import { buildAuditDiff } from '../../../../../src/infrastructure/audit';
+import { buildAuditEncryptionAad, encryptAuditSnapshot } from '../../../../../src/infrastructure/audit';
 
 const patientAfter = {
   patientCode: 'BN-0001',

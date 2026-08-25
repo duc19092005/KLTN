@@ -7,8 +7,8 @@
  */
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
-import { canonicalize, computeAfterHashV2 } from '../src/infrastructure/audit/audit-hash.util';
-import { buildAuditEncryptionAad, decryptAuditSnapshot } from '../src/infrastructure/audit/audit-encryption.util';
+import { canonicalize, computeAfterHashV2 } from '../src/infrastructure/audit';
+import { buildAuditEncryptionAad, decryptAuditSnapshot } from '../src/infrastructure/audit';
 import { buildMedicalResultSnapshot } from '../src/modules/medical-order/domain/medical-result-snapshot';
 import { buildMedicalOrderSnapshot } from '../src/modules/medical-order/domain/medical-order-snapshot';
 

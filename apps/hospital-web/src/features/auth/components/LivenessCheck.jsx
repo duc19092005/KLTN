@@ -15,14 +15,14 @@ import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 // Euclidean distance threshold for identity-continuity check.
 // Embeddings are L2-normalised 128D vectors; threshold ~0.55 is loose enough to
 // tolerate pose variance but tight enough to catch a different-person swap.
-const IDENTITY_ANCHOR_THRESHOLD = 0.55;
+const IDENTITY_ANCHOR_THRESHOLD = 0.58;
 
 // How long (ms) a head direction must be held before it counts as "passed".
-const HOLD_DURATION = 800;       // non-center directions
-const CENTER_HOLD_DURATION = 600; // center direction (easier to hold)
+const HOLD_DURATION = 420;       // non-center directions (fast & responsive)
+const CENTER_HOLD_DURATION = 320; // center direction (quick capture)
 
 // Detection loop interval.
-const LOOP_INTERVAL_MS = 100;
+const LOOP_INTERVAL_MS = 80;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -44,11 +44,11 @@ const generateRandomDirections = (count, { includeCenter = false } = {}) => {
 };
 
 const DIRECTION_INFO = {
-  center: { instruction: 'Nhìn thẳng vào camera, giữ mặt ở giữa khung quét' },
-  left:   { instruction: 'Quay đầu sang TRÁI, giữ trong 1 giây' },
-  right:  { instruction: 'Quay đầu sang PHẢI, giữ trong 1 giây' },
-  up:     { instruction: 'Ngẩng đầu lên TRÊN, giữ trong 1 giây' },
-  down:   { instruction: 'Cúi đầu xuống DƯỚI, giữ trong 1 giây' },
+  center: { instruction: 'Nhìn thẳng vào camera, giữ mặt trong khung quét' },
+  left:   { instruction: 'Nghiêng nhẹ đầu sang TRÁI' },
+  right:  { instruction: 'Nghiêng nhẹ đầu sang PHẢI' },
+  up:     { instruction: 'Ngẩng nhẹ đầu lên TRÊN' },
+  down:   { instruction: 'Cúi nhẹ đầu xuống DƯỚI' },
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -58,17 +58,6 @@ const DIRECTION_INFO = {
  *
  * Migrated from @mediapipe/tasks-vision + @vladmandic/face-api
  * → unified @vladmandic/human pipeline via faceEngine.js
- *
- * Changes vs previous version:
- *  - initFaceMesh() + loadFaceApiModels() → initFaceEngine() (single call)
- *  - detectLandmarks() + computeHeadPose() → detectFrame().{yaw, pitch}
- *  - classifyDirection(yawRatio, pitchRatio) → classifyDirectionFromAngle(yaw, pitch)
- *  - checkFaceDistance(landmarks) → checkDistance(face.distance)
- *  - computeBlendshapeBlink() / computeEyeOpenness() → isBlink(gestures)
- *  - detectFace(canvas) for identity anchor → detectFrame(video).embedding
- *  - destroyFaceMesh() → destroyFaceEngine()
- *
- *  Contract onLivenessPass(source, meta) is UNCHANGED.
  */
 export default function LivenessCheck({
   onLivenessPass,
@@ -84,7 +73,7 @@ export default function LivenessCheck({
   const capturedCanvasRef = useRef(null);
   const poseFramesRef = useRef([]);
   const passSentRef = useRef(false);
-  const blinkStateRef = useRef({ closed: false, verified: false });
+  const blinkStateRef = useRef({ closed: false, verified: false, steadyFrames: 0 });
   const lastFrameWallTimeRef = useRef(null);
   const identityAnchorRef = useRef(null);   // 128D descriptor captured at blink moment
   const anchorPendingRef = useRef(false);
@@ -135,8 +124,8 @@ export default function LivenessCheck({
 
   const [directions] = useState(() => (
     challengeMode === 'enroll'
-      ? ['center', 'left', 'right', 'up', 'down']
-      : generateRandomDirections(sampleCount, { includeCenter: false })
+      ? ['center', 'left', 'right', 'up']
+      : generateRandomDirections(Math.max(1, sampleCount), { includeCenter: false })
   ));
 
   // ─── Init / teardown ───────────────────────────────────────────────────────
@@ -172,14 +161,14 @@ export default function LivenessCheck({
         await new Promise(resolve => {
           const check = () => {
             if (videoRef.current && videoRef.current.readyState >= 2) resolve();
-            else setTimeout(check, 100);
+            else setTimeout(check, 80);
           };
           check();
         });
 
         if (cancelled) return;
         setStatus('active');
-        setMessage('Vui lòng đưa khuôn mặt vào chính giữa khung quét sinh trắc');
+        setMessage('Vui lòng đưa khuôn mặt vào chính giữa khung quét');
 
         startLoop();
       } catch (err) {
@@ -215,16 +204,14 @@ export default function LivenessCheck({
         if (s.allPassed || disabled) return;
         if (!videoRef.current || videoRef.current.readyState < 2) return;
 
-        // Anti-spoof: if wall-clock gap since last frame is too long, the stream
-        // may be a pre-recorded video — reset blink state.
+        // Anti-spoof with generous tolerance (2.5s) to avoid lag resets
         const wallNow = performance.now();
         const lastWall = lastFrameWallTimeRef.current;
-        if (lastWall !== null && (wallNow - lastWall) > 600) {
-          blinkStateRef.current = { closed: false, verified: false };
+        if (lastWall !== null && (wallNow - lastWall) > 2500) {
+          blinkStateRef.current = { closed: false, verified: false, steadyFrames: 0 };
           setBlinkVerified(false);
           holdStartRef.current = null;
           setDisplayProgress(0);
-          setMessage('Khung hình bị gián đoạn. Vui lòng giữ camera ổn định.');
           lastFrameWallTimeRef.current = wallNow;
           return;
         }
@@ -239,55 +226,66 @@ export default function LivenessCheck({
           setDistanceWarn(null);
           holdStartRef.current = null;
           setDisplayProgress(0);
-          setMessage('Không tìm thấy khuôn mặt. Vui lòng điều chỉnh góc camera.');
+          setMessage('Vui lòng đưa khuôn mặt vào khung quét');
           return;
         }
 
         setFaceDetected(true);
 
-        // Distance guard (uses iris model).
+        // Distance guard (uses relaxed iris model distance).
         const dist = checkDistance(detection.distance);
         if (dist === 'TOO_FAR') {
-          setDistanceWarn('Vui lòng di chuyển lại gần camera');
-          setMessage('Vui lòng di chuyển lại gần camera');
+          setDistanceWarn('Vui lòng di chuyển lại gần camera hơn');
+          setMessage('Vui lòng di chuyển lại gần camera hơn');
           holdStartRef.current = null;
           setDisplayProgress(0);
           return;
         }
         if (dist === 'TOO_CLOSE') {
-          setDistanceWarn('Vui lòng đưa khuôn mặt ra xa một chút');
-          setMessage('Vui lòng đưa khuôn mặt ra xa một chút');
+          setDistanceWarn('Vui lòng lùi mặt ra xa một chút');
+          setMessage('Vui lòng lùi mặt ra xa một chút');
           holdStartRef.current = null;
           setDisplayProgress(0);
           return;
         }
         setDistanceWarn(null);
 
-        // ── Phase 1: Wait for blink (liveness proof) ──────────────────────
+        // ── Phase 1: Liveness proof (Blink OR steady face presence) ─────────
         const blinkState = blinkStateRef.current;
 
         if (!blinkState.verified) {
           const blinkNow = isBlink(detection.gestures);
+          const isFaceCentered = Math.abs(detection.yaw) < 0.20 && Math.abs(detection.pitch) < 0.20;
 
           if (blinkNow) {
-            // Eye is closing
             blinkState.closed = true;
-            setMessage('Vui lòng chớp mắt một lần để xác nhận người thật');
           } else if (blinkState.closed) {
-            // Eye re-opened after being closed → blink complete
             blinkState.verified = true;
             setBlinkVerified(true);
-            setMessage('Đã xác nhận chớp mắt. Tiếp tục làm theo hướng dẫn');
+            setMessage('Đã nhận diện khuôn mặt');
             holdStartRef.current = null;
             setDisplayProgress(0);
             captureIdentityAnchor(detection);
+          } else if (isFaceCentered) {
+            blinkState.steadyFrames = (blinkState.steadyFrames || 0) + 1;
+            // After ~4 consecutive centered frames (~320ms), auto-pass liveness phase 1
+            if (blinkState.steadyFrames >= 4) {
+              blinkState.verified = true;
+              setBlinkVerified(true);
+              setMessage('Đã nhận diện khuôn mặt');
+              holdStartRef.current = null;
+              setDisplayProgress(0);
+              captureIdentityAnchor(detection);
+            } else {
+              setMessage('Giữ thẳng mặt hoặc chớp mắt nhẹ...');
+            }
           } else {
-            setMessage('Vui lòng chớp mắt một lần để xác nhận người thật');
+            setMessage('Vui lòng nhìn thẳng vào giữa khung quét');
           }
           return;
         }
 
-        // Retry anchor capture if blink-moment capture failed (eyes were half-closed).
+        // Capture anchor descriptor
         if (!identityAnchorRef.current && !anchorPendingRef.current) {
           captureIdentityAnchor(detection);
         }
@@ -308,8 +306,8 @@ export default function LivenessCheck({
         setMessage(info.instruction);
 
         const isCenterTarget = targetDir === 'center';
-        // Center: yaw and pitch both close to 0 radians.
-        const centerMatched = isCenterTarget && Math.abs(detection.yaw) < 0.12 && Math.abs(detection.pitch) < 0.12;
+        // Natural center tolerance (±0.20 rad ≈ ±11.5°)
+        const centerMatched = isCenterTarget && Math.abs(detection.yaw) < 0.20 && Math.abs(detection.pitch) < 0.20;
         const isTargetMatched = isCenterTarget ? centerMatched : dir === targetDir;
 
         if (isTargetMatched) {
@@ -334,7 +332,7 @@ export default function LivenessCheck({
             if (s.currentIdx + 1 >= s.directions.length) {
               s.allPassed = true;
               setAllPassedUI(true);
-              setMessage('Xác thực thực thể sống thành công');
+              setMessage('Xác thực khuôn mặt thành công');
               if (!capturedCanvasRef.current) {
                 capturedCanvasRef.current = captureVideoFrame();
               }

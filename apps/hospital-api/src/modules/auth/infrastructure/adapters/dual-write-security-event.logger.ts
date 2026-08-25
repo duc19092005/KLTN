@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
-import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { AuditLoggerService } from '../../../../infrastructure/audit';
 import { SecurityEventLoggerPort } from '../../application/ports/security-event-logger.port';
 
 /**

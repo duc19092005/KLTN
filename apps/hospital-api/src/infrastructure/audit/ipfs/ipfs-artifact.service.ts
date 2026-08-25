@@ -5,13 +5,6 @@ type IpfsProvider = 'kubo' | 'pinata';
 /**
  * Uploads/downloads encrypted recovery artifacts. Callers own encryption,
  * content validation, and authorization; this service only handles IPFS bytes.
- *
- * Providers:
- *  - kubo:   local/self-hosted IPFS HTTP API (/api/v0/add, /api/v0/cat)
- *  - pinata: Pinata pinning API (pinFileToIPFS) + gateway download
- *
- * Select via IPFS_PROVIDER=kubo|pinata (default: auto — pinata if PINATA_JWT or
- * pinata.cloud URL is configured, otherwise kubo when IPFS_API_URL is set).
  */
 @Injectable()
 export class IpfsArtifactService {
@@ -32,7 +25,6 @@ export class IpfsArtifactService {
 
     const secondary = process.env.IPFS_SECONDARY_API_URL?.trim();
     if (secondary) {
-      // Secondary remains Kubo-compatible (optional dual-pin). Skip for pure Pinata setups.
       if (this.isPinataUrl(secondary)) {
         this.logger.warn('IPFS_SECONDARY_API_URL points at Pinata; dual-pin secondary is only supported for Kubo APIs.');
       } else {
@@ -147,7 +139,6 @@ export class IpfsArtifactService {
     if (!jwt) throw new Error('PINATA_JWT is required.');
 
     const form = new FormData();
-    // Encrypted artifacts are binary — never stringify as utf8.
     form.append('file', new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' }), fileName);
     form.append(
       'pinataMetadata',

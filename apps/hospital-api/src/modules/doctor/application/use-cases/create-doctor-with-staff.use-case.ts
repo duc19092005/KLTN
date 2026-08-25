@@ -61,14 +61,21 @@ export class CreateDoctorWithStaffUseCase {
         passwordHash,
         async (created, tx) => {
           await this.integrity.anchorChange(created, 'CREATE', actorId, null, tx);
-          await this.mailer.sendTemporaryPassword({
-            to: dto.email.trim().toLowerCase(),
-            fullName: dto.fullName.trim(),
-            username: dto.username.trim(),
-            temporaryPassword,
-          });
         },
       );
+
+      // Send credential email asynchronously outside database transaction
+      try {
+        await this.mailer.sendTemporaryPassword({
+          to: dto.email.trim().toLowerCase(),
+          fullName: dto.fullName.trim(),
+          username: dto.username.trim(),
+          temporaryPassword,
+        });
+      } catch (mailErr) {
+        console.error('[CreateDoctorWithStaffUseCase] Không thể gửi email thông tin đăng nhập:', mailErr);
+      }
+
       return doctor;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {

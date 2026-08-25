@@ -2,7 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { AI_MODEL_INTEGRITY_ANCHOR, AiModelIntegrityAnchorPort } from '../ports/ai-model-integrity-anchor.port';
 import { AI_MODEL_REPOSITORY, AiModelRepositoryPort } from '../ports/ai-model.repository.port';
 import { buildAiModelSnapshot } from '../../domain/ai-model-snapshot';
-import { EntityRecoveryService } from '../../../../infrastructure/audit/entity-recovery.service';
+import { EntityRecoveryService } from '../../../../infrastructure/audit';
 
 /** Soft-deletes an AI model by marking isDeleted=true, then anchors that state. */
 @Injectable()

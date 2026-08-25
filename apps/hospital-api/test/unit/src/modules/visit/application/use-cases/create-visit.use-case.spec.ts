@@ -20,13 +20,14 @@ describe('CreateVisitUseCase audit transaction', () => {
     };
     const prisma = { staffProfile: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]) } };
     const notifications = { createNotification: jest.fn() };
+    const clinicalTrust = { assertTrusted: jest.fn().mockResolvedValue(undefined) };
     const audit = {
       recordV2: jest.fn().mockImplementation(async () => {
         if (auditFails) throw new Error('audit failed');
       }),
     };
     return {
-      useCase: new CreateVisitUseCase(repo as never, prisma as never, notifications as never, audit as never),
+      useCase: new CreateVisitUseCase(repo as never, prisma as never, notifications as never, audit as never, clinicalTrust as never),
       repo,
       audit,
       tx,

@@ -1,49 +1,20 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit, forwardRef, Inject, Optional } from '@nestjs/common';
-import { EntityRecoveryService } from './entity-recovery.service';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { BlockchainService } from '../blockchain/blockchain.service';
-import { AuditArtifactService, AuditRecoveryBundleRow } from './audit-artifact.service';
-import { AuditAnchorService } from './audit-anchor.service';
-import { AuditLoggerService } from './audit-logger.service';
-import { computeMerkleRootForAlgorithm, MERKLE_SHA256_STRING_V1, rootToBytes32 } from './merkle.util';
-import { verifyAuditRow, verifyAuditRowLight } from './audit-verification.util';
+import { PrismaService } from '../../prisma/prisma.service';
+import { BlockchainService } from '../../blockchain/blockchain.service';
+import { AuditArtifactService, AuditRecoveryBundleRow } from '../ipfs/audit-artifact.service';
+import { AuditAnchorService } from '../anchoring/audit-anchor.service';
+import { AuditLoggerService } from '../logging/audit-logger.service';
+import { computeMerkleRootForAlgorithm, MERKLE_SHA256_STRING_V1, rootToBytes32 } from '../crypto/merkle.util';
+import { verifyAuditRow, verifyAuditRowLight } from '../logging/audit-verification.util';
+import { EntityRecoveryService } from './entity-recovery.service';
+import { DeepScanProgressState, VerifiedAuditRecoveryBundle, WatchdogState } from './deep-scan-state';
+export * from './deep-scan-state';
 
-export interface VerifiedAuditRecoveryBundle {
-  batchId: number;
-  artifactHash: string;
-  artifactUri: string;
-  merkleRoot: string;
-  logs: AuditRecoveryBundleRow[];
-}
-
-export interface DeepScanProgressState {
-  active: boolean;
-  progressPercent: number;
-  statusMessage: string;
-  logs: string[];
-  startTime: string | null;
-  endTime: string | null;
-  result: {
-    scannedBatches: number;
-    recoveredBatches: number;
-    recoveredEntities: number;
-    errors: string[];
-  } | null;
-}
-
-export interface WatchdogState {
-  enabled: boolean;
-  intervalMinutes: number;
-  chunkSize: number;
-  lastRunAt: string | null;
-  nextRunAt: string | null;
-  lastScannedBatches: number;
-  lastHealedBatches: number;
-  lastErrors: string[];
-  statusMessage: string;
-}
-
+/**
+ * AuditRecoveryService provides administrative deep-scanning, background watchdog
+ * self-healing, and IPFS artifact reconstruction for corrupted audit batches.
+ */
 @Injectable()
 export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
   private readonly runningBatches = new Set<number>();
@@ -242,7 +213,6 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
       throw new ConflictException('Tiến trình đối soát và tự động sửa chữa đang chạy.');
     }
 
-    // Launch background execution
     void this.runDeepScanAndSelfHealProcess(adminId).catch((error) => {
       console.error('DEEP SCAN ERROR:', error);
     });
@@ -270,14 +240,14 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
     this.deepScanState = {
       active: true,
       progressPercent: 5,
-      statusMessage: 'Đã xác thực khuôn mặt Admin. Đang kết nối Blockchain...',
+      statusMessage: 'Đã xác thực Admin. Đang kết nối Blockchain...',
       logs: [],
       startTime: new Date().toISOString(),
       endTime: null,
       result: null,
     };
 
-    this.pushLog('👤 Đã xác thực khuôn mặt Admin. Khởi chạy tiến trình đối soát chi tiết...');
+    this.pushLog('👤 Khởi chạy tiến trình đối soát chi tiết...');
 
     let scannedCount = 0;
     let recoveredBatchesCount = 0;
@@ -302,11 +272,9 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
       this.pushLog(`🔗 Blockchain đã ghi nhận tổng cộng ${latestOnChain} Audit Batches (Batch #1 đến #${latestOnChain}).`);
       this.deepScanState.progressPercent = 20;
 
-      // Pass 1: Fetch all on-chain checkpoints in ranges
       const onChainCheckpoints = await this.blockchain.getAuditCheckpointsRange(1, latestOnChain);
       scannedCount = onChainCheckpoints.length;
 
-      // Local DB lookup for all batches with detailed metadata
       const localBatches = await this.prisma.auditBatch.findMany({
         select: {
           batchId: true,
@@ -322,7 +290,6 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
 
       this.pushLog(`📊 Đã quét DB local: Tìm thấy ${localBatches.length}/${scannedCount} batches.`);
 
-      // Identify missing or tampered batches (checking both header and actual log entries inside batch)
       const targetBatchIds: number[] = [];
       for (const cp of onChainCheckpoints) {
         if (!cp.committed) continue;
@@ -334,10 +301,8 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
           continue;
         }
 
-        // Header check vs on-chain root
         const isHeaderMatch = rootToBytes32(local.merkleRoot).toLowerCase() === rootToBytes32(cp.root).toLowerCase();
 
-        // Detailed check of log entries inside batch from BlockchainLogger table
         let isLogsIntact = true;
         if (local.fromSeq != null && local.toSeq != null) {
           const logsInBatch = await this.prisma.blockchainLogger.findMany({
@@ -369,12 +334,12 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
           const expectedCount = Number(cp.leafCount) || local.leafCount || (local.toSeq - local.fromSeq + 1);
           if (logsInBatch.length !== expectedCount) {
             isLogsIntact = false;
-            this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} bị THIẾU DỮ LIỆU LOG (DB local có ${logsInBatch.length}/${expectedCount} logs).`);
+            this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} bị THIẾU DỮ LIỆU LOG (${logsInBatch.length}/${expectedCount} logs).`);
           } else {
             const isEveryRowVerified = logsInBatch.every((l) => verifyAuditRowLight(l).ok);
             if (!isEveryRowVerified) {
               isLogsIntact = false;
-              this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} có bản ghi log bị sửa đổi hoặc hỏng mã băm.`);
+              this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} có bản ghi log bị sửa đổi.`);
             } else {
               const recomputedRoot = computeMerkleRootForAlgorithm(
                 logsInBatch.map((l) => l.entryHash!),
@@ -382,7 +347,7 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
               );
               if (rootToBytes32(recomputedRoot).toLowerCase() !== rootToBytes32(cp.root).toLowerCase()) {
                 isLogsIntact = false;
-                this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} bị SỬA ĐỔI MÃ HASH TRONG LOGS (Merkle Root tính lại không khớp với Blockchain).`);
+                this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} bị SỬA ĐỔI MÃ HASH TRONG LOGS.`);
               }
             }
           }
@@ -393,16 +358,14 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
 
         if (!isHeaderMatch || !isLogsIntact) {
           targetBatchIds.push(cp.batchId);
-          if (isHeaderMatch && !isLogsIntact) {
-            // Already logged detailed error above
-          } else if (!isHeaderMatch) {
-            this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} bị SỬA ĐỔI MÃ HASH HEADER trong DB local (Local: ${local.merkleRoot.slice(0, 10)}... vs Chain: ${cp.root.slice(0, 10)}...).`);
+          if (!isHeaderMatch) {
+            this.pushLog(`🔴 Phát hiện Batch #${cp.batchId} bị SỬA ĐỔI MÃ HASH HEADER.`);
           }
         }
       }
 
       if (targetBatchIds.length === 0) {
-        this.pushLog('✅ [Pass 1] Tất cả các Audit Batches trên DB local đều khớp 100% với Blockchain!');
+        this.pushLog('✅ [Pass 1] Tất cả Audit Batches trên DB local đều khớp 100% với Blockchain!');
         this.deepScanState.progressPercent = 60;
       } else {
         this.pushLog(`🔧 [Pass 2] Khởi chạy khôi phục tự động cho ${targetBatchIds.length} batch(es)...`);
@@ -434,7 +397,7 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
           const warnings = await this.entityRecovery.listWarnings(200);
           const recoverable = warnings.items.filter((w) => w.recoverable);
           if (recoverable.length > 0) {
-            this.pushLog(`🔧 [Pass 3] Tự động phục hồi ${recoverable.length} thực thể nghiệp vụ bị lệch/bị xóa...`);
+            this.pushLog(`🔧 [Pass 3] Tự động phục hồi ${recoverable.length} thực thể nghiệp vụ...`);
             const entityRes = await this.entityRecovery.recoverMany(
               recoverable.map((w) => ({ entity: w.entity, entityId: w.entityId })),
               adminId,
@@ -459,7 +422,7 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
           ? `Đã tự động sửa chữa thành công ${recoveredBatchesCount} audit batch(es).`
           : 'Tất cả Audit Batches đều an toàn và toàn vẹn 100%.';
       this.pushLog(errors.length > 0
-        ? `⚠️ Hoàn tất đối soát với ${errors.length} lỗi; không đánh dấu thành công toàn phần.`
+        ? `⚠️ Hoàn tất đối soát với ${errors.length} lỗi.`
         : `🎉 Hoàn tất 100%! Đã quét ${scannedCount} batches, tự động sửa chữa ${recoveredBatchesCount} batches.`);
 
       this.deepScanState.result = {
@@ -680,11 +643,6 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  /**
-   * Read an anchored recovery artifact without mutating PostgreSQL. The returned
-   * rows have been authenticated against both the IPFS artifact hash and the
-   * blockchain checkpoint, then re-verified as a complete hash/Merkle chain.
-   */
   async loadVerifiedBundle(batchId: number): Promise<VerifiedAuditRecoveryBundle> {
     if (!Number.isSafeInteger(batchId) || batchId <= 0) throw new BadRequestException('Invalid audit batch id.');
     const batch = await this.prisma.auditBatch.findUnique({ where: { batchId } });
@@ -728,7 +686,6 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
     if (this.runningBatches.has(batchId)) throw new ConflictException('This audit batch is already being recovered.');
     this.runningBatches.add(batchId);
 
-    // Ensure AuditBatch placeholder exists if the batch was completely wiped from local DB
     await this.prisma.auditBatch.upsert({
       where: { batchId },
       create: {

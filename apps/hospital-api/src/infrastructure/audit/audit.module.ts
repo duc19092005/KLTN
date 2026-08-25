@@ -1,21 +1,23 @@
 import { Global, Module } from '@nestjs/common';
-import { AuditLoggerService } from './audit-logger.service';
-import { AuditAnchorService } from './audit-anchor.service';
 import { BlockchainModule } from '../blockchain/blockchain.module';
-import { AuditRecoveryCryptoService } from './audit-recovery-crypto.service';
-import { IpfsArtifactService } from './ipfs-artifact.service';
-import { AuditArtifactService } from './audit-artifact.service';
-import { AuditRecoveryService } from './audit-recovery.service';
-import { EntityRecoveryService } from './entity-recovery.service';
-import { EntityRecreationService } from './entity-recreation.service';
+import { AuditRecoveryCryptoService } from './crypto/audit-recovery-crypto.service';
+import { IpfsArtifactService } from './ipfs/ipfs-artifact.service';
+import { AuditArtifactService } from './ipfs/audit-artifact.service';
+import { AuditLoggerService } from './logging/audit-logger.service';
+import { AuditAnchorService } from './anchoring/audit-anchor.service';
+import { AuditRecoveryService } from './recovery/audit-recovery.service';
+import { EntityRecoveryService } from './recovery/entity-recovery.service';
+import { EntityRecreationService } from './recovery/entity-recreation.service';
+import { ClinicalAuditTrustService } from './recovery/clinical-audit-trust.service';
 
 /**
  * Global module exposing the tamper-evident audit infrastructure to every feature module:
  *  - AuditLoggerService: hash-chained, append-only writer/reader for BlockchainLogger.
  *  - AuditAnchorService: periodic Merkle-root batch anchoring + inclusion proofs.
- *
- * Marked @Global so services can inject AuditLoggerService without importing this module
- * everywhere. BlockchainModule is imported here for the on-chain commit path.
+ *  - AuditArtifactService: IPFS recovery bundle creation & download.
+ *  - AuditRecoveryService: Batch watchdog & self-healing coordinator.
+ *  - EntityRecoveryService: Clinical integrity warning & entity restoration.
+ *  - EntityRecreationService: Topological missing entity recreation.
  */
 @Global()
 @Module({
@@ -29,6 +31,7 @@ import { EntityRecreationService } from './entity-recreation.service';
     AuditRecoveryService,
     EntityRecoveryService,
     EntityRecreationService,
+    ClinicalAuditTrustService,
   ],
   exports: [
     AuditLoggerService,
@@ -37,6 +40,7 @@ import { EntityRecreationService } from './entity-recreation.service';
     AuditRecoveryService,
     EntityRecoveryService,
     EntityRecreationService,
+    ClinicalAuditTrustService,
     IpfsArtifactService,
   ],
 })

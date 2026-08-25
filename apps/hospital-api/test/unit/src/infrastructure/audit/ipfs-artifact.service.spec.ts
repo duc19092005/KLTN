@@ -1,4 +1,4 @@
-import { IpfsArtifactService } from '../../../../../src/infrastructure/audit/ipfs-artifact.service';
+import { IpfsArtifactService } from '../../../../../src/infrastructure/audit';
 
 describe('IpfsArtifactService Pinata provider', () => {
   const originalEnv = { ...process.env };

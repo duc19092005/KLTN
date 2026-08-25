@@ -49,10 +49,10 @@ async function main() {
     [
       '2026-08-01 16:36',
       'npm run test:tamper-recovery',
-      'Integration: PostgreSQL test, Kafka test, IPFS Kubo test, Hardhat local; audit batch/entity tamper, recovery, recreation và outbox idempotency.',
+      'Integration: PostgreSQL test, IPFS Kubo test, Hardhat local; audit batch/entity tamper, recovery, recreation và outbox idempotency.',
       'Đạt — 1/1 suite; 13/13 tests.',
       '44.267 giây',
-      'Có Kafka partitioner warning, negative timeout warning và Node deprecation warning; không làm test fail.',
+      'Có negative timeout warning và Node deprecation warning; không làm test fail.',
     ],
   ];
 

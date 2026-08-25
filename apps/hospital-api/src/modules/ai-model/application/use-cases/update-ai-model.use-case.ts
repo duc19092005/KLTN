@@ -6,7 +6,7 @@ import { AI_MODEL_INTEGRITY_ANCHOR, AiModelIntegrityAnchorPort } from '../ports/
 import { AI_MODEL_REPOSITORY, AiModelRepositoryPort, UpdateAiModelData } from '../ports/ai-model.repository.port';
 import { buildAiModelSnapshot } from '../../domain/ai-model-snapshot';
 import { presentAiModel } from '../../domain/ai-model.presenter';
-import { EntityRecoveryService } from '../../../../infrastructure/audit/entity-recovery.service';
+import { EntityRecoveryService } from '../../../../infrastructure/audit';
 
 /**
  * Updates an AI model registry row and re-anchors the new business snapshot.

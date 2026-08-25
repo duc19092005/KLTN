@@ -82,35 +82,38 @@ export class PrismaStaffRepository implements StaffRepositoryPort {
     data: CreateStaffData,
     afterCreate?: (created: any, tx: Prisma.TransactionClient) => Promise<void>,
   ): Promise<any> {
-    const user = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.user.create({
-        data: {
-          username: data.username.trim(),
-          email: data.email.trim().toLowerCase(),
-          passwordHash: data.passwordHash,
-          role: data.role,
-          status: UserStatus.ACTIVE,
-          firstLogin: true,
-          staffProfile: {
-            create: {
-              employeeCode: data.employeeCode,
-              fullName: data.fullName.trim(),
-              phone: data.phone.trim(),
-              gender: data.gender.trim(),
-              citizenId: data.citizenId.trim(),
-              birthDate: new Date(data.birthDate),
-              address: data.address?.trim(),
-              avatarUrl: data.avatarUrl.trim(),
-              departmentId: data.departmentId || null,
-              position: data.position?.trim(),
+    const user = await this.prisma.$transaction(
+      async (tx) => {
+        const created = await tx.user.create({
+          data: {
+            username: data.username.trim(),
+            email: data.email.trim().toLowerCase(),
+            passwordHash: data.passwordHash,
+            role: data.role,
+            status: UserStatus.ACTIVE,
+            firstLogin: true,
+            staffProfile: {
+              create: {
+                employeeCode: data.employeeCode,
+                fullName: data.fullName.trim(),
+                phone: data.phone.trim(),
+                gender: data.gender.trim(),
+                citizenId: data.citizenId.trim(),
+                birthDate: new Date(data.birthDate),
+                address: data.address?.trim(),
+                avatarUrl: data.avatarUrl.trim(),
+                departmentId: data.departmentId || null,
+                position: data.position?.trim(),
+              },
             },
           },
-        },
-        include: this.includeUserStaff(),
-      });
-      await afterCreate?.(created, tx);
-      return created;
-    });
+          include: this.includeUserStaff(),
+        });
+        await afterCreate?.(created, tx);
+        return created;
+      },
+      { timeout: 15000, maxWait: 5000 },
+    );
     return this.sanitizeUser(user);
   }
 

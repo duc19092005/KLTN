@@ -5,6 +5,7 @@ import {
   CreateOrderCommand,
   CreateResultCommand,
   CreateResultTransactionPayload,
+  MedicalOrderBeforeWriteHook,
   MedicalOrderRepositoryPort,
   OrderCreatedHook,
   OrderListFilter,
@@ -65,11 +66,16 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
     return Boolean(department);
   }
 
-  async createOrderWithVisitTransition(command: CreateOrderCommand, onCreated?: OrderCreatedHook): Promise<unknown> {
+  async createOrderWithVisitTransition(
+    command: CreateOrderCommand,
+    onCreated?: OrderCreatedHook,
+    beforeWrite?: MedicalOrderBeforeWriteHook,
+  ): Promise<unknown> {
     const maxAttempts = 5;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
         return await this.prisma.$transaction(async (tx) => {
+          await beforeWrite?.(tx);
           const orderCode = await this.generateOrderCode(tx);
           const order = await tx.medicalOrder.create({
             data: {
@@ -130,8 +136,15 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
     return order;
   }
 
-  async updateStatus(id: string, status: MedicalOrderStatus, completedAt?: Date, afterWrite?: OrderStatusUpdatedHook): Promise<unknown> {
+  async updateStatus(
+    id: string,
+    status: MedicalOrderStatus,
+    completedAt?: Date,
+    afterWrite?: OrderStatusUpdatedHook,
+    beforeWrite?: MedicalOrderBeforeWriteHook,
+  ): Promise<unknown> {
     return this.prisma.$transaction(async (tx) => {
+      await beforeWrite?.(tx);
       const order = await tx.medicalOrder.update({
         where: { id },
         data: { status, completedAt },
@@ -146,8 +159,10 @@ export class PrismaMedicalOrderRepository implements MedicalOrderRepositoryPort 
     command: CreateResultCommand,
     visitId: string,
     afterWrite?: (payload: CreateResultTransactionPayload, tx: Prisma.TransactionClient) => Promise<void>,
+    beforeWrite?: MedicalOrderBeforeWriteHook,
   ): Promise<unknown> {
     return this.prisma.$transaction(async (tx) => {
+      await beforeWrite?.(tx);
       const resultCode = await this.generateResultCode(tx);
       const result = await tx.medicalResult.create({
         data: {

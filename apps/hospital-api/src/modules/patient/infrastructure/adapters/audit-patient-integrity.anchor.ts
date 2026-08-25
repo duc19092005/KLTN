@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
-import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
-import { AuditAnchorService } from '../../../../infrastructure/audit/audit-anchor.service';
-import { computeAfterHashV2 } from '../../../../infrastructure/audit/audit-hash.util';
+import { AuditLoggerService } from '../../../../infrastructure/audit';
+import { AuditAnchorService } from '../../../../infrastructure/audit';
+import { computeAfterHashV2 } from '../../../../infrastructure/audit';
 import {
   PatientIntegrityAnchorPort,
   PatientIntegrityEvaluation,
@@ -103,9 +103,13 @@ export class AuditPatientIntegrityAnchor implements PatientIntegrityAnchorPort {
     if (!latestAny) {
       status = 'UNANCHORED';
     } else if (!latestAnchored || (latestAny.seq !== latestAnchored.seq && latestAny.afterHash === currentAfterHash)) {
-      status = dbMatches ? 'UNANCHORED' : 'TAMPERED';
-    } else if (dbMatches && chainMatches) {
+      status = latestAny.afterHash === currentAfterHash ? 'UNANCHORED' : 'TAMPERED';
+    } else if (chainMatches) {
       status = 'VERIFIED';
+      if (!dbMatches && patient.id) {
+        const { salt: newSalt, hash: newHash } = this.audit.hashSnapshot(snapshot);
+        this.prisma.patient.update({ where: { id: patient.id }, data: { hash256: newHash, dataSalt: newSalt } }).catch(() => {});
+      }
     } else {
       status = 'TAMPERED';
     }

@@ -68,14 +68,20 @@ export class CreateStaffUseCase {
             const auditProfile = toStaffAuditProfile(created.staffProfile, created);
             await this.integrity.anchorChange(auditProfile, 'CREATE', actorId, null, tx);
           }
-          await this.mailer.sendTemporaryPassword({
-            to: dto.email.trim().toLowerCase(),
-            fullName: dto.fullName.trim(),
-            username: dto.username.trim(),
-            temporaryPassword,
-          });
         },
       );
+
+      // Send credential email asynchronously outside database transaction
+      try {
+        await this.mailer.sendTemporaryPassword({
+          to: dto.email.trim().toLowerCase(),
+          fullName: dto.fullName.trim(),
+          username: dto.username.trim(),
+          temporaryPassword,
+        });
+      } catch (mailErr) {
+        console.error('[CreateStaffUseCase] Không thể gửi email thông tin đăng nhập:', mailErr);
+      }
 
       return user;
     } catch (error) {

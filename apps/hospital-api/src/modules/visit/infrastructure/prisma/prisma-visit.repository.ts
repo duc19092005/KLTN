@@ -9,6 +9,7 @@ import {
   VisitCreatedHook,
   PatientCreatedHook,
   VisitUpdatedHook,
+  VisitBeforeWriteHook,
   VisitRepositoryPort,
 } from '../../application/ports/visit.repository.port';
 
@@ -62,6 +63,7 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
     command: CreateVisitCommand,
     onCreated?: VisitCreatedHook,
     onPatientCreated?: PatientCreatedHook,
+    beforeWrite?: VisitBeforeWriteHook,
   ): Promise<unknown> {
     if (!command.patientId && command.patient) {
       const identityChecks: Prisma.PatientWhereInput[] = [];
@@ -92,6 +94,7 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
         return await this.prisma.$transaction(async (tx) => {
+          await beforeWrite?.(tx);
           let patientId = command.patientId;
           if (!patientId && command.patient) {
             const patientCode = await this.generatePatientCode(tx);
@@ -148,8 +151,16 @@ export class PrismaVisitRepository implements VisitRepositoryPort {
     return { items, total };
   }
 
-  async updateStatus(id: string, status: VisitStatus, completedAt?: Date, staffId?: string, afterWrite?: VisitUpdatedHook) {
+  async updateStatus(
+    id: string,
+    status: VisitStatus,
+    completedAt?: Date,
+    staffId?: string,
+    afterWrite?: VisitUpdatedHook,
+    beforeWrite?: VisitBeforeWriteHook,
+  ) {
     return this.prisma.$transaction(async (tx) => {
+      await beforeWrite?.(tx);
       const visit = await tx.visit.update({
         where: { id },
         data: { status, completedAt, ...(staffId ? { staffId } : {}) },

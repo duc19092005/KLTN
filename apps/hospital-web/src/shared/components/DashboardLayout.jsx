@@ -293,7 +293,7 @@ export default function DashboardLayout({
       {/* MAIN CONTENT AREA WITH ULTRA-SMOOTH PAGE ENTER ANIMATION */}
       <div className="flex-1 flex flex-col min-w-0 relative overflow-hidden transition-all duration-300">
         {/* TOPBAR */}
-        <header className="h-20 bg-white/95 border-b border-slate-200/80 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-30 shrink-0 backdrop-blur-md">
+        <header className="h-20 bg-white/95 border-b border-slate-200/80 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-50 shrink-0 backdrop-blur-md">
           <div className="flex items-center gap-4">
             <button
               type="button"

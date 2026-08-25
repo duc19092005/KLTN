@@ -1,6 +1,6 @@
-import { EntityRecreationService, RecreatableAuditEntity } from '../../../../../src/infrastructure/audit/entity-recreation.service';
-import { AuditRecoveryBundleRow } from '../../../../../src/infrastructure/audit/audit-artifact.service';
-import { AuditLoggerService } from '../../../../../src/infrastructure/audit/audit-logger.service';
+import { EntityRecreationService, RecreatableAuditEntity } from '../../../../../src/infrastructure/audit';
+import { AuditRecoveryBundleRow } from '../../../../../src/infrastructure/audit';
+import { AuditLoggerService } from '../../../../../src/infrastructure/audit';
 import {
   AUDIT_ENTRY_V2,
   canonicalize,
@@ -10,9 +10,9 @@ import {
   computeDiffHashV2,
   computeEntryHashV2,
   GENESIS_PREV_HASH,
-} from '../../../../../src/infrastructure/audit/audit-hash.util';
-import { buildAuditDiff } from '../../../../../src/infrastructure/audit/audit-diff.util';
-import { buildAuditEncryptionAad, encryptAuditSnapshot } from '../../../../../src/infrastructure/audit/audit-encryption.util';
+} from '../../../../../src/infrastructure/audit';
+import { buildAuditDiff } from '../../../../../src/infrastructure/audit';
+import { buildAuditEncryptionAad, encryptAuditSnapshot } from '../../../../../src/infrastructure/audit';
 
 type Snapshot = Record<string, any>;
 

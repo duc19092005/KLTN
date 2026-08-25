@@ -4,7 +4,7 @@ import { DEPARTMENT_REPOSITORY, DepartmentRepositoryPort } from '../ports/depart
 import { DEPARTMENT_INTEGRITY_ANCHOR, DepartmentIntegrityAnchorPort } from '../ports/department-integrity-anchor.port';
 import { DepartmentValidator } from '../services/department.validator';
 import { buildDepartmentSnapshot } from '../../domain/department-snapshot';
-import { EntityRecoveryService } from '../../../../infrastructure/audit/entity-recovery.service';
+import { EntityRecoveryService } from '../../../../infrastructure/audit';
 
 /**
  * Updates a department then anchors the change (with before-snapshot).

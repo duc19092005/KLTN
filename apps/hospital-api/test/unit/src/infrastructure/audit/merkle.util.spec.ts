@@ -11,7 +11,7 @@ import {
   verifyMerkleProof,
   verifyMerkleProofForAlgorithm,
   verifyMerkleProofV2,
-} from '../../../../../src/infrastructure/audit/merkle.util';
+} from '../../../../../src/infrastructure/audit';
 
 const A = 'a'.repeat(64);
 const B = 'b'.repeat(64);
