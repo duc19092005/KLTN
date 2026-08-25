@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
-import { Animated, Alert, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Animated, Alert, Image, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
 import { passwordPatientLogin, requestPatientOtp, resendPatientOtp, verifyPatientOtp, changePatientPassword, PatientOtpLoginResponse } from '../../shared/api/patientAuthClient';
 import {
@@ -28,6 +29,12 @@ import {
 import { ActionButton } from '../../shared/components/ActionButton';
 import { StatusPanel } from '../../shared/components/StatusPanel';
 import { colors, spacing } from '../../shared/theme/theme';
+
+type ProfileSummary = Pick<PatientSummary, 'id' | 'patientCode' | 'fullName'> & Partial<Pick<PatientSummary, 'gender' | 'birthDate' | 'phone' | 'contactPhone' | 'citizenId' | 'address' | 'insuranceNumber' | 'emergencyContact'>>;
+
+function normalizePatientSummary(patient: ProfileSummary): PatientSummary {
+  return { ...patient, gender: patient.gender || '', birthDate: patient.birthDate || '' };
+}
 
 type Step = 'phone' | 'passwordLogin' | 'otp' | 'passwordSetup' | 'dashboard' | 'notifications' | 'account' | 'changePassword' | 'profiles' | 'profileDetail' | 'visits' | 'detail' | 'createProfile' | 'booking';
 type BookingStage = 'profiles' | 'specialty' | 'doctor' | 'slot' | 'confirm' | 'qr';
@@ -129,7 +136,7 @@ export function PatientPortalScreen() {
   const [session, setSession] = useState<PatientOtpLoginResponse | null>(null);
   const [selectedPatientId, setSelectedPatientId] = useState('');
   const [visits, setVisits] = useState<PatientVisitSummary[]>([]);
-  const [profileDetails, setProfileDetails] = useState<PatientSummary[]>([]);
+  const [profileDetails, setProfileDetails] = useState<ProfileSummary[]>([]);
   const [selectedProfileDetail, setSelectedProfileDetail] = useState<PatientSummary | null>(null);
   const [visitDetail, setVisitDetail] = useState<PatientVisitDetail | null>(null);
   const [previewUrls, setPreviewUrls] = useState<PreviewUrls>({});
@@ -147,6 +154,7 @@ export function PatientPortalScreen() {
   const [profileForm, setProfileForm] = useState<ProfileForm>({ fullName: '', gender: 'MALE', birthDate: '', citizenId: '', address: '', insuranceNumber: '', emergencyContact: '' });
   const [profileFormErrors, setProfileFormErrors] = useState<ProfileFormErrors>({});
   const [creatingProfileFromBooking, setCreatingProfileFromBooking] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     let mounted = true;
@@ -218,7 +226,7 @@ export function PatientPortalScreen() {
     clearFeedback();
     try {
       const accesses = await getPatientProfiles(session.accessToken);
-      setProfileDetails(accesses.map((access) => access.patient));
+      setProfileDetails(accesses.map((access): ProfileSummary => access.patient));
       setSelectedProfileDetail(null);
       setStep('profiles');
     } catch (profileError) {
@@ -668,9 +676,10 @@ export function PatientPortalScreen() {
   const activeTab = step === 'account' ? 'account' : step === 'notifications' ? 'notifications' : step === 'profiles' || step === 'visits' || step === 'detail' ? 'features' : 'home';
 
   return (
-    <View style={styles.portalShell}>
-      <ScrollView style={styles.portalScroll} contentContainerStyle={[styles.content, showAuthenticatedTabs && styles.contentWithTabs]} showsVerticalScrollIndicator={false}>
-      {!showAuthenticatedTabs ? <View style={styles.statusSpacer} /> : null}
+    <KeyboardAvoidingView style={styles.keyboardAvoiding} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
+      <View style={styles.portalShell}>
+        <ScrollView style={styles.portalScroll} contentContainerStyle={[styles.content, { paddingTop: spacing.screen, paddingBottom: showAuthenticatedTabs ? insets.bottom + 104 : Math.max(spacing.screen, insets.bottom + 24) }, showAuthenticatedTabs && styles.contentWithTabs]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {!showAuthenticatedTabs ? <View style={styles.statusSpacer} /> : null}
 
 
 
@@ -798,7 +807,7 @@ export function PatientPortalScreen() {
 
       {step === 'profiles' && session && (
         <ProfileSelectionScreen
-          patients={profileDetails.length ? profileDetails : session.patients}
+          patients={profileDetails.length ? profileDetails.map(normalizePatientSummary) : session.patients.map(normalizePatientSummary)}
           onOpenVisits={openProfileDetail}
           onCreateProfile={() => setStep('createProfile')}
           onBook={openBooking}
@@ -884,9 +893,10 @@ export function PatientPortalScreen() {
         </View>
       ) : null}
       {showAuthenticatedTabs ? (
-        <BottomTabs active={activeTab} onHome={() => setStep('dashboard')} onNotifications={() => setStep('notifications')} onFeatures={openPersonalProfiles} onAccount={() => setStep('account')} />
+        <BottomTabs bottomInset={insets.bottom} active={activeTab} onHome={() => setStep('dashboard')} onNotifications={() => setStep('notifications')} onFeatures={openPersonalProfiles} onAccount={() => setStep('account')} />
       ) : null}
-    </View>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -941,7 +951,7 @@ function DashboardBanner() {
   );
 }
 
-function BottomTabs({ active, onHome, onNotifications, onFeatures, onAccount }: { active: 'home' | 'notifications' | 'features' | 'account'; onHome: () => void; onNotifications: () => void; onFeatures: () => void; onAccount: () => void }) {
+function BottomTabs({ bottomInset, active, onHome, onNotifications, onFeatures, onAccount }: { bottomInset: number; active: 'home' | 'notifications' | 'features' | 'account'; onHome: () => void; onNotifications: () => void; onFeatures: () => void; onAccount: () => void }) {
   const tabs: Array<{ key: 'home' | 'notifications' | 'features' | 'account'; label: string; icon: keyof typeof Ionicons.glyphMap; activeIcon?: keyof typeof Ionicons.glyphMap; onPress?: () => void }> = [
     { key: 'home', label: 'Trang chủ', icon: 'home-outline', activeIcon: 'home', onPress: onHome },
     { key: 'notifications', label: 'Thông báo', icon: 'notifications-outline', activeIcon: 'notifications', onPress: onNotifications },
@@ -950,7 +960,7 @@ function BottomTabs({ active, onHome, onNotifications, onFeatures, onAccount }: 
   ];
 
   return (
-    <View style={styles.bottomTabsDock}>
+    <View style={[styles.bottomTabsDock, { paddingBottom: Math.max(12, bottomInset + 8) }]}>
       <View style={styles.bottomTabsGlow} />
       <View style={styles.bottomTabsGlass}>
         <View style={styles.bottomTabsSheen} />
@@ -1203,7 +1213,7 @@ function maskPhone(value: string) {
   return `${digits.slice(0, 3)}****${digits.slice(-3)}`;
 }
 
-function ProfileSelectionScreen({ patients, onOpenVisits, onCreateProfile, onBook }: { patients: PatientSummary[]; onOpenVisits: (patient: PatientSummary) => void; onCreateProfile: () => void; onBook: () => void }) {
+function ProfileSelectionScreen({ patients, onOpenVisits, onCreateProfile, onBook }: { patients: Array<PatientSummary>; onOpenVisits: (patient: PatientSummary) => void; onCreateProfile: () => void; onBook: () => void }) {
   return (
     <View style={styles.profileScreen}>
       <View style={styles.profileHero}>
@@ -1935,18 +1945,18 @@ function AiDiagnosisCard({ aiDiagnosis, index }: { aiDiagnosis: PatientAiDiagnos
   );
 }
 
-function parseMobileAiDiagnosis(raw?: string | null) {
-  if (!raw) return { summary: 'Chưa có nội dung gợi ý.', probabilities: [] as Array<any>, nextSteps: [] as string[] };
+function parseMobileAiDiagnosis(raw?: string | null): { summary: string; probabilities: Array<{ condition?: string; probability?: number; reason?: string }>; nextSteps: string[] } {
+  if (!raw) return { summary: 'Chưa có nội dung gợi ý.', probabilities: [], nextSteps: [] };
   try {
     const parsed = JSON.parse(raw);
     const analysis = parsed.analysis && typeof parsed.analysis === 'object' ? parsed.analysis : parsed;
     return {
       summary: analysis.summary || parsed.summary || analysis.diagnosis || parsed.diagnosis || 'AI đã phân tích nhưng chưa có tóm tắt.',
       probabilities: Array.isArray(analysis.diagnosticProbabilities) ? analysis.diagnosticProbabilities.slice(0, 3) : [],
-      nextSteps: Array.isArray(analysis.recommendedNextSteps) ? analysis.recommendedNextSteps.slice(0, 3) : [],
+      nextSteps: Array.isArray(analysis.recommendedNextSteps) ? analysis.recommendedNextSteps.filter((step: unknown): step is string => typeof step === 'string').slice(0, 3) : [],
     };
   } catch {
-    return { summary: raw, probabilities: [] as Array<any>, nextSteps: [] as string[] };
+    return { summary: raw, probabilities: [], nextSteps: [] };
   }
 }
 
@@ -2071,10 +2081,11 @@ function formatBytes(size: number) {
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoiding: { flex: 1 },
   portalShell: { flex: 1, backgroundColor: colors.background },
   portalScroll: { flex: 1, backgroundColor: colors.background },
-  content: { minHeight: '100%', padding: spacing.screen, gap: 18, backgroundColor: colors.background },
-  contentWithTabs: { paddingTop: 0, paddingBottom: 4 },
+  content: { flexGrow: 1, paddingHorizontal: spacing.screen, gap: 18, backgroundColor: colors.background },
+  contentWithTabs: { paddingTop: 0 },
   statusSpacer: { height: 10 },
   feedbackWrap: { position: 'absolute', top: 14, left: 18, right: 18, zIndex: 30, elevation: 30 },
   feedbackCard: { position: 'relative', borderRadius: 18, shadowColor: '#0f172a', shadowOpacity: 0.14, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 10 },
@@ -2103,7 +2114,7 @@ const styles = StyleSheet.create({
   registerPill: { flex: 1, minHeight: 62, borderRadius: 10, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', shadowColor: colors.accent, shadowOpacity: 0.24, shadowRadius: 16, shadowOffset: { width: 0, height: 10 }, elevation: 7 },
   loginPillText: { color: '#ffffff', fontSize: 17, fontWeight: '900' },
   registerPillText: { color: '#ffffff', fontSize: 17, fontWeight: '900' },
-  homeScreen: { flexGrow: 1, minHeight: '100%', marginHorizontal: -24, marginTop: -28, marginBottom: -24, paddingTop: 18, paddingBottom: 0, backgroundColor: '#eaf8ff', overflow: 'hidden' },
+  homeScreen: { flexGrow: 1, marginHorizontal: -24, paddingTop: 18, paddingBottom: 24, backgroundColor: '#eaf8ff', overflow: 'hidden' },
   homeGlowOne: { position: 'absolute', top: -84, left: -92, width: 270, height: 270, borderRadius: 135, backgroundColor: '#bdefff', opacity: 0.9 },
   homeGlowTwo: { position: 'absolute', top: 132, right: -122, width: 300, height: 300, borderRadius: 150, backgroundColor: '#cff7ff', opacity: 0.92 },
   homeHeader: { paddingHorizontal: 24, paddingTop: 14, paddingBottom: 24 },
@@ -2135,7 +2146,7 @@ const styles = StyleSheet.create({
   bannerCaption: { position: 'absolute', left: 12, top: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.82)', paddingHorizontal: 10, paddingVertical: 6 },
   bannerText: { color: colors.primaryDark, fontSize: 12, fontWeight: '900' },
   dashboardSpacer: { height: 12 },
-  bottomTabsDock: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 12, backgroundColor: '#f4f7fb' },
+  bottomTabsDock: { paddingHorizontal: 18, paddingTop: 8, backgroundColor: '#f4f7fb' },
   bottomTabsGlow: { position: 'absolute', left: 68, right: 68, top: 8, height: 17, borderRadius: 999, backgroundColor: '#7dd3fc', opacity: 0.14 },
   bottomTabsGlass: { minHeight: 78, borderRadius: 39, borderWidth: 1, borderColor: 'rgba(255,255,255,0.92)', backgroundColor: 'rgba(255,255,255,0.86)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 9, paddingVertical: 7, overflow: 'hidden', shadowColor: '#075985', shadowOpacity: 0.12, shadowRadius: 22, shadowOffset: { width: 0, height: 10 }, elevation: 9 },
   bottomTabsSheen: { position: 'absolute', left: 24, right: 24, top: 7, height: 1, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.95)' },
@@ -2150,7 +2161,7 @@ const styles = StyleSheet.create({
   bottomTabIconHaloActive: { backgroundColor: 'transparent' },
   bottomTabText: { color: '#475569', fontSize: 10.5, lineHeight: 13, fontWeight: '800', textAlign: 'center' },
   bottomTabTextActive: { color: colors.primary, fontWeight: '900' },
-  notificationsScreen: { flexGrow: 1, minHeight: '100%', marginHorizontal: -24, marginTop: -28, marginBottom: -24, padding: 20, paddingTop: 26, gap: 16, backgroundColor: '#f4f7fb' },
+  notificationsScreen: { flexGrow: 1, marginHorizontal: -24, padding: 20, paddingTop: 26, paddingBottom: 28, gap: 16, backgroundColor: '#f4f7fb' },
   notificationsHero: { minHeight: 148, borderRadius: 30, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 15, overflow: 'hidden', backgroundColor: colors.primary, shadowColor: '#075985', shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 8 },
   notificationsHeroGlow: { position: 'absolute', right: -46, top: -58, width: 170, height: 170, borderRadius: 85, backgroundColor: 'rgba(255,255,255,0.18)' },
   notificationsHeroIcon: { width: 58, height: 58, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)', alignItems: 'center', justifyContent: 'center' },
@@ -2175,7 +2186,7 @@ const styles = StyleSheet.create({
   notificationTitle: { flex: 1, color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: '900' },
   notificationTime: { color: '#94a3b8', fontSize: 11, fontWeight: '900' },
   notificationMessage: { marginTop: 5, color: '#64748b', fontSize: 13, lineHeight: 19, fontWeight: '700' },
-  accountScreen: { flexGrow: 1, minHeight: '100%', marginHorizontal: -24, marginTop: -28, marginBottom: -24, backgroundColor: '#f4f6fb' },
+  accountScreen: { flexGrow: 1, marginHorizontal: -24, backgroundColor: '#f4f6fb' },
   accountHero: { height: 244, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   accountBubbleOne: { position: 'absolute', left: -74, top: -70, width: 210, height: 210, borderRadius: 105, backgroundColor: 'rgba(255,255,255,0.12)' },
   accountBubbleTwo: { position: 'absolute', right: -54, bottom: -22, width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(255,255,255,0.10)' },
@@ -2258,7 +2269,7 @@ const styles = StyleSheet.create({
   infoBlock: { gap: 4 },
   infoLabel: { color: colors.muted, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
   infoValue: { color: colors.text, fontSize: 14, lineHeight: 20, fontWeight: '700' },
-  visitHistoryScreen: { marginHorizontal: -24, marginTop: -28, marginBottom: -24, backgroundColor: '#f4f7fb', minHeight: '100%' },
+  visitHistoryScreen: { marginHorizontal: -24, backgroundColor: '#f4f7fb', flexGrow: 1 },
   visitHero: { minHeight: 210, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 30, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, backgroundColor: colors.primary, overflow: 'hidden' },
   visitHeroBubbleOne: { position: 'absolute', left: -70, top: -80, width: 210, height: 210, borderRadius: 105, backgroundColor: 'rgba(255,255,255,0.13)' },
   visitHeroBubbleTwo: { position: 'absolute', right: -62, bottom: -38, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.11)' },
@@ -2296,7 +2307,7 @@ const styles = StyleSheet.create({
   visitPendingBox: { flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'flex-start', borderRadius: 999, backgroundColor: '#fff7ed', paddingHorizontal: 10, paddingVertical: 7 },
   visitPendingText: { color: '#b45309', fontSize: 12, fontWeight: '900' },
   emptyState: { alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 18, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed', backgroundColor: '#fbfdff', padding: 24 },
-  profileScreen: { marginHorizontal: -24, marginTop: -28, marginBottom: -24, backgroundColor: '#f4f7fb', minHeight: '100%' },
+  profileScreen: { marginHorizontal: -24, backgroundColor: '#f4f7fb', flexGrow: 1 },
   profileHero: { minHeight: 214, paddingHorizontal: 24, paddingTop: 30, paddingBottom: 32, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, backgroundColor: colors.primary, overflow: 'hidden' },
   profileHeroBubbleOne: { position: 'absolute', left: -72, top: -82, width: 218, height: 218, borderRadius: 109, backgroundColor: 'rgba(255,255,255,0.13)' },
   profileHeroBubbleTwo: { position: 'absolute', right: -58, bottom: -44, width: 174, height: 174, borderRadius: 87, backgroundColor: 'rgba(255,255,255,0.11)' },
@@ -2329,7 +2340,7 @@ const styles = StyleSheet.create({
   switchAccountIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#eef6ff', alignItems: 'center', justifyContent: 'center' },
   switchAccountTitle: { color: colors.text, fontSize: 15, fontWeight: '900' },
   switchAccountText: { marginTop: 3, color: '#64748b', fontSize: 12, lineHeight: 17, fontWeight: '700' },
-  detailScreen: { marginHorizontal: -24, marginTop: -28, marginBottom: -24, backgroundColor: '#f4f7fb', minHeight: '100%' },
+  detailScreen: { marginHorizontal: -24, backgroundColor: '#f4f7fb', flexGrow: 1 },
   detailHero: { minHeight: 222, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 32, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, backgroundColor: colors.primary, overflow: 'hidden' },
   detailHeroBubbleOne: { position: 'absolute', left: -78, top: -84, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(255,255,255,0.13)' },
   detailHeroBubbleTwo: { position: 'absolute', right: -62, bottom: -42, width: 184, height: 184, borderRadius: 92, backgroundColor: 'rgba(255,255,255,0.11)' },
@@ -2371,7 +2382,7 @@ const styles = StyleSheet.create({
   aiReasonText: { color: '#475569', fontSize: 12, lineHeight: 17, fontWeight: '700' },
   aiMetaText: { color: '#94a3b8', fontSize: 11.5, lineHeight: 16, fontWeight: '800' },
   qrPayload: { marginTop: 10, borderRadius: 16, borderWidth: 1, borderColor: '#bae6fd', backgroundColor: '#f0f9ff', padding: 12, color: colors.primaryDark, fontSize: 12, lineHeight: 18, fontWeight: '900' },
-  bookingScreen: { marginHorizontal: -24, marginTop: 0, marginBottom: -24, minHeight: '100%', backgroundColor: '#f6f8fc', paddingTop: 6, paddingBottom: 28 },
+  bookingScreen: { marginHorizontal: -24, backgroundColor: '#f6f8fc', flexGrow: 1, paddingTop: 6, paddingBottom: 28 },
   bookingHero: { minHeight: 240, paddingHorizontal: 24, paddingTop: 30, paddingBottom: 46, borderBottomLeftRadius: 34, borderBottomRightRadius: 34, backgroundColor: '#075985', overflow: 'hidden' },
   bookingHeroOrbOne: { position: 'absolute', right: -90, top: -70, width: 230, height: 230, borderRadius: 115, backgroundColor: 'rgba(34,211,238,0.28)' },
   bookingHeroOrbTwo: { position: 'absolute', left: -70, bottom: -90, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(255,255,255,0.14)' },
