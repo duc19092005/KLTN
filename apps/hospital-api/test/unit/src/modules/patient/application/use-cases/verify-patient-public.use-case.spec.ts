@@ -1,5 +1,5 @@
 import { VerifyPatientPublicUseCase } from '../../../../../../../src/modules/patient/application/use-cases/verify-patient-public.use-case';
-import { computeAfterHashV2 } from '../../../../../../../src/infrastructure/audit/audit-hash.util';
+import { computeAfterHashV2 } from '../../../../../../../src/infrastructure/audit';
 import { buildMedicalConclusionSnapshot } from '../../../../../../../src/modules/clinical-decision/domain/medical-conclusion-snapshot';
 
 describe('VerifyPatientPublicUseCase', () => {

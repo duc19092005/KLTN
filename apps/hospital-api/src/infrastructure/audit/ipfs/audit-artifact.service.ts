@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AuditRecoveryCryptoService } from './audit-recovery-crypto.service';
+import { AuditRecoveryCryptoService } from '../crypto/audit-recovery-crypto.service';
 import { IpfsArtifactService } from './ipfs-artifact.service';
 
 export interface AuditRecoveryBundleRow {

@@ -41,17 +41,17 @@ export class StaffValidator {
     if (!dept) throw new NotFoundException('Không tìm thấy phòng ban.');
 
     const map: Record<string, string[]> = {
-      RECEPTIONIST: ['ADMINISTRATIVE', 'CLINICAL', 'LABORATORY', 'IMAGING'],
-      DOCTOR: ['EXAMINATION'],
-      LAB_MANAGER: ['ADMINISTRATIVE', 'CLINICAL', 'LABORATORY', 'IMAGING'],
+      RECEPTIONIST: ['ADMINISTRATIVE'],
+      DOCTOR: ['EXAMINATION', 'CLINICAL'],
+      LAB_MANAGER: ['LABORATORY', 'IMAGING'],
       ADMIN: [],
     };
     const allowed = map[role] || [];
     if (allowed.length > 0 && !allowed.includes(dept.type)) {
       const human: Record<UserRole, string> = {
-        RECEPTIONIST: 'Nhân sự chỉ thuộc các phòng ban không phải phòng khám.',
-        DOCTOR: 'Bác sĩ chỉ thuộc phòng khám.',
-        LAB_MANAGER: 'Nhân sự chỉ thuộc các phòng ban không phải phòng khám.',
+        RECEPTIONIST: 'Nhân viên Lễ tân chỉ được gán vào phòng ban Hành chính / Tiếp đón (không thể thuộc phòng Kỹ thuật hoặc Phòng khám).',
+        DOCTOR: 'Bác sĩ chỉ được gán vào phòng khám hoặc khoa lâm sàng.',
+        LAB_MANAGER: 'Kỹ thuật viên cận lâm sàng chỉ được gán vào phòng ban Kỹ thuật (Xét nghiệm, Chẩn đoán hình ảnh - không thể thuộc phòng Lễ tân/Hành chính).',
         ADMIN: '',
       } as Record<UserRole, string>;
       throw new BadRequestException(human[role] || 'Vai trò không phù hợp với loại phòng ban.');

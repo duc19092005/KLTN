@@ -31,6 +31,7 @@ export default function AvatarUpload({ value, onChange, uploadFn, ringTone = 'cy
       toast.error(err?.response?.data?.message || err.message || 'Tải ảnh thất bại');
     } finally {
       setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 

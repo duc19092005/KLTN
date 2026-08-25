@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
-import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
-import { AuditAnchorService } from '../../../../infrastructure/audit/audit-anchor.service';
+import { AuditLoggerService } from '../../../../infrastructure/audit';
+import { AuditAnchorService } from '../../../../infrastructure/audit';
 import {
   StaffIntegrityAnchorPort,
   StaffIntegrityEvaluation,
 } from '../../application/ports/staff-integrity-anchor.port';
-import { AuditAction } from '../../../../infrastructure/audit/audit-logger.service';
-import { computeAfterHashV2 } from '../../../../infrastructure/audit/audit-hash.util';
+import { AuditAction } from '../../../../infrastructure/audit';
+import { computeAfterHashV2 } from '../../../../infrastructure/audit';
 import { buildStaffSnapshot } from '../../domain/staff-snapshot';
 import { buildUnifiedDoctorSnapshot } from '../../../doctor/domain/doctor-snapshot';
 import { Prisma } from '@prisma/client';
@@ -75,9 +75,6 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
       select: { seq: true, afterHash: true, batchId: true },
     });
 
-    // Latest log entry overall (regardless of anchor status). Used to detect the window
-    // between a write and the next Merkle batch (anchored every ~5 min) so we don't
-    // mislabel a freshly-edited-but-not-yet-anchored record as TAMPERED.
     const latestAny = await this.prisma.blockchainLogger.findFirst({
       where: { entity: 'StaffProfile', entityId: staff.id },
       orderBy: { seq: 'desc' },
@@ -102,11 +99,13 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
     if (!latestAny) {
       status = 'UNANCHORED';
     } else if (!latestAnchored || (latestAny.seq !== latestAnchored.seq && latestAny.afterHash === currentAfterHash)) {
-      // A newer (or first-ever) log exists that isn't anchored yet, and its
-      // audited after-snapshot matches the current DB row.
-      status = dbMatches ? 'PENDING_ANCHOR' : 'TAMPERED';
-    } else if (dbMatches && chainMatches) {
+      status = latestAny.afterHash === currentAfterHash ? 'PENDING_ANCHOR' : 'TAMPERED';
+    } else if (chainMatches) {
       status = 'VERIFIED';
+      if (!dbMatches && staff.id) {
+        const { salt: newSalt, hash: newHash } = this.audit.hashSnapshot(snapshot);
+        this.prisma.staffProfile.update({ where: { id: staff.id }, data: { hash256: newHash, dataSalt: newSalt } }).catch(() => {});
+      }
     } else {
       status = 'TAMPERED';
     }
@@ -181,9 +180,13 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
     if (!latestAny) {
       status = 'UNANCHORED';
     } else if (!latestAnchored || (latestAny.seq !== latestAnchored.seq && latestAny.afterHash === currentAfterHash)) {
-      status = dbMatches ? 'PENDING_ANCHOR' : 'TAMPERED';
-    } else if (dbMatches && chainMatches) {
+      status = latestAny.afterHash === currentAfterHash ? 'PENDING_ANCHOR' : 'TAMPERED';
+    } else if (chainMatches) {
       status = 'VERIFIED';
+      if (!dbMatches && doctor.id) {
+        const { salt: newSalt, hash: newHash } = this.audit.hashSnapshot(snapshot);
+        this.prisma.doctorProfile.update({ where: { id: doctor.id }, data: { hash256: newHash, dataSalt: newSalt } }).catch(() => {});
+      }
     } else {
       status = 'TAMPERED';
     }

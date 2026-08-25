@@ -1,6 +1,6 @@
-import { AuditArtifactService, AuditRecoveryBundleRow } from '../../../../../src/infrastructure/audit/audit-artifact.service';
-import { AuditRecoveryCryptoService } from '../../../../../src/infrastructure/audit/audit-recovery-crypto.service';
-import { AuditRecoveryService } from '../../../../../src/infrastructure/audit/audit-recovery.service';
+import { AuditArtifactService, AuditRecoveryBundleRow } from '../../../../../src/infrastructure/audit';
+import { AuditRecoveryCryptoService } from '../../../../../src/infrastructure/audit';
+import { AuditRecoveryService } from '../../../../../src/infrastructure/audit';
 import {
   AUDIT_ENTRY_V2,
   canonicalize,
@@ -10,10 +10,10 @@ import {
   computeDiffHashV2,
   computeEntryHashV2,
   GENESIS_PREV_HASH,
-} from '../../../../../src/infrastructure/audit/audit-hash.util';
-import { buildAuditDiff } from '../../../../../src/infrastructure/audit/audit-diff.util';
-import { buildAuditEncryptionAad, encryptAuditSnapshot } from '../../../../../src/infrastructure/audit/audit-encryption.util';
-import { computeMerkleRoot, rootToBytes32 } from '../../../../../src/infrastructure/audit/merkle.util';
+} from '../../../../../src/infrastructure/audit';
+import { buildAuditDiff } from '../../../../../src/infrastructure/audit';
+import { buildAuditEncryptionAad, encryptAuditSnapshot } from '../../../../../src/infrastructure/audit';
+import { computeMerkleRoot, rootToBytes32 } from '../../../../../src/infrastructure/audit';
 
 function buildRow(): AuditRecoveryBundleRow {
   const createdAt = '2026-07-20T02:00:00.000Z';
@@ -86,7 +86,7 @@ describe('AuditRecoveryService verified IPFS reader', () => {
     };
     const prisma = { auditBatch: { findUnique: jest.fn().mockResolvedValue(batch) } };
     const blockchain = { getAuditCheckpoint: jest.fn().mockResolvedValue({
-      committed: true, root: rootToBytes32(root), leafCount: 1,
+      committed: true, root: rootToBytes32(root), leafCount: 1, fromSeq: 1, toSeq: 1,
       artifactUri: uploaded.artifactUri, artifactHash: uploaded.artifactHash,
     }) };
     const service = new AuditRecoveryService(prisma as never, blockchain as never, artifacts, {} as never, {} as never);

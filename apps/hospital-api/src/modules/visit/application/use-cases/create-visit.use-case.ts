@@ -3,7 +3,7 @@ import { CreateVisitDto } from '../../dto/visit.dto';
 import { VISIT_REPOSITORY, VisitRepositoryPort } from '../ports/visit.repository.port';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { NotificationService } from '../../../notification/services/notification.service';
-import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { AuditLoggerService, ClinicalAuditTrustService } from '../../../../infrastructure/audit';
 import { buildPatientSnapshot } from '../../../patient/domain/patient-snapshot';
 import { AuthUser } from '../../../../common/types/auth-user.type';
 import { buildVisitSnapshot } from '../../domain/visit-snapshot';
@@ -19,6 +19,7 @@ export class CreateVisitUseCase {
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
     private readonly auditLogger: AuditLoggerService,
+    private readonly clinicalTrust: ClinicalAuditTrustService,
   ) {}
 
   async execute(dto: CreateVisitDto, user?: AuthUser): Promise<unknown> {
@@ -105,6 +106,11 @@ export class CreateVisitUseCase {
           onChainStatus: 'PENDING',
         }, tx);
       },
+      dto.patientId
+        ? async (tx) => {
+            await this.clinicalTrust.assertTrusted({ entity: 'Patient', entityId: dto.patientId! }, tx);
+          }
+        : undefined,
     );
 
     try {

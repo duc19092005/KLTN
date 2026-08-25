@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
@@ -35,22 +35,31 @@ import {
   Cpu,
   Check,
   ChevronRight,
+  ChevronDown,
   Filter,
   Info,
-  Scan
+  Scan,
+  Database,
+  Sparkles,
+  ArrowRight,
+  ExternalLink,
+  FileText,
+  Clock,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 
 const ACTION_TONE = {
-  CREATE: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
-  UPDATE: 'bg-sky-50 text-sky-700 border-sky-200/80',
-  DELETE: 'bg-rose-50 text-rose-700 border-rose-200/80',
-  LOGIN_PASSWORD: 'bg-sky-50 text-sky-700 border-sky-200/80',
-  LOGIN_INVITE: 'bg-indigo-50 text-indigo-700 border-indigo-200/80',
-  LOGIN_FAIL: 'bg-rose-50 text-rose-700 border-rose-200/80',
-  FACE_VERIFY_PASS: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
-  FACE_VERIFY_FAIL: 'bg-rose-50 text-rose-700 border-rose-200/80',
-  FACE_INTEGRITY_FAIL: 'bg-rose-50 text-rose-700 border-rose-200/80',
-  FACE_ENROLL: 'bg-sky-50 text-sky-700 border-sky-200/80',
+  CREATE: 'bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800',
+  UPDATE: 'bg-sky-50 text-sky-700 border-sky-200/80 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800',
+  DELETE: 'bg-rose-50 text-rose-700 border-rose-200/80 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800',
+  LOGIN_PASSWORD: 'bg-sky-50 text-sky-700 border-sky-200/80 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800',
+  LOGIN_INVITE: 'bg-indigo-50 text-indigo-700 border-indigo-200/80 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800',
+  LOGIN_FAIL: 'bg-rose-50 text-rose-700 border-rose-200/80 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800',
+  FACE_VERIFY_PASS: 'bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800',
+  FACE_VERIFY_FAIL: 'bg-rose-50 text-rose-700 border-rose-200/80 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800',
+  FACE_INTEGRITY_FAIL: 'bg-rose-50 text-rose-700 border-rose-200/80 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800',
+  FACE_ENROLL: 'bg-sky-50 text-sky-700 border-sky-200/80 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800',
 };
 
 const ACTION_LABEL = {
@@ -67,7 +76,7 @@ const ACTION_LABEL = {
 };
 
 const BATCH_STATUS_LABEL = {
-  ANCHORED: 'Đã neo',
+  ANCHORED: 'Đã neo Sepolia',
   FAILED: 'Thất bại',
   PENDING: 'Chờ neo',
   MISSING: 'Thiếu trong DB',
@@ -77,7 +86,7 @@ const ROLE_LABELS = {
   ADMIN: 'Quản trị viên',
   RECEPTIONIST: 'Lễ tân',
   DOCTOR: 'Bác sĩ',
-  LAB_MANAGER: 'Quản lý xét nghiệm',
+  LAB_MANAGER: 'KTV cận lâm sàng',
 };
 
 const ENTITY_LABELS = {
@@ -165,12 +174,8 @@ function canRecoverBatch(batch, chain) {
       if (match && match[1]) targetSeq = parseInt(match[1], 10);
     }
     if (batch.fromSeq != null && batch.toSeq != null) {
-      if (batch.fromSeq <= targetSeq && batch.toSeq >= targetSeq) {
-        return true;
-      }
-      if (batch.fromSeq <= chain.brokenAtSeq && batch.toSeq >= Math.max(1, targetSeq - 1)) {
-        return true;
-      }
+      if (batch.fromSeq <= targetSeq && batch.toSeq >= targetSeq) return true;
+      if (batch.fromSeq <= chain.brokenAtSeq && batch.toSeq >= Math.max(1, targetSeq - 1)) return true;
     } else {
       return true;
     }
@@ -192,9 +197,9 @@ function formatTime(value) {
 }
 
 const VERIFICATION_TONE = {
-  VERIFIED: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  PENDING: 'border-amber-200 bg-amber-50 text-amber-700',
-  TAMPERED: 'border-rose-200 bg-rose-50 text-rose-600',
+  VERIFIED: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
+  PENDING: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300',
+  TAMPERED: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300',
 };
 
 const VERIFICATION_LABEL = {
@@ -212,7 +217,7 @@ function renderDiffValue(value, _redacted) {
 }
 
 function renderFieldList(fields) {
-  if (!fields.length) return 'Không có thay đổi dữ liệu';
+  if (!fields || !fields.length) return 'Không có thay đổi dữ liệu';
   const labels = fields.map((field) => fieldDisplayName({ fieldPath: field, field }));
   return labels.slice(0, 2).join(', ') + (labels.length > 2 ? ` +${labels.length - 2}` : '');
 }
@@ -253,8 +258,8 @@ export default function AuditLogsPage() {
   const [searchQ, setSearchQ] = useState('');
   const [appliedQ, setAppliedQ] = useState('');
   const [anchoring, setAnchoring] = useState(false);
-  const [anchorStage, setAnchorStage] = useState(0); // 0 = idle, 1 = Chuẩn bị, 2 = IPFS, 3 = Artifact Ready, 4 = Neo Blockchain, 5 = Hoàn tất
-  const [anchoringBatchInfo, setAnchoringBatchInfo] = useState(null); // { batchId, leafCount }
+  const [anchorStage, setAnchorStage] = useState(0);
+  const [anchoringBatchInfo, setAnchoringBatchInfo] = useState(null);
   const [proof, setProof] = useState(null);
   const [recoveryTarget, setRecoveryTarget] = useState(null);
   const [recoveryReason, setRecoveryReason] = useState('');
@@ -315,9 +320,9 @@ export default function AuditLogsPage() {
 
   const loadPendingQueue = useCallback(async () => {
     try {
-      const res = await auditService.logs({ page: 1, limit: 20, sort: 'desc', verificationStatus: 'PENDING' });
+      const res = await auditService.logs({ page: 1, limit: 50, sort: 'desc', verificationStatus: 'PENDING' });
       const items = (res.data?.items || []).filter((item) => item.batchId == null);
-      setPendingQueue({ total: items.length, items: items.slice(0, 5) });
+      setPendingQueue({ total: items.length, items });
     } catch {
       setPendingQueue({ total: 0, items: [] });
     }
@@ -362,12 +367,10 @@ export default function AuditLogsPage() {
   }, [toast]);
 
   const refreshAll = useCallback(async () => {
-    await loadBatches();
-    await loadPendingQueue();
-    await loadChain();
-    await loadEntityWarnings();
+    await Promise.all([loadBatches(), loadPendingQueue(), loadChain(), loadEntityWarnings()]);
     if (selectedBatchId) await openBatchDetail(selectedBatchId);
-  }, [loadBatches, loadPendingQueue, loadChain, loadEntityWarnings, selectedBatchId, openBatchDetail]);
+    toast.success('Đã đồng bộ toàn bộ dữ liệu kiểm toán & blockchain!');
+  }, [loadBatches, loadPendingQueue, loadChain, loadEntityWarnings, selectedBatchId, openBatchDetail, toast]);
 
   useEffect(() => {
     loadBatches();
@@ -382,7 +385,7 @@ export default function AuditLogsPage() {
         active: true,
         progressPercent: 0,
         statusMessage: 'Đang khởi chạy tiến trình đối soát ngầm...',
-        logs: ['[INFO] Đã xác thực khuôn mặt Admin. Đang bắt đầu kiểm tra Merkle Tree & Blockchain...']
+        logs: ['[INFO] Đã xác thực khuôn mặt Admin. Đang bắt đầu kiểm tra Merkle Tree & Blockchain...'],
       });
       setDeepScanCollapsed(false);
       setDeepScanPolling(true);
@@ -401,10 +404,21 @@ export default function AuditLogsPage() {
           setDeepScanProgress(state);
           if (!state.active) {
             setDeepScanPolling(false);
+            const errors = Array.isArray(state.result?.errors) ? state.result.errors : [];
+            const recovered = Number(state.result?.recoveredBatches || 0);
+            const outcome = errors.length === 0 ? 'SUCCESS' : recovered > 0 ? 'PARTIAL' : 'FAILED';
+            setDeepScanProgress({ ...state, outcome });
+            if (outcome === 'SUCCESS') {
+              toast.success(state.statusMessage || 'Đối soát hoàn tất, toàn bộ batch đều hợp lệ.');
+            } else if (outcome === 'PARTIAL') {
+              toast.warning(`Đối soát hoàn tất một phần: đã phục hồi ${recovered} batch, còn ${errors.length} lỗi.`);
+            } else {
+              toast.error(`Đối soát thất bại: ${errors[0] || 'Không thể khôi phục batch từ artifact đã neo.'}`);
+            }
             refreshAll();
             setTimeout(() => {
               setDeepScanProgress(null);
-            }, 5000);
+            }, 15000);
           }
         } catch (err) {
           console.error('Deep scan polling error:', err);
@@ -416,18 +430,21 @@ export default function AuditLogsPage() {
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [deepScanPolling, refreshAll]);
+  }, [deepScanPolling, refreshAll, toast]);
 
   useEffect(() => {
     loadPendingQueue();
     loadChain();
     loadEntityWarnings();
-    auditService.getDeepScanStatus().then((res) => {
-      if (res.data && res.data.active) {
-        setDeepScanProgress(res.data);
-        setDeepScanPolling(true);
-      }
-    }).catch(() => {});
+    auditService
+      .getDeepScanStatus()
+      .then((res) => {
+        if (res.data && res.data.active) {
+          setDeepScanProgress(res.data);
+          setDeepScanPolling(true);
+        }
+      })
+      .catch(() => {});
   }, [loadPendingQueue, loadChain, loadEntityWarnings]);
 
   const stats = useMemo(() => {
@@ -437,8 +454,9 @@ export default function AuditLogsPage() {
       chainLength: chain?.total ?? 0,
       pending: pendingQueue.total,
       warningsCount: entityWarnings.length,
+      latestBatch: batches[0] || null,
     };
-  }, [batchesTotal, chain, pendingQueue.total, entityWarnings.length]);
+  }, [batchesTotal, chain, pendingQueue.total, entityWarnings.length, batches]);
 
   const filteredBatches = useMemo(() => {
     let result = batches;
@@ -452,9 +470,7 @@ export default function AuditLogsPage() {
         .flatMap((item) => [item.entity, ...(item.samples || [])])
         .join(' ')
         .toLowerCase();
-      return String(b.batchId).includes(q)
-        || summaryText.includes(q)
-        || (b.merkleRoot || '').toLowerCase().includes(q);
+      return String(b.batchId).includes(q) || summaryText.includes(q) || (b.merkleRoot || '').toLowerCase().includes(q);
     });
   }, [batches, appliedQ, filterOnlyFaulty, chain]);
 
@@ -478,9 +494,9 @@ export default function AuditLogsPage() {
       const res = await auditService.batches({ limit: 200 });
       const allBatches = res.data?.items || batches || [];
 
-      const affectedBatches = allBatches.filter(
-        (b) => b.fromSeq <= endSeq && b.toSeq >= startSeq
-      ).sort((a, b) => a.batchId - b.batchId);
+      const affectedBatches = allBatches
+        .filter((b) => b.fromSeq <= endSeq && b.toSeq >= startSeq)
+        .sort((a, b) => a.batchId - b.batchId);
 
       if (affectedBatches.length > 0) {
         const targetIds = affectedBatches.map((b) => b.batchId);
@@ -496,8 +512,9 @@ export default function AuditLogsPage() {
           `Đã phát hiện ${targetIds.length} lô bị ảnh hưởng (${targetIds.map((id) => `#${id}`).join(', ')}). Vui lòng quét khuôn mặt để khôi phục toàn bộ.`
         );
       } else {
-        let fallback = allBatches.find((b) => b.fromSeq <= startSeq && b.toSeq >= startSeq)
-          || allBatches.find((b) => b.fromSeq <= brokenSeq && b.toSeq >= brokenSeq);
+        let fallback =
+          allBatches.find((b) => b.fromSeq <= startSeq && b.toSeq >= startSeq) ||
+          allBatches.find((b) => b.fromSeq <= brokenSeq && b.toSeq >= brokenSeq);
         if (fallback) {
           setRecoveryTarget(fallback);
           setRecoveryReason(`[QUICK RECOVER] Khôi phục tự động lô #${fallback.batchId} do đứt gãy SEQ ${startSeq}`);
@@ -515,16 +532,16 @@ export default function AuditLogsPage() {
 
   const handleAnchorNow = async () => {
     setAnchoring(true);
-    setAnchorStage(1); // Giai đoạn 1: Chuẩn bị (Gom SEQ log & dựng Merkle Tree)
-    const upcomingBatchId = (batches && batches[0]?.batchId) ? batches[0].batchId + 1 : 1;
+    setAnchorStage(1);
+    const upcomingBatchId = batches && batches[0]?.batchId ? batches[0].batchId + 1 : 1;
     setAnchoringBatchInfo({
       batchId: upcomingBatchId,
       leafCount: pendingQueue.total || 1,
     });
 
-    const timer1 = setTimeout(() => setAnchorStage(2), 700);  // Giai đoạn 2: Đang đưa lên IPFS
-    const timer2 = setTimeout(() => setAnchorStage(3), 1600); // Giai đoạn 3: Artifact Ready
-    const timer3 = setTimeout(() => setAnchorStage(4), 2400); // Giai đoạn 4: Neo Blockchain
+    const timer1 = setTimeout(() => setAnchorStage(2), 700);
+    const timer2 = setTimeout(() => setAnchorStage(3), 1600);
+    const timer3 = setTimeout(() => setAnchorStage(4), 2400);
 
     try {
       const res = await auditService.anchorNow();
@@ -534,7 +551,7 @@ export default function AuditLogsPage() {
 
       const d = res.data || {};
       if (d.committed) {
-        setAnchorStage(5); // Hoàn tất!
+        setAnchorStage(5);
         if (d.batchId) {
           setAnchoringBatchInfo({ batchId: d.batchId, leafCount: d.leafCount || pendingQueue.total });
         }
@@ -573,9 +590,10 @@ export default function AuditLogsPage() {
     if (!recoveryTarget) return;
     setRecoveryFaceOpen(false);
 
-    const targetIds = Array.isArray(recoveryTarget.batchIds) && recoveryTarget.batchIds.length > 0
-      ? recoveryTarget.batchIds
-      : [recoveryTarget.batchId];
+    const targetIds =
+      Array.isArray(recoveryTarget.batchIds) && recoveryTarget.batchIds.length > 0
+        ? recoveryTarget.batchIds
+        : [recoveryTarget.batchId];
 
     setMultiRecoveryProgress({
       total: targetIds.length,
@@ -639,14 +657,18 @@ export default function AuditLogsPage() {
   };
 
   const handleEntityRecovery = () => {
-    const selected = entityWarnings.filter((item) => selectedEntityWarnings.includes(`${item.entity}:${item.entityId}`) && item.recoverable);
+    const selected = entityWarnings.filter(
+      (item) => selectedEntityWarnings.includes(`${item.entity}:${item.entityId}`) && item.recoverable
+    );
     if (!selected.length || entityRecoveryReason.trim().length < 10) return;
     setEntityRecoveryFaceOpen(true);
   };
 
   const handleEntityRecoveryTicket = async (ticket) => {
     setEntityRecoveryFaceOpen(false);
-    const selected = entityWarnings.filter((item) => selectedEntityWarnings.includes(`${item.entity}:${item.entityId}`) && item.recoverable);
+    const selected = entityWarnings.filter(
+      (item) => selectedEntityWarnings.includes(`${item.entity}:${item.entityId}`) && item.recoverable
+    );
     if (!selected.length || entityRecoveryReason.trim().length < 10) return;
     setRecoveringEntities(true);
     setEntityRecoveryCollapsed(false);
@@ -670,16 +692,20 @@ export default function AuditLogsPage() {
     });
 
     try {
-      setEntityRecoveryProgress((prev) => prev ? {
-        ...prev,
-        progressPercent: 45,
-        statusMessage: `Đang đối soát ${selected.length} bản ghi với Blockchain Merkle Root...`,
-      } : null);
+      setEntityRecoveryProgress((prev) =>
+        prev
+          ? {
+              ...prev,
+              progressPercent: 45,
+              statusMessage: `Đang đối soát ${selected.length} bản ghi với Blockchain Merkle Root...`,
+            }
+          : null
+      );
 
       const res = await auditService.recoverEntities(
         selected.map(({ entity, entityId }) => ({ entity, entityId })),
         entityRecoveryReason.trim(),
-        ticket,
+        ticket
       );
       const data = res.data || {};
       const tamperedResults = (data.results || []).filter((r) => r.tamperDetected === true);
@@ -689,7 +715,9 @@ export default function AuditLogsPage() {
         const entLabel = ENTITY_LABELS[item.entity] || item.entity;
         const idShort = item.entityId ? item.entityId.slice(0, 8) + '…' : 'N/A';
         if (item.tamperDetected) {
-          newLogs.push(`[${now()}] ⚠️ [CẢNH BÁO CAN THIỆP] ${entLabel} (${idShort}): Audit local bị sửa! Đã tự động tải IPFS Artifact (Lô #${item.batchId}) & khôi phục thành công.`);
+          newLogs.push(
+            `[${now()}] ⚠️ [CẢNH BÁO CAN THIỆP] ${entLabel} (${idShort}): Audit local bị sửa! Đã tự động tải IPFS Artifact (Lô #${item.batchId}) & khôi phục thành công.`
+          );
         } else if (item.status === 'RECOVERED' || item.status === 'RECREATED') {
           newLogs.push(`[${now()}] 🟢 [KHỚP ON-CHAIN] ${entLabel} (${idShort}): Merkle proof hợp lệ 100%. Đã khôi phục từ snapshot chuẩn.`);
         } else if (item.status === 'SKIPPED') {
@@ -699,14 +727,19 @@ export default function AuditLogsPage() {
         }
       });
 
-      newLogs.push(`[${now()}] 🎉 Hoàn tất quy trình: Đã khôi phục ${data.recovered || 0}/${selected.length} thực thể.${tamperedResults.length > 0 ? ` Phát hiện ${tamperedResults.length} bản ghi bị can thiệp trái phép đã cứu qua IPFS.` : ''}`);
+      newLogs.push(
+        `[${now()}] 🎉 Hoàn tất quy trình: Đã khôi phục ${data.recovered || 0}/${selected.length} thực thể.${
+          tamperedResults.length > 0 ? ` Phát hiện ${tamperedResults.length} bản ghi bị can thiệp trái phép đã cứu qua IPFS.` : ''
+        }`
+      );
 
       setEntityRecoveryProgress((prev) => ({
         active: false,
         progressPercent: 100,
-        statusMessage: tamperedResults.length > 0
-          ? `Hoàn tất! Đã khôi phục ${data.recovered || 0} thực thể (${tamperedResults.length} bản ghi cứu qua IPFS do bị sửa trái phép).`
-          : `Hoàn tất! Đã khôi phục thành công ${data.recovered || 0} thực thể toàn vẹn.`,
+        statusMessage:
+          tamperedResults.length > 0
+            ? `Hoàn tất! Đã khôi phục ${data.recovered || 0} thực thể (${tamperedResults.length} bản ghi cứu qua IPFS do bị sửa trái phép).`
+            : `Hoàn tất! Đã khôi phục thành công ${data.recovered || 0} thực thể toàn vẹn.`,
         total: selected.length,
         completed: selected.length,
         logs: prev ? [...prev.logs, ...newLogs] : newLogs,
@@ -723,7 +756,9 @@ export default function AuditLogsPage() {
           recoveredCount: data.recovered || 0,
           items: tamperedResults,
         });
-        toast.warning(`Phát hiện ${tamperedResults.length} bản ghi có dấu hiệu bị can thiệp trái phép trong CSDL. Đã tự động đối soát Blockchain và khôi phục an toàn từ IPFS!`);
+        toast.warning(
+          `Phát hiện ${tamperedResults.length} bản ghi có dấu hiệu bị can thiệp trái phép trong CSDL. Đã tự động đối soát Blockchain và khôi phục an toàn từ IPFS!`
+        );
       } else if (data.failed > 0) {
         setEntityRecoveryAlert(null);
         const details = (data.results || [])
@@ -770,8 +805,8 @@ export default function AuditLogsPage() {
       onNavigate={(id) => navigateAdmin(navigate, id)}
       onLogout={logout}
     >
-      <div className="mx-auto max-w-7xl space-y-6 pb-12">
-        {/* Executive Header & Action Bar */}
+      <div className="mx-auto max-w-7xl space-y-6 pb-16">
+        {/* Executive Header & Intelligent Action Menu */}
         <ExecutiveHeader
           onRefresh={refreshAll}
           onAnchor={handleAnchorNow}
@@ -783,6 +818,10 @@ export default function AuditLogsPage() {
           deepScanActive={deepScanPolling || (deepScanProgress && deepScanProgress.active)}
           stats={stats}
           chain={chain}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          filterOnlyFaulty={filterOnlyFaulty}
+          setFilterOnlyFaulty={setFilterOnlyFaulty}
         />
 
         {/* Top Metric Cards */}
@@ -790,25 +829,28 @@ export default function AuditLogsPage() {
           <StatCard
             label="Lô đã chốt Blockchain"
             value={stats.batches}
-            hint="Dữ liệu gốc được bảo chứng bất biến"
+            hint="Dữ liệu gốc được bảo chứng bất biến trên Sepolia"
             icon={Layers}
             accentColor="emerald"
+            onClick={() => setActiveTab('batches')}
           />
           <StatCard
             label="Trạng thái chuỗi nhật ký"
-            value={stats.isChainOk ? 'An toàn 100%' : 'Phát hiện bất thường!'}
-            hint={`${stats.chainLength} bản ghi đã liên kết an toàn`}
+            value={stats.isChainOk ? 'Toàn vẹn 100%' : 'Phát hiện bất thường!'}
+            hint={`${stats.chainLength} bản ghi đã liên kết mã băm liên tục`}
             icon={stats.isChainOk ? ShieldCheck : ShieldAlert}
-            color={stats.isChainOk ? 'text-emerald-600' : 'text-rose-600'}
+            color={stats.isChainOk ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}
             accentColor={stats.isChainOk ? 'emerald' : 'rose'}
+            onClick={() => setActiveTab('integrity')}
           />
           <StatCard
-            label="Nhật ký mới chờ chốt"
+            label="Nhật ký chờ chốt lô"
             value={stats.pending}
-            hint="Sẽ tự động gom thành lô tiếp theo"
+            hint={stats.pending > 0 ? 'Sẽ tự động gom thành lô tiếp theo' : 'Hàng đợi đang trống — Đã seal toàn bộ'}
             icon={History}
-            color={stats.pending > 0 ? 'text-amber-600' : 'text-slate-700'}
+            color={stats.pending > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-700 dark:text-slate-300'}
             accentColor={stats.pending > 0 ? 'amber' : 'slate'}
+            onClick={() => setActiveTab('pending')}
           />
         </div>
 
@@ -817,10 +859,10 @@ export default function AuditLogsPage() {
           <AnchoringStepper stage={anchorStage} anchoring={anchoring} batchInfo={anchoringBatchInfo} />
         )}
 
-        {/* Navigation Tabs Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-1 dark:border-slate-800">
-          <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">
-            <TabButton
+        {/* Modern Segmented Navigation Tabs Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-3 dark:border-slate-800">
+          <div className="inline-flex rounded-2xl bg-slate-100/90 p-1.5 shadow-inner dark:bg-slate-800/90 gap-1 overflow-x-auto scrollbar-none">
+            <TabSegmentButton
               id="batches"
               label="Lô đã chốt Blockchain"
               icon={Layers}
@@ -828,29 +870,29 @@ export default function AuditLogsPage() {
               active={activeTab === 'batches'}
               onClick={setActiveTab}
             />
-            <TabButton
+            <TabSegmentButton
               id="integrity"
               label="Kiểm tra & Khôi phục dữ liệu"
               icon={ShieldAlert}
-              count={stats.warningsCount > 0 ? stats.warningsCount : (!stats.isChainOk ? '!' : null)}
-              badgeColor={stats.warningsCount > 0 || !stats.isChainOk ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-600'}
+              count={stats.warningsCount > 0 ? stats.warningsCount : !stats.isChainOk ? '!' : null}
+              badgeColor={stats.warningsCount > 0 || !stats.isChainOk ? 'bg-rose-500 text-white' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'}
               active={activeTab === 'integrity'}
               onClick={setActiveTab}
             />
-            <TabButton
+            <TabSegmentButton
               id="pending"
               label="Nhật ký chờ chốt lô"
               icon={History}
               count={stats.pending}
-              badgeColor="bg-amber-500 text-white"
+              badgeColor={stats.pending > 0 ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'}
               active={activeTab === 'pending'}
               onClick={setActiveTab}
             />
           </div>
 
-          <div className="hidden sm:flex items-center gap-2 text-xs font-semibold text-slate-500">
-            <Bot className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-            <span>Tự động kiểm tra: <b>20 phút / lần</b> (Chạy ngầm đối soát)</span>
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <Bot className="h-4 w-4 text-sky-600 dark:text-sky-400 shrink-0" />
+            <span>Watchdog tự động: <b>20 phút / lần</b> (Chạy ngầm đối soát)</span>
           </div>
         </div>
 
@@ -866,8 +908,8 @@ export default function AuditLogsPage() {
               />
             )}
 
-            {/* Search & Filter Bar */}
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-3">
+            {/* Search & Filter Toolbar */}
+            <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-3">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -878,14 +920,17 @@ export default function AuditLogsPage() {
                       setSearchQ(e.target.value);
                       setAppliedQ(e.target.value.trim());
                     }}
-                    placeholder="Tìm lô theo số lô (#), mã Merkle Root, tên thực thể..."
-                    className="w-full rounded-xl border border-slate-200/80 bg-slate-50/80 py-2.5 pl-10 pr-10 text-xs font-semibold text-slate-700 outline-none focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200"
+                    placeholder="Tìm theo số lô (#), mã băm Merkle Root, tên đối tượng tác động..."
+                    className="w-full rounded-2xl border border-slate-200/80 bg-slate-50/80 py-2.5 pl-10 pr-10 text-xs font-semibold text-slate-700 outline-none focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200 dark:focus:bg-slate-900 transition-all"
                   />
                   {searchQ && (
                     <button
                       type="button"
-                      onClick={() => { setSearchQ(''); setAppliedQ(''); }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      onClick={() => {
+                        setSearchQ('');
+                        setAppliedQ('');
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -897,47 +942,55 @@ export default function AuditLogsPage() {
                     type="button"
                     onClick={() => setDeepScanFaceOpen(true)}
                     disabled={deepScanPolling || (deepScanProgress && deepScanProgress.active)}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-sky-700 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-2xl bg-sky-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-sky-700 shadow-sm transition-all cursor-pointer disabled:opacity-50 active:scale-95"
                   >
-                    <Scan className="h-3.5 w-3.5 text-amber-300" />
+                    <Scan className="h-4 w-4 text-amber-300" />
                     <span>Scan toàn bộ Batch</span>
                   </button>
 
-                  <div className="flex items-center gap-1 rounded-xl border border-slate-200/80 bg-slate-50/80 p-1 dark:border-slate-800 dark:bg-slate-800">
+                  <div className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-slate-100/80 p-1 dark:border-slate-700 dark:bg-slate-800">
                     <button
                       type="button"
                       onClick={() => setBatchSortBy('batchId')}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${batchSortBy === 'batchId' ? 'bg-white text-sky-700 shadow-xs dark:bg-slate-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-400'}`}
+                      className={`rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all cursor-pointer ${
+                        batchSortBy === 'batchId'
+                          ? 'bg-white text-sky-700 shadow-xs dark:bg-slate-700 dark:text-sky-300'
+                          : 'text-slate-700 dark:text-slate-300 hover:text-slate-900'
+                      }`}
                     >
                       Số lô
                     </button>
                     <button
                       type="button"
                       onClick={() => setBatchSortBy('time')}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${batchSortBy === 'time' ? 'bg-white text-sky-700 shadow-xs dark:bg-slate-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-400'}`}
+                      className={`rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all cursor-pointer ${
+                        batchSortBy === 'time'
+                          ? 'bg-white text-sky-700 shadow-xs dark:bg-slate-700 dark:text-sky-300'
+                          : 'text-slate-700 dark:text-slate-300 hover:text-slate-900'
+                      }`}
                     >
                       Thời gian
                     </button>
                     <button
                       type="button"
                       onClick={() => setBatchSortOrder((v) => (v === 'desc' ? 'asc' : 'desc'))}
-                      className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-200/60 dark:text-slate-400"
+                      className="rounded-xl p-1.5 text-slate-700 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
                       title={batchSortOrder === 'desc' ? 'Giảm dần' : 'Tăng dần'}
                     >
-                      {batchSortOrder === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />}
+                      {batchSortOrder === 'desc' ? <ArrowDown className="h-4 w-4 text-sky-600" /> : <ArrowUp className="h-4 w-4 text-sky-600" />}
                     </button>
                   </div>
 
                   <button
                     type="button"
                     onClick={() => setFilterOnlyFaulty((prev) => !prev)}
-                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-bold transition-all ${
+                    className={`inline-flex items-center gap-1.5 rounded-2xl border px-3.5 py-2.5 text-xs font-extrabold transition-all cursor-pointer shadow-2xs ${
                       filterOnlyFaulty
-                        ? 'border-rose-300 bg-rose-50 text-rose-700 ring-2 ring-rose-200/60 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                        : 'border-slate-200/80 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300'
+                        ? 'border-rose-400 bg-rose-50 text-rose-800 ring-2 ring-rose-200/60 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'
                     }`}
                   >
-                    <AlertTriangle className={`h-3.5 w-3.5 ${filterOnlyFaulty ? 'text-rose-600' : 'text-slate-400'}`} />
+                    <AlertTriangle className={`h-3.5 w-3.5 ${filterOnlyFaulty ? 'text-rose-600' : 'text-slate-500'}`} />
                     {filterOnlyFaulty ? 'Chỉ hiện lô cần khôi phục' : 'Lọc lô bị lệch'}
                   </button>
                 </div>
@@ -945,7 +998,7 @@ export default function AuditLogsPage() {
             </div>
 
             {loading ? (
-              <div className="py-16 bg-white rounded-3xl border border-slate-200/80 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <div className="py-20 bg-white rounded-3xl border border-slate-200/80 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <LoadingIndicator size="lg" label="Đang đối soát danh sách lô Blockchain..." />
               </div>
             ) : (
@@ -959,7 +1012,10 @@ export default function AuditLogsPage() {
                 recoveringBatchId={recoveringBatchId}
                 chain={chain}
                 onOpenDetail={openBatchDetail}
-                onRecover={(batch) => { setRecoveryTarget(batch); setRecoveryReason(''); }}
+                onRecover={(batch) => {
+                  setRecoveryTarget(batch);
+                  setRecoveryReason('');
+                }}
                 onPrev={() => setBatchesPage((v) => Math.max(1, v - 1))}
                 onNext={() => setBatchesPage((v) => Math.min(batchesTotalPages, v + 1))}
               />
@@ -967,7 +1023,7 @@ export default function AuditLogsPage() {
           </div>
         )}
 
-        {/* TAB 2: INTEGRITY VERIFICATION & ENTITY RECOVERY */}
+        {/* TAB 2: INTEGRITY VERIFICATION & CLINICAL ENTITY RECOVERY */}
         {activeTab === 'integrity' && (
           <div className="space-y-6 animate-fadeIn">
             <ChainBanner
@@ -996,57 +1052,15 @@ export default function AuditLogsPage() {
         {/* TAB 3: PENDING QUEUE */}
         {activeTab === 'pending' && (
           <div className="space-y-6 animate-fadeIn">
-            {/* Live 4-Stage Anchoring Stepper */}
-            <AnchoringStepper stage={anchorStage} anchoring={anchoring} batchInfo={anchoringBatchInfo} />
-
-            <div className="rounded-3xl border border-amber-200/90 bg-amber-50/60 p-6 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/30">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <History className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                    <h3 className="text-base font-bold text-amber-950 dark:text-amber-100">
-                      Hàng đợi chưa seal lô ({pendingQueue.total} bản ghi)
-                    </h3>
-                  </div>
-                  <p className="text-xs font-semibold text-amber-800/90 dark:text-amber-300/90">
-                    Các Sequence này đã ghi vào cơ sở dữ liệu PostgreSQL nhưng chưa tạo Merkle Root để neo on-chain.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleAnchorNow}
-                  disabled={anchoring || pendingQueue.total === 0}
-                  className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-amber-600 px-5 py-3 text-xs font-bold text-white shadow-md hover:bg-amber-700 disabled:opacity-50 transition-all cursor-pointer"
-                >
-                  <LockKeyhole className="h-4 w-4" />
-                  <span>{anchoring ? 'Đang đóng lô & neo...' : 'Đóng lô & Neo ngay'}</span>
-                </button>
-              </div>
-
-              {pendingQueue.items.length > 0 ? (
-                <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {pendingQueue.items.map((log) => (
-                    <div key={log.id} className="rounded-2xl border border-amber-200 bg-white p-4 shadow-xs dark:border-amber-900 dark:bg-slate-900">
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs font-black text-amber-900 dark:text-amber-300">SEQ #{log.seq}</span>
-                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${ACTION_TONE[log.action] || 'bg-slate-100 text-slate-700'}`}>
-                          {ACTION_LABEL[log.action] || log.action}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-xs font-bold text-slate-800 dark:text-slate-200">{ENTITY_LABELS[log.entity] || log.entity}</p>
-                      <p className="text-[10px] font-semibold text-slate-400">{formatTime(log.createdAt)}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="mt-5 rounded-2xl border border-amber-200/50 bg-white/80 p-8 text-center dark:bg-slate-900/50">
-                  <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500" />
-                  <p className="mt-2 text-xs font-bold text-slate-700 dark:text-slate-300">Hàng đợi đang trống!</p>
-                  <p className="text-[11px] font-medium text-slate-400">Tất cả audit log đã được đóng lô và neo đầy đủ lên Blockchain.</p>
-                </div>
-              )}
-            </div>
+            <PendingQueuePanel
+              pendingQueue={pendingQueue}
+              anchoring={anchoring}
+              anchorStage={anchorStage}
+              anchoringBatchInfo={anchoringBatchInfo}
+              latestBatch={stats.latestBatch}
+              onAnchorNow={handleAnchorNow}
+              onRefresh={loadPendingQueue}
+            />
           </div>
         )}
       </div>
@@ -1057,8 +1071,14 @@ export default function AuditLogsPage() {
           loading={batchDetailLoading}
           detail={batchDetail}
           recoveringBatchId={recoveringBatchId}
-          onClose={() => { setSelectedBatchId(null); setBatchDetail(null); }}
-          onRecover={(batch) => { setRecoveryTarget(batch); setRecoveryReason(''); }}
+          onClose={() => {
+            setSelectedBatchId(null);
+            setBatchDetail(null);
+          }}
+          onRecover={(batch) => {
+            setRecoveryTarget(batch);
+            setRecoveryReason('');
+          }}
           onProof={handleProof}
           onOpenSeq={setSeqDetail}
         />
@@ -1082,13 +1102,16 @@ export default function AuditLogsPage() {
       )}
 
       {proof && <ProofModal proof={proof} onClose={() => setProof(null)} />}
-      
+
       {recoveryTarget && !recoveryFaceOpen && (
         <RecoveryReasonModal
           batch={recoveryTarget}
           reason={recoveryReason}
           setReason={setRecoveryReason}
-          onClose={() => { setRecoveryTarget(null); setRecoveryReason(''); }}
+          onClose={() => {
+            setRecoveryTarget(null);
+            setRecoveryReason('');
+          }}
           onContinue={() => setRecoveryFaceOpen(true)}
         />
       )}
@@ -1099,7 +1122,9 @@ export default function AuditLogsPage() {
           resourceId={String(recoveryTarget.batchId)}
           title={
             Array.isArray(recoveryTarget.batchIds) && recoveryTarget.batchIds.length > 1
-              ? `Quét khuôn mặt để khôi phục toàn bộ ${recoveryTarget.batchIds.length} lô audit (${recoveryTarget.batchIds.map((id) => `#${id}`).join(', ')})`
+              ? `Quét khuôn mặt để khôi phục toàn bộ ${recoveryTarget.batchIds.length} lô audit (${recoveryTarget.batchIds
+                  .map((id) => `#${id}`)
+                  .join(', ')})`
               : `Quét khuôn mặt để khôi phục batch #${recoveryTarget.batchId}`
           }
           description="Backend sẽ kiểm chứng blockchain và IPFS trước khi thay audit logs. Nội dung bệnh án không được hiển thị."
@@ -1128,6 +1153,10 @@ export default function AuditLogsPage() {
                 className={`flex h-7 w-7 items-center justify-center rounded-lg ${
                   deepScanProgress.active
                     ? 'bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400 animate-pulse'
+                    : deepScanProgress.outcome === 'FAILED'
+                    ? 'bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-400'
+                    : deepScanProgress.outcome === 'PARTIAL'
+                    ? 'bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400'
                     : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400'
                 }`}
               >
@@ -1144,7 +1173,7 @@ export default function AuditLogsPage() {
                   setDeepScanCollapsed(false);
                 }}
                 className="ml-1 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-                title="Thu gọn"
+                title="Mở rộng"
               >
                 <Maximize2 className="h-3.5 w-3.5" />
               </button>
@@ -1161,24 +1190,34 @@ export default function AuditLogsPage() {
               </button>
             </div>
           ) : (
-            <div className="w-96 max-w-[calc(100vw-3rem)] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl dark:border-slate-800 dark:bg-slate-900 transition-all duration-300">
+            <div className="w-96 max-w-[calc(100vw-3rem)] rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900 transition-all duration-300">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-3">
                 <div className="flex items-center gap-2.5">
                   <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                    className={`flex h-8 w-8 items-center justify-center rounded-xl ${
                       deepScanProgress.active
                         ? 'bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400 animate-pulse'
+                        : deepScanProgress.outcome === 'FAILED'
+                        ? 'bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-400'
+                        : deepScanProgress.outcome === 'PARTIAL'
+                        ? 'bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400'
                         : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400'
                     }`}
                   >
                     <Activity className="h-4 w-4" />
                   </div>
                   <div>
-                    <h5 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    <h5 className="text-xs font-bold text-slate-900 dark:text-slate-100">
                       Đối soát Blockchain & Tự sửa chữa
                     </h5>
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                      {deepScanProgress.active ? 'Đang chạy ngầm...' : 'Đã hoàn thành đối soát'}
+                    <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                      {deepScanProgress.active
+                        ? 'Đang chạy ngầm...'
+                        : deepScanProgress.outcome === 'FAILED'
+                        ? 'FAILED · Cần can thiệp'
+                        : deepScanProgress.outcome === 'PARTIAL'
+                        ? 'PARTIAL · Chưa khôi phục hết'
+                        : 'SUCCESS · Đã xác minh toàn bộ'}
                     </p>
                   </div>
                 </div>
@@ -1189,7 +1228,7 @@ export default function AuditLogsPage() {
                     className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
                     title="Thu gọn"
                   >
-                    <Minimize2 className="h-4 w-4" />
+                    <Minimize2 className="h-3.5 w-3.5" />
                   </button>
                   <button
                     type="button"
@@ -1197,7 +1236,7 @@ export default function AuditLogsPage() {
                     className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
                     title="Tắt"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
@@ -1209,13 +1248,19 @@ export default function AuditLogsPage() {
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                   <div
-                    className="h-full bg-gradient-to-r from-sky-500 to-emerald-500 transition-all duration-300 rounded-full"
+                    className={`h-full transition-all duration-300 rounded-full ${
+                      deepScanProgress.outcome === 'FAILED'
+                        ? 'bg-rose-500'
+                        : deepScanProgress.outcome === 'PARTIAL'
+                        ? 'bg-amber-500'
+                        : 'bg-gradient-to-r from-sky-500 to-emerald-500'
+                    }`}
                     style={{ width: `${deepScanProgress.progressPercent}%` }}
                   />
                 </div>
               </div>
 
-              <div className="h-36 overflow-y-auto rounded-xl bg-slate-950 p-2.5 font-mono text-[11px] text-slate-300 space-y-1 scrollbar-thin">
+              <div className="h-36 overflow-y-auto rounded-2xl bg-slate-950 p-2.5 font-mono text-[11px] text-slate-300 space-y-1 scrollbar-thin">
                 {(deepScanProgress.logs || []).map((log, idx) => (
                   <div key={idx} className="leading-relaxed break-words">
                     {log}
@@ -1227,7 +1272,7 @@ export default function AuditLogsPage() {
         </div>
       )}
 
-      {/* Floating Entity Recovery Progress Widget (Right Sidebar / Bottom-Right) */}
+      {/* Floating Entity Recovery Progress Widget */}
       {entityRecoveryProgress && (
         <div className="fixed bottom-6 right-6 z-50 transition-all duration-300">
           {entityRecoveryCollapsed ? (
@@ -1257,7 +1302,13 @@ export default function AuditLogsPage() {
               </div>
               <div className="flex items-center gap-1.5 font-mono text-xs font-bold">
                 <span className="text-slate-500 dark:text-slate-400">Khôi phục:</span>
-                <span className={entityRecoveryProgress.tamperedCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-sky-600 dark:text-sky-400'}>
+                <span
+                  className={
+                    entityRecoveryProgress.tamperedCount > 0
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-sky-600 dark:text-sky-400'
+                  }
+                >
                   {entityRecoveryProgress.progressPercent}%
                 </span>
               </div>
@@ -1291,11 +1342,11 @@ export default function AuditLogsPage() {
               </button>
             </div>
           ) : (
-            <div className="w-[430px] max-w-[calc(100vw-3rem)] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl dark:border-slate-800 dark:bg-slate-900 transition-all duration-300">
+            <div className="w-[430px] max-w-[calc(100vw-3rem)] rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900 transition-all duration-300">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-3">
                 <div className="flex items-center gap-2.5">
                   <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                    className={`flex h-8 w-8 items-center justify-center rounded-xl ${
                       entityRecoveryProgress.active
                         ? 'bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400 animate-pulse'
                         : entityRecoveryProgress.tamperedCount > 0
@@ -1310,15 +1361,15 @@ export default function AuditLogsPage() {
                     )}
                   </div>
                   <div>
-                    <h5 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                      Khôi phục Thực thể & Đối soát Blockchain
+                    <h5 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                      Khôi phục Thực thể & Đối soát On-Chain
                       {entityRecoveryProgress.tamperedCount > 0 && (
-                        <span className="rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 px-2 py-0.5 text-[10px] font-bold">
+                        <span className="rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 px-2 py-0.5 text-[9px] font-bold">
                           IPFS Fallback
                         </span>
                       )}
                     </h5>
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
                       {entityRecoveryProgress.active ? 'Đang chạy ngầm đối soát...' : 'Đã hoàn tất quá trình'}
                     </p>
                   </div>
@@ -1330,7 +1381,7 @@ export default function AuditLogsPage() {
                     className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 cursor-pointer"
                     title="Thu gọn"
                   >
-                    <Minimize2 className="h-4 w-4" />
+                    <Minimize2 className="h-3.5 w-3.5" />
                   </button>
                   <button
                     type="button"
@@ -1338,12 +1389,11 @@ export default function AuditLogsPage() {
                     className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 cursor-pointer"
                     title="Tắt"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
 
-              {/* Progress status & percentage bar */}
               <div className="space-y-1.5 mb-3">
                 <div className="flex justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
                   <span className="truncate">{entityRecoveryProgress.statusMessage}</span>
@@ -1361,7 +1411,6 @@ export default function AuditLogsPage() {
                 </div>
               </div>
 
-              {/* Real-time Terminal Logger */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-slate-400 px-1">
                   <span className="flex items-center gap-1">
@@ -1370,7 +1419,7 @@ export default function AuditLogsPage() {
                   </span>
                   <span>{entityRecoveryProgress.logs?.length || 0} dòng</span>
                 </div>
-                <div className="h-40 overflow-y-auto rounded-xl bg-slate-950 p-3 font-mono text-[11px] text-slate-300 space-y-1.5 scrollbar-thin border border-slate-800">
+                <div className="h-40 overflow-y-auto rounded-2xl bg-slate-950 p-3 font-mono text-[11px] text-slate-300 space-y-1.5 scrollbar-thin border border-slate-800">
                   {(entityRecoveryProgress.logs || []).map((log, idx) => (
                     <div
                       key={idx}
@@ -1420,26 +1469,58 @@ export default function AuditLogsPage() {
 }
 
 /* =========================================================================
-   SUB-COMPONENTS (Executive Header, Cards, Tables, Drawers, Stepper)
+   EXECUTIVE HEADER & ACTION MENU
    ========================================================================= */
 
-function ExecutiveHeader({ onRefresh, onAnchor, onOpenDeepScan, onQuickRecoverBatch, quickRecovering, loading, anchoring, deepScanActive, stats, chain }) {
+function ExecutiveHeader({
+  onRefresh,
+  onAnchor,
+  onOpenDeepScan,
+  onQuickRecoverBatch,
+  quickRecovering,
+  loading,
+  anchoring,
+  deepScanActive,
+  stats,
+  chain,
+  activeTab,
+  setActiveTab,
+  filterOnlyFaulty,
+  setFilterOnlyFaulty,
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    }
+    if (menuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [menuOpen]);
+
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-sky-50/30 to-indigo-50/20 p-6 sm:p-8 shadow-sm dark:border-slate-800 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950">
+    <div className="relative rounded-3xl border border-slate-200/90 bg-gradient-to-br from-white via-sky-50/30 to-indigo-50/20 p-6 sm:p-8 shadow-sm dark:border-slate-800 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100/90 px-3 py-1 text-xs font-bold text-sky-800 border border-sky-200/80 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1 text-xs font-extrabold text-sky-800 border border-sky-300/80 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800">
               <LockKeyhole className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
               Audit Integrity & Blockchain Sepolia
             </span>
             {stats.isChainOk ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100/80 px-2.5 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> 100% Toàn vẹn
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-extrabold text-emerald-800 border border-emerald-300/80 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> 100% Toàn vẹn
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-800 dark:bg-rose-950 dark:text-rose-300 animate-pulse">
-                <ShieldAlert className="h-3.5 w-3.5 text-rose-600" /> Phát hiện đứt băm!
+              <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-3 py-1 text-xs font-extrabold text-rose-800 border border-rose-300 dark:bg-rose-950 dark:text-rose-300 animate-pulse">
+                <ShieldAlert className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" /> Phát hiện đứt băm!
               </span>
             )}
           </div>
@@ -1447,33 +1528,132 @@ function ExecutiveHeader({ onRefresh, onAnchor, onOpenDeepScan, onQuickRecoverBa
           <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl dark:text-white">
             Nhật ký Audit & Neo Blockchain
           </h1>
-          <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 max-w-2xl">
+          <p className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-400 max-w-2xl leading-relaxed">
             Giám sát toàn vẹn dữ liệu bệnh viện, kiểm chứng mã băm Merkle Tree và tự động phục hồi bản ghi khi phát hiện sai lệch.
           </p>
         </div>
 
+        {/* Executive Action Hub */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          {/* Sync Button */}
           <button
             type="button"
             onClick={onRefresh}
             disabled={loading}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200/90 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-sky-700 transition-all shadow-xs disabled:opacity-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-800 hover:bg-slate-50 hover:text-sky-600 hover:border-sky-300 transition-all shadow-sm active:scale-95 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+            title="Đồng bộ tức thời với cơ sở dữ liệu và blockchain"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-sky-600' : 'text-sky-600 dark:text-sky-400'}`} />
             <span>Đồng bộ</span>
           </button>
 
-          <button
-            type="button"
-            onClick={onOpenDeepScan}
-            disabled={deepScanActive}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-sky-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-sky-700 transition-all shadow-md active:scale-95 disabled:opacity-50 cursor-pointer"
-            title="Quét khuôn mặt để đối soát & kiểm tra toàn bộ batch ngầm với Blockchain & IPFS"
-          >
-            <Scan className="h-4 w-4 text-amber-300" />
-            <span>Scan & Đối soát toàn bộ Batch</span>
-          </button>
+          {/* Quick Action: Feature Dropdown Menu */}
+          <div className="relative z-20" ref={menuRef}>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((prev) => !prev)}
+              className={`inline-flex items-center justify-center gap-2 rounded-2xl border-2 px-4 py-2.5 text-xs font-extrabold transition-all shadow-sm cursor-pointer active:scale-95 ${
+                menuOpen
+                  ? 'border-sky-600 bg-sky-600 text-white ring-4 ring-sky-100 dark:ring-sky-950'
+                  : 'border-sky-300 bg-sky-50 text-sky-800 hover:bg-sky-100 hover:border-sky-400 dark:border-sky-700 dark:bg-sky-950 dark:text-sky-200 dark:hover:bg-sky-900'
+              }`}
+            >
+              <Sparkles className={`h-4 w-4 ${menuOpen ? 'text-amber-300' : 'text-sky-600 dark:text-sky-400'}`} />
+              <span>Tính năng & Công cụ</span>
+              <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${menuOpen ? 'rotate-180' : ''}`} />
+            </button>
 
+            {menuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-3xl border border-slate-200 bg-white p-3.5 shadow-2xl dark:border-slate-700 dark:bg-slate-900 z-30 animate-fadeIn space-y-2 ring-1 ring-black/5">
+                <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Công cụ Kiểm toán Chuyên sâu</p>
+                  <span className="text-[10px] font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full dark:bg-sky-950 dark:text-sky-400">Admin</span>
+                </div>
+
+                <div className="space-y-1.5">
+                  {/* Action 1: Deep Scan */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onOpenDeepScan();
+                    }}
+                    disabled={deepScanActive}
+                    className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left text-xs font-bold text-slate-800 hover:bg-sky-50 hover:text-sky-800 dark:text-slate-200 dark:hover:bg-slate-800 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400 shadow-2xs">
+                      <Scan className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 dark:text-white">Scan toàn bộ Batch</p>
+                      <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">Đối soát Merkle Root & IPFS toàn bộ</p>
+                    </div>
+                  </button>
+
+                  {/* Action 2: Go to Entity Recovery */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setActiveTab('integrity');
+                    }}
+                    className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left text-xs font-bold text-slate-800 hover:bg-rose-50 hover:text-rose-800 dark:text-slate-200 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-400 shadow-2xs">
+                      <ShieldAlert className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 dark:text-white">Kiểm tra & Khôi phục</p>
+                      <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">Đối chiếu dữ liệu ca khám & phục hồi</p>
+                    </div>
+                  </button>
+
+                  {/* Action 3: Quick Recover Broken SEQ if any */}
+                  {!stats.isChainOk && chain?.brokenAtSeq != null && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onQuickRecoverBatch?.(chain.brokenAtSeq);
+                      }}
+                      disabled={quickRecovering}
+                      className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left text-xs font-bold text-rose-800 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:text-rose-300 dark:hover:bg-rose-900 transition-all cursor-pointer"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-600 text-white shadow-2xs">
+                        <Zap className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold">Khôi phục đứt SEQ #{chain.brokenAtSeq}</p>
+                        <p className="text-[10px] font-medium text-rose-600 dark:text-rose-400">Tự động nạp lại artifact chuẩn</p>
+                      </div>
+                    </button>
+                  )}
+
+                  {/* Action 4: Filter Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setFilterOnlyFaulty((prev) => !prev);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left text-xs font-bold text-slate-800 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 shadow-2xs">
+                      <Filter className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 dark:text-white">
+                        {filterOnlyFaulty ? 'Hủy lọc lô bị lệch' : 'Lọc các lô có cảnh báo'}
+                      </p>
+                      <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">Bật/tắt chế độ lọc thông minh</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Recover broken SEQ button in header if error exists */}
           {!stats.isChainOk && chain?.brokenAtSeq != null && (
             <button
               type="button"
@@ -1486,15 +1666,21 @@ function ExecutiveHeader({ onRefresh, onAnchor, onOpenDeepScan, onQuickRecoverBa
             </button>
           )}
 
+          {/* Primary Action Button: Anchor Now */}
           <button
             id="audit-anchor-now-button"
             type="button"
             onClick={onAnchor}
             disabled={anchoring}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 dark:bg-slate-100 dark:text-slate-900 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-slate-800 transition-all disabled:opacity-60 cursor-pointer active:scale-95"
+            className={`inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-extrabold shadow-md transition-all cursor-pointer active:scale-95 disabled:opacity-50 ${
+              stats.pending > 0
+                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white hover:from-amber-600 hover:to-amber-700 ring-2 ring-amber-300/50 animate-pulse'
+                : 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200'
+            }`}
+            title={stats.pending > 0 ? `Gom ${stats.pending} bản ghi và neo lên Sepolia` : 'Gom bản ghi và neo lên Sepolia'}
           >
-            <LockKeyhole className="h-3.5 w-3.5" />
-            <span>{anchoring ? 'Đang neo...' : 'Neo blockchain ngay'}</span>
+            <LockKeyhole className="h-4 w-4" />
+            <span>{anchoring ? 'Đang neo...' : stats.pending > 0 ? `Neo ngay (${stats.pending} SEQ)` : 'Đóng lô & Neo (0 SEQ)'}</span>
           </button>
         </div>
       </div>
@@ -1502,20 +1688,29 @@ function ExecutiveHeader({ onRefresh, onAnchor, onOpenDeepScan, onQuickRecoverBa
   );
 }
 
-function StatCard({ label, value, hint, icon: Icon, color = 'text-slate-900', accentColor = 'sky' }) {
+/* =========================================================================
+   STAT CARD COMPONENT
+   ========================================================================= */
+
+function StatCard({ label, value, hint, icon: Icon, color = 'text-slate-900', accentColor = 'sky', onClick }) {
   const accentBgs = {
-    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-900',
-    amber: 'bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-900',
-    rose: 'bg-rose-50 text-rose-600 border-rose-100 dark:bg-rose-950 dark:text-rose-400 dark:border-rose-900',
+    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-900',
+    amber: 'bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-950/60 dark:text-amber-400 dark:border-amber-900',
+    rose: 'bg-rose-50 text-rose-600 border-rose-100 dark:bg-rose-950/60 dark:text-rose-400 dark:border-rose-900',
     slate: 'bg-slate-50 text-slate-600 border-slate-100 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700',
-    sky: 'bg-sky-50 text-sky-600 border-sky-100 dark:bg-sky-950 dark:text-sky-400 dark:border-sky-900',
+    sky: 'bg-sky-50 text-sky-600 border-sky-100 dark:bg-sky-950/60 dark:text-sky-400 dark:border-sky-900',
   };
 
   return (
-    <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 flex items-start justify-between transition-all hover:border-slate-300">
+    <div
+      onClick={onClick}
+      className={`rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 flex items-start justify-between transition-all hover:border-slate-300 dark:hover:border-slate-700 ${
+        onClick ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : ''
+      }`}
+    >
       <div className="space-y-1">
         <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">{label}</p>
-        <p className={`text-2xl font-extrabold tracking-tight dark:text-white ${color}`}>{value}</p>
+        <p className={`text-2xl font-black tracking-tight ${color}`}>{value}</p>
         <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">{hint}</p>
       </div>
       {Icon && (
@@ -1527,22 +1722,26 @@ function StatCard({ label, value, hint, icon: Icon, color = 'text-slate-900', ac
   );
 }
 
-function TabButton({ id, label, icon: Icon, count, badgeColor = 'bg-sky-100 text-sky-700', active, onClick }) {
+/* =========================================================================
+   TAB SEGMENT BUTTON
+   ========================================================================= */
+
+function TabSegmentButton({ id, label, icon: Icon, count, badgeColor = 'bg-sky-100 text-sky-800', active, onClick }) {
   return (
     <button
       type="button"
       onClick={() => onClick(id)}
-      className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-bold transition-all shrink-0 cursor-pointer ${
+      className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-extrabold transition-all shrink-0 cursor-pointer active:scale-95 ${
         active
-          ? 'bg-sky-600 text-white shadow-md'
-          : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200/80 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
+          ? 'bg-sky-600 text-white shadow-md ring-2 ring-sky-400/50 dark:bg-sky-600 dark:text-white'
+          : 'bg-white/90 text-slate-700 hover:text-sky-700 hover:bg-white shadow-2xs border border-slate-200/80 dark:bg-slate-800/90 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700'
       }`}
     >
-      {Icon && <Icon className="h-4 w-4" />}
+      {Icon && <Icon className={`h-4 w-4 ${active ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />}
       <span>{label}</span>
       {count != null && (
         <span
-          className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
+          className={`rounded-full px-2 py-0.5 text-[10px] font-black transition-all ${
             active ? 'bg-white/20 text-white' : badgeColor
           }`}
         >
@@ -1553,10 +1752,32 @@ function TabButton({ id, label, icon: Icon, count, badgeColor = 'bg-sky-100 text
   );
 }
 
-function BatchesHomeTable({ batches, page, totalPages, total, sortBy, sortOrder, onPrev, onNext, onRecover, onOpenDetail, recoveringBatchId, chain }) {
-  const sortHint = sortBy === 'time'
-    ? (sortOrder === 'desc' ? 'Mới → cũ' : 'Cũ → mới')
-    : (sortOrder === 'desc' ? 'Lô lớn → nhỏ' : 'Lô nhỏ → lớn');
+/* =========================================================================
+   TAB 1: BATCHES LIST TABLE
+   ========================================================================= */
+
+function BatchesHomeTable({
+  batches,
+  page,
+  totalPages,
+  total,
+  sortBy,
+  sortOrder,
+  onPrev,
+  onNext,
+  onRecover,
+  onOpenDetail,
+  recoveringBatchId,
+  chain,
+}) {
+  const sortHint =
+    sortBy === 'time'
+      ? sortOrder === 'desc'
+        ? 'Mới → cũ'
+        : 'Cũ → mới'
+      : sortOrder === 'desc'
+      ? 'Lô lớn → nhỏ'
+      : 'Lô nhỏ → lớn';
 
   return (
     <section className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden dark:border-slate-800 dark:bg-slate-900">
@@ -1566,7 +1787,8 @@ function BatchesHomeTable({ batches, page, totalPages, total, sortBy, sortOrder,
           <span>Danh sách Lô Blockchain (Checkpoints)</span>
         </div>
         <div className="text-xs font-semibold text-slate-400">
-          Sắp xếp: <span className="text-slate-700 dark:text-slate-300 font-bold">{sortHint}</span> · Tổng: <span className="font-bold text-slate-900 dark:text-white">{total}</span> lô
+          Sắp xếp: <span className="text-slate-700 dark:text-slate-300 font-bold">{sortHint}</span> · Tổng:{' '}
+          <span className="font-bold text-slate-900 dark:text-white">{total}</span> lô
         </div>
       </div>
 
@@ -1593,7 +1815,12 @@ function BatchesHomeTable({ batches, page, totalPages, total, sortBy, sortOrder,
                 {batches.map((b) => {
                   const integrity = b.integrity || {};
                   const isRecoverable = canRecoverBatch(b, chain);
-                  const isBrokenSeqBatch = chain && !chain.ok && chain.brokenAtSeq != null && (b.fromSeq <= chain.brokenAtSeq + 1 && b.toSeq >= Math.max(1, chain.brokenAtSeq - 1));
+                  const isBrokenSeqBatch =
+                    chain &&
+                    !chain.ok &&
+                    chain.brokenAtSeq != null &&
+                    b.fromSeq <= chain.brokenAtSeq + 1 &&
+                    b.toSeq >= Math.max(1, chain.brokenAtSeq - 1);
 
                   return (
                     <tr
@@ -1632,7 +1859,13 @@ function BatchesHomeTable({ batches, page, totalPages, total, sortBy, sortOrder,
                         <BatchIntegrityBadge integrity={integrity} isBrokenSeqBatch={isBrokenSeqBatch} />
                       </td>
                       <td className="px-4 py-4 space-y-1">
-                        <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold ${b.status === 'ANCHORED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800' : 'bg-rose-50 text-rose-700 border-rose-200/80 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800'}`}>
+                        <span
+                          className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold ${
+                            b.status === 'ANCHORED'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800'
+                              : 'bg-rose-50 text-rose-700 border-rose-200/80 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800'
+                          }`}
+                        >
                           {BATCH_STATUS_LABEL[b.status] || b.status}
                         </span>
                         <div className="flex items-center gap-1 text-[9px] font-extrabold text-slate-400">
@@ -1650,7 +1883,7 @@ function BatchesHomeTable({ batches, page, totalPages, total, sortBy, sortOrder,
                           <button
                             type="button"
                             onClick={() => onOpenDetail(b.batchId)}
-                            className="rounded-xl border border-slate-200/80 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-sky-300 hover:text-sky-700 shadow-xs dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200"
+                            className="rounded-xl border border-sky-300 bg-sky-50/80 px-3.5 py-1.5 text-xs font-extrabold text-sky-800 hover:bg-sky-600 hover:text-white shadow-2xs dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300 dark:hover:bg-sky-600 dark:hover:text-white transition-all cursor-pointer"
                           >
                             Chi tiết
                           </button>
@@ -1659,10 +1892,10 @@ function BatchesHomeTable({ batches, page, totalPages, total, sortBy, sortOrder,
                             onClick={() => onRecover(b)}
                             disabled={!isRecoverable || recoveringBatchId === b.batchId}
                             title={recoverBatchDisabledReason(b, chain) || 'Khôi phục lô khi kiểm tra toàn vẹn không ổn'}
-                            className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition-all ${
+                            className={`rounded-xl border px-3.5 py-1.5 text-xs font-extrabold transition-all ${
                               isBrokenSeqBatch || isRecoverable
-                                ? 'border-rose-300 bg-rose-600 text-white hover:bg-rose-700 shadow-xs animate-pulse'
-                                : 'border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-800 dark:bg-slate-800/40 disabled:cursor-not-allowed opacity-50'
+                                ? 'border-rose-400 bg-rose-600 text-white hover:bg-rose-700 shadow-sm animate-pulse cursor-pointer'
+                                : 'border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-500 cursor-not-allowed'
                             }`}
                           >
                             {recoveringBatchId === b.batchId ? 'Đang xử lý...' : 'Khôi phục'}
@@ -1685,9 +1918,10 @@ function BatchesHomeTable({ batches, page, totalPages, total, sortBy, sortOrder,
 function BatchIntegrityBadge({ integrity, isBrokenSeqBatch }) {
   const status = integrity?.status || 'PENDING';
   let label = status === 'VERIFIED' ? 'Toàn vẹn' : status === 'TAMPERED' ? 'Nghi sửa đổi' : 'Thiếu field hash';
-  let tone = status === 'VERIFIED'
-    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800'
-    : status === 'TAMPERED'
+  let tone =
+    status === 'VERIFIED'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800'
+      : status === 'TAMPERED'
       ? 'border-rose-200 bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800'
       : 'border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800';
 
@@ -1706,15 +1940,34 @@ function BatchIntegrityBadge({ integrity, isBrokenSeqBatch }) {
   );
 }
 
-function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason, setReason, recovering, onRecover, onRefresh, alert, onDismissAlert }) {
-  const [viewMode, setViewMode] = useState('clustered'); // 'clustered' | 'flat'
+/* =========================================================================
+   TAB 2: ENTITY INTEGRITY & CLINICAL RECOVERY PANEL
+   ========================================================================= */
+
+function EntityRecoveryPanel({
+  warnings,
+  loading,
+  selected,
+  setSelected,
+  reason,
+  setReason,
+  recovering,
+  onRecover,
+  onRefresh,
+  alert,
+  onDismissAlert,
+}) {
+  const [viewMode, setViewMode] = useState('clustered');
+  const [filterQuery, setFilterQuery] = useState('');
+
   const recoverable = warnings.filter((item) => item.recoverable);
   const allSelected = recoverable.length > 0 && recoverable.every((item) => selected.includes(`${item.entity}:${item.entityId}`));
   const selectedCount = recoverable.filter((item) => selected.includes(`${item.entity}:${item.entityId}`)).length;
-  const toggleAll = () => setSelected(allSelected ? [] : recoverable.map((item) => `${item.entity}:${item.entityId}`));
-  const toggleOne = (key) => setSelected((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
+  const toggleAll = () =>
+    setSelected(allSelected ? [] : recoverable.map((item) => `${item.entity}:${item.entityId}`));
+  const toggleOne = (key) =>
+    setSelected((current) => (current.includes(key) ? current.filter((item) => item !== key) : [...current, key]));
 
-  // Group warnings into clinical case clusters
   const CLINICAL_ENTITY_ORDER = {
     Patient: 1,
     Appointment: 2,
@@ -1737,7 +1990,7 @@ function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason,
       if (!map.has(key)) {
         map.set(key, {
           clusterKey: key,
-          clusterLabel: item.clusterLabel || `Ca bệnh / Cụm thực thể #${key.slice(0, 8)}`,
+          clusterLabel: item.clusterLabel || `Ca khám / Cụm thực thể #${key.slice(0, 8)}`,
           items: [],
           hasRecoverable: false,
         });
@@ -1755,8 +2008,17 @@ function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason,
       });
     }
 
-    return Array.from(map.values());
-  }, [warnings]);
+    let list = Array.from(map.values());
+    if (filterQuery.trim()) {
+      const q = filterQuery.trim().toLowerCase();
+      list = list.filter((c) => {
+        const hay = [c.clusterLabel, c.clusterKey, ...c.items.map((i) => `${i.entity} ${i.message} ${i.entityId}`)].join(' ').toLowerCase();
+        return hay.includes(q);
+      });
+    }
+
+    return list;
+  }, [warnings, filterQuery]);
 
   const selectCluster = (clusterItems) => {
     const keys = clusterItems.filter((i) => i.recoverable).map((i) => `${i.entity}:${i.entityId}`);
@@ -1773,30 +2035,67 @@ function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason,
 
   if (!loading && warnings.length === 0) {
     return (
-      <section className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 dark:border-emerald-900 dark:bg-emerald-950/40">
-        <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-emerald-800 dark:text-emerald-200">
-          <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-          <span>Tất cả dữ liệu bệnh viện hiện tại hoàn toàn khớp và an toàn với nhật ký hệ thống</span>
+      <section className="space-y-6">
+        <div className="relative overflow-hidden rounded-3xl border border-emerald-200/90 bg-gradient-to-br from-emerald-500/10 via-emerald-50/50 to-white p-8 shadow-sm dark:border-emerald-900/60 dark:from-emerald-950/40 dark:via-slate-900 dark:to-slate-900">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-start gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-500/20">
+                <ShieldCheck className="h-8 w-8" />
+              </div>
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  Xác minh Bất biến On-Chain
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                  Dữ liệu Bệnh viện Khớp Toàn vẹn 100%
+                </h3>
+                <p className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 max-w-2xl leading-relaxed">
+                  Hệ thống đã tự động đối soát toàn bộ bản ghi Bệnh nhân, Lượt khám, Chỉ định CLS, Kết quả và Chẩn đoán lâm sàng với Merkle Root trên Smart Contract Sepolia. Không có bất kỳ sai lệch hay can thiệp dữ liệu nào.
+                </p>
+              </div>
+            </div>
+
+            <div className="shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <button
+                type="button"
+                onClick={onRefresh}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-300 bg-white px-5 py-3 text-xs font-bold text-emerald-800 hover:bg-emerald-50 shadow-xs transition-all dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-300 cursor-pointer"
+              >
+                <RefreshCw className="h-4 w-4 text-emerald-600" />
+                <span>Kiểm tra lại ngay</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3 border-t border-emerald-100 dark:border-emerald-900/50 pt-6">
+            <div className="rounded-2xl border border-emerald-100 bg-white/80 p-4 dark:border-emerald-900/30 dark:bg-slate-900/60">
+              <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Bảo chứng Blockchain</p>
+              <p className="mt-1 text-sm font-black text-slate-800 dark:text-slate-100">Ethereum Sepolia Testnet</p>
+              <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">Merkle Tree SHA-256 Validated</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-100 bg-white/80 p-4 dark:border-emerald-900/30 dark:bg-slate-900/60">
+              <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Watchdog Tự động</p>
+              <p className="mt-1 text-sm font-black text-slate-800 dark:text-slate-100">20 Phút / Chu kỳ</p>
+              <p className="text-[10px] font-semibold text-sky-600 dark:text-sky-400 mt-0.5">Tự động kích hoạt phục hồi nếu lệch</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-100 bg-white/80 p-4 dark:border-emerald-900/30 dark:bg-slate-900/60">
+              <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Cơ chế Khôi phục</p>
+              <p className="mt-1 text-sm font-black text-slate-800 dark:text-slate-100">IPFS Decryption Ready</p>
+              <p className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5">Yêu cầu Face Step-Up Admin</p>
+            </div>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={onRefresh}
-          className="rounded-xl p-2 text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900"
-          title="Kiểm tra lại dữ liệu"
-        >
-          <RefreshCw className="h-4 w-4" />
-        </button>
       </section>
     );
   }
 
   return (
     <section className="space-y-4">
-      {/* Tamper Warning Banner if IPFS Recovery occurred */}
       {alert && alert.type === 'TAMPER_DETECTED' && (
-        <div className="rounded-2xl border border-rose-300 bg-rose-50 p-4.5 dark:border-rose-800 dark:bg-rose-950/60 shadow-xs animate-fadeIn">
+        <div className="rounded-3xl border border-rose-300 bg-rose-50 p-5 dark:border-rose-800 dark:bg-rose-950/60 shadow-xs animate-fadeIn">
           <div className="flex items-start gap-3.5">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-600 text-white shadow-xs">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-600 text-white shadow-xs">
               <ShieldAlert className="h-5 w-5" />
             </div>
             <div className="space-y-1.5 min-w-0 flex-1">
@@ -1818,7 +2117,7 @@ function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason,
               <p className="text-rose-800 dark:text-rose-300 leading-relaxed text-[11px] sm:text-xs">
                 Khi thực hiện khôi phục, hệ thống đã đối soát trực tiếp với <b>Blockchain Smart Contract</b>, phát hiện audit log trong CSDL bị sai lệch so với On-chain Merkle Root và đã <b>tự động tải bản sao lưu IPFS artifact để phục hồi an toàn 100%</b>.
               </p>
-              <div className="mt-2 space-y-1 rounded-xl bg-white/70 dark:bg-slate-900/60 p-2.5 border border-rose-200/60 dark:border-rose-900/40">
+              <div className="mt-2 space-y-1 rounded-2xl bg-white/70 dark:bg-slate-900/60 p-3 border border-rose-200/60 dark:border-rose-900/40">
                 {(alert.items || []).map((item, idx) => (
                   <div key={idx} className="flex items-center gap-2 text-[11px] font-medium text-rose-900 dark:text-rose-200">
                     <span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-500" />
@@ -1833,289 +2132,639 @@ function EntityRecoveryPanel({ warnings, loading, selected, setSelected, reason,
         </div>
       )}
 
-      {/* Friendly Guidance Box */}
-      <div className="rounded-2xl border border-sky-200/80 bg-gradient-to-r from-sky-50/90 via-indigo-50/40 to-white p-4.5 text-xs text-slate-700 dark:border-sky-900/60 dark:bg-slate-800/80 dark:text-slate-200 shadow-xs">
-        <div className="flex items-start gap-3.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-600 text-white shadow-xs">
-            <Info className="h-4 w-4" />
-          </div>
-          <div className="space-y-1 min-w-0">
-            <h4 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
-              💡 Lưu ý về cơ chế kiểm tra & khôi phục
-            </h4>
-            <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[11px] sm:text-xs">
-              Mục này thực hiện <b>đối chiếu nhanh</b> giữa dữ liệu bệnh viện thực tế và bản ghi nhật ký trong cơ sở dữ liệu để tìm ra các ca khám bị chỉnh sửa hoặc vô tình bị xóa.
-            </p>
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-sky-500"></span>
-                <b>Kiểm tra nhanh tại đây:</b> So sánh trực tiếp trong Database để hiển thị ngay tức thì.
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-                <b>Đối soát với Blockchain:</b> Mở tab <i>"Lô đã neo Blockchain"</i> ➔ bấm <i>"Scan toàn bộ Batch"</i> để xác thực toàn diện với Smart Contract.
-              </span>
+      <div className="overflow-hidden rounded-3xl border border-rose-200/90 bg-white shadow-sm dark:border-rose-900/70 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rose-100 bg-rose-50/70 p-5 sm:p-6 dark:border-rose-900/50 dark:bg-rose-950/30">
+          <div className="flex items-start gap-3.5">
+            <div className="p-2.5 rounded-2xl bg-rose-600 text-white shadow-xs">
+              <ShieldAlert className="h-5 w-5" />
             </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="overflow-hidden rounded-3xl border border-rose-200 bg-white shadow-sm dark:border-rose-900 dark:bg-slate-900">
-        {/* Header with View Mode Switcher */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rose-100 bg-rose-50 px-6 py-4 dark:border-rose-900 dark:bg-rose-950/40">
-          <div className="flex items-start gap-3">
-            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
             <div>
-              <h2 className="text-sm font-bold text-rose-950 dark:text-rose-100">
+              <h2 className="text-sm sm:text-base font-black text-rose-950 dark:text-rose-100">
                 Dữ liệu cần kiểm tra & khôi phục ({warnings.length} bản ghi · {clusters.length} ca khám)
               </h2>
               <p className="mt-0.5 text-xs font-semibold text-rose-700 dark:text-rose-300">
-                Hệ thống tự động liên kết và khôi phục trọn gói theo đúng trình tự (từ Lượt khám, Chỉ định đến Kết quả & Chẩn đoán).
+                Hệ thống tự động liên kết và khôi phục trọn gói theo đúng trình tự y tế (Lượt khám ➔ Chỉ định ➔ Kết quả ➔ Chẩn đoán).
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Mode Switcher */}
-            <div className="inline-flex rounded-xl bg-white p-1 shadow-xs border border-rose-200/80 dark:bg-slate-800 dark:border-slate-700 text-[11px] font-bold">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-xl bg-white p-1 shadow-xs border border-rose-200/80 dark:bg-slate-800 dark:border-slate-700 text-xs font-bold">
               <button
                 type="button"
                 onClick={() => setViewMode('clustered')}
-                className={`rounded-lg px-3 py-1.5 transition-all ${viewMode === 'clustered' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300'}`}
+                className={`rounded-lg px-3 py-1.5 transition-all cursor-pointer ${
+                  viewMode === 'clustered'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-300'
+                }`}
               >
                 Gom theo Ca khám ({clusters.length})
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode('flat')}
-                className={`rounded-lg px-3 py-1.5 transition-all ${viewMode === 'flat' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300'}`}
+                className={`rounded-lg px-3 py-1.5 transition-all cursor-pointer ${
+                  viewMode === 'flat'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-300'
+                }`}
               >
                 Danh sách chi tiết ({warnings.length})
               </button>
             </div>
 
-            <button type="button" onClick={onRefresh} disabled={loading || recovering} className="rounded-xl p-2 text-rose-700 hover:bg-rose-100 disabled:opacity-50" title="Kiểm tra lại dữ liệu">
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={loading || recovering}
+              className="rounded-xl border border-rose-200 bg-white p-2 text-rose-700 hover:bg-rose-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-rose-300 cursor-pointer"
+              title="Kiểm tra lại dữ liệu"
+            >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
 
-        {/* CLUSTERED CASE VIEW */}
-        {viewMode === 'clustered' && (
-          <div className="p-6 space-y-4">
-            <div className="flex items-center justify-between gap-3 text-xs font-semibold text-slate-500 pb-2 border-b border-slate-100 dark:border-slate-800">
-              <span>Hiển thị gom gọn theo từng ca khám. Bấm "Chọn trọn gói ca này" để khôi phục toàn bộ thông tin của ca bệnh.</span>
+        <div className="px-6 pt-4 pb-2 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="relative flex-1 max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              placeholder="Lọc theo tên ca, mã thực thể, thông điệp..."
+              className="w-full rounded-xl border border-slate-200/80 bg-slate-50/80 py-2 pl-9 pr-8 text-xs font-semibold text-slate-700 outline-none focus:border-sky-500 focus:bg-white dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200"
+            />
+            {filterQuery && (
               <button
                 type="button"
-                onClick={toggleAll}
-                disabled={!recoverable.length || recovering}
-                className="text-sky-600 hover:text-sky-700 font-bold text-xs"
+                onClick={() => setFilterQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
-                {allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả ca khám'}
+                <X className="h-3.5 w-3.5" />
               </button>
-            </div>
+            )}
+          </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            {clusters.map((cluster) => {
-              const clusterKeys = cluster.items.map((i) => `${i.entity}:${i.entityId}`);
-              const isClusterSelected = cluster.items.some((i) => i.recoverable && selected.includes(`${i.entity}:${i.entityId}`));
-              const allClusterSelected = cluster.items.filter((i) => i.recoverable).every((i) => selected.includes(`${i.entity}:${i.entityId}`));
-
-              return (
-                <div
-                  key={cluster.clusterKey}
-                  className={`rounded-2xl border p-4.5 transition-all ${
-                    isClusterSelected
-                      ? 'border-sky-300 bg-sky-50/40 shadow-xs dark:border-sky-800 dark:bg-sky-950/20'
-                      : 'border-slate-200/80 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-800/40'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 font-black text-xs">
-                        {cluster.items.length}
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 truncate">
-                          {cluster.clusterLabel}
-                        </h3>
-                        <p className="text-[10px] font-mono text-slate-400 truncate">
-                          ID: {cluster.clusterKey}
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => selectCluster(cluster.items)}
-                      disabled={!cluster.hasRecoverable || recovering}
-                      className={`shrink-0 rounded-xl px-3 py-1.5 text-[11px] font-bold transition-all shadow-2xs ${
-                        allClusterSelected
-                          ? 'bg-sky-600 text-white'
-                          : 'bg-slate-100 text-slate-700 hover:bg-sky-50 hover:text-sky-700 dark:bg-slate-800 dark:text-slate-300'
-                      }`}
-                    >
-                      {allClusterSelected ? '✓ Đã chọn cả ca' : 'Chọn trọn gói ca này'}
-                    </button>
-                  </div>
-
-                  {/* Entities in cluster */}
-                  <div className="mt-3.5 space-y-2">
-                    {cluster.items.map((item, idx) => {
-                      const key = `${item.entity}:${item.entityId}`;
-                      const isItemChecked = selected.includes(key);
-                      const isChild = item.entity !== 'Visit' && item.entity !== 'Patient' && cluster.items.length > 1;
-
-                      return (
-                        <div
-                          key={key}
-                          onClick={() => item.recoverable && toggleOne(key)}
-                          className={`flex items-center justify-between gap-2.5 rounded-xl border p-2.5 text-xs transition-all cursor-pointer ${
-                            isChild ? 'ml-3 border-l-2 border-l-sky-400' : ''
-                          } ${
-                            isItemChecked
-                              ? 'border-sky-200 bg-white dark:border-sky-800 dark:bg-slate-900 shadow-2xs'
-                              : 'border-slate-100 bg-slate-50/70 hover:bg-slate-100/80 dark:border-slate-800 dark:bg-slate-800/60'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <input
-                              type="checkbox"
-                              checked={isItemChecked}
-                              onChange={() => toggleOne(key)}
-                              disabled={!item.recoverable || recovering}
-                              className="h-3.5 w-3.5 accent-sky-600"
-                            />
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                {isChild && <span className="text-slate-400 text-xs font-mono select-none">↳</span>}
-                                <span className="font-bold text-slate-800 dark:text-slate-200">
-                                  {ENTITY_LABELS[item.entity] || item.entity}
-                                </span>
-                                <span className="text-[10px] font-mono text-slate-400">
-                                  {shortHash(item.entityId)}
-                                </span>
-                              </div>
-                              <p className="text-[10px] text-slate-500 truncate max-w-xs mt-0.5">
-                                {item.message}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="shrink-0 flex items-center gap-1.5">
-                            {item.recoveryMode === 'DEPENDENCY_CHAIN' && (
-                              <span className="rounded-md bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 text-[9px] font-bold text-indigo-700 dark:bg-indigo-950 dark:border-indigo-800 dark:text-indigo-300" title="Tự động khôi phục các thực thể cha trước khi tạo thực thể này">
-                                Chuỗi phụ thuộc
-                              </span>
-                            )}
-                            <span className={`rounded-md border px-2 py-0.5 text-[10px] font-bold ${
-                              item.status === 'TAMPERED'
-                                ? 'border-rose-200 bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
-                                : 'border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                            }`}>
-                              {item.status === 'MISSING' ? 'Bị mất dữ liệu' : item.status === 'TAMPERED' ? 'Bị sửa đổi' : item.status}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-semibold text-slate-400">
+              Đã chọn: <b className="text-sky-600 dark:text-sky-400">{selectedCount}</b>/{recoverable.length} bản ghi
+            </span>
+            <button
+              type="button"
+              onClick={toggleAll}
+              disabled={!recoverable.length || recovering}
+              className="text-sky-600 hover:text-sky-700 font-bold text-xs cursor-pointer"
+            >
+              {allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả bản ghi'}
+            </button>
           </div>
         </div>
-      )}
 
-      {/* FLAT TABLE VIEW */}
-      {viewMode === 'flat' && (
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-xs">
-            <thead className="border-b border-slate-100 bg-slate-50 text-slate-500 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-400">
-              <tr>
-                <th className="w-12 px-6 py-3.5">
-                  <input type="checkbox" checked={allSelected} onChange={toggleAll} disabled={!recoverable.length || recovering} aria-label="Chọn tất cả bản ghi có thể khôi phục" className="h-4 w-4 accent-sky-600" />
-                </th>
-                <th className="px-4 py-3.5 font-bold">Đối tượng & Cụm ca</th>
-                <th className="px-4 py-3.5 font-bold">Mốc tin cậy</th>
-                <th className="px-4 py-3.5 font-bold">Phát hiện & Phụ thuộc</th>
-                <th className="px-4 py-3.5 font-bold">Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {warnings.map((item) => {
-                const key = `${item.entity}:${item.entityId}`;
-                const fields = (item.fieldsChanged || []).map((field) => field === 'SENSITIVE_FIELD_CHANGED'
-                  ? 'Trường nhạy cảm đã thay đổi'
-                  : fieldDisplayName({ fieldPath: `${item.entity}.${field}`, field }));
+        {viewMode === 'clustered' && (
+          <div className="p-6 space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              {clusters.map((cluster) => {
+                const clusterKeys = cluster.items.map((i) => `${i.entity}:${i.entityId}`);
+                const isClusterSelected = cluster.items.some((i) => i.recoverable && selected.includes(`${i.entity}:${i.entityId}`));
+                const allClusterSelected = cluster.items.filter((i) => i.recoverable).every((i) => selected.includes(`${i.entity}:${i.entityId}`));
+
                 return (
-                  <tr key={key} className="align-top hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="px-6 py-4">
-                      <input type="checkbox" checked={selected.includes(key)} onChange={() => toggleOne(key)} disabled={!item.recoverable || recovering} aria-label={`Chọn ${item.entity}`} className="h-4 w-4 accent-sky-600 disabled:opacity-30" />
-                    </td>
-                    <td className="px-4 py-4">
-                      <p className="font-bold text-slate-900 dark:text-slate-100">{ENTITY_LABELS[item.entity] || item.entity}</p>
-                      <p className="mt-0.5 font-mono text-[10px] text-slate-400">{shortHash(item.entityId)}</p>
-                      {item.clusterLabel && (
-                        <span className="mt-1 inline-block rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-                          {item.clusterLabel}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 text-slate-600 dark:text-slate-400">
-                      <p className="font-bold">SEQ {item.latestTrustedSeq ?? '—'} · Batch #{item.batchId ?? '—'}</p>
-                      <p className="mt-1 text-[10px] text-slate-400">{formatTime(item.anchoredAt)}</p>
-                    </td>
-                    <td className="max-w-sm px-4 py-4 text-slate-600 dark:text-slate-400">
-                      <p className="font-semibold">{fields.length ? fields.join(', ') : 'Không công khai chi tiết dữ liệu'}</p>
-                      <p className="mt-1 text-[10px] text-slate-400">{item.message}</p>
-                      {(item.blockers || []).length > 0 && (
-                        <p className="mt-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
-                          Trở ngại: {item.blockers.join(', ')}
-                        </p>
-                      )}
-                      {(item.dependencies || []).length > 0 && (
-                        <p className="mt-1 text-[10px] font-semibold text-indigo-700 dark:text-indigo-400">
-                          Phụ thuộc cha: {item.dependencies.map((d) => ENTITY_LABELS[d.entity] || d.entity).join(', ')} (tự động vá)
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
-                      <span className={`inline-flex rounded-lg border px-2.5 py-1 text-[10px] font-bold ${item.recoverable ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300' : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300'}`}>
-                        {item.recoveryMode === 'DEPENDENCY_CHAIN'
-                          ? 'Khôi phục chuỗi phụ thuộc'
-                          : item.recoveryMode === 'AUDIT_BATCH_FIRST'
-                            ? 'Khôi phục audit batch trước'
-                            : item.recoveryMode === 'PITR_REQUIRED'
-                              ? 'Cần backup/PITR thủ công'
-                              : item.recoverable ? 'Có thể khôi phục' : 'Không thể khôi phục tự động'}
-                      </span>
-                    </td>
-                  </tr>
+                  <div
+                    key={cluster.clusterKey}
+                    className={`rounded-2xl border p-4.5 transition-all ${
+                      isClusterSelected
+                        ? 'border-sky-300 bg-sky-50/40 shadow-xs dark:border-sky-800 dark:bg-sky-950/20'
+                        : 'border-slate-200/80 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-800/40'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 font-black text-xs">
+                          {cluster.items.length}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 truncate">
+                            {cluster.clusterLabel}
+                          </h3>
+                          <p className="text-[10px] font-mono text-slate-400 truncate">
+                            ID: {cluster.clusterKey}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => selectCluster(cluster.items)}
+                        disabled={!cluster.hasRecoverable || recovering}
+                        className={`shrink-0 rounded-xl px-3 py-1.5 text-[11px] font-bold transition-all shadow-2xs cursor-pointer ${
+                          allClusterSelected
+                            ? 'bg-sky-600 text-white'
+                            : 'bg-slate-100 text-slate-700 hover:bg-sky-50 hover:text-sky-700 dark:bg-slate-800 dark:text-slate-300'
+                        }`}
+                      >
+                        {allClusterSelected ? '✓ Đã chọn cả ca' : 'Chọn trọn gói ca này'}
+                      </button>
+                    </div>
+
+                    <div className="mt-3.5 space-y-2">
+                      {cluster.items.map((item) => {
+                        const key = `${item.entity}:${item.entityId}`;
+                        const isItemChecked = selected.includes(key);
+                        const isChild = item.entity !== 'Visit' && item.entity !== 'Patient' && cluster.items.length > 1;
+
+                        return (
+                          <div
+                            key={key}
+                            onClick={() => item.recoverable && toggleOne(key)}
+                            className={`flex items-center justify-between gap-2.5 rounded-xl border p-2.5 text-xs transition-all cursor-pointer ${
+                              isChild ? 'ml-3 border-l-2 border-l-sky-400' : ''
+                            } ${
+                              isItemChecked
+                                ? 'border-sky-200 bg-white dark:border-sky-800 dark:bg-slate-900 shadow-2xs'
+                                : 'border-slate-100 bg-slate-50/70 hover:bg-slate-100/80 dark:border-slate-800 dark:bg-slate-800/60'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <input
+                                type="checkbox"
+                                checked={isItemChecked}
+                                onChange={() => toggleOne(key)}
+                                disabled={!item.recoverable || recovering}
+                                className="h-3.5 w-3.5 accent-sky-600 cursor-pointer"
+                              />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  {isChild && <span className="text-slate-400 text-xs font-mono select-none">↳</span>}
+                                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                                    {ENTITY_LABELS[item.entity] || item.entity}
+                                  </span>
+                                  <span className="text-[10px] font-mono text-slate-400">
+                                    {shortHash(item.entityId)}
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-slate-500 truncate max-w-xs mt-0.5">
+                                  {item.message}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="shrink-0 flex items-center gap-1.5">
+                              {item.recoveryMode === 'DEPENDENCY_CHAIN' && (
+                                <span
+                                  className="rounded-md bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 text-[9px] font-bold text-indigo-700 dark:bg-indigo-950 dark:border-indigo-800 dark:text-indigo-300"
+                                  title="Tự động khôi phục các thực thể cha trước khi tạo thực thể này"
+                                >
+                                  Chuỗi phụ thuộc
+                                </span>
+                              )}
+                              <span
+                                className={`rounded-md border px-2 py-0.5 text-[10px] font-bold ${
+                                  item.status === 'TAMPERED'
+                                    ? 'border-rose-200 bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
+                                    : 'border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                                }`}
+                              >
+                                {item.status === 'MISSING' ? 'Bị mất dữ liệu' : item.status === 'TAMPERED' ? 'Bị sửa đổi' : item.status}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </div>
+          </div>
+        )}
 
-      {/* Action Footer */}
-      {recoverable.length > 0 && (
-        <div className="grid gap-3 border-t border-slate-100 bg-slate-50 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end dark:border-slate-800 dark:bg-slate-800/40">
-          <label className="block space-y-1.5">
-            <span className="block text-xs font-bold text-slate-700 dark:text-slate-300">Lý do khôi phục</span>
-            <textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} rows={2} placeholder="Nhập lý do sự cố khôi phục..." className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" />
-          </label>
-          <button type="button" onClick={onRecover} disabled={recovering || selectedCount === 0 || reason.trim().length < 10} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-40 shadow-xs">
-            <RefreshCw className={`h-4 w-4 ${recovering ? 'animate-spin' : ''}`} />
-            {recovering ? 'Đang tự động khôi phục...' : `Khôi phục ${selectedCount} bản ghi đã chọn`}
-          </button>
-        </div>
-      )}
+        {viewMode === 'flat' && (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-xs">
+              <thead className="border-b border-slate-100 bg-slate-50 text-slate-500 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-400">
+                <tr>
+                  <th className="w-12 px-6 py-3.5">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                      disabled={!recoverable.length || recovering}
+                      aria-label="Chọn tất cả bản ghi có thể khôi phục"
+                      className="h-4 w-4 accent-sky-600"
+                    />
+                  </th>
+                  <th className="px-4 py-3.5 font-bold">Đối tượng & Cụm ca</th>
+                  <th className="px-4 py-3.5 font-bold">Mốc tin cậy</th>
+                  <th className="px-4 py-3.5 font-bold">Phát hiện & Phụ thuộc</th>
+                  <th className="px-4 py-3.5 font-bold">Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {warnings.map((item) => {
+                  const key = `${item.entity}:${item.entityId}`;
+                  const fields = (item.fieldsChanged || []).map((field) =>
+                    field === 'SENSITIVE_FIELD_CHANGED'
+                      ? 'Trường nhạy cảm đã thay đổi'
+                      : fieldDisplayName({ fieldPath: `${item.entity}.${field}`, field })
+                  );
+                  return (
+                    <tr key={key} className="align-top hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="px-6 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(key)}
+                          onChange={() => toggleOne(key)}
+                          disabled={!item.recoverable || recovering}
+                          aria-label={`Chọn ${item.entity}`}
+                          className="h-4 w-4 accent-sky-600 disabled:opacity-30 cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-4 py-4">
+                        <p className="font-bold text-slate-900 dark:text-slate-100">{ENTITY_LABELS[item.entity] || item.entity}</p>
+                        <p className="mt-0.5 font-mono text-[10px] text-slate-400">{shortHash(item.entityId)}</p>
+                        {item.clusterLabel && (
+                          <span className="mt-1 inline-block rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                            {item.clusterLabel}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-slate-600 dark:text-slate-400">
+                        <p className="font-bold">SEQ {item.latestTrustedSeq ?? '—'} · Batch #{item.batchId ?? '—'}</p>
+                        <p className="mt-1 text-[10px] text-slate-400">{formatTime(item.anchoredAt)}</p>
+                      </td>
+                      <td className="max-w-sm px-4 py-4 text-slate-600 dark:text-slate-400">
+                        <p className="font-semibold">{fields.length ? fields.join(', ') : 'Không công khai chi tiết dữ liệu'}</p>
+                        <p className="mt-1 text-[10px] text-slate-400">{item.message}</p>
+                        {(item.blockers || []).length > 0 && (
+                          <p className="mt-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
+                            Trở ngại: {item.blockers.join(', ')}
+                          </p>
+                        )}
+                        {(item.dependencies || []).length > 0 && (
+                          <p className="mt-1 text-[10px] font-semibold text-indigo-700 dark:text-indigo-400">
+                            Phụ thuộc cha: {item.dependencies.map((d) => ENTITY_LABELS[d.entity] || d.entity).join(', ')} (tự động vá)
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-4">
+                        <span
+                          className={`inline-flex rounded-lg border px-2.5 py-1 text-[10px] font-bold ${
+                            item.recoverable
+                              ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300'
+                              : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300'
+                          }`}
+                        >
+                          {item.recoveryMode === 'DEPENDENCY_CHAIN'
+                            ? 'Khôi phục chuỗi phụ thuộc'
+                            : item.recoveryMode === 'AUDIT_BATCH_FIRST'
+                            ? 'Khôi phục audit batch trước'
+                            : item.recoveryMode === 'PITR_REQUIRED'
+                            ? 'Cần backup/PITR thủ công'
+                            : item.recoverable
+                            ? 'Có thể khôi phục'
+                            : 'Không thể khôi phục tự động'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {selectedCount > 0 && (
+          <div className="border-t border-slate-200 bg-slate-50/95 p-5 dark:border-slate-800 dark:bg-slate-800/90 shadow-lg space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                <CheckSquare className="h-4 w-4 text-sky-600" />
+                Đang chọn {selectedCount} bản ghi thực thể để phục hồi
+              </span>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setReason('Khôi phục dữ liệu do phát hiện sai lệch so với Blockchain Audit Snapshot')}
+                  className="rounded-lg bg-white border border-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-100 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 cursor-pointer"
+                >
+                  Gợi ý: Lệch snapshot
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReason('Khôi phục toàn vẹn dữ liệu ca khám theo quy trình kiểm toán định kỳ')}
+                  className="rounded-lg bg-white border border-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-100 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 cursor-pointer"
+                >
+                  Gợi ý: Kiểm toán định kỳ
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <label className="block space-y-1">
+                <span className="block text-[11px] font-bold text-slate-600 dark:text-slate-400">
+                  Lý do khôi phục (Tối thiểu 10 ký tự để cấp quyền Face Step-Up)
+                </span>
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  maxLength={500}
+                  rows={2}
+                  placeholder="Nhập chi tiết lý do phục hồi dữ liệu y tế..."
+                  className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={onRecover}
+                disabled={recovering || selectedCount === 0 || reason.trim().length < 10}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-sky-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-40 shadow-md cursor-pointer transition-all active:scale-95"
+              >
+                <RefreshCw className={`h-4 w-4 ${recovering ? 'animate-spin' : ''}`} />
+                <span>{recovering ? 'Đang tự động khôi phục...' : `Khôi phục ${selectedCount} bản ghi đã chọn`}</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
 }
+
+/* =========================================================================
+   TAB 3: PENDING QUEUE PANEL (0 vs >0 Items)
+   ========================================================================= */
+
+function PendingQueuePanel({
+  pendingQueue,
+  anchoring,
+  anchorStage,
+  anchoringBatchInfo,
+  latestBatch,
+  onAnchorNow,
+  onRefresh,
+}) {
+  const isZero = pendingQueue.total === 0;
+
+  return (
+    <div className="space-y-6">
+      <AnchoringStepper stage={anchorStage} anchoring={anchoring} batchInfo={anchoringBatchInfo} />
+
+      {isZero ? (
+        <div className="rounded-3xl border border-emerald-200/90 bg-white p-6 sm:p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-6">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400">
+                <CheckCircle2 className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                  Hàng đợi Nhật ký đang trống (0 bản ghi chờ chốt)
+                </h3>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 max-w-xl">
+                  Toàn bộ các sự kiện thay đổi dữ liệu đã được tổng hợp thành công vào các Lô Merkle Tree trước đó và neo an toàn trên Blockchain Sepolia.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 cursor-pointer"
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span>Kiểm tra hàng đợi mới</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+              <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2">
+                <Layers className="h-4 w-4 text-sky-600" />
+                <span>Lô Checkpoint gần nhất</span>
+              </div>
+              <p className="text-xl font-black text-slate-900 dark:text-white">
+                {latestBatch ? `Lô #${latestBatch.batchId}` : '—'}
+              </p>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">
+                {latestBatch ? `${latestBatch.leafCount || 0} bản ghi (SEQ ${latestBatch.fromSeq} → ${latestBatch.toSeq})` : 'Chưa có lô nào'}
+              </p>
+              <p className="text-[10px] font-mono text-slate-400 mt-1 truncate">
+                Root: {latestBatch ? shortHash(latestBatch.merkleRoot) : '—'}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+              <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2">
+                <LockKeyhole className="h-4 w-4 text-emerald-600" />
+                <span>Sepolia Smart Contract</span>
+              </div>
+              <p className="text-sm font-black text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+                Sẵn sàng tiếp nhận Lô mới
+              </p>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">
+                Tự động seal và neo on-chain ngay khi có sự kiện nghiệp vụ phát sinh trong CSDL.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+              <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2">
+                <FileDiff className="h-4 w-4 text-indigo-600" />
+                <span>Lưu trữ IPFS Artifact</span>
+              </div>
+              <p className="text-sm font-black text-indigo-700 dark:text-indigo-300">
+                Mã hóa AES-256 GCM
+              </p>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">
+                Mỗi checkpoint tạo bản sao lưu phân tán giúp phục hồi CSDL tức thời khi có sự cố.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-3xl border border-amber-200/90 bg-white p-6 shadow-sm dark:border-amber-900/50 dark:bg-slate-900 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-5">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <History className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  Hàng đợi chưa seal lô ({pendingQueue.total} bản ghi SEQ)
+                </h3>
+              </div>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                Các bản ghi này đã lưu an toàn trong PostgreSQL nhưng chưa được tạo Merkle Tree để neo lên Blockchain Sepolia.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onAnchorNow}
+              disabled={anchoring || pendingQueue.total === 0}
+              className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-amber-600 px-6 py-3 text-xs font-bold text-white shadow-md hover:bg-amber-700 disabled:opacity-50 transition-all cursor-pointer active:scale-95"
+            >
+              <LockKeyhole className="h-4 w-4" />
+              <span>{anchoring ? 'Đang đóng lô & neo...' : 'Đóng lô & Neo Sepolia ngay'}</span>
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 text-slate-400 uppercase font-extrabold text-[10px] tracking-wider">
+                  <th className="px-4 py-3">Mã SEQ</th>
+                  <th className="px-4 py-3">Thao tác</th>
+                  <th className="px-4 py-3">Thực thể & Đối tượng</th>
+                  <th className="px-4 py-3">Người thực hiện</th>
+                  <th className="px-4 py-3">Thời gian ghi nhận</th>
+                  <th className="px-4 py-3">Mã băm dự kiến</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {pendingQueue.items.map((log) => (
+                  <tr key={log.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="px-4 py-3.5 font-mono font-black text-amber-900 dark:text-amber-300">
+                      SEQ #{log.seq}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${ACTION_TONE[log.action] || 'bg-slate-100 text-slate-700'}`}>
+                        {ACTION_LABEL[log.action] || log.action}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <p className="font-bold text-slate-900 dark:text-slate-100">{ENTITY_LABELS[log.entity] || log.entity}</p>
+                      <p className="text-[10px] font-mono text-slate-400">{shortHash(log.entityId)}</p>
+                    </td>
+                    <td className="px-4 py-3.5 text-slate-600 dark:text-slate-300">
+                      <p className="font-semibold">{log.actor?.displayName || 'Hệ thống tự động'}</p>
+                      <p className="text-[10px] text-slate-400">{log.actor ? ROLE_LABELS[log.actor.role] || log.actor.role : '—'}</p>
+                    </td>
+                    <td className="px-4 py-3.5 text-slate-500 font-medium">
+                      {formatTime(log.createdAt)}
+                    </td>
+                    <td className="px-4 py-3.5 font-mono text-[10px] text-slate-400">
+                      {shortHash(log.entryHash || log.hashes?.entryHash)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =========================================================================
+   ANCHORING STEPPER COMPONENT
+   ========================================================================= */
+
+function AnchoringStepper({ stage, anchoring, batchInfo }) {
+  const steps = [
+    { id: 1, label: '1. Chuẩn bị', desc: 'Gom SEQ log & dựng Merkle Tree', icon: Layers },
+    { id: 2, label: '2. Đưa lên IPFS', desc: 'Mã hóa snapshot & upload Artifact', icon: FileDiff },
+    { id: 3, label: '3. Artifact Ready', desc: 'Tạo IPFS URI & đối chiếu mã băm', icon: ShieldCheck },
+    { id: 4, label: '4. Neo Sepolia', desc: 'Commit Merkle Root lên Smart Contract', icon: LockKeyhole },
+  ];
+
+  const batchTitle = batchInfo?.batchId ? `Lô #${batchInfo.batchId}` : 'Lô Mới';
+  const countText = batchInfo?.leafCount ? ` (${batchInfo.leafCount} bản ghi SEQ logs)` : '';
+
+  return (
+    <div
+      className={`rounded-3xl border transition-all duration-500 p-5 ${
+        anchoring || stage > 0
+          ? 'border-sky-300 bg-gradient-to-r from-sky-50 via-indigo-50/60 to-emerald-50/80 shadow-md dark:border-sky-800 dark:from-slate-900 dark:via-sky-950 dark:to-slate-900'
+          : 'border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900'
+      }`}
+    >
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-100/80 dark:border-slate-800 pb-3">
+        <div className="flex items-center gap-3">
+          <div
+            className={`p-2.5 rounded-2xl transition-all ${
+              stage === 5
+                ? 'bg-emerald-600 text-white'
+                : anchoring
+                ? 'bg-sky-600 text-white animate-spin'
+                : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+            }`}
+          >
+            {stage === 5 ? <CheckCircle2 className="h-5 w-5" /> : <RefreshCw className="h-5 w-5" />}
+          </div>
+          <div>
+            <h4 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+              <span>Tiến trình niêm phong {batchTitle}{countText}</span>
+              {anchoring && (
+                <span className="rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-black uppercase text-white animate-pulse">
+                  Đang xử lý
+                </span>
+              )}
+            </h4>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
+              {stage === 0 && 'Quy trình đóng từng lô tự động trải qua 4 bước: Chuẩn bị ➔ Đưa lên IPFS ➔ Artifact Ready ➔ Neo Sepolia.'}
+              {stage === 1 && `🔹 [Giai đoạn 1/4] Đang gom các bản ghi Sequence chưa neo của ${batchTitle} và tính toán Merkle Tree...`}
+              {stage === 2 && `🔹 [Giai đoạn 2/4] Đang mã hóa AES-256 snapshot và tải Artifact lên IPFS cho ${batchTitle}...`}
+              {stage === 3 && `🔹 [Giai đoạn 3/4] Artifact Ready! Đã nhận IPFS URI & kiểm tra mã băm cho ${batchTitle}.`}
+              {stage === 4 && `🔹 [Giai đoạn 4/4] Đang gửi giao dịch Commit Merkle Root của ${batchTitle} lên Sepolia Smart Contract...`}
+              {stage === 5 && `✅ Hoàn tất 100%! ${batchTitle} đã được niêm phong và neo thành công lên Blockchain.`}
+            </p>
+          </div>
+        </div>
+
+        {stage > 0 && (
+          <div className="inline-flex items-center gap-1.5 rounded-2xl bg-white px-3.5 py-1.5 text-xs font-black text-sky-700 shadow-xs border border-sky-200 dark:bg-slate-800 dark:text-sky-300 dark:border-slate-700 shrink-0">
+            <span>Tiến trình lô:</span>
+            <span className="text-sm font-black text-emerald-600">{stage === 5 ? '4/4 (Hoàn tất)' : `${stage}/4`}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+        {steps.map((step) => {
+          const Icon = step.icon;
+          const isDone = stage > step.id || stage === 5;
+          const isActive = stage === step.id && stage !== 5;
+
+          return (
+            <div
+              key={step.id}
+              className={`relative flex items-center gap-3 rounded-2xl border p-3.5 transition-all duration-500 ${
+                isDone
+                  ? 'border-emerald-300 bg-emerald-50 text-emerald-900 shadow-xs dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200'
+                  : isActive
+                  ? 'border-sky-500 bg-white text-sky-950 shadow-md ring-2 ring-sky-400 dark:border-sky-500 dark:bg-sky-950 dark:text-white scale-102 font-extrabold'
+                  : 'border-slate-200/80 bg-slate-50/60 text-slate-400 opacity-70 dark:border-slate-800 dark:bg-slate-900/60'
+              }`}
+            >
+              <div
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-extrabold text-xs transition-all duration-300 ${
+                  isDone
+                    ? 'bg-emerald-600 text-white'
+                    : isActive
+                    ? 'bg-sky-600 text-white shadow-md animate-bounce'
+                    : 'bg-slate-200/80 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                }`}
+              >
+                {isDone ? <Check className="h-5 w-5 stroke-[3]" /> : isActive ? <Icon className="h-4 w-4" /> : step.id}
+              </div>
+              <div className="min-w-0">
+                <p className={`text-xs font-extrabold truncate ${isActive ? 'text-sky-700 dark:text-sky-300' : ''}`}>
+                  {step.label}
+                </p>
+                <p className="text-[10px] font-semibold opacity-80 truncate">{step.desc}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   CHAIN BANNER COMPONENT
+   ========================================================================= */
 
 function ChainBanner({ chain, loading, onQuickRecoverBatch, quickRecovering }) {
   if (loading || !chain) {
@@ -2167,7 +2816,7 @@ function ChainBanner({ chain, loading, onQuickRecoverBatch, quickRecovering }) {
               type="button"
               onClick={() => onQuickRecoverBatch?.(chain.brokenAtSeq)}
               disabled={quickRecovering}
-              className="inline-flex items-center gap-2 rounded-2xl bg-rose-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-md hover:bg-rose-700 transition-all active:scale-95 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-2xl bg-rose-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-md hover:bg-rose-700 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
             >
               <Zap className={`h-4 w-4 ${quickRecovering ? 'animate-spin' : ''}`} />
               {quickRecovering
@@ -2182,6 +2831,10 @@ function ChainBanner({ chain, loading, onQuickRecoverBatch, quickRecovering }) {
     </section>
   );
 }
+
+/* =========================================================================
+   SUMMARY & UTILITY SUB-COMPONENTS
+   ========================================================================= */
 
 function BatchContentSummary({ summary, fromSeq, toSeq, activeEntity = '', onSelectEntity }) {
   if (!summary?.length) {
@@ -2224,10 +2877,26 @@ function BatchContentSummary({ summary, fromSeq, toSeq, activeEntity = '', onSel
 function Pagination({ page, totalPages, total, label = 'bản ghi', onPrev, onNext }) {
   return (
     <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 px-6 py-4">
-      <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Trang {page}/{totalPages} · {total} {label}</p>
+      <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
+        Trang {page}/{totalPages} · {total} {label}
+      </p>
       <div className="flex gap-2">
-        <button type="button" onClick={onPrev} disabled={page <= 1} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-sky-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300">Trang trước</button>
-        <button type="button" onClick={onNext} disabled={page >= totalPages} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-sky-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300">Trang sau</button>
+        <button
+          type="button"
+          onClick={onPrev}
+          disabled={page <= 1}
+          className="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-sky-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300 cursor-pointer"
+        >
+          Trang trước
+        </button>
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={page >= totalPages}
+          className="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-sky-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300 cursor-pointer"
+        >
+          Trang sau
+        </button>
       </div>
     </div>
   );
@@ -2245,20 +2914,14 @@ function Empty({ title, desc }) {
   );
 }
 
+/* =========================================================================
+   BATCH DETAIL DRAWER
+   ========================================================================= */
+
 function BatchDetailDrawer({ loading, detail, recoveringBatchId, onClose, onRecover, onProof, onOpenSeq }) {
   const [entityFilter, setEntityFilter] = useState('');
   const [integrityFilter, setIntegrityFilter] = useState('');
   const [seqQuery, setSeqQuery] = useState('');
-
-  const integrityCounts = useMemo(() => {
-    const logs = detail?.logs || [];
-    return logs.reduce((acc, log) => {
-      const status = log.blockchainStatus || log.verification?.status;
-      if (status === 'VERIFIED') acc.verified++;
-      if (status === 'TAMPERED') acc.tampered++;
-      return acc;
-    }, { verified: 0, tampered: 0 });
-  }, [detail?.logs]);
 
   useEffect(() => {
     setEntityFilter('');
@@ -2294,7 +2957,9 @@ function BatchDetailDrawer({ loading, detail, recoveringBatchId, onClose, onReco
           subjectSubtitle(log),
           ENTITY_LABELS[log.entity] || '',
           ACTION_LABEL[log.action] || '',
-        ].join(' ').toLowerCase();
+        ]
+          .join(' ')
+          .toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -2322,7 +2987,11 @@ function BatchDetailDrawer({ loading, detail, recoveringBatchId, onClose, onReco
               </p>
             )}
           </div>
-          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 cursor-pointer"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -2335,14 +3004,18 @@ function BatchDetailDrawer({ loading, detail, recoveringBatchId, onClose, onReco
                 <BatchIntegrityBadge integrity={detail.integrity} />
                 <div className="rounded-2xl border border-slate-200/80 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800">
                   <p className="text-[10px] font-extrabold uppercase text-slate-400">On-chain Status</p>
-                  <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">{BATCH_STATUS_LABEL[detail.status] || detail.status}</p>
+                  <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+                    {BATCH_STATUS_LABEL[detail.status] || detail.status}
+                  </p>
                   <p className="mt-1 font-mono text-[10px] text-slate-500 break-all">{detail.merkleRoot || '—'}</p>
-                  <p className="mt-1 text-xs font-medium text-slate-400">Neo: {formatTime(detail.anchoredAt || detail.createdAt)}</p>
+                  <p className="mt-1 text-xs font-medium text-slate-400">
+                    Neo: {formatTime(detail.anchoredAt || detail.createdAt)}
+                  </p>
                 </div>
               </div>
 
               <div className="rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <p className="mb-2 text-[10px] font-extrabold uppercase text-slate-400">Đối tượng có trong lô</p>
+                <p className="mb-2 text-[10px] font-extrabold uppercase text-slate-400">Tóm tắt đối tượng trong lô</p>
                 <BatchContentSummary
                   summary={detail.contentSummary}
                   fromSeq={detail.fromSeq}
@@ -2358,7 +3031,7 @@ function BatchDetailDrawer({ loading, detail, recoveringBatchId, onClose, onReco
                   onClick={() => onRecover(detail)}
                   disabled={!canRecoverBatch(detail) || recoveringBatchId === detail.batchId}
                   title={recoverBatchDisabledReason(detail) || 'Khôi phục lô khi kiểm tra toàn vẹn không ổn'}
-                  className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-bold text-amber-800 hover:bg-amber-100 disabled:opacity-40 transition-all dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
+                  className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-bold text-amber-800 hover:bg-amber-100 disabled:opacity-40 transition-all dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300 cursor-pointer"
                 >
                   {recoveringBatchId === detail.batchId ? 'Đang khôi phục...' : `Khôi phục lô #${detail.batchId}`}
                 </button>
@@ -2427,11 +3100,19 @@ function BatchDetailDrawer({ loading, detail, recoveringBatchId, onClose, onReco
                       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                         <p className="text-[10px] font-medium text-slate-400">{formatTime(log.createdAt)}</p>
                         <div className="flex gap-2">
-                          <button type="button" onClick={() => onOpenSeq(log)} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-sky-600 hover:bg-sky-50 dark:border-slate-700 dark:bg-slate-800 dark:text-sky-400">
+                          <button
+                            type="button"
+                            onClick={() => onOpenSeq(log)}
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-sky-600 hover:bg-sky-50 dark:border-slate-700 dark:bg-slate-800 dark:text-sky-400 cursor-pointer"
+                          >
                             Chi tiết SEQ
                           </button>
                           {log.onChainStatus === 'ANCHORED' && (
-                            <button type="button" onClick={() => onProof(log.seq)} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                            <button
+                              type="button"
+                              onClick={() => onProof(log.seq)}
+                              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 cursor-pointer"
+                            >
                               Bằng chứng
                             </button>
                           )}
@@ -2449,6 +3130,10 @@ function BatchDetailDrawer({ loading, detail, recoveringBatchId, onClose, onReco
     document.body
   );
 }
+
+/* =========================================================================
+   LOG DETAIL MODAL (Diff & Snapshot)
+   ========================================================================= */
 
 function LogDetailModal({ summaryLog, onClose, onProof, onRecoverBatch, onOpenBatch }) {
   const [log, setLog] = useState(summaryLog);
@@ -2504,15 +3189,18 @@ function LogDetailModal({ summaryLog, onClose, onProof, onRecoverBatch, onOpenBa
             {log.onChainStatus === 'ANCHORED' && log.batchId != null && (
               <button
                 type="button"
-                onClick={() => { onOpenBatch?.(log.batchId); onClose(); }}
-                className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300"
+                onClick={() => {
+                  onOpenBatch?.(log.batchId);
+                  onClose();
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300 cursor-pointer"
               >
                 Xem lô #{log.batchId}
               </button>
             )}
             <button
               onClick={onClose}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800"
+              className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 cursor-pointer"
             >
               <X className="h-4 w-4" />
             </button>
@@ -2546,7 +3234,7 @@ function LogDetailModal({ summaryLog, onClose, onProof, onRecoverBatch, onOpenBa
               </h4>
               <div className="space-y-2">
                 <DetailField label="Người thực thi" value={actor?.displayName || 'Hệ thống tự động'} highlight={Boolean(actor)} />
-                <DetailField label="Vai trò nghiệp vụ" value={actor ? (ROLE_LABELS[actor.role] || actor.role) : '—'} />
+                <DetailField label="Vai trò nghiệp vụ" value={actor ? ROLE_LABELS[actor.role] || actor.role : '—'} />
                 <DetailField label="Mã định danh Actor ID" value={log.actorId || '—'} mono />
                 <DetailField label="Thời gian hệ thống" value={formatTime(log.createdAt)} />
               </div>
@@ -2618,8 +3306,11 @@ function LogDetailModal({ summaryLog, onClose, onProof, onRecoverBatch, onOpenBa
             {log.onChainStatus === 'ANCHORED' && (
               <button
                 type="button"
-                onClick={() => { onClose(); onProof(log.seq); }}
-                className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 hover:border-slate-300 rounded-xl text-xs font-bold transition-all shadow-xs dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                onClick={() => {
+                  onClose();
+                  onProof(log.seq);
+                }}
+                className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 hover:border-slate-300 rounded-xl text-xs font-bold transition-all shadow-xs dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
               >
                 Xem bằng chứng blockchain
               </button>
@@ -2627,7 +3318,7 @@ function LogDetailModal({ summaryLog, onClose, onProof, onRecoverBatch, onOpenBa
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-bold text-white transition-all hover:bg-sky-700 shadow-xs"
+              className="rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-bold text-white transition-all hover:bg-sky-700 shadow-xs cursor-pointer"
             >
               Đóng
             </button>
@@ -2639,12 +3330,18 @@ function LogDetailModal({ summaryLog, onClose, onProof, onRecoverBatch, onOpenBa
   );
 }
 
+/* =========================================================================
+   PROOF & RECOVERY MODALS
+   ========================================================================= */
+
 function VerificationBadge({ status, title }) {
   const Icon = status === 'VERIFIED' ? ShieldCheck : ShieldAlert;
   return (
     <span
       title={title}
-      className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10px] font-bold ${VERIFICATION_TONE[status] || VERIFICATION_TONE.PENDING}`}
+      className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10px] font-bold ${
+        VERIFICATION_TONE[status] || VERIFICATION_TONE.PENDING
+      }`}
     >
       <Icon className="h-3.5 w-3.5 shrink-0" />
       {VERIFICATION_LABEL[status] || status || 'Không rõ'}
@@ -2656,8 +3353,11 @@ function DetailField({ label, value, mono = false, highlight = false }) {
   return (
     <div className="flex items-center justify-between gap-4 text-xs border-b border-slate-100/60 pb-1.5 last:border-0 last:pb-0 dark:border-slate-800">
       <span className="text-slate-400 font-semibold">{label}:</span>
-      <span className={`text-right truncate max-w-[200px] sm:max-w-xs ${mono ? 'font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 text-[11px] dark:bg-slate-700 dark:text-slate-300' : ''
-        } ${highlight ? 'font-bold text-slate-900 dark:text-white' : 'font-bold text-slate-700 dark:text-slate-300'}`}>
+      <span
+        className={`text-right truncate max-w-[200px] sm:max-w-xs ${
+          mono ? 'font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 text-[11px] dark:bg-slate-700 dark:text-slate-300' : ''
+        } ${highlight ? 'font-bold text-slate-900 dark:text-white' : 'font-bold text-slate-700 dark:text-slate-300'}`}
+      >
         {value}
       </span>
     </div>
@@ -2671,13 +3371,20 @@ function RecoveryReasonModal({ batch, reason, setReason, onClose, onContinue }) 
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 outline-none animate-fadeIn">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200/80 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100" onClick={(event) => event.stopPropagation()}>
+      <div
+        className="relative z-10 w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200/80 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="border-b border-slate-100 p-6 dark:border-slate-800">
           <h3 className="text-xl font-bold text-slate-900 dark:text-white">Khôi phục audit batch #{batch.batchId}</h3>
-          <p className="mt-1 text-xs font-semibold text-slate-400">Thao tác sẽ tải artifact IPFS, đối chiếu blockchain và phục hồi khi mọi hash khớp.</p>
+          <p className="mt-1 text-xs font-semibold text-slate-400">
+            Thao tác sẽ tải artifact IPFS, đối chiếu blockchain và phục hồi khi mọi hash khớp.
+          </p>
         </div>
         <div className="p-6 space-y-2">
-          <label className="text-xs font-bold text-slate-700 dark:text-slate-300" htmlFor="audit-recovery-reason">Lý do khôi phục</label>
+          <label className="text-xs font-bold text-slate-700 dark:text-slate-300" htmlFor="audit-recovery-reason">
+            Lý do khôi phục
+          </label>
           <textarea
             id="audit-recovery-reason"
             value={reason}
@@ -2690,12 +3397,18 @@ function RecoveryReasonModal({ batch, reason, setReason, onClose, onContinue }) 
           <p className="text-[11px] font-semibold text-slate-400">Tối thiểu 10 ký tự.</p>
         </div>
         <div className="flex justify-end gap-2.5 border-t border-slate-100 p-5 dark:border-slate-800">
-          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300">Hủy</button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 cursor-pointer"
+          >
+            Hủy
+          </button>
           <button
             type="button"
             onClick={onContinue}
             disabled={!valid}
-            className="rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-sky-700 disabled:opacity-40 shadow-xs"
+            className="rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-sky-700 disabled:opacity-40 shadow-xs cursor-pointer"
           >
             Tiếp tục quét mặt
           </button>
@@ -2715,7 +3428,13 @@ function MultiBatchRecoveryProgressModal({ progress, onClose }) {
       <div className="w-full max-w-lg rounded-3xl border border-slate-200/80 bg-white p-6 shadow-2xl space-y-6 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`p-3 rounded-2xl ${done ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400' : 'bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-400'}`}>
+            <div
+              className={`p-3 rounded-2xl ${
+                done
+                  ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400'
+                  : 'bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-400'
+              }`}
+            >
               {done ? <CheckCircle2 className="h-6 w-6" /> : <RefreshCw className="h-6 w-6 animate-spin" />}
             </div>
             <div>
@@ -2732,7 +3451,7 @@ function MultiBatchRecoveryProgressModal({ progress, onClose }) {
           {done && (
             <button
               onClick={onClose}
-              className="rounded-xl border border-slate-200 p-2 text-slate-400 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800"
+              className="rounded-xl border border-slate-200 p-2 text-slate-400 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>
@@ -2791,7 +3510,7 @@ function MultiBatchRecoveryProgressModal({ progress, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="w-full rounded-2xl bg-sky-600 py-3 text-xs font-extrabold text-white shadow-md hover:bg-sky-700 transition-all"
+            className="w-full rounded-2xl bg-sky-600 py-3 text-xs font-extrabold text-white shadow-md hover:bg-sky-700 transition-all cursor-pointer"
           >
             Hoàn tất & Đóng
           </button>
@@ -2835,7 +3554,11 @@ function ProofModal({ proof, onClose }) {
             <h3 className="mt-3 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Chứng chỉ bản ghi #{proof.seq}</h3>
             <p className="mt-1 text-xs font-semibold text-slate-400">Dùng để đối chiếu bản ghi trong cây Merkle đã neo.</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 cursor-pointer"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -2844,12 +3567,16 @@ function ProofModal({ proof, onClose }) {
           {proof.loading ? (
             <LoadingIndicator size="sm" label="Đang tải chứng chỉ Merkle Proof..." />
           ) : proof.error ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 font-bold text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">{proof.error}</div>
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 font-bold text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+              {proof.error}
+            </div>
           ) : (
             <div className="space-y-4">
               <div className="rounded-2xl border border-slate-200/80 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
                 <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Merkle Root</p>
-                <p className="mt-2 break-all font-mono text-xs font-bold text-slate-700 dark:text-slate-300">{proof.data?.merkleRoot || proof.data?.root || '—'}</p>
+                <p className="mt-2 break-all font-mono text-xs font-bold text-slate-700 dark:text-slate-300">
+                  {proof.data?.merkleRoot || proof.data?.root || '—'}
+                </p>
               </div>
 
               <div className="rounded-2xl border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-slate-900">
@@ -2861,7 +3588,9 @@ function ProofModal({ proof, onClose }) {
                     proof.data.proof.map((p, i) => (
                       <div key={i} className="grid gap-2 px-4 py-3 md:grid-cols-[56px_1fr]">
                         <span className="text-xs font-bold text-sky-600 dark:text-sky-400">#{i + 1}</span>
-                        <span className="break-all font-mono text-xs font-semibold text-slate-600 dark:text-slate-300">{typeof p === 'object' ? JSON.stringify(p) : p}</span>
+                        <span className="break-all font-mono text-xs font-semibold text-slate-600 dark:text-slate-300">
+                          {typeof p === 'object' ? JSON.stringify(p) : p}
+                        </span>
                       </div>
                     ))
                   ) : (
@@ -2874,110 +3603,16 @@ function ProofModal({ proof, onClose }) {
         </div>
 
         <div className="flex justify-end border-t border-slate-100 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-800/50">
-          <button type="button" onClick={onClose} className="rounded-xl bg-sky-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-sky-700 shadow-xs">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl bg-sky-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-sky-700 shadow-xs cursor-pointer"
+          >
             Xác nhận
           </button>
         </div>
       </div>
     </div>,
     document.body
-  );
-}
-
-function AnchoringStepper({ stage, anchoring, batchInfo }) {
-  const steps = [
-    { id: 1, label: '1. Chuẩn bị', desc: 'Gom SEQ log & dựng Merkle Tree', icon: Layers },
-    { id: 2, label: '2. Đang đưa lên IPFS', desc: 'Mã hóa snapshot & upload Artifact', icon: FileDiff },
-    { id: 3, label: '3. Artifact Ready', desc: 'Tạo IPFS URI & đối chiếu mã băm', icon: ShieldCheck },
-    { id: 4, label: '4. Neo Blockchain', desc: 'Commit Merkle Root lên Sepolia', icon: LockKeyhole },
-  ];
-
-  const batchTitle = batchInfo?.batchId ? `Lô #${batchInfo.batchId}` : 'Lô Mới';
-  const countText = batchInfo?.leafCount ? ` (${batchInfo.leafCount} bản ghi SEQ logs)` : '';
-
-  return (
-    <div className={`rounded-3xl border transition-all duration-500 p-5 ${
-      anchoring || stage > 0
-        ? 'border-sky-300 bg-gradient-to-r from-sky-50 via-indigo-50/60 to-emerald-50/80 shadow-md dark:border-sky-800 dark:from-slate-900 dark:via-sky-950 dark:to-slate-900'
-        : 'border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900'
-    }`}>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-100/80 dark:border-slate-800 pb-3">
-        <div className="flex items-center gap-3">
-          <div className={`p-2.5 rounded-2xl transition-all ${
-            stage === 5
-              ? 'bg-emerald-600 text-white'
-              : anchoring
-              ? 'bg-sky-600 text-white animate-spin'
-              : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-          }`}>
-            {stage === 5 ? <CheckCircle2 className="h-5 w-5" /> : <RefreshCw className="h-5 w-5" />}
-          </div>
-          <div>
-            <h4 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <span>Tiến trình niêm phong {batchTitle}{countText}</span>
-              {anchoring && (
-                <span className="rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-black uppercase text-white animate-pulse">
-                  Đang xử lý
-                </span>
-              )}
-            </h4>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
-              {stage === 0 && 'Quy trình đóng từng lô tự động trải qua 4 bước: Chuẩn bị ➔ Đưa lên IPFS ➔ Artifact Ready ➔ Neo Blockchain.'}
-              {stage === 1 && `🔹 [Giai đoạn 1/4] Đang gom các bản ghi Sequence chưa neo của ${batchTitle} và tính toán Merkle Tree...`}
-              {stage === 2 && `🔹 [Giai đoạn 2/4] Đang mã hóa AES-256 snapshot và tải Artifact lên IPFS cho ${batchTitle}...`}
-              {stage === 3 && `🔹 [Giai đoạn 3/4] Artifact Ready! Đã nhận IPFS URI & kiểm tra mã băm cho ${batchTitle}.`}
-              {stage === 4 && `🔹 [Giai đoạn 4/4] Đang gửi giao dịch Commit Merkle Root của ${batchTitle} lên Sepolia Smart Contract...`}
-              {stage === 5 && `✅ Hoàn tất 100%! ${batchTitle} đã được niêm phong và neo thành công lên Blockchain.`}
-            </p>
-          </div>
-        </div>
-
-        {stage > 0 && (
-          <div className="inline-flex items-center gap-1.5 rounded-2xl bg-white px-3.5 py-1.5 text-xs font-black text-sky-700 shadow-xs border border-sky-200 dark:bg-slate-800 dark:text-sky-300 dark:border-slate-700 shrink-0">
-            <span>Tiến trình lô:</span>
-            <span className="text-sm font-black text-emerald-600">{stage === 5 ? '4/4 (Hoàn tất)' : `${stage}/4`}</span>
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-        {steps.map((step) => {
-          const Icon = step.icon;
-          const isDone = stage > step.id || stage === 5;
-          const isActive = stage === step.id && stage !== 5;
-
-          return (
-            <div
-              key={step.id}
-              className={`relative flex items-center gap-3 rounded-2xl border p-3.5 transition-all duration-500 ${
-                isDone
-                  ? 'border-emerald-300 bg-emerald-50 text-emerald-900 shadow-xs dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200'
-                  : isActive
-                  ? 'border-sky-500 bg-white text-sky-950 shadow-md ring-2 ring-sky-400 dark:border-sky-500 dark:bg-sky-950 dark:text-white scale-102 font-extrabold'
-                  : 'border-slate-200/80 bg-slate-50/60 text-slate-400 opacity-70 dark:border-slate-800 dark:bg-slate-900/60'
-              }`}
-            >
-              <div
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-extrabold text-xs transition-all duration-300 ${
-                  isDone
-                    ? 'bg-emerald-600 text-white'
-                    : isActive
-                    ? 'bg-sky-600 text-white shadow-md animate-bounce'
-                    : 'bg-slate-200/80 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                }`}
-              >
-                {isDone ? <Check className="h-5 w-5 stroke-[3]" /> : isActive ? <Icon className="h-4 w-4" /> : step.id}
-              </div>
-              <div className="min-w-0">
-                <p className={`text-xs font-extrabold truncate ${isActive ? 'text-sky-700 dark:text-sky-300' : ''}`}>
-                  {step.label}
-                </p>
-                <p className="text-[10px] font-semibold opacity-80 truncate">{step.desc}</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
   );
 }

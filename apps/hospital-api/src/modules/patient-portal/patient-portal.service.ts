@@ -3,7 +3,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { MedicalSpecialty, Prisma, PrismaClient, VisitSource, VisitStatus } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { S3MedicalResultStorageAdapter } from '../medical-order/infrastructure/adapters/s3-medical-result-storage.adapter';
-import { AuditLoggerService } from '../../infrastructure/audit/audit-logger.service';
+import { AuditLoggerService } from '../../infrastructure/audit';
 import { AuthUser } from '../../common/types/auth-user.type';
 import { getMedicalSpecialtyLabel, getMedicalSpecialtyOptions } from '../doctor/medical-specialty';
 import { buildVisitSnapshot } from '../visit/domain/visit-snapshot';

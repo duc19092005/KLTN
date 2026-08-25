@@ -5,13 +5,6 @@ type IpfsProvider = 'kubo' | 'pinata';
 /**
  * Uploads/downloads encrypted recovery artifacts. Callers own encryption,
  * content validation, and authorization; this service only handles IPFS bytes.
- *
- * Providers:
- *  - kubo:   local/self-hosted IPFS HTTP API (/api/v0/add, /api/v0/cat)
- *  - pinata: Pinata pinning API (pinFileToIPFS) + gateway download
- *
- * Select via IPFS_PROVIDER=kubo|pinata (default: auto — pinata if PINATA_JWT or
- * pinata.cloud URL is configured, otherwise kubo when IPFS_API_URL is set).
  */
 @Injectable()
 export class IpfsArtifactService {
@@ -32,7 +25,6 @@ export class IpfsArtifactService {
 
     const secondary = process.env.IPFS_SECONDARY_API_URL?.trim();
     if (secondary) {
-      // Secondary remains Kubo-compatible (optional dual-pin). Skip for pure Pinata setups.
       if (this.isPinataUrl(secondary)) {
         this.logger.warn('IPFS_SECONDARY_API_URL points at Pinata; dual-pin secondary is only supported for Kubo APIs.');
       } else {
@@ -147,7 +139,6 @@ export class IpfsArtifactService {
     if (!jwt) throw new Error('PINATA_JWT is required.');
 
     const form = new FormData();
-    // Encrypted artifacts are binary — never stringify as utf8.
     form.append('file', new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' }), fileName);
     form.append(
       'pinataMetadata',
@@ -183,19 +174,42 @@ export class IpfsArtifactService {
   }
 
   private async kuboAdd(apiUrl: string, bytes: Buffer, fileName: string, authEnv: string): Promise<string> {
-    const form = new FormData();
-    form.append('file', new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' }), fileName);
-    const response = await fetch(`${apiUrl.replace(/\/$/, '')}/api/v0/add?pin=true&cid-version=1`, {
-      method: 'POST',
-      headers: this.authHeadersFromValue(process.env[authEnv]),
-      body: form,
-    });
-    if (!response.ok) throw new Error(`IPFS add failed with HTTP ${response.status}.`);
-    const text = await response.text();
-    const lastLine = text.trim().split(/\r?\n/).at(-1);
-    const parsed = lastLine ? (JSON.parse(lastLine) as { Hash?: unknown }) : null;
-    if (!parsed || typeof parsed.Hash !== 'string') throw new Error('IPFS add response is missing CID.');
-    return parsed.Hash;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    try {
+      const form = new FormData();
+      form.append('file', new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' }), fileName);
+      const response = await fetch(`${apiUrl.replace(/\/$/, '')}/api/v0/add?pin=true&cid-version=1`, {
+        method: 'POST',
+        headers: this.authHeadersFromValue(process.env[authEnv]),
+        body: form,
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`IPFS add failed with HTTP ${response.status}.`);
+
+      let text = '';
+      if (response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+          const { value, done } = await reader.read();
+          if (value) text += decoder.decode(value, { stream: !done });
+          if (done || (text.includes('Hash') && text.includes('}'))) {
+            try { await reader.cancel(); } catch {}
+            break;
+          }
+        }
+      } else {
+        text = await response.text();
+      }
+
+      const lastLine = text.trim().split(/\r?\n/).at(-1);
+      const parsed = lastLine ? (JSON.parse(lastLine) as { Hash?: unknown }) : null;
+      if (!parsed || typeof parsed.Hash !== 'string') throw new Error('IPFS add response is missing CID.');
+      return parsed.Hash;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private requiredApiUrl(name: string): string {

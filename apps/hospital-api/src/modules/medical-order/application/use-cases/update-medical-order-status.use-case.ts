@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { MedicalOrderStatus } from '@prisma/client';
 import { AuthUser } from '../../../../common/types/auth-user.type';
-import { AuditLoggerService } from '../../../../infrastructure/audit/audit-logger.service';
+import { AuditLoggerService, ClinicalAuditTrustService } from '../../../../infrastructure/audit';
 import { buildMedicalOrderSnapshot } from '../../domain/medical-order-snapshot';
 import { MedicalOrderAccessPolicy } from '../policies/medical-order-access.policy';
 import { MEDICAL_ORDER_REPOSITORY, MedicalOrderRepositoryPort } from '../ports/medical-order.repository.port';
@@ -20,6 +20,7 @@ export class UpdateMedicalOrderStatusUseCase {
     @Inject(MEDICAL_ORDER_REPOSITORY) private readonly repo: MedicalOrderRepositoryPort,
     private readonly accessPolicy: MedicalOrderAccessPolicy,
     private readonly audit: AuditLoggerService,
+    private readonly clinicalTrust: ClinicalAuditTrustService,
   ) {}
 
   async execute(id: string, status: MedicalOrderStatus, user: AuthUser, demoMode = false): Promise<unknown> {
@@ -54,6 +55,11 @@ export class UpdateMedicalOrderStatusUseCase {
         },
         tx,
       );
+    }, async (tx) => {
+      await this.clinicalTrust.assertManyTrusted([
+        { entity: 'MedicalOrder', entityId: id },
+        { entity: 'Visit', entityId: order.visitId },
+      ], tx);
     });
   }
 

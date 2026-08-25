@@ -47,7 +47,7 @@ describe('CreateMedicalOrderUseCase audit transaction', () => {
       }),
     };
     return {
-      useCase: new CreateMedicalOrderUseCase(repo as never, prisma as never, notifications as never, audit as never),
+      useCase: new CreateMedicalOrderUseCase(repo as never, prisma as never, notifications as never, audit as never, { assertManyTrusted: jest.fn().mockResolvedValue([]), assertTrusted: jest.fn().mockResolvedValue(undefined) } as any),
       repo,
       audit,
       tx,

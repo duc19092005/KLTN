@@ -1,102 +1,82 @@
 import React from 'react';
 import Reveal from './Reveal';
-import { HeartHandshake, FileCheck, Building2, Sparkles } from 'lucide-react';
+import { QUICK_SERVICES } from '../data/homeContent';
+import {
+  HeartHandshake,
+  Activity,
+  Baby,
+  Stethoscope,
+  Clock,
+  ShieldCheck,
+  ArrowRight,
+  Sparkles,
+  CheckCircle2,
+} from 'lucide-react';
 
-const VISION_IMG_1 = 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=800&q=80';
-const VISION_IMG_2 = 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=800&q=80';
+const SERVICE_ICONS = {
+  'kham-tong-quat': Stethoscope,
+  'kham-chuyen-khoa': HeartHandshake,
+  'kham-san-nhi': Baby,
+  'xet-nghiem-tai-vien': Activity,
+  'kham-ngoai-gio': Clock,
+  'tam-soat-chuyen-sau': ShieldCheck,
+};
 
 export default function VisionSection() {
-  const humanPillars = [
-    {
-      icon: HeartHandshake,
-      title: 'Y Bác sĩ Tận tụy & Lắng nghe',
-      desc: 'Mỗi bệnh nhân luôn được chào đón với sự ân cần đầm ấm. Lộ trình thăm khám được giải thích chi tiết, chu đáo.'
-    },
-    {
-      icon: FileCheck,
-      title: 'Minh bạch Hồ sơ & Kết quả Khám',
-      desc: 'Người bệnh và gia đình chủ động nắm rõ thông tin sức khỏe, kết quả xét nghiệm được lưu trữ an toàn, rõ ràng.'
-    },
-    {
-      icon: Building2,
-      title: 'Môi trường Khám chữa bệnh Đạt chuẩn',
-      desc: 'Không gian phòng khám sạch đẹp, yên tĩnh, tạo cảm giác thư thái và an tâm như ở nhà.'
-    }
-  ];
-
   return (
-    <section id="ve-chung-toi" className="bg-white py-20 border-t border-slate-100 antialiased" aria-labelledby="vision-heading">
-      <div className="mx-auto max-w-[1280px] px-4 sm:px-6">
-        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12">
-          {/* Left Column */}
-          <div className="lg:col-span-6">
-            <Reveal variant="left">
-              <span className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-sky-700 mb-3 border border-sky-100">
-                <Sparkles className="w-3.5 h-3.5 text-sky-600" />
-                <span>Sứ mệnh Chăm sóc sức khỏe</span>
-              </span>
-              <h2 id="vision-heading" className="text-3xl font-extrabold text-slate-900 sm:text-4xl leading-tight tracking-tight">
-                Đặt sự hài lòng và sức khỏe của bệnh nhân lên hàng đầu.
-              </h2>
-              <p className="mt-4 text-base leading-relaxed text-slate-600 font-medium">
-                Tại Bệnh viện KLTN, chúng tôi hiểu rằng niềm tin của người bệnh được xây dựng từ những quan tâm chân thành nhất. Mọi quy trình khám đều hướng tới sự thoải mái và nhanh chóng cho bạn.
-              </p>
-            </Reveal>
+    <section id="dich-vu" className="bg-slate-50/50 py-20 border-t border-slate-200/60 antialiased" aria-labelledby="services-heading">
+      <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
+        
+        <Reveal variant="up" className="mb-14 text-center max-w-3xl mx-auto">
+          <span className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider text-sky-700 mb-3 border border-sky-200/80 shadow-2xs">
+            <Sparkles className="w-3.5 h-3.5 text-sky-600" />
+            <span>Dịch Vụ Y Tế Đời Thường & Thiết Thực</span>
+          </span>
+          <h2 id="services-heading" className="text-3xl font-black text-slate-900 sm:text-4xl tracking-tight leading-tight">
+            Đáp Ứng Mọi Nhu Cầu Chăm Sóc Sức Khỏe Gia Đình
+          </h2>
+          <p className="mt-3 text-sm text-slate-600 font-medium leading-relaxed">
+            Từ khám sức khỏe định kỳ, chăm sóc mẹ và bé đến xét nghiệm nhanh trong ngày — Tất cả đều được thực hiện chu đáo với chi phí minh bạch và hỗ trợ BHYT đầy đủ.
+          </p>
+        </Reveal>
 
-            <div className="mt-8 space-y-3.5">
-              {humanPillars.map((item, index) => {
-                const Icon = item.icon;
-                return (
-                  <Reveal key={item.title} variant="up" delay={80 + index * 80}>
-                    <div className="flex gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 transition-all hover:bg-white hover:border-sky-300 hover:shadow-md">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-600 text-white shadow-md shadow-sky-600/20">
-                        <Icon className="w-5 h-5" />
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {QUICK_SERVICES.map((srv, index) => {
+            const Icon = SERVICE_ICONS[srv.id] || Stethoscope;
+            return (
+              <Reveal key={srv.id} variant="up" delay={index * 80}>
+                <div className="group relative flex h-full flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-7 shadow-xs hover:border-sky-300 hover:shadow-xl transition-all duration-300">
+                  <div>
+                    <div className="flex items-center justify-between mb-5">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-50 text-sky-600 border border-sky-100 shadow-2xs group-hover:bg-sky-600 group-hover:text-white transition-all duration-300">
+                        <Icon className="w-6 h-6" />
                       </div>
-                      <div>
-                        <h3 className="text-sm sm:text-base font-bold text-slate-900">{item.title}</h3>
-                        <p className="mt-1 text-xs text-slate-500 font-medium leading-relaxed">{item.desc}</p>
-                      </div>
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-extrabold text-slate-600 group-hover:bg-sky-50 group-hover:text-sky-700 transition-colors">
+                        {srv.tag}
+                      </span>
                     </div>
-                  </Reveal>
-                );
-              })}
-            </div>
-          </div>
 
-          {/* Right Column Visual Images */}
-          <div className="lg:col-span-6">
-            <div className="grid grid-cols-2 gap-4">
-              <Reveal variant="up" delay={80}>
-                <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white p-2.5 shadow-lg">
-                  <div className="aspect-[3/4] overflow-hidden rounded-2xl">
-                    <img
-                      src={VISION_IMG_1}
-                      alt="Bác sĩ ân cần lắng nghe bệnh nhân"
-                      className="h-full w-full object-cover transition-transform duration-700 hover:scale-105"
-                      width={480}
-                      height={640}
-                      loading="lazy"
-                    />
+                    <h3 className="text-lg font-extrabold text-slate-900 mb-2 group-hover:text-sky-600 transition-colors">
+                      {srv.title}
+                    </h3>
+                    <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                      {srv.desc}
+                    </p>
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t border-slate-100">
+                    <a
+                      href="#lien-he"
+                      className="inline-flex items-center gap-1.5 text-xs font-extrabold text-sky-600 hover:text-sky-700 transition-colors group-hover:translate-x-1 duration-200"
+                    >
+                      <span>Tư vấn & Đăng ký gói khám</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </a>
                   </div>
                 </div>
               </Reveal>
-
-              <Reveal variant="up" delay={160}>
-                <div className="mt-8 overflow-hidden rounded-3xl border border-slate-200 bg-white p-2.5 shadow-lg">
-                  <div className="aspect-[3/4] overflow-hidden rounded-2xl">
-                    <img
-                      src={VISION_IMG_2}
-                      alt="Phòng khám sạch đẹp và trang thiết bị hiện đại"
-                      className="h-full w-full object-cover transition-transform duration-700 hover:scale-105"
-                      width={480}
-                      height={640}
-                      loading="lazy"
-                    />
-                  </div>
-                </div>
-              </Reveal>
-            </div>
-          </div>
+            );
+          })}
         </div>
       </div>
     </section>

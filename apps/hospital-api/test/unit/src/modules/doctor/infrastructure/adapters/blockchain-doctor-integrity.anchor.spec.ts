@@ -1,6 +1,6 @@
-import { AuditAnchorService } from '../../../../../../../src/infrastructure/audit/audit-anchor.service';
-import { AuditLoggerService } from '../../../../../../../src/infrastructure/audit/audit-logger.service';
-import { computeAfterHashV2 } from '../../../../../../../src/infrastructure/audit/audit-hash.util';
+import { AuditAnchorService } from '../../../../../../../src/infrastructure/audit';
+import { AuditLoggerService } from '../../../../../../../src/infrastructure/audit';
+import { computeAfterHashV2 } from '../../../../../../../src/infrastructure/audit';
 import { PrismaService } from '../../../../../../../src/infrastructure/prisma/prisma.service';
 import { buildUnifiedDoctorSnapshot } from '../../../../../../../src/modules/doctor/domain/doctor-snapshot';
 import { BlockchainDoctorIntegrityAnchor } from '../../../../../../../src/modules/doctor/infrastructure/adapters/blockchain-doctor-integrity.anchor';

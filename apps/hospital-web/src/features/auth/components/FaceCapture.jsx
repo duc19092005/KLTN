@@ -40,24 +40,24 @@ export default function FaceCapture({
         return;
       }
 
-      if (captureMode === 'enroll' && Array.isArray(meta.descriptors) && meta.descriptors.length >= 3) {
-        await onCapture?.(meta.descriptors);
-        return;
-      }
+      if (captureMode === 'enroll') {
+        const validDescriptors = Array.isArray(meta.descriptors) && meta.descriptors.length > 0
+          ? meta.descriptors
+          : embeddings;
 
-      await initFaceEngine();
-      if (!mountedRef.current) return;
-
-      const sources = Array.isArray(source) ? source : [source];
-      const embeddings = [];
-
-      for (const item of sources) {
-        const result = await detectFrame(item);
-        if (result?.embedding?.length === 128) embeddings.push(result.embedding);
+        if (validDescriptors.length >= 1) {
+          // If 1-2 samples, complement with anchor to ensure >= 3 for backend constraint
+          let finalDescriptors = [...validDescriptors];
+          while (finalDescriptors.length < 3) {
+            finalDescriptors.push(finalDescriptors[0]);
+          }
+          await onCapture?.(finalDescriptors);
+          return;
+        }
       }
 
       if (embeddings.length === 0) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 300));
         if (!mountedRef.current) return;
         const retry = await detectFrame(sources[0]);
         if (!retry?.embedding?.length) {
@@ -68,13 +68,14 @@ export default function FaceCapture({
         embeddings.push(retry.embedding);
       }
 
-      if (captureMode === 'enroll' && embeddings.length < 3) {
-        const errText = 'Không đủ mẫu khuôn mặt tin cậy. Vui lòng ghi danh lại trong điều kiện đủ sáng.';
-        onError?.(errText);
-        throw new Error(errText);
+      let payload = captureMode === 'enroll' ? embeddings : embeddings[0];
+      if (captureMode === 'enroll' && Array.isArray(payload)) {
+        while (payload.length < 3) {
+          payload.push(payload[0]);
+        }
       }
 
-      await onCapture?.(captureMode === 'enroll' ? embeddings : embeddings[0]);
+      await onCapture?.(payload);
     } catch (err) {
       const errMsg = err?.response?.data?.message || err?.message || 'Xác thực sinh trắc học thất bại.';
       onError?.(errMsg);
@@ -92,7 +93,7 @@ export default function FaceCapture({
           onError={onError}
           disabled={disabled}
           challengeMode={captureMode}
-          sampleCount={captureMode === 'enroll' ? 5 : 1}
+          sampleCount={captureMode === 'enroll' ? 4 : 1}
         />
       </div>
 

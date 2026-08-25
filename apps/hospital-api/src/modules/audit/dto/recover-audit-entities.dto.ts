@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsString, IsUUID, MaxLength, MinLength, ValidateNested } from 'class-validator';
-import { RECOVERABLE_AUDIT_ENTITIES, RecoverableAuditEntity } from '../../../infrastructure/audit/entity-recovery.service';
+import { RECOVERABLE_AUDIT_ENTITIES, RecoverableAuditEntity } from '../../../infrastructure/audit';
 
 export class RecoverAuditEntityTargetDto {
   @IsIn(RECOVERABLE_AUDIT_ENTITIES)

@@ -3,18 +3,18 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
-import { AuditLoggerService } from '../../../infrastructure/audit/audit-logger.service';
-import { AuditAnchorService } from '../../../infrastructure/audit/audit-anchor.service';
+import { AuditLoggerService } from '../../../infrastructure/audit';
+import { AuditAnchorService } from '../../../infrastructure/audit';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
-import { toDisplayAuditDiff, toDisplayAuditFields } from '../../../infrastructure/audit/audit-diff.util';
-import { verifyAuditRow, verifyAuditRowLight } from '../../../infrastructure/audit/audit-verification.util';
+import { toDisplayAuditDiff, toDisplayAuditFields } from '../../../infrastructure/audit';
+import { verifyAuditRow, verifyAuditRowLight } from '../../../infrastructure/audit';
 import { FaceStepUpGuard } from '../../../common/stepup/face-stepup.guard';
 import { RequireFaceStepUp } from '../../../common/stepup/require-face-stepup.decorator';
-import { AuditRecoveryService } from '../../../infrastructure/audit/audit-recovery.service';
+import { AuditRecoveryService } from '../../../infrastructure/audit';
 import { RecoverAuditBatchDto } from '../dto/recover-audit-batch.dto';
-import { EntityRecoveryService } from '../../../infrastructure/audit/entity-recovery.service';
+import { EntityRecoveryService } from '../../../infrastructure/audit';
 import { BlockchainService } from '../../../infrastructure/blockchain/blockchain.service';
 import { PreviewRecoverAuditEntitiesDto, RecoverAuditEntitiesDto } from '../dto/recover-audit-entities.dto';
 import type { AuditBatch, BlockchainLogger, Prisma } from '@prisma/client';
@@ -256,8 +256,8 @@ export class AuditController {
                 batchId: cp.batchId,
                 merkleRoot: cp.root,
                 leafCount: cp.leafCount,
-                fromSeq: null,
-                toSeq: null,
+                fromSeq: cp.fromSeq,
+                toSeq: cp.toSeq,
                 status: 'MISSING',
                 algorithmVersion: 'MERKLE_SHA256_STRING_V1',
                 contractVersion: 'AUDIT_ANCHOR_CHECKPOINT_V2',

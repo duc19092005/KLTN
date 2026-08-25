@@ -3,7 +3,7 @@ import { UpdatePatientDto } from '../../dto/patient.dto';
 import { PATIENT_REPOSITORY, PatientRepositoryPort } from '../ports/patient.repository.port';
 import { PATIENT_INTEGRITY_ANCHOR, PatientIntegrityAnchorPort } from '../ports/patient-integrity-anchor.port';
 import { buildPatientSnapshot } from '../../domain/patient-snapshot';
-import { EntityRecoveryService } from '../../../../infrastructure/audit/entity-recovery.service';
+import { EntityRecoveryService } from '../../../../infrastructure/audit';
 
 /**
  * Fetch one patient and update a patient. Behavior copied verbatim from the

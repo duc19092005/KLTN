@@ -84,11 +84,14 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
   }
 
   async createForExistingStaff(dto: CreateDoctorDto, afterWrite?: DoctorWriteHook): Promise<any> {
-    return this.prisma.$transaction(async (tx) => {
-      const doctor = await tx.doctorProfile.create({ data: this.toCreateData(dto), include: this.includeRelations() });
-      await afterWrite?.(doctor, tx);
-      return doctor;
-    });
+    return this.prisma.$transaction(
+      async (tx) => {
+        const doctor = await tx.doctorProfile.create({ data: this.toCreateData(dto), include: this.includeRelations() });
+        await afterWrite?.(doctor, tx);
+        return doctor;
+      },
+      { timeout: 15000, maxWait: 5000 },
+    );
   }
 
   async createWithStaff(
@@ -97,43 +100,46 @@ export class PrismaDoctorRepository implements DoctorRepositoryPort {
     passwordHash: string,
     afterWrite?: DoctorWriteHook,
   ): Promise<any> {
-    return this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          username: dto.username.trim(),
-          email: dto.email.trim().toLowerCase(),
-          passwordHash,
-          role: UserRole.DOCTOR,
-          status: UserStatus.ACTIVE,
-          firstLogin: true,
-          staffProfile: {
-            create: {
-              employeeCode,
-              fullName: dto.fullName.trim(),
-              phone: dto.phone.trim(),
-              gender: dto.gender.trim(),
-              citizenId: dto.citizenId.trim(),
-              birthDate: new Date(dto.birthDate),
-              address: dto.address?.trim(),
-              avatarUrl: dto.avatarUrl.trim(),
-              departmentId: dto.departmentId || null,
-              position: dto.position?.trim(),
-              doctorProfile: {
-                create: this.toNestedCreateData(dto),
+    return this.prisma.$transaction(
+      async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            username: dto.username.trim(),
+            email: dto.email.trim().toLowerCase(),
+            passwordHash,
+            role: UserRole.DOCTOR,
+            status: UserStatus.ACTIVE,
+            firstLogin: true,
+            staffProfile: {
+              create: {
+                employeeCode,
+                fullName: dto.fullName.trim(),
+                phone: dto.phone.trim(),
+                gender: dto.gender.trim(),
+                citizenId: dto.citizenId.trim(),
+                birthDate: new Date(dto.birthDate),
+                address: dto.address?.trim(),
+                avatarUrl: dto.avatarUrl.trim(),
+                departmentId: dto.departmentId || null,
+                position: dto.position?.trim(),
+                doctorProfile: {
+                  create: this.toNestedCreateData(dto),
+                },
               },
             },
           },
-        },
-        include: { staffProfile: { include: { doctorProfile: true } } },
-      });
+          include: { staffProfile: { include: { doctorProfile: true } } },
+        });
 
-      const doctorId = user.staffProfile?.doctorProfile?.id;
-      if (!doctorId) throw new BadRequestException('Chưa tạo được hồ sơ bác sĩ.');
+        const doctorId = user.staffProfile?.doctorProfile?.id;
+        if (!doctorId) throw new BadRequestException('Chưa tạo được hồ sơ bác sĩ.');
 
-      const doctor = await tx.doctorProfile.findUniqueOrThrow({ where: { id: doctorId }, include: this.includeRelations() });
-      await afterWrite?.(doctor, tx);
-      return doctor;
-    });
+        const doctor = await tx.doctorProfile.findUniqueOrThrow({ where: { id: doctorId }, include: this.includeRelations() });
+        await afterWrite?.(doctor, tx);
+        return doctor;
+      },
+      { timeout: 15000, maxWait: 5000 },
+    );
   }
 
   async findManyPaginated(filter: DoctorListFilter, skip: number, take: number) {

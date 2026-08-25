@@ -9,7 +9,7 @@ import {
   computeRecordHash,
   GENESIS_PREV_HASH,
   getAuditHashKey,
-} from '../../../../../src/infrastructure/audit/audit-hash.util';
+} from '../../../../../src/infrastructure/audit';
 
 describe('audit-hash.util canonicalize', () => {
   it('sorts object keys deterministically', () => {

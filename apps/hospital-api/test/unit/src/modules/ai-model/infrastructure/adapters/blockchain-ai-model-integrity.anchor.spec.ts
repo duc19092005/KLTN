@@ -1,6 +1,6 @@
-import { AuditAnchorService } from '../../../../../../../src/infrastructure/audit/audit-anchor.service';
-import { AuditLoggerService } from '../../../../../../../src/infrastructure/audit/audit-logger.service';
-import { computeAfterHashV2 } from '../../../../../../../src/infrastructure/audit/audit-hash.util';
+import { AuditAnchorService } from '../../../../../../../src/infrastructure/audit';
+import { AuditLoggerService } from '../../../../../../../src/infrastructure/audit';
+import { computeAfterHashV2 } from '../../../../../../../src/infrastructure/audit';
 import { PrismaService } from '../../../../../../../src/infrastructure/prisma/prisma.service';
 import { buildAiModelSnapshot } from '../../../../../../../src/modules/ai-model/domain/ai-model-snapshot';
 import { BlockchainAiModelIntegrityAnchor } from '../../../../../../../src/modules/ai-model/infrastructure/adapters/blockchain-ai-model-integrity.anchor';

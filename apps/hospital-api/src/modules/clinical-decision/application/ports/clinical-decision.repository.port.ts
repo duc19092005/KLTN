@@ -1,7 +1,9 @@
-import { AiModelRegistry } from '@prisma/client';
+import { AiModelRegistry, Prisma } from '@prisma/client';
 
 /** DI token for the clinical decision repository port. */
 export const CLINICAL_DECISION_REPOSITORY = Symbol('CLINICAL_DECISION_REPOSITORY');
+
+export type ClinicalDecisionBeforeWriteHook = (tx: Prisma.TransactionClient) => Promise<void>;
 
 /** Minimal visit shape for doctor ownership checks. */
 export type ClinicalVisitInfo = {
@@ -74,7 +76,8 @@ export interface ClinicalDecisionRepositoryPort {
 
   createAiDiagnosis(
     data: CreateAiDiagnosisData,
-    afterWrite?: (diagnosis: unknown, tx: import('@prisma/client').Prisma.TransactionClient) => Promise<void>,
+    afterWrite?: (diagnosis: unknown, tx: Prisma.TransactionClient) => Promise<void>,
+    beforeWrite?: ClinicalDecisionBeforeWriteHook,
   ): Promise<unknown>;
 
   findAiDiagnosisWithVisit(id: string): Promise<{ id: string; visit: ClinicalVisitInfo | null } | null>;
@@ -82,7 +85,8 @@ export interface ClinicalDecisionRepositoryPort {
     id: string,
     reviewedByDoctorId: string,
     doctorFeedback: string | null,
-    afterWrite?: (before: unknown, after: unknown, tx: import('@prisma/client').Prisma.TransactionClient) => Promise<void>,
+    afterWrite?: (before: unknown, after: unknown, tx: Prisma.TransactionClient) => Promise<void>,
+    beforeWrite?: ClinicalDecisionBeforeWriteHook,
   ): Promise<unknown>;
 
   findAiDiagnosisById(id: string): Promise<{ id: string; visitId: string } | null>;
@@ -96,7 +100,8 @@ export interface ClinicalDecisionRepositoryPort {
     afterWrite?: (
       conclusion: unknown,
       visitAfter: ClinicalVisitAuditSnapshot | null,
-      tx: import('@prisma/client').Prisma.TransactionClient,
+      tx: Prisma.TransactionClient,
     ) => Promise<void>,
+    beforeWrite?: ClinicalDecisionBeforeWriteHook,
   ): Promise<unknown>;
 }

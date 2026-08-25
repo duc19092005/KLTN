@@ -706,7 +706,7 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
 
   const selectAddress = (suggestion) => {
     const nextAddress = suggestion.displayName || suggestion.display_name;
-    setForm({ ...form, address: nextAddress });
+    setForm((prev) => ({ ...prev, address: nextAddress }));
     setAddressSuggestions([]);
     setAddressSearched(false);
     setAddressDropdownOpen(false);
@@ -765,22 +765,22 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
         <div className="p-6 sm:p-8 space-y-6">
           <SectionTitle title="Thông tin tài khoản & nhân sự" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Input label="Họ tên" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: onlyVietnameseNameChars(v) })} onBlur={() => validateField('fullName')} error={fieldErrors.fullName} required maxLength={MAX_FULL_NAME_LENGTH} />
-            <AvatarUpload value={form.avatarUrl} onChange={(url) => setForm({ ...form, avatarUrl: url })} uploadFn={doctorService.uploadAvatar} />
-            <Input label="Tên đăng nhập" value={form.username} onChange={(v) => setForm({ ...form, username: onlyUsernameChars(v) })} onBlur={() => validateField('username')} error={fieldErrors.username} disabled={!isCreate} required maxLength={MAX_USERNAME_LENGTH} />
-            <Input label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: onlyEmailChars(v) })} onBlur={() => validateField('email')} error={fieldErrors.email} disabled={!isCreate} required />
-            <Input label="Số điện thoại" value={form.phone} onChange={(v) => setForm({ ...form, phone: onlyDigits(v).slice(0, 10) })} onBlur={() => validateField('phone')} error={fieldErrors.phone} required maxLength={10} />
-            <Input label="CCCD/CMND" value={form.citizenId} onChange={(v) => setForm({ ...form, citizenId: onlyDigits(v).slice(0, 12) })} onBlur={() => validateField('citizenId')} error={fieldErrors.citizenId} required maxLength={12} />
-            <DateInput label="Ngày sinh" value={form.birthDate} onChange={(v) => setForm({ ...form, birthDate: v })} onBlur={(nextValue) => validateField('birthDate', nextValue)} error={fieldErrors.birthDate} required />
-            <Select label="Giới tính" value={form.gender} onChange={(v) => { setForm({ ...form, gender: v }); validateField('gender', v); }} error={fieldErrors.gender} empty="Chọn giới tính" required options={['Nam', 'Nữ']} />
-            <Select label="Phòng ban" value={form.departmentId} onChange={(v) => { setForm({ ...form, departmentId: v }); validateField('departmentId', v); }} error={fieldErrors.departmentId} empty="Chưa gán phòng ban" required options={departments.filter((d) => ['EXAMINATION', 'CLINICAL'].includes(d.type)).map((d) => ({ value: d.id, label: `${d.departmentCode || 'PB'} - ${d.name}` }))} />
-            <Select label="Chức danh" value={form.position} onChange={(v) => { setForm({ ...form, position: limitPosition(v) }); validateField('position', v); }} error={fieldErrors.position} empty="Chọn chức danh" required options={DOCTOR_POSITIONS} />
+            <Input label="Họ tên" value={form.fullName} onChange={(v) => setForm((prev) => ({ ...prev, fullName: onlyVietnameseNameChars(v) }))} onBlur={() => validateField('fullName')} error={fieldErrors.fullName} required maxLength={MAX_FULL_NAME_LENGTH} />
+            <AvatarUpload value={form.avatarUrl} onChange={(url) => setForm((prev) => ({ ...prev, avatarUrl: url }))} uploadFn={doctorService.uploadAvatar} />
+            <Input label="Tên đăng nhập" value={form.username} onChange={(v) => setForm((prev) => ({ ...prev, username: onlyUsernameChars(v) }))} onBlur={() => validateField('username')} error={fieldErrors.username} disabled={!isCreate} required maxLength={MAX_USERNAME_LENGTH} />
+            <Input label="Email" value={form.email} onChange={(v) => setForm((prev) => ({ ...prev, email: onlyEmailChars(v) }))} onBlur={() => validateField('email')} error={fieldErrors.email} disabled={!isCreate} required />
+            <Input label="Số điện thoại" value={form.phone} onChange={(v) => setForm((prev) => ({ ...prev, phone: onlyDigits(v).slice(0, 10) }))} onBlur={() => validateField('phone')} error={fieldErrors.phone} required maxLength={10} />
+            <Input label="CCCD/CMND" value={form.citizenId} onChange={(v) => setForm((prev) => ({ ...prev, citizenId: onlyDigits(v).slice(0, 12) }))} onBlur={() => validateField('citizenId')} error={fieldErrors.citizenId} required maxLength={12} />
+            <DateInput label="Ngày sinh" value={form.birthDate} onChange={(v) => setForm((prev) => ({ ...prev, birthDate: v }))} onBlur={(nextValue) => validateField('birthDate', nextValue)} error={fieldErrors.birthDate} required />
+            <Select label="Giới tính" value={form.gender} onChange={(v) => { setForm((prev) => ({ ...prev, gender: v })); validateField('gender', v); }} error={fieldErrors.gender} empty="Chọn giới tính" required options={['Nam', 'Nữ']} />
+            <Select label="Phòng ban" value={form.departmentId} onChange={(v) => { setForm((prev) => ({ ...prev, departmentId: v })); validateField('departmentId', v); }} error={fieldErrors.departmentId} empty="Chưa gán phòng ban" required options={departments.filter((d) => ['EXAMINATION', 'CLINICAL'].includes(d.type)).map((d) => ({ value: d.id, label: `${d.departmentCode || 'PB'} - ${d.name}` }))} />
+            <Select label="Chức danh" value={form.position} onChange={(v) => { setForm((prev) => ({ ...prev, position: limitPosition(v) })); validateField('position', v); }} error={fieldErrors.position} empty="Chọn chức danh" required options={DOCTOR_POSITIONS} />
             <AddressInput
               label="Địa chỉ"
               value={form.address}
               onChange={(v) => {
                 setAddressTouched(true);
-                setForm({ ...form, address: limitAddress(v) });
+                setForm((prev) => ({ ...prev, address: limitAddress(v) }));
               }}
               onBlur={handleAddressBlur}
               onFocus={handleAddressFocus}
@@ -796,10 +796,10 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
 
           <SectionTitle title="Thông tin bằng cấp & Chuyên môn" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Select label="Chuyên khoa khám" value={form.specialty} onChange={(v) => { setForm({ ...form, specialty: v }); validateField('specialty', v); }} error={fieldErrors.specialty} empty="Chọn chuyên khoa" required options={SPECIALTIES} />
-            <Input label="Số chứng chỉ hành nghề" value={form.licenseNumber} onChange={(v) => setForm({ ...form, licenseNumber: v.slice(0, MAX_LICENSE_NUMBER_LENGTH) })} onBlur={() => validateField('licenseNumber')} error={fieldErrors.licenseNumber} required maxLength={MAX_LICENSE_NUMBER_LENGTH} />
-            <Select label="Trình độ học vấn" value={form.qualification} onChange={(v) => { setForm({ ...form, qualification: v }); validateField('qualification', v); }} error={fieldErrors.qualification} empty="Chọn trình độ" required options={QUALIFICATIONS} />
-            <Input type="text" label="Số năm kinh nghiệm" value={form.yearsExperience} onChange={(v) => setForm({ ...form, yearsExperience: onlyDigits(v).slice(0, 2) })} onBlur={() => validateField('yearsExperience')} error={fieldErrors.yearsExperience} required maxLength={2} inputMode="numeric" pattern="[0-9]*" />
+            <Select label="Chuyên khoa khám" value={form.specialty} onChange={(v) => { setForm((prev) => ({ ...prev, specialty: v })); validateField('specialty', v); }} error={fieldErrors.specialty} empty="Chọn chuyên khoa" required options={SPECIALTIES} />
+            <Input label="Số chứng chỉ hành nghề" value={form.licenseNumber} onChange={(v) => setForm((prev) => ({ ...prev, licenseNumber: v.slice(0, MAX_LICENSE_NUMBER_LENGTH) }))} onBlur={() => validateField('licenseNumber')} error={fieldErrors.licenseNumber} required maxLength={MAX_LICENSE_NUMBER_LENGTH} />
+            <Select label="Trình độ học vấn" value={form.qualification} onChange={(v) => { setForm((prev) => ({ ...prev, qualification: v })); validateField('qualification', v); }} error={fieldErrors.qualification} empty="Chọn trình độ" required options={QUALIFICATIONS} />
+            <Input type="text" label="Số năm kinh nghiệm" value={form.yearsExperience} onChange={(v) => setForm((prev) => ({ ...prev, yearsExperience: onlyDigits(v).slice(0, 2) }))} onBlur={() => validateField('yearsExperience')} error={fieldErrors.yearsExperience} required maxLength={2} inputMode="numeric" pattern="[0-9]*" />
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-100">

@@ -1,6 +1,6 @@
-import { AuditAnchorService } from '../../../../../../../src/infrastructure/audit/audit-anchor.service';
-import { AuditLoggerService } from '../../../../../../../src/infrastructure/audit/audit-logger.service';
-import { computeAfterHashV2 } from '../../../../../../../src/infrastructure/audit/audit-hash.util';
+import { AuditAnchorService } from '../../../../../../../src/infrastructure/audit';
+import { AuditLoggerService } from '../../../../../../../src/infrastructure/audit';
+import { computeAfterHashV2 } from '../../../../../../../src/infrastructure/audit';
 import { PrismaService } from '../../../../../../../src/infrastructure/prisma/prisma.service';
 import { buildPatientSnapshot } from '../../../../../../../src/modules/patient/domain/patient-snapshot';
 import { AuditPatientIntegrityAnchor } from '../../../../../../../src/modules/patient/infrastructure/adapters/audit-patient-integrity.anchor';

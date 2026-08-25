@@ -77,6 +77,7 @@ export type PatientCreatedRecord = {
 export type VisitCreatedHook = (visit: VisitCreatedRecord, tx: Prisma.TransactionClient) => Promise<void>;
 export type VisitUpdatedHook = (visit: VisitCreatedRecord, tx: Prisma.TransactionClient) => Promise<void>;
 export type PatientCreatedHook = (patient: PatientCreatedRecord, tx: Prisma.TransactionClient) => Promise<void>;
+export type VisitBeforeWriteHook = (tx: Prisma.TransactionClient) => Promise<void>;
 
 /**
  * Persistence boundary for the Visit aggregate. The Prisma implementation keeps
@@ -94,11 +95,19 @@ export interface VisitRepositoryPort {
     command: CreateVisitCommand,
     onCreated?: VisitCreatedHook,
     onPatientCreated?: PatientCreatedHook,
+    beforeWrite?: VisitBeforeWriteHook,
   ): Promise<unknown>;
 
   findManyPaginated(filter: VisitListFilter, skip: number, take: number): Promise<{ items: unknown[]; total: number }>;
 
-  updateStatus(id: string, status: VisitStatus, completedAt?: Date, staffId?: string, afterWrite?: VisitUpdatedHook): Promise<unknown>;
+  updateStatus(
+    id: string,
+    status: VisitStatus,
+    completedAt?: Date,
+    staffId?: string,
+    afterWrite?: VisitUpdatedHook,
+    beforeWrite?: VisitBeforeWriteHook,
+  ): Promise<unknown>;
 
   suggestDepartments(specialty: string): Promise<unknown[]>;
 }

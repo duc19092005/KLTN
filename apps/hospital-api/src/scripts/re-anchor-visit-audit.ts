@@ -1,9 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { PrismaService } from '../infrastructure/prisma/prisma.service';
-import { AuditLoggerService } from '../infrastructure/audit/audit-logger.service';
-import { AuditAnchorService } from '../infrastructure/audit/audit-anchor.service';
-import { verifyAuditRow } from '../infrastructure/audit/audit-verification.util';
+import { AuditLoggerService } from '../infrastructure/audit';
+import { AuditAnchorService } from '../infrastructure/audit';
+import { verifyAuditRow } from '../infrastructure/audit';
 import { buildVisitSnapshot } from '../modules/visit/domain/visit-snapshot';
 
 /**

@@ -1,4 +1,4 @@
-import { AuditRecoveryCryptoService } from '../../../../../src/infrastructure/audit/audit-recovery-crypto.service';
+import { AuditRecoveryCryptoService } from '../../../../../src/infrastructure/audit';
 
 describe('AuditRecoveryCryptoService', () => {
   const originalKey = process.env.AUDIT_RECOVERY_ENCRYPTION_KEY;

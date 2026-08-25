@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { canonicalize } from '../audit/audit-hash.util';
+import { canonicalize } from '../audit';
 
 export function computeBackendActionHash(actionPayload: unknown): string {
   const canonicalPayload = canonicalize(actionPayload);

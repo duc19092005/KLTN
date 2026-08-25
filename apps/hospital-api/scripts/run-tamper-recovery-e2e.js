@@ -13,13 +13,13 @@ for (const name of ['DATABASE_URL', 'AUDIT_ANCHOR_ADDRESS', 'IPFS_API_URL']) {
   }
 }
 
-const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-const run = (args) => {
-  const result = spawnSync(npx, args, {
+const node = process.execPath;
+const run = (script, args) => {
+  const result = spawnSync(node, [script, ...args], {
     cwd: backendDir,
     env: { ...process.env, RUN_TAMPER_RECOVERY_E2E: 'true' },
     stdio: 'inherit',
-    shell: process.platform === 'win32',
+    shell: false,
   });
   if (result.error) {
     console.error(result.error);
@@ -28,11 +28,12 @@ const run = (args) => {
   if (result.status !== 0) process.exit(result.status || 1);
 };
 
-run(['prisma', 'db', 'push', '--skip-generate', '--accept-data-loss']);
-run([
-  'jest',
+const extraArgs = process.argv.slice(2);
+run(require.resolve('prisma/build/index.js'), ['db', 'push', '--skip-generate', '--accept-data-loss']);
+run(path.join(path.dirname(require.resolve('jest/package.json')), 'bin', 'jest.js'), [
   '--config',
   './test/jest-integration.json',
   'test/integration/tamper-recovery/tamper-recovery.integration-spec.ts',
   '--runInBand',
+  ...extraArgs,
 ]);
