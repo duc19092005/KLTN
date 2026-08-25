@@ -12,7 +12,7 @@ import { departmentService } from '../apis/departmentService';
 import DoctorDetailModal from '../components/DoctorDetailModal';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { Calendar, ExternalLink, MapPin, Search, Trash2, Plus, Stethoscope, Filter, UserCheck, CheckSquare, Square, Sparkles, Eye, EyeOff, Pencil, Layers, ShieldCheck } from 'lucide-react';
+import { Calendar, ExternalLink, MapPin, Search, Trash2, Plus, Stethoscope, Filter, UserCheck, CheckSquare, Square, Sparkles, Eye, EyeOff, Pencil, Layers, ShieldCheck, AlertTriangle } from 'lucide-react';
 
 const OSM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
 const MIN_BIRTH_YEAR = 1900;
@@ -191,6 +191,7 @@ export default function DoctorsPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [detailDoctorId, setDetailDoctorId] = useState(null);
+  const [pendingDeleteDoctor, setPendingDeleteDoctor] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const totalLabel = useMemo(() => `${pagination.total} bác sĩ`, [pagination.total]);
 
@@ -301,19 +302,23 @@ export default function DoctorsPage() {
     finally { setBusy(false); }
   };
 
-  const removeDoctor = async (doctor) => {
-    const staffId = doctor?.staffProfile?.id;
-    if (!staffId) {
-      toast.error('Không tìm thấy hồ sơ nhân sự của bác sĩ.');
-      return;
-    }
+  const removeDoctor = (doctor) => {
+    setPendingDeleteDoctor(doctor);
+  };
+
+  const confirmRemoveDoctor = async () => {
+    if (!pendingDeleteDoctor) return;
     setBusy(true);
     try {
-      await staffService.remove(staffId);
-      toast.success('Xóa bác sĩ thành công!');
+      await doctorService.remove(pendingDeleteDoctor.id);
+      toast.success('Đã chuyển bác sĩ vào thùng rác thành công!');
+      setPendingDeleteDoctor(null);
       await load(pagination.page);
-    } catch (err) { toast.error(getError(err)); }
-    finally { setBusy(false); }
+    } catch (err) {
+      toast.error(getError(err, 'Không xóa được bác sĩ'));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleBulkSoftDelete = async (ids) => {
@@ -460,6 +465,14 @@ export default function DoctorsPage() {
         )}
         {(isCreateOpen || editing) && <DoctorModal mode={editing ? 'edit' : 'create'} form={form} setForm={setForm} departments={departments} onSubmit={submit} onClose={close} busy={busy} />}
         {detailDoctorId && <DoctorDetailModal doctorId={detailDoctorId} onClose={() => setDetailDoctorId(null)} />}
+        {pendingDeleteDoctor && (
+          <DeleteDoctorModal
+            doctor={pendingDeleteDoctor}
+            busy={busy}
+            onCancel={() => setPendingDeleteDoctor(null)}
+            onConfirm={confirmRemoveDoctor}
+          />
+        )}
       </div>
     </DashboardLayout>
   );
@@ -744,7 +757,7 @@ function DoctorModal({ mode, form, setForm, departments, onSubmit, onClose, busy
   if (typeof document === 'undefined' || !document.body) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-md" onClick={onClose} />
       <form onSubmit={handleSubmit} className="relative z-10 w-full max-w-[1150px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white shadow-2xl border border-slate-200 space-y-6 overflow-hidden">
         
@@ -944,5 +957,73 @@ function Select({ label, value, onChange, options, empty, required, disabled, er
       </select>
       <FieldError message={error} />
     </label>
+  );
+}
+
+function DeleteDoctorModal({ doctor, busy, onCancel, onConfirm }) {
+  const staff = doctor?.staffProfile || {};
+  const isActive = staff.user?.status === 'ACTIVE';
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={busy ? undefined : onCancel} />
+      <div className="relative z-10 w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="border-b border-slate-100 p-6">
+          <div className="flex items-center gap-2 text-rose-600">
+            <AlertTriangle className="h-5 w-5" />
+            <p className="text-xs font-bold uppercase tracking-wider">Xác nhận xóa bác sĩ</p>
+          </div>
+          <h3 className="mt-1 text-xl font-bold text-slate-900">Chuyển vào thùng rác?</h3>
+          <p className="mt-2 text-xs font-medium text-slate-500 leading-relaxed">
+            Hồ sơ bác sĩ sẽ được chuyển sang thùng rác lưu trữ (lưu trong 30 ngày để có thể khôi phục).
+          </p>
+        </div>
+
+        <div className="space-y-4 p-6">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-400 uppercase">Họ và tên</span>
+              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600'}`}>
+                {isActive ? 'Đang hoạt động' : 'Ngưng hoạt động'}
+              </span>
+            </div>
+            <p className="text-sm font-bold text-slate-900">{staff.fullName || 'Bác sĩ'}</p>
+            <div className="text-xs text-slate-500 flex flex-wrap gap-x-3 gap-y-1 pt-1 border-t border-slate-200/60">
+              <span>Mã NV: <strong className="font-mono text-sky-600">{staff.employeeCode || '—'}</strong></span>
+              <span>Chuyên khoa: <strong>{doctor.specialty || '—'}</strong></span>
+            </div>
+          </div>
+
+          {isActive && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 flex items-start gap-2.5 text-amber-900 text-xs">
+              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="leading-relaxed">
+                <strong>Lưu ý:</strong> Bác sĩ này hiện đang ở trạng thái <strong>Đang hoạt động</strong>. Khi xóa, tài khoản sẽ tự động chuyển sang <strong>NGƯNG HOẠT ĐỘNG</strong> và đưa vào Thùng rác.
+              </p>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2.5 pt-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onCancel}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onConfirm}
+              className="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-rose-700 shadow-sm disabled:opacity-50"
+            >
+              {busy ? 'Đang xóa...' : 'Xác nhận xóa'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }

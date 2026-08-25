@@ -9,7 +9,7 @@ import { departmentService } from '../apis/departmentService';
 import { staffService } from '../apis/staffService';
 import { ADMIN_NAV_ITEMS, navigateAdmin } from '../constants/navigation';
 import { useToast } from '../../../providers/ToastProvider';
-import { Search, Trash2, X, Plus, Building2, Layers, Filter, CheckCircle2, ShieldCheck, CheckSquare, Square, Sparkles, Eye, EyeOff, Pencil, Activity, UserCheck } from 'lucide-react';
+import { Search, Trash2, X, Plus, Building2, Layers, Filter, CheckCircle2, ShieldCheck, CheckSquare, Square, Sparkles, Eye, EyeOff, Pencil, Activity, UserCheck, AlertTriangle } from 'lucide-react';
 import AuditHistoryChanges from '../components/AuditHistoryChanges';
 
 const DEPARTMENT_TYPES = [
@@ -788,25 +788,48 @@ function DepartmentHistory({ departmentId }) {
 }
 
 function DeleteDepartmentModal({ department, busy, onCancel, onConfirm }) {
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={busy ? undefined : onCancel} />
+  const isActive = department.status === 'ACTIVE';
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={busy ? undefined : onCancel} />
       <div className="relative z-10 w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="border-b border-slate-100 p-6">
-          <p className="text-xs font-bold uppercase tracking-wider text-rose-600">Cảnh báo xóa</p>
-          <h3 className="mt-1 text-xl font-bold text-slate-900">Xóa phòng ban?</h3>
+          <div className="flex items-center gap-2 text-rose-600">
+            <AlertTriangle className="h-5 w-5" />
+            <p className="text-xs font-bold uppercase tracking-wider">Cảnh báo xóa phòng ban</p>
+          </div>
+          <h3 className="mt-1 text-xl font-bold text-slate-900">Chuyển vào thùng rác?</h3>
           <p className="mt-2 text-xs font-medium text-slate-500 leading-relaxed">
-            Phòng ban sẽ được chuyển sang trạng thái ẩn/xóa mềm và có thể khôi phục từ thùng rác.
+            Phòng ban sẽ được chuyển sang thùng rác lưu trữ (lưu trong 30 ngày để có thể khôi phục).
           </p>
         </div>
 
         <div className="space-y-4 p-6">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-400 uppercase">Tên phòng ban</span>
+              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600'}`}>
+                {isActive ? 'Đang hoạt động' : 'Ngưng hoạt động'}
+              </span>
+            </div>
             <p className="text-sm font-bold text-slate-900">{department.name}</p>
-            <p className="mt-1 font-mono text-xs font-bold text-sky-600">{department.departmentCode}</p>
+            <div className="text-xs text-slate-500 flex flex-wrap gap-x-3 gap-y-1 pt-1 border-t border-slate-200/60">
+              <span>Mã phòng: <strong className="font-mono text-sky-600">{department.departmentCode}</strong></span>
+              <span>Tầng: <strong>{department.floor || '—'}</strong></span>
+            </div>
           </div>
 
-          <div className="flex justify-end gap-2.5">
+          {isActive && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 flex items-start gap-2.5 text-amber-900 text-xs">
+              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="leading-relaxed">
+                <strong>Lưu ý:</strong> Phòng ban này hiện đang ở trạng thái <strong>Đang hoạt động</strong>. Khi xóa, phòng ban sẽ tự động chuyển sang <strong>NGƯNG HOẠT ĐỘNG</strong> và đưa vào Thùng rác.
+              </p>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2.5 pt-2">
             <button
               type="button"
               disabled={busy}
@@ -819,14 +842,15 @@ function DeleteDepartmentModal({ department, busy, onCancel, onConfirm }) {
               type="button"
               disabled={busy}
               onClick={onConfirm}
-              className="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-rose-700 shadow-sm"
+              className="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-rose-700 shadow-sm disabled:opacity-50"
             >
-              {busy ? 'Đang xóa...' : 'Xóa phòng ban'}
+              {busy ? 'Đang xóa...' : 'Xác nhận xóa'}
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -884,7 +908,7 @@ function DepartmentModal({ form, setForm, onSubmit, onClose, busy, editing, stru
   if (typeof document === 'undefined' || !document.body) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fadeIn">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-fadeIn">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <form onSubmit={handleSubmit} noValidate className="relative z-10 w-full max-w-xl rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
         <div className="flex items-start justify-between">

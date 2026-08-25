@@ -23,24 +23,34 @@ export class AdministrativeLifecycleService {
   async softDelete(entity: LifecycleEntity, id: string, actorId: string) {
     const current = await this.find(entity, id);
     if (!current) throw new NotFoundException('Không tìm thấy bản ghi.');
-    await this.entityRecovery.assertTrusted(this.auditEntity(entity), id);
+    const curr: any = current;
+    const isDoctorStaff = entity === 'staff' && Boolean(curr.doctorProfile);
+    const auditEntityName = isDoctorStaff ? 'DoctorProfile' : this.auditEntity(entity);
+    const auditEntityId = isDoctorStaff ? curr.doctorProfile.id : id;
+
+    await this.entityRecovery.assertTrusted(auditEntityName, auditEntityId);
     if (this.statusOf(entity, current) === 'DELETE') throw new ConflictException('Bản ghi đã được xóa trước đó.');
-    if (entity === 'departments') {
-      const department: any = current;
-      const businessReferences = department._count.staffs + department._count.visits + department._count.medicalOrders + department._count.appointments;
-      if (businessReferences > 0 && department.status !== OperationalStatus.INACTIVE) {
-        throw new ConflictException('Phòng ban có dữ liệu phải chuyển sang ngừng hoạt động trước khi xóa mềm.');
-      }
-    }
+
     const now = new Date();
     const updated = await this.prisma.$transaction(async (tx) => {
       const after = await this.updateLifecycle(tx, entity, current, UserStatus.DELETE, OperationalStatus.DELETE, {
         deletedAt: now, deletedBy: actorId, restoredAt: null,
       });
-      const afterSnapshot = this.snapshot(entity, after);
-      const { salt, hash } = this.audit.hashSnapshot(afterSnapshot);
-      await this.updateIntegrityHash(tx, entity, id, hash, salt);
-      await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'DELETE', actorId, before: this.snapshot(entity, current), after: afterSnapshot }, tx);
+      const aft: any = after;
+
+      if (isDoctorStaff) {
+        const doctorBefore = buildUnifiedDoctorSnapshot({ ...curr.doctorProfile, staffProfile: curr });
+        const doctorAfter = buildUnifiedDoctorSnapshot({ ...curr.doctorProfile, staffProfile: aft });
+        const { salt: docSalt, hash: docHash } = this.audit.hashSnapshot(doctorAfter);
+        await tx.doctorProfile.update({ where: { id: curr.doctorProfile.id }, data: { hash256: docHash, dataSalt: docSalt } });
+        await this.audit.recordV2({ entity: 'DoctorProfile', entityId: curr.doctorProfile.id, action: 'DELETE', actorId, before: doctorBefore, after: doctorAfter }, tx);
+      } else {
+        const afterSnapshot = this.snapshot(entity, after);
+        const { salt, hash } = this.audit.hashSnapshot(afterSnapshot);
+        await this.updateIntegrityHash(tx, entity, id, hash, salt);
+        await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'DELETE', actorId, before: this.snapshot(entity, current), after: afterSnapshot }, tx);
+      }
+
       return after;
     });
     return { deleted: true, id, status: 'DELETE', deletedAt: now };
@@ -49,7 +59,13 @@ export class AdministrativeLifecycleService {
   async restore(entity: LifecycleEntity, id: string, actorId: string) {
     const current = await this.find(entity, id);
     if (!current || this.statusOf(entity, current) !== 'DELETE') throw new NotFoundException('Không tìm thấy bản ghi đã xóa.');
-    await this.entityRecovery.assertTrusted(this.auditEntity(entity), id);
+    const curr: any = current;
+    const isDoctorStaff = entity === 'staff' && Boolean(curr.doctorProfile);
+    const auditEntityName = isDoctorStaff ? 'DoctorProfile' : this.auditEntity(entity);
+    const auditEntityId = isDoctorStaff ? curr.doctorProfile.id : id;
+
+    await this.entityRecovery.assertTrusted(auditEntityName, auditEntityId);
+
     const deletedAt = this.deletedAtOf(entity, current);
     if (!deletedAt || Date.now() - deletedAt.getTime() > RESTORE_WINDOW_MS) {
       throw new ConflictException('Bản ghi đã quá thời hạn khôi phục 30 ngày hoặc thiếu thời điểm xóa hợp lệ.');
@@ -59,10 +75,20 @@ export class AdministrativeLifecycleService {
       const after = await this.updateLifecycle(tx, entity, current, UserStatus.INACTIVE, OperationalStatus.INACTIVE, {
         deletedAt: null, deletedBy: null, restoredAt: now,
       });
-      const afterSnapshot = this.snapshot(entity, after);
-      const { salt, hash } = this.audit.hashSnapshot(afterSnapshot);
-      await this.updateIntegrityHash(tx, entity, id, hash, salt);
-      await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'RESTORE', actorId, before: this.snapshot(entity, current), after: afterSnapshot }, tx);
+      const aft: any = after;
+
+      if (isDoctorStaff) {
+        const doctorBefore = buildUnifiedDoctorSnapshot({ ...curr.doctorProfile, staffProfile: curr });
+        const doctorAfter = buildUnifiedDoctorSnapshot({ ...curr.doctorProfile, staffProfile: aft });
+        const { salt: docSalt, hash: docHash } = this.audit.hashSnapshot(doctorAfter);
+        await tx.doctorProfile.update({ where: { id: curr.doctorProfile.id }, data: { hash256: docHash, dataSalt: docSalt } });
+        await this.audit.recordV2({ entity: 'DoctorProfile', entityId: curr.doctorProfile.id, action: 'RESTORE', actorId, before: doctorBefore, after: doctorAfter }, tx);
+      } else {
+        const afterSnapshot = this.snapshot(entity, after);
+        const { salt, hash } = this.audit.hashSnapshot(afterSnapshot);
+        await this.updateIntegrityHash(tx, entity, id, hash, salt);
+        await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'RESTORE', actorId, before: this.snapshot(entity, current), after: afterSnapshot }, tx);
+      }
     });
     return { restored: true, id, status: 'INACTIVE', restoredAt: now };
   }

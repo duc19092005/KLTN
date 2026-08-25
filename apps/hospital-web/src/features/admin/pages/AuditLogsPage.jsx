@@ -562,7 +562,11 @@ export default function AuditLogsPage() {
         }, 4000);
       } else {
         setAnchorStage(0);
-        toast.info(`Không có gì để neo: ${d.reason || 'hàng đợi trống'}.`);
+        if (d.reason === 'Chu trình neo đang chạy.' || d.reason?.includes('đang chạy')) {
+          toast.info('Tiến trình neo đang tự động xử lý trên mạng Sepolia Blockchain. Vui lòng đợi xác nhận giao dịch...');
+        } else {
+          toast.info(d.reason || 'Hàng đợi đang trống — Đã seal toàn bộ.');
+        }
       }
       await refreshAll();
     } catch (err) {

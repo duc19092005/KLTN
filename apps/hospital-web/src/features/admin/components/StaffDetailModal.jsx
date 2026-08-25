@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import LoadingIndicator from '../../../shared/components/LoadingIndicator';
 import { staffService } from '../apis/staffService';
 import { useToast } from '../../../providers/ToastProvider';
@@ -71,9 +72,9 @@ export default function StaffDetailModal({ staffId, onClose }) {
   const audit = detail?.audit || {};
   const tone = STATUS_TONE[audit.status] || STATUS_TONE.UNANCHORED;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" />
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 flex max-h-[92vh] w-full max-w-[1120px] flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
         {/* Header */}
         <div className="shrink-0 border-b border-slate-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -198,7 +199,8 @@ export default function StaffDetailModal({ staffId, onClose }) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
