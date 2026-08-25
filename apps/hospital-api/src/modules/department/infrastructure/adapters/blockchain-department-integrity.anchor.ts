@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { AuditLoggerService } from '../../../../infrastructure/audit';
-import { AuditAnchorService } from '../../../../infrastructure/audit';
+import { AuditAnchorService, AuditPageIntegrityService } from '../../../../infrastructure/audit';
 import { computeAfterHashV2 } from '../../../../infrastructure/audit';
 import {
   DepartmentAnchorAction,
@@ -22,6 +22,7 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
     private readonly prisma: PrismaService,
     private readonly audit: AuditLoggerService,
     private readonly auditAnchor: AuditAnchorService,
+    private readonly pageIntegrity?: AuditPageIntegrityService,
   ) {}
 
   async anchorChange(
@@ -123,6 +124,41 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
       storedHash: dbHash,
       onChainHash: latestAnchored?.afterHash ?? null,
     };
+  }
+
+  async evaluateMany(departments: any[]): Promise<DepartmentIntegrityEvaluation[]> {
+    const prepared = departments.map((department) => {
+      const snapshot = buildDepartmentSnapshot(department);
+      const recomputedHash = department.dataSalt ? this.audit.recompute(snapshot, department.dataSalt) : null;
+      const storedHash = department.hash256 || null;
+      return {
+        department,
+        target: {
+          id: department.id,
+          entity: 'Department',
+          entityId: department.id,
+          currentAfterHash: computeAfterHashV2('Department', department.id, snapshot),
+          storedHash,
+          recomputedHash,
+          dbMatches: recomputedHash !== null && recomputedHash === storedHash,
+        },
+      };
+    });
+    const verified = await this.pageIntegrity!.evaluate(prepared.map(({ target }) => target));
+    return prepared.map(({ department }) => {
+      const result = verified.get(department.id)!;
+      return {
+        id: department.id,
+        departmentCode: department.departmentCode,
+        name: department.name,
+        status: result.status,
+        dbMatches: result.dbMatches,
+        chainMatches: result.chainMatches,
+        recomputedHash: result.recomputedHash,
+        storedHash: result.storedHash,
+        onChainHash: result.onChainHash,
+      };
+    });
   }
 
   history(id?: string) {

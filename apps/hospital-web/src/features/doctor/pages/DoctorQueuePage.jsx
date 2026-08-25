@@ -13,6 +13,7 @@ import { clinicalDecisionService } from '../../medical-order/apis/clinicalDecisi
 import { aiModelService } from '../../admin/apis/aiModelService';
 import { useToast } from '../../../providers/ToastProvider';
 import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock';
+import BlockchainStatusBadge from '../../../shared/components/BlockchainStatusBadge';
 
 const STATUS = {
   WAITING: { label: 'Chờ khám', color: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-400' },
@@ -708,13 +709,14 @@ function QueueList({ query, setQuery, filter, setFilter, loading, visits, active
               <th className="px-6 py-3.5">Phòng khám</th>
               <th className="px-6 py-3.5">Giờ tiếp nhận</th>
               <th className="px-6 py-3.5">Trạng thái</th>
+              <th className="px-6 py-3.5">Độ tin cậy dữ liệu</th>
               <th className="px-6 py-3.5 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan={6} className="py-12">
+                <td colSpan={7} className="py-12">
                   <LoadingIndicator size="md" label="Đang cập nhật danh sách..." />
                 </td>
               </tr>
@@ -731,7 +733,7 @@ function QueueList({ query, setQuery, filter, setFilter, loading, visits, active
             ))}
             {!loading && !visits.length && (
               <tr>
-                <td colSpan={6} className="p-8">
+                <td colSpan={7} className="p-8">
                   <Empty title="Không tìm thấy lượt khám" desc="Không có hồ sơ nào trùng khớp với bộ lọc hoặc từ khóa hiện tại." />
                 </td>
               </tr>
@@ -797,6 +799,9 @@ function VisitRow({ visit, active, busy, onSelect, onStart, onOpenWorkflow }) {
           {active && <span className="h-6 w-1 rounded-full bg-sky-500" />}
           <StatusBadge status={st} />
         </div>
+      </td>
+      <td className="whitespace-nowrap px-6 py-4">
+        <BlockchainStatusBadge status={visit.blockchainStatus} size="xs" />
       </td>
       <td className="px-6 py-4 text-right">
         <div className="flex justify-end gap-2">

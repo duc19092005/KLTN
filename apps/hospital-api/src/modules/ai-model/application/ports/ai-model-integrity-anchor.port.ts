@@ -7,7 +7,7 @@ export type IntegrityEvaluation = {
   id: string;
   modelName: string;
   modelVersion: string;
-  status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR';
+  status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR' | 'VERIFICATION_UNAVAILABLE';
   dbMatches: boolean;
   chainMatches: boolean;
   recomputedHash: string | null;
@@ -35,6 +35,7 @@ export interface AiModelIntegrityAnchorPort {
   ): Promise<void>;
   /** Recompute the integrity hash and compare against DB + on-chain values. */
   evaluate(model: any, skipChainCheck?: boolean): Promise<IntegrityEvaluation>;
+  evaluateMany(models: any[]): Promise<IntegrityEvaluation[]>;
   /** Append-only change history for an AI model (or all). */
   history(id?: string): Promise<unknown>;
 }

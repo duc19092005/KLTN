@@ -6,7 +6,10 @@ import { NotificationService } from '../../../notification/services/notification
 import { AuditLoggerService, ClinicalAuditTrustService } from '../../../../infrastructure/audit';
 import { buildPatientSnapshot } from '../../../patient/domain/patient-snapshot';
 import { AuthUser } from '../../../../common/types/auth-user.type';
-import { buildVisitSnapshot } from '../../domain/visit-snapshot';
+import {
+  VISIT_INTEGRITY_ANCHOR,
+  VisitIntegrityAnchorPort,
+} from '../ports/visit-integrity-anchor.port';
 
 /**
  * Intake workflow: reception selects an active examination department, then the
@@ -16,6 +19,7 @@ import { buildVisitSnapshot } from '../../domain/visit-snapshot';
 export class CreateVisitUseCase {
   constructor(
     @Inject(VISIT_REPOSITORY) private readonly repo: VisitRepositoryPort,
+    @Inject(VISIT_INTEGRITY_ANCHOR) private readonly integrity: VisitIntegrityAnchorPort,
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
     private readonly auditLogger: AuditLoggerService,
@@ -78,15 +82,7 @@ export class CreateVisitUseCase {
         staffId: assignedStaffId ?? null,
       },
       async (visit, tx) => {
-        await this.auditLogger.recordV2({
-          entity: 'Visit',
-          entityId: visit.id,
-          action: 'CREATE',
-          actorId: user?.sub ?? null,
-          before: null,
-          after: buildVisitSnapshot(visit),
-          metadata: { schema: 'KLTN_VISIT_CREATE_AUDIT_V3' },
-        }, tx);
+        await this.integrity.anchorChange(visit, 'CREATE', user?.sub ?? null, null, tx);
       },
       async (patient, tx) => {
         const snapshot = buildPatientSnapshot(patient);

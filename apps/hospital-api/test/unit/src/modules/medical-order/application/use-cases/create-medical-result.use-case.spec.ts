@@ -74,8 +74,32 @@ describe('CreateMedicalResultUseCase audit integrity', () => {
         if (options.auditFails) throw new Error('audit failed');
       }),
     };
+    const resultIntegrity = {
+      anchorChange: jest.fn().mockImplementation(async (record, _action, _actor, _before, transaction) => {
+        if (options.auditFails) throw new Error('audit failed');
+        await audit.recordV2({ entity: 'MedicalResult', after: record }, transaction);
+      }),
+    };
+    const orderIntegrity = {
+      anchorChange: jest.fn().mockImplementation(async (record, _action, _actor, _before, transaction) => {
+        await audit.recordV2({ entity: 'MedicalOrder', after: record }, transaction);
+      }),
+    };
+    const visitIntegrity = {
+      anchorChange: jest.fn().mockImplementation(async (record, _action, _actor, _before, transaction) => {
+        await audit.recordV2({ entity: 'Visit', after: record }, transaction);
+      }),
+    };
     const notificationService = { createNotification: jest.fn().mockResolvedValue(undefined) };
-    const useCase = new CreateMedicalResultUseCase(repo as any, accessPolicy as any, audit as any, notificationService as any, { assertManyTrusted: jest.fn().mockResolvedValue([]), assertTrusted: jest.fn().mockResolvedValue(undefined) } as any);
+    const useCase = new CreateMedicalResultUseCase(
+      repo as any,
+      accessPolicy as any,
+      orderIntegrity as any,
+      resultIntegrity as any,
+      visitIntegrity as any,
+      notificationService as any,
+      { assertManyTrusted: jest.fn().mockResolvedValue([]), assertTrusted: jest.fn().mockResolvedValue(undefined) } as any,
+    );
     return { useCase, repo, audit, tx };
   }
 

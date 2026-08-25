@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { AuditLoggerService } from '../../../../infrastructure/audit';
-import { AuditAnchorService } from '../../../../infrastructure/audit';
+import { AuditAnchorService, AuditPageIntegrityService } from '../../../../infrastructure/audit';
 import {
   DoctorAnchorAction,
   DoctorIntegrityAnchorPort,
@@ -23,6 +23,7 @@ export class BlockchainDoctorIntegrityAnchor implements DoctorIntegrityAnchorPor
     private readonly prisma: PrismaService,
     private readonly audit: AuditLoggerService,
     private readonly auditAnchor: AuditAnchorService,
+    private readonly pageIntegrity?: AuditPageIntegrityService,
   ) {}
 
   async anchorChange(
@@ -125,6 +126,42 @@ export class BlockchainDoctorIntegrityAnchor implements DoctorIntegrityAnchorPor
       storedHash: dbHash,
       onChainHash: latestAnchored?.afterHash ?? null,
     };
+  }
+
+  async evaluateMany(doctors: any[]): Promise<DoctorIntegrityEvaluation[]> {
+    const prepared = doctors.map((doctor) => {
+      const snapshot = buildUnifiedDoctorSnapshot(doctor);
+      const recomputedHash = doctor.dataSalt ? this.audit.recompute(snapshot, doctor.dataSalt) : null;
+      const storedHash = doctor.hash256 || null;
+      return {
+        doctor,
+        target: {
+          id: doctor.id,
+          entity: 'DoctorProfile',
+          entityId: doctor.id,
+          currentAfterHash: computeAfterHashV2('DoctorProfile', doctor.id, snapshot),
+          storedHash,
+          recomputedHash,
+          dbMatches: recomputedHash !== null && recomputedHash === storedHash,
+        },
+      };
+    });
+    const verified = await this.pageIntegrity!.evaluate(prepared.map(({ target }) => target));
+    return prepared.map(({ doctor }) => {
+      const result = verified.get(doctor.id)!;
+      return {
+        id: doctor.id,
+        staffProfileId: doctor.staffProfileId,
+        specialty: doctor.specialty,
+        licenseNumber: doctor.licenseNumber,
+        status: result.status,
+        dbMatches: result.dbMatches,
+        chainMatches: result.chainMatches,
+        recomputedHash: result.recomputedHash,
+        storedHash: result.storedHash,
+        onChainHash: result.onChainHash,
+      };
+    });
   }
 
   history(id?: string) {

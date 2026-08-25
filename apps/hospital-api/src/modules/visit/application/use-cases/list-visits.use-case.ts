@@ -4,6 +4,10 @@ import { AuthUser } from '../../../../common/types/auth-user.type';
 import { getPagination, paginated } from '../../../shared/pagination.dto';
 import { VisitQueryDto } from '../../dto/visit.dto';
 import { VISIT_REPOSITORY, VisitRepositoryPort } from '../ports/visit.repository.port';
+import {
+  VISIT_INTEGRITY_ANCHOR,
+  VisitIntegrityAnchorPort,
+} from '../ports/visit-integrity-anchor.port';
 
 /**
  * Lists visits with pagination. Doctors are scoped to their department so they
@@ -11,11 +15,16 @@ import { VISIT_REPOSITORY, VisitRepositoryPort } from '../ports/visit.repository
  */
 @Injectable()
 export class ListVisitsUseCase {
-  constructor(@Inject(VISIT_REPOSITORY) private readonly repo: VisitRepositoryPort) {}
+  constructor(
+    @Inject(VISIT_REPOSITORY) private readonly repo: VisitRepositoryPort,
+    @Inject(VISIT_INTEGRITY_ANCHOR) private readonly integrity: VisitIntegrityAnchorPort,
+  ) {}
 
   async execute(input: { query: VisitQueryDto; user?: AuthUser }) {
     const { query, user } = input;
-    const { page, limit, skip } = getPagination(query);
+    const { page } = getPagination(query);
+    const limit = 10;
+    const skip = (page - 1) * limit;
 
     let departmentId = query.departmentId;
     let staffId = query.staffId;
@@ -41,6 +50,17 @@ export class ListVisitsUseCase {
       limit,
     );
 
-    return paginated(items, total, page, limit);
+    const visitItems = items as Array<Record<string, unknown> & { id: string }>;
+    const evaluations = await this.integrity.evaluateMany(visitItems);
+    const verifiedItems = visitItems.map((item) => {
+      const verification = evaluations.get(item.id);
+      return {
+        ...item,
+        blockchainStatus: verification?.status ?? 'UNANCHORED',
+        integrity: verification ?? null,
+      };
+    });
+
+    return paginated(verifiedItems, total, page, limit);
   }
 }

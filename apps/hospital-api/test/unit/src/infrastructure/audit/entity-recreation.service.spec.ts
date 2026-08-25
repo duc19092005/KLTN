@@ -136,7 +136,7 @@ function buildRow(entity: RecreatableAuditEntity, entityId: string, after: Snaps
     afterEncrypted: encryptAuditSnapshot(canonicalize(after), aad),
     encryptionVersion: 'AES-256-GCM-V1', encryptionKeyId: 'entity-recreation-test-key', diffJson, fieldsChanged: diffJson.fieldsChanged,
     departmentId: null, staffProfileId: null, doctorProfileId: null, patientId: null,
-    aiModelRegistryId: null, medicalConclusionId: null, aiQualityId: null, createdAt,
+    aiModelRegistryId: null, medicalConclusionId: null, visitId: null, medicalOrderId: null, medicalResultId: null, aiQualityId: null, createdAt,
   };
 }
 
@@ -163,7 +163,7 @@ function buildPermanentDeletionRow(entityId: string, before: Snapshot): AuditRec
     afterEncrypted: encryptAuditSnapshot(canonicalize(null), aad),
     encryptionVersion: 'AES-256-GCM-V1', encryptionKeyId: 'entity-recreation-test-key', diffJson, fieldsChanged: diffJson.fieldsChanged,
     departmentId: null, staffProfileId: null, doctorProfileId: null, patientId: null,
-    aiModelRegistryId: null, medicalConclusionId: null, aiQualityId: null, createdAt,
+    aiModelRegistryId: null, medicalConclusionId: null, visitId: null, medicalOrderId: null, medicalResultId: null, aiQualityId: null, createdAt,
   };
 }
 

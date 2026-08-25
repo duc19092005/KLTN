@@ -8,7 +8,7 @@ export type StaffIntegrityEvaluation = {
   id: string;
   employeeCode: string;
   fullName: string;
-  status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR';
+  status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR' | 'VERIFICATION_UNAVAILABLE';
   dbMatches: boolean;
   chainMatches: boolean;
   recomputedHash: string | null;
@@ -34,5 +34,6 @@ export interface StaffIntegrityAnchorPort {
     tx?: Prisma.TransactionClient,
   ): Promise<void>;
   evaluate(staff: any, skipChainCheck?: boolean): Promise<StaffIntegrityEvaluation>;
+  evaluateMany(staff: any[]): Promise<StaffIntegrityEvaluation[]>;
   history(id?: string): Promise<unknown>;
 }

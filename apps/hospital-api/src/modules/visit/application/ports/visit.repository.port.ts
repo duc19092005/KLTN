@@ -41,6 +41,8 @@ export type VisitEntity = {
   source: Prisma.VisitGetPayload<Record<string, never>>['source'];
   checkInAt: Date;
   completedAt: Date | null;
+  hash256?: string | null;
+  dataSalt?: string | null;
 };
 
 export type VisitDoctorStaff = {

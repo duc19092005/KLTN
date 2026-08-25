@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, AlertTriangle, Clock3 } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, Clock3, WifiOff } from 'lucide-react';
 
 /**
  * Unified "data integrity" badge for any record whose authenticity is anchored on the blockchain.
@@ -40,6 +40,12 @@ const STATUS_MAP = {
     label: 'Đang chờ neo on-chain',
     cls: 'border-cyan-100 bg-cyan-50 text-cyan-700',
     Icon: Clock3,
+    pulse: false,
+  },
+  VERIFICATION_UNAVAILABLE: {
+    label: 'Tạm thời chưa xác minh được blockchain',
+    cls: 'border-slate-200 bg-slate-50 text-slate-600',
+    Icon: WifiOff,
     pulse: false,
   },
 };

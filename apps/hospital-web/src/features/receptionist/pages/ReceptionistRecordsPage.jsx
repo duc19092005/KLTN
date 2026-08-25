@@ -9,6 +9,7 @@ import { patientService } from '../apis/patientService';
 import { FRONTDESK_NAV_ITEMS, frontdeskRouteFor } from '../constants/frontdeskNavigation';
 import { getVisitStatus } from '../constants/visitStatus';
 import { useToast } from '../../../providers/ToastProvider';
+import BlockchainStatusBadge from '../../../shared/components/BlockchainStatusBadge';
 import { FileText, Search, Plus, User, Calendar, Phone, CreditCard, X, ChevronRight, Activity } from 'lucide-react';
 
 function getItems(data) { return Array.isArray(data) ? data : data?.items || []; }
@@ -133,6 +134,7 @@ export default function ReceptionistRecordsPage() {
                         <th className="px-6 py-3.5">Số điện thoại</th>
                         <th className="px-6 py-3.5">Lượt khám</th>
                         <th className="px-6 py-3.5">Trạng thái gần nhất</th>
+                        <th className="px-6 py-3.5">Độ tin cậy dữ liệu</th>
                         <th className="px-6 py-3.5 text-right">Thao tác</th>
                       </tr>
                     </thead>
@@ -209,6 +211,13 @@ function PatientRow({ patient, visits, onOpen }) {
       <td className="px-6 py-4 text-xs font-extrabold text-sky-700">{visits.length} lượt</td>
       <td className="px-6 py-4">
         {latestStatus ? <StatusBadge st={latestStatus} /> : <span className="text-xs font-medium text-slate-400">Chưa có</span>}
+      </td>
+      <td className="px-6 py-4">
+        {latestVisit?.blockchainStatus ? (
+          <BlockchainStatusBadge status={latestVisit.blockchainStatus} size="xs" />
+        ) : (
+          <span className="text-xs font-medium text-slate-400">—</span>
+        )}
       </td>
       <td className="px-6 py-4 text-right">
         <button
@@ -366,13 +375,14 @@ function PatientDetailModal({ patient, visits, onClose, onCreateVisit }) {
 function VisitRow({ visit }) {
   const st = getVisitStatus(visit.status);
   return (
-    <div className="grid grid-cols-1 gap-2 bg-white p-4 hover:bg-slate-50 md:grid-cols-[1fr_130px_140px] md:items-center transition-colors">
+    <div className="grid grid-cols-1 gap-2 bg-white p-4 hover:bg-slate-50 md:grid-cols-[1fr_auto_130px_140px] md:items-center transition-colors">
       <div>
         <strong className="text-xs font-bold text-slate-900">{visit.visitCode}</strong>
         <p className="mt-0.5 text-xs font-semibold text-slate-500">
           Phòng: {getVisitDepartmentName(visit)} • BS. {getVisitStaffName(visit)}
         </p>
       </div>
+      <BlockchainStatusBadge status={visit.blockchainStatus} size="xs" />
       <StatusBadge st={st} />
       <span className="text-[11px] font-medium text-slate-400 md:text-right">
         {visit.createdAt

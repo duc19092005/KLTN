@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { AuditLoggerService } from '../../../../infrastructure/audit';
-import { AuditAnchorService } from '../../../../infrastructure/audit';
+import { AuditAnchorService, AuditPageIntegrityService } from '../../../../infrastructure/audit';
 import {
   StaffIntegrityAnchorPort,
   StaffIntegrityEvaluation,
@@ -26,6 +26,7 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
     private readonly prisma: PrismaService,
     private readonly audit: AuditLoggerService,
     private readonly auditAnchor: AuditAnchorService,
+    private readonly pageIntegrity?: AuditPageIntegrityService,
   ) {}
 
   async anchorChange(
@@ -213,6 +214,62 @@ export class BlockchainStaffIntegrityAnchor implements StaffIntegrityAnchorPort 
       storedHash: dbHash,
       onChainHash: latestAnchored?.afterHash ?? null,
     };
+  }
+
+  async evaluateMany(staffItems: any[]): Promise<StaffIntegrityEvaluation[]> {
+    const prepared = staffItems.map((staff) => {
+      if (staff.doctorProfile) {
+        const doctor = staff.doctorProfile;
+        const snapshot = buildUnifiedDoctorSnapshot({
+          ...doctor,
+          staffProfile: { ...staff, doctorProfile: undefined },
+        });
+        const recomputedHash = doctor.dataSalt ? this.audit.recompute(snapshot, doctor.dataSalt) : null;
+        const storedHash = doctor.hash256 || null;
+        return {
+          staff,
+          target: {
+            id: staff.id,
+            entity: 'DoctorProfile',
+            entityId: doctor.id,
+            currentAfterHash: computeAfterHashV2('DoctorProfile', doctor.id, snapshot),
+            storedHash,
+            recomputedHash,
+            dbMatches: recomputedHash !== null && recomputedHash === storedHash,
+          },
+        };
+      }
+      const snapshot = buildStaffSnapshot(staff);
+      const recomputedHash = staff.dataSalt ? this.audit.recompute(snapshot, staff.dataSalt) : null;
+      const storedHash = staff.hash256 || null;
+      return {
+        staff,
+        target: {
+          id: staff.id,
+          entity: 'StaffProfile',
+          entityId: staff.id,
+          currentAfterHash: computeAfterHashV2('StaffProfile', staff.id, snapshot),
+          storedHash,
+          recomputedHash,
+          dbMatches: recomputedHash !== null && recomputedHash === storedHash,
+        },
+      };
+    });
+    const verified = await this.pageIntegrity!.evaluate(prepared.map(({ target }) => target));
+    return prepared.map(({ staff }) => {
+      const result = verified.get(staff.id)!;
+      return {
+        id: staff.id,
+        employeeCode: staff.employeeCode,
+        fullName: staff.fullName,
+        status: result.status,
+        dbMatches: result.dbMatches,
+        chainMatches: result.chainMatches,
+        recomputedHash: result.recomputedHash,
+        storedHash: result.storedHash,
+        onChainHash: result.onChainHash,
+      };
+    });
   }
 
   history(id?: string) {

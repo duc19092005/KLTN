@@ -1,7 +1,7 @@
 import api from '../../../shared/apis/api';
 
 export const medicalOrderService = {
-  list: (params = {}) => api.get('/medical-orders', { params }),
+  list: (params = {}) => api.get('/medical-orders', { params: { page: 1, limit: 10, ...params } }),
   create: (payload) => api.post('/medical-orders', payload),
   createResult: (id, payload) => api.post(`/medical-orders/${id}/results`, payload),
   getResultFileDownloadUrl: (fileId) => api.get(`/medical-orders/results/files/${fileId}/download`),

@@ -841,6 +841,9 @@ export class AuditRecoveryService implements OnModuleInit, OnModuleDestroy {
       patientId: row.patientId,
       aiModelRegistryId: row.aiModelRegistryId,
       medicalConclusionId: row.medicalConclusionId,
+      visitId: row.visitId,
+      medicalOrderId: row.medicalOrderId,
+      medicalResultId: row.medicalResultId,
       aiQualityId: row.aiQualityId,
       createdAt: new Date(row.createdAt),
     };

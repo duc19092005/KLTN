@@ -9,6 +9,7 @@ import { LAB_MANAGER_NAV_ITEMS, labManagerRouteFor } from '../constants/navigati
 import { getMedicalOrderStatus } from '../constants/medicalOrderStatus';
 import { useToast } from '../../../providers/ToastProvider';
 import { FileCheck2, Search, Download, FileText, ArrowRight, Filter } from 'lucide-react';
+import BlockchainStatusBadge from '../../../shared/components/BlockchainStatusBadge';
 
 function getItems(data) { return Array.isArray(data) ? data : data?.items || []; }
 
@@ -155,6 +156,7 @@ function ResultList({ results, onOpen }) {
             <th className="px-6 py-3.5">Bệnh nhân</th>
             <th className="px-6 py-3.5">Loại chỉ định</th>
             <th className="px-6 py-3.5">Số lượng tệp</th>
+            <th className="px-6 py-3.5">Độ tin cậy dữ liệu</th>
             <th className="px-6 py-3.5 text-right">Thao tác</th>
           </tr>
         </thead>
@@ -197,6 +199,9 @@ function ResultRow({ result, onClick }) {
       </td>
       <td className="whitespace-nowrap px-6 py-4 text-xs font-bold text-emerald-700">
         {result.files?.length || 0} tệp đính kèm
+      </td>
+      <td className="whitespace-nowrap px-6 py-4">
+        <BlockchainStatusBadge status={result.blockchainStatus} size="xs" />
       </td>
       <td className="px-6 py-4 text-right">
         <button

@@ -7,7 +7,7 @@ export type DepartmentIntegrityEvaluation = {
   id: string;
   departmentCode: string;
   name: string;
-  status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR';
+  status: 'VERIFIED' | 'TAMPERED' | 'UNANCHORED' | 'PENDING_ANCHOR' | 'VERIFICATION_UNAVAILABLE';
   dbMatches: boolean;
   chainMatches: boolean;
   recomputedHash: string | null;
@@ -29,6 +29,7 @@ export interface DepartmentIntegrityAnchorPort {
     tx?: Prisma.TransactionClient,
   ): Promise<void>;
   evaluate(department: any, skipChainCheck?: boolean): Promise<DepartmentIntegrityEvaluation>;
+  evaluateMany(departments: any[]): Promise<DepartmentIntegrityEvaluation[]>;
   history(id?: string): Promise<unknown>;
 }
 import { Prisma } from '@prisma/client';
