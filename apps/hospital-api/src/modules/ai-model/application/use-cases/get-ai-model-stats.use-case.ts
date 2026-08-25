@@ -74,8 +74,10 @@ export class GetAiModelStatsUseCase {
       .sort((a, b) => (b.averageAccuracy ?? 0) - (a.averageAccuracy ?? 0) || b.totalRatings - a.totalRatings)
       .slice(0, 5);
 
+    // Only include models that actually need improvement (< 80% accuracy or has negative ratings)
     const bottomModels = [...ratedModels]
-      .sort((a, b) => (a.averageAccuracy ?? 0) - (b.averageAccuracy ?? 0) || b.totalRatings - a.totalRatings)
+      .filter((m) => (m.averageAccuracy !== null && m.averageAccuracy < 80) || m.negativeRatings > 0)
+      .sort((a, b) => (a.averageAccuracy ?? 0) - (b.averageAccuracy ?? 0) || b.negativeRatings - a.negativeRatings)
       .slice(0, 5);
 
     // Grab all recent negative feedbacks across all models

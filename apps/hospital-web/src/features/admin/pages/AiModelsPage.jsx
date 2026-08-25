@@ -560,36 +560,71 @@ export default function AiModelsPage() {
                         <span className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-black text-emerald-700">
                           {m.averageAccuracy}% tin cậy
                         </span>
+                        {m.totalRatings > 0 && (
+                          <span className="block text-[10px] font-semibold text-slate-400 mt-1">
+                            ({m.totalRatings} lượt đánh giá)
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}
-                  {!statsData.topModels?.length && <div className="text-xs text-slate-400 italic text-center py-6">Chưa có dữ liệu đánh giá.</div>}
+                  {!statsData.topModels?.length && <div className="text-xs text-slate-400 italic text-center py-6">Chưa có dữ liệu đánh giá từ bác sĩ.</div>}
                 </div>
               </div>
 
-              {/* Bottom Models */}
-              <div className="rounded-3xl border border-rose-100 bg-gradient-to-br from-rose-50/40 via-white to-amber-50/40 p-6 space-y-4 shadow-xs">
-                <h3 className="text-xs font-extrabold uppercase tracking-wider text-rose-900 flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-rose-600" />
-                  Mô hình cần cải thiện độ chính xác
-                </h3>
-                <div className="space-y-3">
-                  {statsData.bottomModels?.map((m) => (
-                    <div key={m.id} className="flex justify-between items-center rounded-2xl bg-white border border-rose-100 p-4 shadow-xs">
-                      <div>
-                        <strong className="block text-sm font-bold text-slate-900">{m.modelName}</strong>
-                        <span className="text-[11px] font-semibold text-slate-400">Phiên bản {m.modelVersion} · {providerLabel(m.provider) || m.provider}</span>
+              {/* Bottom Models / Quality Status */}
+              {statsData.bottomModels?.length > 0 ? (
+                <div className="rounded-3xl border border-rose-100 bg-gradient-to-br from-rose-50/40 via-white to-amber-50/40 p-6 space-y-4 shadow-xs">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-rose-900 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-rose-600" />
+                    Mô hình cần cải thiện độ chính xác
+                  </h3>
+                  <div className="space-y-3">
+                    {statsData.bottomModels.map((m) => (
+                      <div key={m.id} className="flex justify-between items-center rounded-2xl bg-white border border-rose-100 p-4 shadow-xs">
+                        <div>
+                          <strong className="block text-sm font-bold text-slate-900">{m.modelName}</strong>
+                          <span className="text-[11px] font-semibold text-slate-400">Phiên bản {m.modelVersion} · {providerLabel(m.provider) || m.provider}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="inline-flex items-center gap-1 rounded-xl bg-rose-50 border border-rose-200 px-3 py-1 text-xs font-black text-rose-700">
+                            {m.averageAccuracy ?? 0}% tin cậy
+                          </span>
+                          {m.negativeRatings > 0 && (
+                            <span className="block text-[10px] font-bold text-rose-500 mt-1">
+                              {m.negativeRatings} phản hồi chưa hài lòng
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <span className="inline-flex items-center gap-1 rounded-xl bg-rose-50 border border-rose-200 px-3 py-1 text-xs font-black text-rose-700">
-                          {m.averageAccuracy}% tin cậy
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  {!statsData.bottomModels?.length && <div className="text-xs text-slate-400 italic text-center py-6">Chưa có dữ liệu đánh giá.</div>}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : statsData.topModels?.length > 0 ? (
+                <div className="rounded-3xl border border-emerald-100/80 bg-gradient-to-br from-emerald-50/30 via-white to-sky-50/20 p-6 space-y-4 shadow-xs">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-emerald-900 flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                    Chất lượng & Độ chính xác AI
+                  </h3>
+                  <div className="flex flex-col items-center justify-center text-center py-6 px-4 rounded-2xl bg-white border border-emerald-100 text-emerald-800 space-y-2 shadow-2xs">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                      <ShieldCheck className="h-5 w-5" />
+                    </div>
+                    <strong className="text-xs font-bold text-emerald-900">Tất cả mô hình đều đạt chuẩn chất lượng cao</strong>
+                    <p className="text-[11px] font-medium text-slate-500 max-w-xs leading-relaxed">
+                      Hiện tại toàn bộ mô hình AI đều đạt độ tin cậy cao (≥ 80%) và không ghi nhận phản hồi tiêu cực từ bác sĩ chuyên khoa.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-3xl border border-slate-100 bg-slate-50/40 p-6 space-y-4 shadow-xs">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-slate-400" />
+                    Mô hình cần cải thiện độ chính xác
+                  </h3>
+                  <div className="text-xs text-slate-400 italic text-center py-6">Chưa có dữ liệu đánh giá từ bác sĩ.</div>
+                </div>
+              )}
             </div>
           </section>
         )}
