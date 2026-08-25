@@ -2189,7 +2189,7 @@ const styles = StyleSheet.create({
   authTitle: { color: colors.text, fontSize: 27, lineHeight: 34, fontWeight: '900', textAlign: 'center', marginTop: 10 },
   authSubtitle: { color: colors.muted, fontSize: 16, lineHeight: 22, fontWeight: '700', textAlign: 'center' },
   authCard: { width: '100%', gap: 18, borderRadius: 18, backgroundColor: colors.surface, padding: 28, marginTop: 18, shadowColor: '#8aa7bd', shadowOpacity: 0.2, shadowRadius: 24, shadowOffset: { width: 0, height: 14 }, elevation: 9 },
-  inputGroup: { gap: 10 },
+  inputGroup: { width: '100%', gap: 10 },
   label: { color: colors.text, fontSize: 15, fontWeight: '900' },
   inputShell: { minHeight: 60, borderRadius: 13, borderWidth: 1.2, borderColor: colors.border, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fbfdff' },
   input: { flex: 1, minHeight: 50, color: colors.text, fontSize: 17, fontWeight: '800' },
