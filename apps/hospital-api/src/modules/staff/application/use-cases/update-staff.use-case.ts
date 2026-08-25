@@ -68,6 +68,10 @@ export class UpdateStaffUseCase {
           position: dto.position,
         },
         async (updatedUser, tx) => {
+          if (updatedUser.staffProfile) {
+            const auditProfile = toStaffAuditProfile(updatedUser.staffProfile, updatedUser);
+            await this.integrity.anchorChange(auditProfile, 'UPDATE', actorId, before, tx);
+          }
           if (isDoctor && updatedUser.staffProfile?.doctorProfile) {
             await this.doctorReanchor.reanchorSnapshot(
               { ...updatedUser.staffProfile.doctorProfile, staffProfile: updatedUser.staffProfile },
@@ -76,9 +80,6 @@ export class UpdateStaffUseCase {
               'UPDATE',
               tx,
             );
-          } else if (updatedUser.staffProfile) {
-            const auditProfile = toStaffAuditProfile(updatedUser.staffProfile, updatedUser);
-            await this.integrity.anchorChange(auditProfile, 'UPDATE', actorId, before, tx);
           }
         },
       );

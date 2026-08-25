@@ -25,22 +25,41 @@ export class AdministrativeLifecycleService {
     if (!current) throw new NotFoundException('Không tìm thấy bản ghi.');
     await this.entityRecovery.assertTrusted(this.auditEntity(entity), id);
     if (this.statusOf(entity, current) === 'DELETE') throw new ConflictException('Bản ghi đã được xóa trước đó.');
-    if (entity === 'departments') {
-      const department: any = current;
-      const businessReferences = department._count.staffs + department._count.visits + department._count.medicalOrders + department._count.appointments;
-      if (businessReferences > 0 && department.status !== OperationalStatus.INACTIVE) {
-        throw new ConflictException('Phòng ban có dữ liệu phải chuyển sang ngừng hoạt động trước khi xóa mềm.');
-      }
+
+    const curr: any = current;
+    // Also assert trust of paired entity if exists
+    if (entity === 'staff' && curr.doctorProfile) {
+      await this.entityRecovery.assertTrusted('DoctorProfile', curr.doctorProfile.id);
+    } else if (entity === 'doctors' && curr.staffProfileId) {
+      await this.entityRecovery.assertTrusted('StaffProfile', curr.staffProfileId);
     }
+
     const now = new Date();
     const updated = await this.prisma.$transaction(async (tx) => {
       const after = await this.updateLifecycle(tx, entity, current, UserStatus.DELETE, OperationalStatus.DELETE, {
         deletedAt: now, deletedBy: actorId, restoredAt: null,
       });
+      const aft: any = after;
       const afterSnapshot = this.snapshot(entity, after);
       const { salt, hash } = this.audit.hashSnapshot(afterSnapshot);
       await this.updateIntegrityHash(tx, entity, id, hash, salt);
       await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'DELETE', actorId, before: this.snapshot(entity, current), after: afterSnapshot }, tx);
+
+      // Synchronize paired DoctorProfile / StaffProfile entity so neither drifts
+      if (entity === 'staff' && curr.doctorProfile) {
+        const doctorBefore = buildUnifiedDoctorSnapshot({ ...curr.doctorProfile, staffProfile: curr });
+        const doctorAfter = buildUnifiedDoctorSnapshot({ ...curr.doctorProfile, staffProfile: aft });
+        const { salt: docSalt, hash: docHash } = this.audit.hashSnapshot(doctorAfter);
+        await tx.doctorProfile.update({ where: { id: curr.doctorProfile.id }, data: { hash256: docHash, dataSalt: docSalt } });
+        await this.audit.recordV2({ entity: 'DoctorProfile', entityId: curr.doctorProfile.id, action: 'DELETE', actorId, before: doctorBefore, after: doctorAfter }, tx);
+      } else if (entity === 'doctors' && curr.staffProfileId) {
+        const staffBefore = buildStaffSnapshot(curr.staffProfile);
+        const staffAfter = buildStaffSnapshot(aft.staffProfile);
+        const { salt: staffSalt, hash: staffHash } = this.audit.hashSnapshot(staffAfter);
+        await tx.staffProfile.update({ where: { id: curr.staffProfileId }, data: { hash256: staffHash, dataSalt: staffSalt } });
+        await this.audit.recordV2({ entity: 'StaffProfile', entityId: curr.staffProfileId, action: 'DELETE', actorId, before: staffBefore, after: staffAfter }, tx);
+      }
+
       return after;
     });
     return { deleted: true, id, status: 'DELETE', deletedAt: now };
@@ -50,6 +69,15 @@ export class AdministrativeLifecycleService {
     const current = await this.find(entity, id);
     if (!current || this.statusOf(entity, current) !== 'DELETE') throw new NotFoundException('Không tìm thấy bản ghi đã xóa.');
     await this.entityRecovery.assertTrusted(this.auditEntity(entity), id);
+
+    const curr: any = current;
+    // Also assert trust of paired entity if exists
+    if (entity === 'staff' && curr.doctorProfile) {
+      await this.entityRecovery.assertTrusted('DoctorProfile', curr.doctorProfile.id);
+    } else if (entity === 'doctors' && curr.staffProfileId) {
+      await this.entityRecovery.assertTrusted('StaffProfile', curr.staffProfileId);
+    }
+
     const deletedAt = this.deletedAtOf(entity, current);
     if (!deletedAt || Date.now() - deletedAt.getTime() > RESTORE_WINDOW_MS) {
       throw new ConflictException('Bản ghi đã quá thời hạn khôi phục 30 ngày hoặc thiếu thời điểm xóa hợp lệ.');
@@ -59,10 +87,26 @@ export class AdministrativeLifecycleService {
       const after = await this.updateLifecycle(tx, entity, current, UserStatus.INACTIVE, OperationalStatus.INACTIVE, {
         deletedAt: null, deletedBy: null, restoredAt: now,
       });
+      const aft: any = after;
       const afterSnapshot = this.snapshot(entity, after);
       const { salt, hash } = this.audit.hashSnapshot(afterSnapshot);
       await this.updateIntegrityHash(tx, entity, id, hash, salt);
       await this.audit.recordV2({ entity: this.auditEntity(entity), entityId: id, action: 'RESTORE', actorId, before: this.snapshot(entity, current), after: afterSnapshot }, tx);
+
+      // Synchronize paired DoctorProfile / StaffProfile entity on restore
+      if (entity === 'staff' && curr.doctorProfile) {
+        const doctorBefore = buildUnifiedDoctorSnapshot({ ...curr.doctorProfile, staffProfile: curr });
+        const doctorAfter = buildUnifiedDoctorSnapshot({ ...curr.doctorProfile, staffProfile: aft });
+        const { salt: docSalt, hash: docHash } = this.audit.hashSnapshot(doctorAfter);
+        await tx.doctorProfile.update({ where: { id: curr.doctorProfile.id }, data: { hash256: docHash, dataSalt: docSalt } });
+        await this.audit.recordV2({ entity: 'DoctorProfile', entityId: curr.doctorProfile.id, action: 'RESTORE', actorId, before: doctorBefore, after: doctorAfter }, tx);
+      } else if (entity === 'doctors' && curr.staffProfileId) {
+        const staffBefore = buildStaffSnapshot(curr.staffProfile);
+        const staffAfter = buildStaffSnapshot(aft.staffProfile);
+        const { salt: staffSalt, hash: staffHash } = this.audit.hashSnapshot(staffAfter);
+        await tx.staffProfile.update({ where: { id: curr.staffProfileId }, data: { hash256: staffHash, dataSalt: staffSalt } });
+        await this.audit.recordV2({ entity: 'StaffProfile', entityId: curr.staffProfileId, action: 'RESTORE', actorId, before: staffBefore, after: staffAfter }, tx);
+      }
     });
     return { restored: true, id, status: 'INACTIVE', restoredAt: now };
   }
