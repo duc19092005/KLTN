@@ -35,20 +35,21 @@ export class SetStaffStatusUseCase {
       staff.userId,
       status,
       async (updatedUser, tx) => {
+        if (updatedUser.staffProfile) {
+          await this.integrity.anchorChange(
+            { ...updatedUser.staffProfile, user: updatedUser },
+            action,
+            actorId,
+            before,
+            tx,
+          );
+        }
         if (isDoctor && updatedUser.staffProfile?.doctorProfile) {
           await this.doctorReanchor.reanchorSnapshot(
             { ...updatedUser.staffProfile.doctorProfile, staffProfile: { ...updatedUser.staffProfile, user: updatedUser } },
             actorId,
             doctorBefore,
             action,
-            tx,
-          );
-        } else if (updatedUser.staffProfile) {
-          await this.integrity.anchorChange(
-            { ...updatedUser.staffProfile, user: updatedUser },
-            action,
-            actorId,
-            before,
             tx,
           );
         }
