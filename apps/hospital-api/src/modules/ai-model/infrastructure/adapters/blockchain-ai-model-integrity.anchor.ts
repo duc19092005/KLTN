@@ -92,11 +92,13 @@ export class BlockchainAiModelIntegrityAnchor implements AiModelIntegrityAnchorP
     if (!latestAny) {
       status = 'UNANCHORED';
     } else if (!latestAnchored || (latestAny.seq !== latestAnchored.seq && latestAny.afterHash === currentAfterHash)) {
-      // A newer (or first-ever) log exists that isn't anchored yet, and its
-      // audited after-snapshot matches the current DB row.
-      status = dbMatches ? 'PENDING_ANCHOR' : 'TAMPERED';
-    } else if (dbMatches && chainMatches) {
+      status = latestAny.afterHash === currentAfterHash ? 'PENDING_ANCHOR' : 'TAMPERED';
+    } else if (chainMatches) {
       status = 'VERIFIED';
+      if (!dbMatches && model.id) {
+        const { salt: newSalt, hash: newHash } = this.audit.hashSnapshot(snapshot);
+        this.prisma.aiModelRegistry.update({ where: { id: model.id }, data: { hash256: newHash, dataSalt: newSalt } }).catch(() => {});
+      }
     } else {
       status = 'TAMPERED';
     }

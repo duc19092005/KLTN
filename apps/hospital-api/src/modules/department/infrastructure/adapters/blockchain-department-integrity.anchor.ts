@@ -90,9 +90,13 @@ export class BlockchainDepartmentIntegrityAnchor implements DepartmentIntegrityA
     if (!latestAny) {
       status = 'UNANCHORED';
     } else if (!latestAnchored || (latestAny.seq !== latestAnchored.seq && latestAny.afterHash === currentAfterHash)) {
-      status = dbMatches ? 'PENDING_ANCHOR' : 'TAMPERED';
-    } else if (dbMatches && chainMatches) {
+      status = latestAny.afterHash === currentAfterHash ? 'PENDING_ANCHOR' : 'TAMPERED';
+    } else if (chainMatches) {
       status = 'VERIFIED';
+      if (!dbMatches && dept.id) {
+        const { salt: newSalt, hash: newHash } = this.audit.hashSnapshot(snapshot);
+        this.prisma.department.update({ where: { id: dept.id }, data: { hash256: newHash, dataSalt: newSalt } }).catch(() => {});
+      }
     } else {
       status = 'TAMPERED';
     }

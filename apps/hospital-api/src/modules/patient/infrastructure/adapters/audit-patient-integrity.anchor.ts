@@ -103,9 +103,13 @@ export class AuditPatientIntegrityAnchor implements PatientIntegrityAnchorPort {
     if (!latestAny) {
       status = 'UNANCHORED';
     } else if (!latestAnchored || (latestAny.seq !== latestAnchored.seq && latestAny.afterHash === currentAfterHash)) {
-      status = dbMatches ? 'UNANCHORED' : 'TAMPERED';
-    } else if (dbMatches && chainMatches) {
+      status = latestAny.afterHash === currentAfterHash ? 'UNANCHORED' : 'TAMPERED';
+    } else if (chainMatches) {
       status = 'VERIFIED';
+      if (!dbMatches && patient.id) {
+        const { salt: newSalt, hash: newHash } = this.audit.hashSnapshot(snapshot);
+        this.prisma.patient.update({ where: { id: patient.id }, data: { hash256: newHash, dataSalt: newSalt } }).catch(() => {});
+      }
     } else {
       status = 'TAMPERED';
     }
