@@ -117,38 +117,92 @@ Quy định mã OTP:
 
 ---
 
-## 6. Xuất File APK Bằng Dịch Vụ EAS Cloud Build
+## 6. Build APK Bằng EAS Cloud (Khuyến Nghị)
 
-Đăng nhập tài khoản Expo:
+Profile `preview` đã được cấu hình để tạo file `.apk` và dùng remote Android credentials trên Expo.
 
-```bash
-npx eas-cli@latest login
-```
+### 6.1. Kiểm tra trước khi build
 
-Khởi tạo cấu hình dự án (chỉ thực hiện 1 lần):
+Chạy các lệnh từ thư mục gốc repository:
 
 ```bash
 cd apps/hospital-mobile
-npx eas-cli@latest build:configure
+npm install
+npm run typecheck
 ```
 
-Thực hiện đóng gói file APK trên Cloud:
+Đăng nhập EAS nếu máy chưa đăng nhập:
 
 ```bash
-npx eas-cli@latest build -p android --profile preview
+npx -y eas-cli@22.4.0 login
 ```
 
-Sau khi quá trình build hoàn tất, hệ thống EAS sẽ cung cấp đường dẫn tải về. Mở liên kết đó trên điện thoại Android để tải và cài đặt tệp `.apk`.
+Kiểm tra tài khoản hiện tại (không bắt buộc):
+
+```bash
+npx -y eas-cli@22.4.0 whoami
+```
+
+### 6.2. Build file APK
+
+```bash
+npx -y eas-cli@22.4.0 build --platform android --profile preview
+```
+
+Cấu hình hiện tại của profile `preview`:
+
+| Thuộc tính | Giá trị |
+|---|---|
+| Phân phối | `internal` |
+| Android output | `.apk` |
+| Backend EAS preview | `https://api.abc.vn/api` |
+| Android credentials | Remote credentials trên Expo |
+
+Khi EAS hỏi có cài APK vào Android Emulator hay không:
+
+```text
+Install and run the Android build on an emulator? (Y/n)
+```
+
+chọn `n` nếu máy không cài Android Studio/Emulator. Việc này chỉ bỏ qua bước cài tự động, không hủy APK đã build.
+
+Sau khi build hoàn tất, EAS hiển thị một đường dẫn dạng:
+
+```text
+https://expo.dev/accounts/<account>/projects/<project>/builds/<build-id>
+```
+
+Mở đường dẫn trên điện thoại Android để tải và cài file APK.
+
+> [!IMPORTANT]
+> APK EAS là bản cài trực tiếp trên Android. Khi cài lần đầu, điện thoại có thể yêu cầu cho phép cài ứng dụng từ nguồn không xác định.
+
+### 6.3. Khác nhau giữa các profile
+
+- `preview`: tạo APK để demo và cài nội bộ.
+- `production`: hiện được cấu hình tạo Android App Bundle (`.aab`) để phát hành lên Google Play, không dùng để tải APK trực tiếp.
+
+### 6.4. Các cảnh báo/lỗi thường gặp
+
+#### Build đã xong nhưng báo `spawn emulator ENOENT`
+
+Nếu log đã có dòng `Build finished` và đã cung cấp link Expo thì APK đã build thành công. Lỗi này chỉ cho biết máy local không tìm thấy Android Emulator. Tải APK từ link Expo hoặc build lại rồi chọn `n` ở câu hỏi cài Emulator.
+
+#### Cảnh báo `cli.appVersionSource`
+
+Thông báo `The field "cli.appVersionSource" is not set` chỉ là cảnh báo chuyển tiếp của EAS, không làm hỏng APK hiện tại.
+
+#### APK không kết nối được Backend
+
+Không cấu hình `localhost` cho APK cài trên điện thoại thật. Hãy dùng URL HTTPS public cho build EAS hoặc IP LAN của máy Backend nếu điện thoại và máy tính cùng Wi-Fi.
+
+Biến `EXPO_PUBLIC_BACKEND_URL` trong `.env` dùng cho chạy local; biến trong profile `preview` của `eas.json` được dùng khi build trên EAS.
 
 ---
 
-## 7. Xuất File APK Thủ Công Trên Máy Local
+## 7. Build APK Local Trên Linux/Fedora (Tùy Chọn)
 
-Cài đặt Android Studio và đảm bảo cấu hình đầy đủ các biến môi trường:
-- Android SDK & Android SDK Platform Tools
-- Java Development Kit (JDK) tương thích
-- Biến môi trường `ANDROID_HOME`
-- Công cụ `adb` có sẵn trong đường dẫn hệ thống
+Cách này cần Android Studio, Android SDK, JDK tương thích và `adb`. Đảm bảo `ANDROID_HOME` hoặc `ANDROID_SDK_ROOT` đã được cấu hình.
 
 Khởi tạo dự án Android native:
 
@@ -157,11 +211,18 @@ cd apps/hospital-mobile
 npx expo prebuild --platform android
 ```
 
-Đóng gói file Debug APK:
+Build Debug APK trên Linux/macOS:
 
 ```bash
 cd android
-.\gradlew assembleDebug
+./gradlew assembleDebug
+```
+
+Trên Windows dùng:
+
+```powershell
+cd android
+gradlew.bat assembleDebug
 ```
 
 Tệp APK sau khi tạo nằm tại đường dẫn:
@@ -170,18 +231,15 @@ Tệp APK sau khi tạo nằm tại đường dẫn:
 apps/hospital-mobile/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Đóng gói file Release APK (Dùng cho Demo/Cài đặt trực tiếp không cần Metro):
+Build Release APK local:
 
 ```bash
 cd apps/hospital-mobile/android
-.\gradlew assembleRelease
+./gradlew assembleRelease
 ```
 
-Tệp Release APK nằm tại:
-
-```text
-apps/hospital-mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
-```
+> [!WARNING]
+> Release APK local cần cấu hình signing để dùng trong môi trường production. Để demo/cài nhanh, dùng APK từ EAS profile `preview` là đơn giản và ổn định hơn.
 
 ---
 
@@ -192,5 +250,11 @@ apps/hospital-mobile/android/app/build/outputs/apk/release/app-release-unsigned.
 **Cách 2:** Cài đặt nhanh bằng câu lệnh ADB:
 
 ```bash
-adb install -r "duong\\dan\\toi\\app.apk"
+adb install -r "/đường/dẫn/tới/app.apk"
+```
+
+Nếu điện thoại chưa được nhận diện, bật **Developer options** và **USB debugging**, sau đó kiểm tra:
+
+```bash
+adb devices
 ```
