@@ -19,6 +19,7 @@ Tài liệu dự án được sắp xếp tập trung theo ứng dụng và chuy
 
 | Nhóm tài liệu | Nội dung chi tiết |
 |---|---|
+| **[Benchmarks](benchmarks/)** | ⚡ **Báo cáo thực nghiệm chuyên sâu: Tiêu thụ Gas, Tốc độ mở rộng và Năng lực phát hiện sai sót dữ liệu (Tamper Detection).** |
 | **[Architecture](architecture/)** | Kiến trúc Backend, cấu trúc tệp tin, quy tắc UI Frontend và thuật toán Audit Merkle Tree. |
 | **[Domain](domain/)** | Biểu mẫu y tế, quy định pháp lý và quy trình use case nghiệp vụ bệnh viện. |
 | **[Operations](operations/)** | Quy trình triển khai (Deployment), sao lưu khôi phục và Runbook kiểm toán vận hành. |
@@ -33,8 +34,8 @@ Tài liệu dự án được sắp xếp tập trung theo ứng dụng và chuy
 ## Điểm Truy Cập Nhanh (Quick Links)
 
 - [Tài liệu chính dự án (README.md)](../README.md)
+- [Báo cáo thực nghiệm Benchmark đầy đủ](benchmarks/README.md)
 - [Tổng quan dự án tiếng Anh (English overview)](translations/README.en.md)
-- [Tổng quan dự án tiếng Nga (Russian overview)](translations/README.ru.md)
 - [Thuật toán kiểm toán Merkle (Audit Algorithm)](architecture/audit-algorithm.md)
 - [ERD & từ điển dữ liệu PostgreSQL](erd/README.md)
 - [Quy trình triển khai Production](operations/deployment.md)

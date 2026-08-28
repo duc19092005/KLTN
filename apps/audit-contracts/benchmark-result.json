@@ -1,0 +1,58 @@
+{
+  "totalLogs": 1000,
+  "rawLogging": {
+    "transactions": 1000,
+    "totalGas": 236626908,
+    "avgGasPerLog": 236626.908,
+    "minGas": 236517,
+    "maxGas": 253641,
+    "durationMs": 2021,
+    "costs": {
+      "per1k": {
+        "ethMainnet": "14789.1817",
+        "l2Eth": "59.156727",
+        "polygon": "3.5494"
+      },
+      "per100k": {
+        "ethMainnet": "1478918.1750",
+        "l2Eth": "5915.672700",
+        "polygon": "354.9404"
+      },
+      "per1M": {
+        "ethMainnet": "14789181.7500",
+        "l2Eth": "59156.727000",
+        "polygon": "3549.4036"
+      }
+    }
+  },
+  "merkleCheckpoint": {
+    "transactions": 1,
+    "totalGas": 300883,
+    "avgGasPerLog": 300.883,
+    "offChainTreeTimeMs": 19,
+    "durationMs": 22,
+    "verifyProofGas": 46192,
+    "costs": {
+      "per1k": {
+        "ethMainnet": "18.8052",
+        "l2Eth": "0.075221",
+        "polygon": "0.0045"
+      },
+      "per100k": {
+        "ethMainnet": "1880.5187",
+        "l2Eth": "7.522075",
+        "polygon": "0.4513"
+      },
+      "per1M": {
+        "ethMainnet": "18805.1875",
+        "l2Eth": "75.220750",
+        "polygon": "4.5132"
+      }
+    }
+  },
+  "comparison": {
+    "gasSavingsPercent": 99.87284497670062,
+    "gasReductionFactor": 786.4416002233427,
+    "speedupFactor": 91.86363636363636
+  }
+}
