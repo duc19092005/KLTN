@@ -102,8 +102,8 @@ Giả sử bạn là Bệnh nhân B muốn kiểm tra xem hồ sơ của mình c
 1. Hệ thống lấy dữ liệu ca khám của bạn và tính ra mã `H_B`.
 2. Hệ thống chỉ cần cung cấp thêm cho bạn 2 "mảnh ghép" nhỏ (gọi là **Sibling Hashes**): mã `H_A` của người bên cạnh và mã `H_CD` của nhánh đối diện.
 3. Ứng dụng của bạn tự tính:
-   $$\text{H\_B} + \text{H\_A} \xrightarrow{\text{SHA-256}} \text{H\_AB}$$
-   $$\text{H\_AB} + \text{H\_CD} \xrightarrow{\text{SHA-256}} \text{Merkle Root}$$
+   $$H_B + H_A \xrightarrow{\text{SHA-256}} H_{AB}$$
+   $$H_{AB} + H_{CD} \xrightarrow{\text{SHA-256}} \text{Merkle Root}$$
 4. Bạn lấy mã tính được đem so khớp với **Merkle Root đã lưu trên Blockchain**:
    - Nếu **TRÙNG KHỚP 100%**: Đảm bảo tuyệt đối ca khám của bạn nguyên vẹn, không ai sửa đổi được dù chỉ 1 dấu chấm!
    - Nếu **LỆCH MÃ**: Phát hiện ngay lập tức dữ liệu trong cơ sở dữ liệu đã bị sửa trái phép!

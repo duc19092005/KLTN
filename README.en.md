@@ -102,8 +102,8 @@ Suppose Patient Bob wants to independently verify that his medical record was ne
 1. The client app calculates Bob's leaf hash `H_B`.
 2. The server supplies only 2 sibling hashes (`H_A` and `H_CD`).
 3. The client reconstructs the root:
-   $$\text{H\_B} + \text{H\_A} \xrightarrow{\text{SHA-256}} \text{H\_AB}$$
-   $$\text{H\_AB} + \text{H\_CD} \xrightarrow{\text{SHA-256}} \text{Merkle Root}$$
+   $$H_B + H_A \xrightarrow{\text{SHA-256}} H_{AB}$$
+   $$H_{AB} + H_{CD} \xrightarrow{\text{SHA-256}} \text{Merkle Root}$$
 4. The client compares the result against the **immutable Merkle Root stored on-chain**:
    - If **MATCH (100%)**: Guarantees the medical record is authentic down to the exact punctuation mark.
    - If **MISMATCH**: Instantly flags unauthorized database tampering!
