@@ -1,6 +1,8 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+﻿import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ethers } from 'ethers';
-import { computeBackendActionHash } from './blockchain-action-hash.util';
+import { BlockchainGovernanceClient } from './clients/blockchain-governance.client';
+import { BlockchainFaceRegistryClient } from './clients/blockchain-face-registry.client';
+import { BlockchainAuditAnchorClient } from './clients/blockchain-audit-anchor.client';
 
 const LEGACY_SUPER_ADMIN_PLACEHOLDER = 'your_super_admin_private_key_here';
 
@@ -23,23 +25,16 @@ export class BlockchainService implements OnModuleInit {
   private provider: ethers.JsonRpcProvider;
   private contract: ethers.Contract | null = null;
   private contractAddress = '';
-
-  // Governance signer: root contract authority. For production, this should be
-  // a cold wallet or multisig and must not live on the backend host.
   private ownerSigner: ethers.Wallet | null = null;
-
-  // Operational signer: backend hot wallet used for routine on-chain writes.
-  // It is intentionally separate from owner so it can be revoked/rotated.
   private relayerSigner: ethers.Wallet | null = null;
-
-  // FaceRegistry: on-chain key-value store of face-template integrity hashes.
   private faceRegistry: ethers.Contract | null = null;
   private faceRegistryAddress = '';
-
-  // AuditAnchor: append-only Merkle-root logger. The backend commits one Merkle root per batch
-  // of audit logs (gas flat regardless of batch size); individual logs are never stored on-chain.
   private auditAnchor: ethers.Contract | null = null;
   private auditAnchorAddress = '';
+
+  private governanceClient: BlockchainGovernanceClient;
+  private faceRegistryClient: BlockchainFaceRegistryClient;
+  private auditAnchorClient: BlockchainAuditAnchorClient;
 
   private readonly abi = [
     'function authorizeAdmin(address wallet) external',
@@ -77,6 +72,27 @@ export class BlockchainService implements OnModuleInit {
     'function owner() external view returns (address)',
   ];
 
+  constructor() {
+    this.governanceClient = new BlockchainGovernanceClient(
+      () => this.contract,
+      () => this.ownerSigner,
+      () => this.relayerSigner,
+      (fn) => this.enqueueWrite(fn),
+    );
+    this.faceRegistryClient = new BlockchainFaceRegistryClient(
+      () => this.faceRegistry,
+      () => this.ownerSigner,
+      () => this.relayerSigner,
+      (fn) => this.enqueueWrite(fn),
+    );
+    this.auditAnchorClient = new BlockchainAuditAnchorClient(
+      () => this.auditAnchor,
+      () => this.ownerSigner,
+      () => this.relayerSigner,
+      (fn) => this.enqueueWrite(fn),
+    );
+  }
+
   async onModuleInit() {
     const rpcUrl = process.env.BLOCKCHAIN_RPC_URL || 'http://127.0.0.1:8545';
     this.contractAddress = process.env.IDENTITY_REGISTRY_ADDRESS || '';
@@ -92,36 +108,19 @@ export class BlockchainService implements OnModuleInit {
     if (ownerKey) {
       this.ownerSigner = new ethers.Wallet(ownerKey, this.provider);
       console.log(`Blockchain owner signer initialized: ${this.ownerSigner.address}`);
-      if (!process.env.BLOCKCHAIN_OWNER_PRIVATE_KEY && process.env.SUPER_ADMIN_PRIVATE_KEY) {
-        console.warn('SUPER_ADMIN_PRIVATE_KEY is deprecated. Use BLOCKCHAIN_OWNER_PRIVATE_KEY for governance.');
-      }
-    } else {
-      console.warn('BLOCKCHAIN_OWNER_PRIVATE_KEY not set. On-chain governance writes are disabled.');
     }
-
     if (relayerKey) {
       this.relayerSigner = new ethers.Wallet(relayerKey, this.provider);
       console.log(`Blockchain relayer signer initialized: ${this.relayerSigner.address}`);
-      if (!process.env.BLOCKCHAIN_RELAYER_PRIVATE_KEY) {
-        console.warn('BLOCKCHAIN_RELAYER_PRIVATE_KEY not set. Falling back to owner/legacy key for local development.');
-      }
-    } else {
-      console.warn('BLOCKCHAIN_RELAYER_PRIVATE_KEY not set. On-chain operational writes are disabled.');
-    }
-
-    if (this.ownerSigner && this.relayerSigner && this.ownerSigner.address === this.relayerSigner.address) {
-      console.warn('Blockchain owner and relayer are the same address. This is acceptable for local dev only.');
     }
 
     if (this.contractAddress) {
       this.contract = new ethers.Contract(this.contractAddress, this.abi, this.provider);
     }
-
     this.faceRegistryAddress = process.env.FACE_REGISTRY_ADDRESS || '';
     if (this.faceRegistryAddress) {
       this.faceRegistry = new ethers.Contract(this.faceRegistryAddress, this.faceRegistryAbi, this.provider);
     }
-
     this.auditAnchorAddress = process.env.AUDIT_ANCHOR_ADDRESS || '';
     if (this.auditAnchorAddress) {
       this.auditAnchor = new ethers.Contract(this.auditAnchorAddress, this.auditAnchorAbi, this.provider);
@@ -152,162 +151,59 @@ export class BlockchainService implements OnModuleInit {
   }
 
   async isAuthorizedAdmin(walletAddress: string): Promise<boolean> {
-    if (!this.contract) return false;
-    try {
-      return await this.contract.isAuthorized(walletAddress);
-    } catch {
-      return false;
-    }
+    return this.governanceClient.isAuthorizedAdmin(walletAddress);
   }
 
   async isAuthorized(walletAddress: string): Promise<boolean> {
-    return this.isAuthorizedAdmin(walletAddress);
+    return this.governanceClient.isAuthorizedAdmin(walletAddress);
   }
 
   async isRelayer(walletAddress: string): Promise<boolean> {
-    if (!this.contract) return false;
-    try {
-      return await this.contract.isRelayer(walletAddress);
-    } catch {
-      return false;
-    }
+    return this.governanceClient.isRelayer(walletAddress);
   }
 
   async isRelayerOrOwner(walletAddress: string): Promise<boolean> {
-    if (!this.contract) return false;
-    try {
-      return await this.contract.isRelayerOrOwner(walletAddress);
-    } catch {
-      return false;
-    }
+    return this.governanceClient.isRelayerOrOwner(walletAddress);
   }
 
   async authorizeAdminOnChain(walletAddress: string): Promise<string> {
-    if (!this.contract) throw new Error('Blockchain contract not initialized.');
-
-    return this.enqueueWrite(async () => {
-      const isAuth = await this.contract!.isAuthorized(walletAddress);
-      if (isAuth) return 'ALREADY_AUTHORIZED';
-
-      const signer = this.relayerSigner || this.ownerSigner;
-      if (!signer) throw new Error('No operational signer configured for governance call.');
-
-      const signedContract = this.contract!.connect(signer) as ethers.Contract;
-      const tx = await signedContract.getFunction('authorizeAdmin')(walletAddress);
-      const receipt = await tx.wait();
-      return receipt.hash;
-    });
+    return this.governanceClient.authorizeAdminOnChain(walletAddress);
   }
 
   async authorizeAdmin(walletAddress: string): Promise<string> {
-    return this.authorizeAdminOnChain(walletAddress);
+    return this.governanceClient.authorizeAdminOnChain(walletAddress);
   }
 
   async revokeAdminOnChain(walletAddress: string): Promise<string> {
-    if (!this.contract) throw new Error('Blockchain contract not initialized.');
-    if (!this.ownerSigner) throw new Error('REVOKE_REQUIRES_OWNER: Only BLOCKCHAIN_OWNER_PRIVATE_KEY can revoke admins.');
-
-    return this.enqueueWrite(async () => {
-      const isAuth = await this.contract!.isAuthorized(walletAddress);
-      if (!isAuth) return 'ALREADY_REVOKED';
-
-      const signedContract = this.contract!.connect(this.ownerSigner!) as ethers.Contract;
-      const tx = await signedContract.getFunction('revokeAdmin')(walletAddress);
-      const receipt = await tx.wait();
-      return receipt.hash;
-    });
+    return this.governanceClient.revokeAdminOnChain(walletAddress);
   }
 
   async rotateAdminOnChain(oldWallet: string, newWallet: string): Promise<string> {
-    if (!this.contract) throw new Error('Blockchain contract not initialized.');
-
-    return this.enqueueWrite(async () => {
-      const isOldAuth = await this.contract!.isAuthorized(oldWallet);
-      if (!isOldAuth) throw new Error(`Old wallet ${oldWallet} is not an authorized admin.`);
-
-      const isNewAuth = await this.contract!.isAuthorized(newWallet);
-      if (isNewAuth && oldWallet.toLowerCase() !== newWallet.toLowerCase()) {
-        throw new Error(`New wallet ${newWallet} is already an authorized admin.`);
-      }
-
-      const signer = this.relayerSigner || this.ownerSigner;
-      if (!signer) throw new Error('No operational signer configured for admin rotation.');
-
-      const signedContract = this.contract!.connect(signer) as ethers.Contract;
-      const tx = await signedContract.getFunction('rotateAdmin')(oldWallet, newWallet);
-      const receipt = await tx.wait();
-      return receipt.hash;
-    });
+    return this.governanceClient.rotateAdminOnChain(oldWallet, newWallet);
   }
 
   async rotateAdmin(oldWallet: string, newWallet: string): Promise<string> {
-    return this.rotateAdminOnChain(oldWallet, newWallet);
+    return this.governanceClient.rotateAdminOnChain(oldWallet, newWallet);
   }
 
   async recordActionOnChain(entityId: string, action: string, actorId: string): Promise<string | null> {
-    if (!this.contract) return null;
-    const signer = this.relayerSigner || this.ownerSigner;
-    if (!signer) return null;
-
-    try {
-      const actionHash = computeBackendActionHash({ entityId, action, actorId });
-      return await this.enqueueWrite(async () => {
-        const signedContract = this.contract!.connect(signer) as ethers.Contract;
-        const tx = await signedContract.getFunction('recordAction')(actionHash);
-        const receipt = await tx.wait();
-        return receipt.hash;
-      });
-    } catch (err) {
-      console.error('Failed to record action on-chain:', err);
-      return null;
-    }
+    return this.governanceClient.recordActionOnChain(entityId, action, actorId);
   }
 
   async addRelayerOnChain(walletAddress: string): Promise<string> {
-    if (!this.contract) throw new Error('Blockchain contract not initialized.');
-    if (!this.ownerSigner) throw new Error('Only BLOCKCHAIN_OWNER_PRIVATE_KEY can authorize relayers.');
-
-    return this.enqueueWrite(async () => {
-      const signedContract = this.contract!.connect(this.ownerSigner!) as ethers.Contract;
-      const tx = await signedContract.getFunction('addRelayer')(walletAddress);
-      const receipt = await tx.wait();
-      return receipt.hash;
-    });
+    return this.governanceClient.addRelayerOnChain(walletAddress);
   }
 
   async removeRelayerOnChain(walletAddress: string): Promise<string> {
-    if (!this.contract) throw new Error('Blockchain contract not initialized.');
-    if (!this.ownerSigner) throw new Error('Only BLOCKCHAIN_OWNER_PRIVATE_KEY can revoke relayers.');
-
-    return this.enqueueWrite(async () => {
-      const signedContract = this.contract!.connect(this.ownerSigner!) as ethers.Contract;
-      const tx = await signedContract.getFunction('removeRelayer')(walletAddress);
-      const receipt = await tx.wait();
-      return receipt.hash;
-    });
+    return this.governanceClient.removeRelayerOnChain(walletAddress);
   }
 
   async setFaceHashOnChain(userKey: string, faceHashBytes32: string): Promise<string | null> {
-    if (!this.faceRegistry) return null;
-    const signer = this.relayerSigner || this.ownerSigner;
-    if (!signer) return null;
-
-    try {
-      const keyBytes32 = ethers.keccak256(ethers.toUtf8Bytes(userKey));
-      return await this.enqueueWrite(async () => {
-        const signedRegistry = this.faceRegistry!.connect(signer) as ethers.Contract;
-        const tx = await signedRegistry.getFunction('setFaceHash')(keyBytes32, faceHashBytes32);
-        const receipt = await tx.wait();
-        return receipt.hash;
-      });
-    } catch (err) {
-      console.error(`Failed to setFaceHash on-chain for ${userKey}:`, err);
-      return null;
-    }
+    return this.faceRegistryClient.setFaceHashOnChain(userKey, faceHashBytes32);
   }
 
   async setFaceHash(userKey: string, faceHashBytes32: string): Promise<string | null> {
-    return this.setFaceHashOnChain(userKey, faceHashBytes32);
+    return this.faceRegistryClient.setFaceHashOnChain(userKey, faceHashBytes32);
   }
 
   async setFaceRecoveryOnChain(
@@ -316,28 +212,7 @@ export class BlockchainService implements OnModuleInit {
     artifactHashBytes32: string,
     artifactUri: string,
   ): Promise<{ txHash: string; keyBytes32: string } | null> {
-    if (!this.faceRegistry) return null;
-    const signer = this.relayerSigner || this.ownerSigner;
-    if (!signer) return null;
-
-    try {
-      const keyBytes32 = ethers.keccak256(ethers.toUtf8Bytes(userKey));
-      const txHash = await this.enqueueWrite(async () => {
-        const signedRegistry = this.faceRegistry!.connect(signer) as ethers.Contract;
-        const tx = await signedRegistry.getFunction('setFaceRecovery')(
-          keyBytes32,
-          faceHashBytes32,
-          artifactHashBytes32,
-          artifactUri,
-        );
-        const receipt = await tx.wait();
-        return receipt.hash;
-      });
-      return { txHash, keyBytes32 };
-    } catch (err) {
-      console.error(`Failed to setFaceRecovery on-chain for ${userKey}:`, err);
-      return null;
-    }
+    return this.faceRegistryClient.setFaceRecoveryOnChain(userKey, faceHashBytes32, artifactHashBytes32, artifactUri);
   }
 
   async setFaceRecovery(
@@ -346,52 +221,23 @@ export class BlockchainService implements OnModuleInit {
     artifactHashBytes32: string,
     artifactUri: string,
   ): Promise<{ txHash: string; keyBytes32: string } | null> {
-    return this.setFaceRecoveryOnChain(userKey, faceHashBytes32, artifactHashBytes32, artifactUri);
+    return this.faceRegistryClient.setFaceRecoveryOnChain(userKey, faceHashBytes32, artifactHashBytes32, artifactUri);
   }
 
   async getFaceHashFromChain(userKey: string): Promise<string | null> {
-    if (!this.faceRegistry) return null;
-    try {
-      const keyBytes32 = ethers.keccak256(ethers.toUtf8Bytes(userKey));
-      const value: string = await this.faceRegistry.getFaceHash(keyBytes32);
-      if (!value || value === ethers.ZeroHash) return null;
-      return value;
-    } catch {
-      return null;
-    }
+    return this.faceRegistryClient.getFaceHashFromChain(userKey);
   }
 
   async getFaceHash(userKey: string): Promise<string | null> {
-    return this.getFaceHashFromChain(userKey);
+    return this.faceRegistryClient.getFaceHashFromChain(userKey);
   }
 
-  async getFaceRecoveryFromChain(userKey: string): Promise<{
-    faceHash: string;
-    artifactHash: string;
-    artifactUri: string;
-    isActive: boolean;
-    updatedAt: number;
-  } | null> {
-    if (!this.faceRegistry) return null;
-    try {
-      const keyBytes32 = ethers.keccak256(ethers.toUtf8Bytes(userKey));
-      const [faceHash, artifactHash, artifactUri, isActive, updatedAt] =
-        await this.faceRegistry.getFaceRecovery(keyBytes32);
-      if (!isActive || !artifactUri || artifactHash === ethers.ZeroHash) return null;
-      return {
-        faceHash,
-        artifactHash,
-        artifactUri,
-        isActive: Boolean(isActive),
-        updatedAt: Number(updatedAt),
-      };
-    } catch {
-      return null;
-    }
+  async getFaceRecoveryFromChain(userKey: string) {
+    return this.faceRegistryClient.getFaceRecoveryFromChain(userKey);
   }
 
   async getFaceRecovery(userKey: string) {
-    return this.getFaceRecoveryFromChain(userKey);
+    return this.faceRegistryClient.getFaceRecoveryFromChain(userKey);
   }
 
   async commitAuditCheckpointOnChain(
@@ -402,35 +248,16 @@ export class BlockchainService implements OnModuleInit {
     toSeq: number,
     artifactHashBytes32: string,
     artifactUri: string,
-  ): Promise<{ success: boolean; txHash: string; blockNumber: number } | null> {
-    if (!this.auditAnchor) return null;
-    const signer = this.relayerSigner || this.ownerSigner;
-    if (!signer) return null;
-
-    try {
-      return await this.enqueueWrite(async () => {
-        const signedAnchor = this.auditAnchor!.connect(signer) as ethers.Contract;
-        const tx = await signedAnchor.getFunction('commitCheckpoint')(
-          batchId,
-          merkleRootBytes32,
-          leafCount,
-          fromSeq,
-          toSeq,
-          artifactHashBytes32,
-          artifactUri,
-        );
-        const receipt = await tx.wait();
-        this.cachedLatestBatchId = { value: batchId, timestamp: Date.now() };
-        return {
-          success: true,
-          txHash: receipt.hash,
-          blockNumber: Number(receipt.blockNumber),
-        };
-      });
-    } catch (err) {
-      console.error(`Failed to commitAuditCheckpoint for batch ${batchId}:`, err);
-      return null;
-    }
+  ) {
+    return this.auditAnchorClient.commitAuditCheckpointOnChain(
+      batchId,
+      merkleRootBytes32,
+      leafCount,
+      fromSeq,
+      toSeq,
+      artifactHashBytes32,
+      artifactUri,
+    );
   }
 
   async commitAuditCheckpoint(
@@ -441,113 +268,36 @@ export class BlockchainService implements OnModuleInit {
     toSeq: number,
     artifactHashBytes32: string,
     artifactUri: string,
-  ): Promise<{ success: boolean; txHash: string; blockNumber: number } | null> {
-    return this.commitAuditCheckpointOnChain(batchId, merkleRootBytes32, leafCount, fromSeq, toSeq, artifactHashBytes32, artifactUri);
+  ) {
+    return this.auditAnchorClient.commitAuditCheckpointOnChain(
+      batchId,
+      merkleRootBytes32,
+      leafCount,
+      fromSeq,
+      toSeq,
+      artifactHashBytes32,
+      artifactUri,
+    );
   }
 
   async getAuditRoot(batchId: number): Promise<string | null> {
-    if (!this.auditAnchor) return null;
-    try {
-      const value: string = await this.auditAnchor.getRoot(batchId);
-      if (!value || value === ethers.ZeroHash) return null;
-      return value;
-    } catch {
-      return null;
-    }
+    return this.auditAnchorClient.getAuditRoot(batchId);
   }
 
-  async getAuditCheckpoint(
-    batchId: number,
-  ): Promise<{
-    root: string;
-    artifactHash: string;
-    artifactUri: string;
-    leafCount: number;
-    fromSeq: number;
-    toSeq: number;
-    timestamp: number;
-    committed: boolean;
-  } | null> {
-    if (!this.auditAnchor) return null;
-    try {
-      const [root, artifactHash, artifactUri, leafCount, fromSeq, toSeq, timestamp, committed] = await this.auditAnchor.getCheckpoint(batchId);
-      return {
-        root,
-        artifactHash,
-        artifactUri,
-        leafCount: Number(leafCount),
-        fromSeq: Number(fromSeq),
-        toSeq: Number(toSeq),
-        timestamp: Number(timestamp),
-        committed: Boolean(committed),
-      };
-    } catch {
-      return null;
-    }
+  async getAuditCheckpoint(batchId: number) {
+    return this.auditAnchorClient.getAuditCheckpoint(batchId);
   }
 
-  async getAuditCheckpointsRange(fromBatchId: number, toBatchId: number): Promise<Array<{
-    batchId: number;
-    root: string;
-    artifactHash: string;
-    artifactUri: string;
-    leafCount: number;
-    fromSeq: number;
-    toSeq: number;
-    timestamp: number;
-    committed: boolean;
-  }>> {
-    if (!this.auditAnchor) return [];
-    try {
-      const items = await this.auditAnchor.getCheckpointsRange(fromBatchId, toBatchId);
-      return (items || []).map((item: any) => ({
-        batchId: Number(item.batchId),
-        root: String(item.merkleRoot),
-        artifactHash: String(item.artifactHash),
-        artifactUri: String(item.artifactUri),
-        leafCount: Number(item.leafCount),
-        fromSeq: Number(item.fromSeq),
-        toSeq: Number(item.toSeq),
-        timestamp: Number(item.timestamp),
-        committed: Boolean(item.committed),
-      }));
-    } catch {
-      return [];
-    }
+  async getAuditCheckpointsRange(fromBatchId: number, toBatchId: number) {
+    return this.auditAnchorClient.getAuditCheckpointsRange(fromBatchId, toBatchId);
   }
 
-  async getAllCheckpoints(): Promise<Array<{
-    batchId: number;
-    root: string;
-    artifactHash: string;
-    artifactUri: string;
-    leafCount: number;
-    fromSeq: number;
-    toSeq: number;
-    timestamp: number;
-    committed: boolean;
-  }>> {
-    const latest = await this.getLatestAuditBatchId();
-    if (!latest || latest <= 0) return [];
-    return this.getAuditCheckpointsRange(1, latest);
+  async getAllCheckpoints() {
+    return this.auditAnchorClient.getAllCheckpoints();
   }
-
-  private cachedLatestBatchId: { value: number | null; timestamp: number } | null = null;
 
   async getLatestAuditBatchId(forceRefresh = false): Promise<number | null> {
-    if (!this.auditAnchor) return null;
-    const now = Date.now();
-    if (!forceRefresh && this.cachedLatestBatchId && now - this.cachedLatestBatchId.timestamp < 15000) {
-      return this.cachedLatestBatchId.value;
-    }
-    try {
-      const value = await this.auditAnchor.latestBatchId();
-      const num = Number(value);
-      this.cachedLatestBatchId = { value: num, timestamp: now };
-      return num;
-    } catch {
-      return this.cachedLatestBatchId?.value ?? null;
-    }
+    return this.auditAnchorClient.getLatestAuditBatchId(forceRefresh);
   }
 
   getContractAddress(): string {

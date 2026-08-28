@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './controllers/auth.controller';
+import { AuthRecoveryController } from './controllers/auth-recovery.controller';
 import { AuthService } from './services/auth.service';
 import { AuthRateLimiterService } from './services/auth-rate-limiter.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -74,7 +75,7 @@ import { AdminFaceRecoveryArtifactAdapter } from './infrastructure/adapters/admi
     BlockchainModule,
     AuditModule,
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, AuthRecoveryController],
   providers: [
     AuthService,
     AuthRateLimiterService,

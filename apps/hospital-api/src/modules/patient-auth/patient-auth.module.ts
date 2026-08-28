@@ -5,6 +5,7 @@ import { getJwtSecret } from '../auth/constants/auth-security';
 import { AuthRateLimiterService } from '../auth/services/auth-rate-limiter.service';
 import { PatientAuthController } from './patient-auth.controller';
 import { PatientAuthService } from './patient-auth.service';
+import { PatientOtpUseCase } from './application/use-cases/patient-otp.use-case';
 import { EsmsService } from './sms/esms.service';
 
 @Module({
@@ -18,6 +19,7 @@ import { EsmsService } from './sms/esms.service';
     }),
   ],
   controllers: [PatientAuthController],
-  providers: [PatientAuthService, EsmsService, AuthRateLimiterService],
+  providers: [PatientAuthService, PatientOtpUseCase, EsmsService, AuthRateLimiterService],
+  exports: [PatientAuthService],
 })
 export class PatientAuthModule {}
