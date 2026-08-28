@@ -1,4 +1,4 @@
-﻿# Hệ Thống Quản Lý Bệnh Viện Thông Minh Tích Hợp Bảo Mật Sinh Trắc Học & Chuỗi Nhật Ký Kiểm Toán Chống Can Thiệp
+# Hệ Thống Quản Lý Bệnh Viện Thông Minh Tích Hợp Bảo Mật Sinh Trắc Học & Chuỗi Nhật Ký Kiểm Toán Chống Can Thiệp
 
 [![NestJS](https://img.shields.io/badge/Backend-NestJS%2010-E0234E?logo=nestjs&logoColor=white)](apps/hospital-api)
 [![React](https://img.shields.io/badge/Frontend-React%20%2B%20Vite-61DAFB?logo=react&logoColor=black)](apps/hospital-web)
@@ -110,7 +110,7 @@ Giả sử bạn là Bệnh nhân B muốn kiểm tra xem hồ sơ của mình c
 
 ---
 
-### 📊 Bảng So Sánh: Cách Làm Truyền Thống vs Dự Án
+### 📊 Bảng So Sánh Tổng Quan: Các Cách Tiếp Cận
 
 | Tiêu chí | Lưu trực tiếp lên Blockchain | Lưu CSDL truyền thống (MySQL) | **Giải pháp của Dự án (Merkle + Blockchain + IPFS)** |
 |---|:---:|:---:|:---:|
@@ -163,7 +163,48 @@ sequenceDiagram
 
 ---
 
-## 🏛️ 5. Cấu Trúc Toàn Bộ Dự Án (Monorepo)
+## ⚡ 5. Thực Nghiệm & Đánh Giá Hiệu Năng (Empirical Benchmarks)
+
+Dự án đã tiến hành đo kiểm thực nghiệm độc lập trên môi trường máy ảo EVM cục bộ (Hardhat EVM Cancun Node) với **1.000 bản ghi nhật ký y tế thực tế** trên 2 phương diện: (1) Tiêu thụ Gas & Độ trễ mở rộng quy mô và (2) Khả năng phát hiện sai sót dữ liệu khi bị tấn công.
+
+> 📖 **Xem báo cáo kỹ thuật thực nghiệm chi tiết:** [docs/benchmarks/README.md](docs/benchmarks/README.md)
+
+### 📊 Benchmark 1: So sánh Tiêu thụ Gas & Thời gian xử lý (1.000 Logs)
+
+| Chỉ Số Đo Lường | Ghi Raw On-Chain | Cây Merkle (KLTN) | Mức Độ Cải Thiện |
+|---|:---:|:---:|:---:|
+| **Số lượng giao dịch (Transactions)** | 1.000 transactions | **1 transaction** | 📉 **Giảm 1.000 lần (99,9%)** |
+| **Tổng lượng Gas tiêu thụ** | 236.626.908 gas | **300.883 gas** | ⚡ **Tiết kiệm 99,87% Gas** |
+| **Chi phí Gas / 1 log** | 236.627 gas / log | **300,88 gas / log** | 💡 **Tối ưu hơn 786,4 LẦN** |
+| **Thời gian xử lý local** | 2.021 ms (~2,02s) | **22 ms** (~0,022s) | ⏱️ **Nhanh gấp 91,9 lần** |
+| **Thời gian chờ xác nhận On-Chain** | 2 – 3,5 phút *(8–10 khối)* | **12 giây** *(1 khối duy nhất)* | 🎯 **Tức thì, 0 nguy cơ nghẽn mạng** |
+
+<p align="center">
+  <img src="docs/assets/benchmark_gas_and_time_comparison.png" alt="Benchmark Gas & Time Comparison" width="100%" />
+</p>
+
+---
+
+### 🛡️ Benchmark 2: Khả Năng Phát Hiện Sai Sót Dữ Liệu (Tamper Detection)
+
+Hệ thống mô phỏng 4 kịch bản tấn công thực tế vào cơ sở dữ liệu bệnh viện: sửa 1 trường thông tin bệnh án, xóa lén bản ghi, tráo đổi thứ tự thời gian và chèn bản ghi khống:
+
+| Kịch Bản Tấn Công / Sai Lệch | Ghi Raw On-Chain | Cây Merkle (KLTN) | So Sánh Hiệu Quả |
+|---|:---:|:---:|:---:|
+| **1. Sửa 1 trường dữ liệu (#450)** | Phát hiện *(307 ms, 451 RPC)* | **Phát hiện (5,3 ms, 1 RPC)** | ⚡ Merkle **nhanh gấp 57 LẦN** |
+| **2. Xóa lén bản ghi kiểm toán (#720)** | Phát hiện *(453 ms, 721 RPC)* | **Phát hiện (4,9 ms, 1 RPC)** | 🎯 Merkle **nhanh gấp 92 LẦN** |
+| **3. Tráo đổi thứ tự bản ghi (#300 ⇄ #301)** | Phát hiện *(190 ms, 301 RPC)* | **Phát hiện (4,9 ms, 1 RPC)** | ⚡ Merkle **nhanh gấp 38 LẦN** |
+| **4. Chèn bản ghi giả mạo (#151)** | Phát hiện *(98 ms, 152 RPC)* | **Phát hiện (4,7 ms, 1 RPC)** | 🎯 Merkle **nhanh gấp 21 LẦN** |
+| **Số lượng RPC Request cần gọi** | 152 – 721 requests | **1 request duy nhất** | 📉 **Giảm tới 721 lần tải mạng RPC** |
+| **Băng thông tải về (Bandwidth)** | 37 KB – 180 KB | **0,06 KB (32 bytes hash)** | 📉 **Tiết kiệm tới 3.000 lần băng thông** |
+
+<p align="center">
+  <img src="docs/assets/benchmark_tamper_detection.png" alt="Benchmark Tamper Detection" width="100%" />
+</p>
+
+---
+
+## 🏛️ 6. Cấu Trúc Toàn Bộ Dự Án (Monorepo)
 
 ```text
 KLTN/
@@ -180,7 +221,7 @@ KLTN/
 
 ---
 
-## 🚀 6. Hướng Dẫn Cài Đặt & Khởi Chạy Nhanh (Quick Start)
+## 🚀 7. Hướng Dẫn Cài Đặt & Khởi Chạy Nhanh (Quick Start)
 
 ### Yêu cầu môi trường:
 - Node.js $\ge 20.x$, Docker & Docker Compose, Git.
@@ -225,8 +266,9 @@ npx expo start
 
 ---
 
-## 📖 7. Danh Mục Tài Liệu Kỹ Thuật Chuyên Sâu
+## 📖 8. Danh Mục Tài Liệu Kỹ Thuật Chuyên Sâu
 
+- ⚡ **[Báo Cáo Benchmark Hiệu Năng & Khả Năng Phát Hiện Sai Sót](docs/benchmarks/README.md)**
 - 🎮 **[Tài Liệu Chi Tiết 16 Controllers Backend & Endpoints](docs/applications/hospital-api/vi/controllers.md)**
 - 🎯 **[Tài Liệu Chi Tiết 59 Use Cases Nghiệp Vụ Backend](docs/applications/hospital-api/vi/use-cases.md)**
 - 🏗️ **[Tài Liệu Cấu Trúc Hạ Tầng (Audit Engine, Blockchain, Multi-AI)](docs/applications/hospital-api/vi/infrastructure.md)**

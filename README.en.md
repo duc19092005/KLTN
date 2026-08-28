@@ -1,4 +1,4 @@
-﻿# Smart Hospital Management System with Biometric Authentication & Tamper-Evident Blockchain Audit Trail
+# Smart Hospital Management System with Biometric Authentication & Tamper-Evident Blockchain Audit Trail
 
 [![NestJS](https://img.shields.io/badge/Backend-NestJS%2010-E0234E?logo=nestjs&logoColor=white)](apps/hospital-api)
 [![React](https://img.shields.io/badge/Frontend-React%20%2B%20Vite-61DAFB?logo=react&logoColor=black)](apps/hospital-web)
@@ -98,101 +98,142 @@ graph TD
 
 ### 🔍 How to Verify a Single Record Without Trusting the Server (Merkle Proof)
 
-If Patient Bob wants to prove his record was never tampered with:
-1. The app computes Bob's leaf hash `H_B`.
-2. The server provides just two companion pieces (called **Sibling Hashes**): neighbor hash `H_A` and subtree hash `H_CD`.
-3. The app computes:
+Suppose Patient Bob wants to independently verify that his medical record was never tampered with:
+1. The client app calculates Bob's leaf hash `H_B`.
+2. The server supplies only 2 sibling hashes (`H_A` and `H_CD`).
+3. The client reconstructs the root:
    $$\text{H\_B} + \text{H\_A} \xrightarrow{\text{SHA-256}} \text{H\_AB}$$
-   $$\text{H\_AB} + \text{H\_CD} \xrightarrow{\text{SHA-256}} \text{Calculated Root}$$
-4. The calculated root is compared against the **Merkle Root anchored on the Blockchain**:
-   - If they **MATCH EXACTLY**: The record is 100% authentic and unaltered!
-   - If they **MISMATCH**: Tampering in the database is instantly caught!
+   $$\text{H\_AB} + \text{H\_CD} \xrightarrow{\text{SHA-256}} \text{Merkle Root}$$
+4. The client compares the result against the **immutable Merkle Root stored on-chain**:
+   - If **MATCH (100%)**: Guarantees the medical record is authentic down to the exact punctuation mark.
+   - If **MISMATCH**: Instantly flags unauthorized database tampering!
 
 ---
 
-### 📊 Comparative Analysis: Traditional vs. Our Solution
+### 📊 Comparison Matrix: Architectural Paradigms
 
-| Feature | Direct On-Chain Storage | Traditional Database (MySQL) | **Our Solution (Merkle + Blockchain + IPFS)** |
+| Feature | Raw On-Chain Storage | Standard Database (MySQL) | **Our Hybrid Architecture (Merkle + IPFS + Chain)** |
 |---|:---:|:---:|:---:|
-| **Tamper Resistance** | ✅ Absolute | ❌ Easily altered by DBAs | ✅ **Absolute (Via On-Chain Merkle Root)** |
-| **Patient Privacy** | ❌ Violated (Public data) | ⚠️ Depends on admins | ✅ **100% Private (Zero PII on-chain)** |
-| **Storage & Gas Costs** | ❌ Prohibitive | ✅ Cheap | ✅ **Ultra Cheap (Only 32 bytes on-chain)** |
-| **System Throughput** | ❌ Slow (Seconds per action) | ✅ Fast | ✅ **Instantaneous (Thousands of ops/sec)** |
-| **Database Self-Healing** | ❌ None | ❌ Manual backup restore | ✅ **Instant automated self-healing from IPFS** |
+| **Tamper Resistance** | ✅ Absolute | ❌ Vulnerable to DBAs/Hackers | ✅ **Absolute (Via On-Chain Merkle Root)** |
+| **Patient Privacy** | ❌ Severe Violation (Public PII) | ⚠️ Depends on Admin | ✅ **100% Zero PII On-Chain** |
+| **Gas Cost & Storage Fee** | ❌ Prohibitive ($ Millions/year) | ✅ Low | ✅ **Ultra Low (32 bytes per batch)** |
+| **Transaction Latency** | ❌ Very Slow (Seconds/action) | ✅ Instant | ✅ **Instant (Thousands of ops/sec)** |
+| **Self-Healing Recovery** | ❌ None | ❌ Manual DB Restores | ✅ **Instant Automated Recovery via IPFS** |
 
 ---
 
-## 🛠️ 4. Real-World Clinical & Auditing Workflow
+## 🛠️ 4. Clinical Workflow & Audit Lifecycle
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor P as 📱 Patient (Mobile App)
-    actor D as 👨‍⚕️ Doctor / Staff (Web Portal)
-    participant API as ⚙️ Backend Core (NestJS API)
-    participant AI as 🤖 Clinical AI (Claude / GPT / Gemini)
-    participant IPFS as 📦 Decentralized IPFS Storage
+    actor D as 👨‍⚕️ Clinician / Lab Tech (Web Portal)
+    participant API as ⚙️ Core Backend (NestJS API)
+    participant AI as 🤖 AI Diagnostic Gateway
+    participant IPFS as 📦 IPFS Decentralized Storage
     participant SC as ⛓️ Smart Contract (AuditAnchor)
 
-    Note over P,API: 1. Booking & Reception Check-in
-    P->>API: SMS OTP Login & Online Appointment Scheduling
-    API-->>P: Generate Encrypted Check-in QR Code
-    P->>D: Scan QR at Hospital Reception -> Automatically opens Visit Episode
+    Note over P,API: 1. Appointment & Reception Check-in
+    P->>API: Login via SMS OTP & Book Appointment
+    API-->>P: Generate Encrypted QR Check-in Code
+    P->>D: Scan QR at Reception -> Initialize Clinical Visit
 
-    Note over D,AI: 2. Consultation & AI Assistance
-    D->>API: Review clinical history & laboratory results
-    D->>API: Request Multi-AI diagnostic assistance
-    API->>AI: Send sanitized, anonymized clinical data
-    AI-->>D: Return diagnostic recommendations & ICD-10 suggestions
-    D->>API: Doctor signs definitive conclusion & treatment plan
+    Note over D,AI: 2. Consultation & AI Consultation
+    D->>API: Record Symptoms & Review Lab Diagnostics
+    D->>API: Request Multi-AI Differential Diagnosis
+    API->>AI: Send Anonymized Clinical Data
+    AI-->>D: Return Suggested Treatment & ICD-10 Coding
+    D->>API: Clinician Signs Medical Conclusion (with AI audit trail)
 
-    Note over API,SC: 3. Cryptographic Sealing & Blockchain Anchor
-    API->>API: AES-256-GCM encryption, V2 hashing, Merkle Tree construction
-    API->>IPFS: Bundle audit logs & upload encrypted JSON package
-    API->>SC: Anchor 32-byte Merkle Root & IPFS CID on-chain
+    Note over API,SC: 3. Cryptographic Sealing & On-Chain Anchoring
+    API->>API: Encrypt AES-256-GCM, Compute Hash Chain, Build Merkle Tree
+    API->>IPFS: Archive Encrypted Audit Batch Artifact to IPFS
+    API->>SC: Anchor 32-Byte Merkle Root & IPFS CID to Smart Contract
 
     Note over P,SC: 4. Transparent Verification & Self-Healing
-    P->>API: Check lab results & generate independent Merkle Proof
-    alt Database tampered by attacker
-        API->>SC: Cross-check against on-chain Merkle Root
-        API->>IPFS: Fetch authentic bundle -> Automatically restore database (Self-Healing)
+    P->>API: Query Lab Result & Verify Cryptographic Merkle Proof
+    alt Unauthorized Database Tampering Detected
+        API->>SC: Audit mismatch against immutable on-chain root
+        API->>IPFS: Fetch authentic batch -> Self-heal database record in 1 second
     end
 ```
 
 ---
 
-## 🏛️ 5. Monorepo Project Structure
+## ⚡ 5. Empirical Benchmarks & Performance Evaluation
+
+The hybrid architecture was benchmarked on an isolated Hardhat EVM Cancun Node over **1,000 realistic clinical audit logs** across two dimensions: (1) Gas Consumption & Scalability Latency, and (2) Adversarial Tamper Detection Capability.
+
+> 📖 **Read the in-depth technical benchmark report:** [docs/benchmarks/README.en.md](docs/benchmarks/README.en.md)
+
+### 📊 Benchmark 1: Gas Consumption & Processing Latency (1,000 Logs)
+
+| Metric | Raw On-Chain Baseline | Merkle Tree Hybrid (KLTN) | Improvement Factor |
+|---|:---:|:---:|:---:|
+| **On-Chain Transactions** | 1,000 txs | **1 tx** | 📉 **1,000x reduction (99.9%)** |
+| **Total Gas Consumed** | 236,626,908 gas | **300,883 gas** | ⚡ **99.87% Gas Savings** |
+| **Average Gas / Log** | 236,627 gas / log | **300.88 gas / log** | 💡 **786.4x More Cost-Effective** |
+| **Local Processing Time** | 2,021 ms (~2.02s) | **22 ms** (~0.022s) | ⏱️ **91.9x Faster** |
+| **Blockchain Confirmation** | 2 – 3.5 minutes *(8–10 blocks)* | **12 seconds** *(1 single block)* | 🎯 **Instant, Zero Congestion Risk** |
+
+<p align="center">
+  <img src="docs/assets/benchmark_gas_and_time_comparison.png" alt="Benchmark Gas & Time Comparison" width="100%" />
+</p>
+
+---
+
+### 🛡️ Benchmark 2: Tamper Detection & Adversarial Attack Simulation
+
+Four realistic database attack vectors were simulated: single field modification, unauthorized deletion, event reordering, and fraudulent record injection:
+
+| Attack Vector / Tamper Scenario | Raw On-Chain Baseline | Merkle Tree Hybrid (KLTN) | Architectural Advantage |
+|---|:---:|:---:|:---:|
+| **1. Single Field Tamper (#450)** | Detected *(307 ms, 451 RPC)* | **Detected (5.3 ms, 1 RPC)** | ⚡ Merkle is **57x FASTER** |
+| **2. Log Deletion (#720)** | Detected *(453 ms, 721 RPC)* | **Detected (4.9 ms, 1 RPC)** | 🎯 Merkle is **92x FASTER** |
+| **3. Reorder Attack (#300 ⇄ #301)** | Detected *(190 ms, 301 RPC)* | **Detected (4.9 ms, 1 RPC)** | ⚡ Merkle is **38x FASTER** |
+| **4. Fake Log Injection (#151)** | Detected *(98 ms, 152 RPC)* | **Detected (4.7 ms, 1 RPC)** | 🎯 Merkle is **21x FASTER** |
+| **Total RPC Requests Required** | 152 – 721 requests | **1 single request** | 📉 **Up to 721x lower RPC load** |
+| **Network Bandwidth Incurred** | 37 KB – 180 KB | **0.06 KB (32 bytes hash)** | 📉 **3,000x lower bandwidth overhead** |
+
+<p align="center">
+  <img src="docs/assets/benchmark_tamper_detection.png" alt="Benchmark Tamper Detection" width="100%" />
+</p>
+
+---
+
+## 🏛️ 6. Monorepo Project Structure
 
 ```text
 KLTN/
 ├── apps/
-│   ├── hospital-api/              # Core API Server (NestJS 10, Prisma, PostgreSQL, Multi-AI Gateway)
-│   ├── hospital-web/              # Web Clinical & Admin Portal (React, Vite, Tailwind CSS)
-│   ├── hospital-mobile/           # Mobile Patient App (Expo React Native, QR Check-in)
-│   └── audit-contracts/           # Solidity Smart Contracts (Solidity v0.8.20 + Hardhat)
+│   ├── hospital-api/              # Backend Core Server (NestJS 10, Prisma, PostgreSQL, Multi-AI Gateway)
+│   ├── hospital-web/              # Clinician & Admin Web Portal (React + Vite, TailwindCSS)
+│   ├── hospital-mobile/           # Patient Mobile App (Expo React Native, QR Check-in)
+│   └── audit-contracts/           # Blockchain Smart Contracts (Solidity v0.8.20 + Hardhat)
 │
-├── infrastructure/                # Docker Compose, Nginx Reverse Proxy, Deployment scripts
-├── docs/                          # Detailed technical and architecture documentation
-└── README.md                      # Primary project overview
+├── infrastructure/                # Docker Compose configurations, Nginx Reverse Proxy, Deployment scripts
+├── docs/                          # In-depth technical architecture and engineering documentation
+└── README.md                      # Project root documentation
 ```
 
 ---
 
-## 🚀 6. Quick Start Guide
+## 🚀 7. Quick Start Guide
 
 ### Prerequisites:
 - Node.js $\ge 20.x$, Docker & Docker Compose, Git.
 
-### Step 1: Start Local Blockchain Node & Deploy Smart Contracts
+### Step 1: Start Local Blockchain & Deploy Smart Contracts
 ```bash
 cd apps/audit-contracts
 npm install
 npm run node
-# In a separate terminal:
+# In a separate terminal window:
 npm run deploy:local
 ```
 
-### Step 2: Configure & Start Backend API
+### Step 2: Start Backend Core API
 ```bash
 cd apps/hospital-api
 npm install
@@ -201,33 +242,34 @@ npx prisma generate
 npx prisma db push
 npm run start:dev
 ```
-*API runs at:* `http://localhost:3001/api`
+*API Endpoint:* `http://localhost:3001/api`
 
-### Step 3: Start Web Clinical & Admin Portal
+### Step 3: Start Clinician & Admin Web Portal
 ```bash
 cd apps/hospital-web
 npm install
 cp .env.example .env
 npm run dev
 ```
-*Web Portal runs at:* `http://localhost:5173`
+*Web Portal URL:* `http://localhost:5173`
 
-### Step 4: Start Mobile Patient App
+### Step 4: Start Patient Mobile Application
 ```bash
 cd apps/hospital-mobile
 npm install
 cp .env.example .env
 npx expo start
 ```
-*Scan the terminal QR code with the **Expo Go** mobile app.*
+*Scan the generated QR code using the **Expo Go** mobile app on iOS/Android.*
 
 ---
 
-## 📖 7. Comprehensive Technical Documentation Links
+## 📖 8. Technical Documentation Index
 
-- 🎮 **[Backend 16 Controllers & API Endpoints Specification](docs/applications/hospital-api/en/controllers.md)**
-- 🎯 **[Backend 59 Business Use Cases Specification](docs/applications/hospital-api/en/use-cases.md)**
-- 🏗️ **[Backend Technical Infrastructure (Audit Engine, Blockchain, Multi-AI)](docs/applications/hospital-api/en/infrastructure.md)**
-- ⛓️ **[Smart Contracts Specification](apps/audit-contracts/README.en.md)**
-- 💻 **[Frontend Web Portal Specification](apps/hospital-web/README.en.md)**
-- 📱 **[Mobile Patient Portal Specification](apps/hospital-mobile/README.en.md)**
+- ⚡ **[Empirical Performance & Tamper Detection Benchmark Report](docs/benchmarks/README.en.md)**
+- 🎮 **[Backend 16 Controllers & API Endpoints Reference](docs/applications/hospital-api/en/controllers.md)**
+- 🎯 **[Backend 59 Clinical & Administrative Use Cases](docs/applications/hospital-api/en/use-cases.md)**
+- 🏗️ **[Infrastructure Architecture (Audit Engine, Blockchain, Multi-AI)](docs/applications/hospital-api/en/infrastructure.md)**
+- ⛓️ **[Smart Contracts Architecture & Deployment Guide](apps/audit-contracts/README.en.md)**
+- 💻 **[Admin & Clinician Web Portal Guide](apps/hospital-web/README.en.md)**
+- 📱 **[Patient Mobile Portal Guide](apps/hospital-mobile/README.en.md)**
