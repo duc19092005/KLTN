@@ -6,6 +6,9 @@ import { AuditArtifactService } from '../../../src/infrastructure/audit';
 import { AuditLoggerService } from '../../../src/infrastructure/audit';
 import { AuditRecoveryService } from '../../../src/infrastructure/audit';
 import { AuditRecoveryCryptoService } from '../../../src/infrastructure/audit';
+import { VerifiedAuditBundleReader } from '../../../src/infrastructure/audit';
+import { ClinicalAuditTrustService } from '../../../src/infrastructure/audit';
+import { AuditPageIntegrityService } from '../../../src/infrastructure/audit';
 import { EntityRecoveryService } from '../../../src/infrastructure/audit';
 import { EntityRecreationService } from '../../../src/infrastructure/audit';
 import { IpfsArtifactService } from '../../../src/infrastructure/audit';
@@ -53,6 +56,7 @@ import { AuditPatientIntegrityAnchor } from '../../../src/modules/patient/infras
 import { CreateVisitUseCase } from '../../../src/modules/visit/application/use-cases/create-visit.use-case';
 import { CreateVisitDto } from '../../../src/modules/visit/dto/visit.dto';
 import { PrismaVisitRepository } from '../../../src/modules/visit/infrastructure/prisma/prisma-visit.repository';
+import { BlockchainVisitIntegrityAnchor } from '../../../src/modules/visit/infrastructure/adapters/blockchain-visit-integrity.anchor';
 
 import { CreateMedicalConclusionUseCase } from '../../../src/modules/clinical-decision/application/use-cases/create-medical-conclusion.use-case';
 import { CreateMedicalConclusionDto } from '../../../src/modules/clinical-decision/dto/clinical-decision.dto';
@@ -78,17 +82,43 @@ describeIntegration('Audit tamper and recovery integration', () => {
   let rpc: JsonRpcProvider;
   let cleanChainSnapshotId: string;
 
+function createAnchorService(prisma: PrismaService, blockchain: BlockchainService, artifacts: AuditArtifactService) {
+  const alerts = new AuditTelegramAlertService();
+  const verifier = new AuditChainVerifier(prisma, blockchain, alerts);
+  const proofs = new AuditProofService(prisma, blockchain);
+  const publisher = new AuditBatchArtifactPublisher(prisma, artifacts);
+  const resumer = new AuditPendingBatchResumer(prisma, blockchain, publisher, alerts);
+  const preparer = new AuditBatchPreparer(prisma, blockchain, verifier);
+  return new AuditAnchorService(prisma, blockchain, alerts, verifier, proofs, publisher, resumer, preparer);
+}
+
+function createRecoveryService(
+  prisma: PrismaService,
+  blockchain: BlockchainService,
+  artifacts: AuditArtifactService,
+  verifiedReader: VerifiedAuditBundleReader,
+  audit: AuditLoggerService,
+  entityRecovery?: EntityRecoveryService,
+) {
+  const scanner = new AuditBatchScanner(prisma, blockchain);
+  const restorer = new AuditBatchRestorer(prisma, blockchain, artifacts, audit);
+  const watchdog = new AuditWatchdogScheduler(blockchain, scanner, restorer);
+  const deepScan = new AuditDeepScanService(blockchain, scanner, restorer, entityRecovery);
+  return new AuditRecoveryService(prisma, blockchain, verifiedReader, watchdog, deepScan, restorer);
+}
+
   beforeAll(async () => {
     prisma = new PrismaService();
     blockchain = new BlockchainService();
     ipfs = new IpfsArtifactService();
     const recoveryCrypto = new AuditRecoveryCryptoService();
     artifacts = new AuditArtifactService(recoveryCrypto, ipfs);
-    anchor = new AuditAnchorService(prisma, blockchain, artifacts);
+    anchor = createAnchorService(prisma, blockchain, artifacts);
     audit = new AuditLoggerService(prisma, anchor);
-    batchRecovery = new AuditRecoveryService(prisma, blockchain, artifacts, anchor, audit);
-    const entityRecreation = new EntityRecreationService(prisma, audit, batchRecovery);
-    entityRecovery = new EntityRecoveryService(prisma, audit, anchor, batchRecovery, entityRecreation);
+    const verifiedBundleReader = new VerifiedAuditBundleReader(blockchain, artifacts);
+    const entityRecreation = new EntityRecreationService(prisma, audit, verifiedBundleReader);
+    entityRecovery = new EntityRecoveryService(prisma, audit, anchor, verifiedBundleReader, entityRecreation);
+    batchRecovery = createRecoveryService(prisma, blockchain, artifacts, verifiedBundleReader, audit, entityRecovery);
     lifecycle = new AdministrativeLifecycleService(prisma, audit, entityRecovery);
 
     await prisma.onModuleInit();
@@ -581,7 +611,7 @@ describeIntegration('Audit tamper and recovery integration', () => {
     // The process stops after the business transaction and durable audit insert. A new service
     // instance represents the backend starting again with the same PostgreSQL state.
     anchor.onModuleDestroy();
-    const restartedDuringOutage = new AuditAnchorService(prisma, blockchain, artifacts);
+    const restartedDuringOutage = createAnchorService(prisma, blockchain, artifacts);
     restartedDuringOutage.onModuleInit();
 
     const commitSpy = jest
@@ -599,7 +629,7 @@ describeIntegration('Audit tamper and recovery integration', () => {
 
     // Network and server are available again. Startup/retry cycles resume the same batch rather
     // than creating a second artifact or checkpoint.
-    const restartedAfterRecovery = new AuditAnchorService(prisma, blockchain, artifacts);
+    const restartedAfterRecovery = createAnchorService(prisma, blockchain, artifacts);
     restartedAfterRecovery.onModuleInit();
     await restartedAfterRecovery.anchorNow();
     await restartedAfterRecovery.anchorNow();
@@ -1390,13 +1420,29 @@ describeIntegration('Audit tamper and recovery integration', () => {
     const createPatientUseCase = new CreatePatientUseCase(patientRepo, patientAnchor);
 
     const visitRepo = new PrismaVisitRepository(prisma);
+    const pageIntegrity = new AuditPageIntegrityService(prisma, blockchain);
+    const visitIntegrity = new BlockchainVisitIntegrityAnchor(prisma, audit, pageIntegrity);
     const nullNotification = { createNotification: async () => {} };
-    const createVisitUseCase = new CreateVisitUseCase(visitRepo, prisma, nullNotification as any, audit);
+    const clinicalTrust = new ClinicalAuditTrustService(prisma, anchor);
+    const createVisitUseCase = new CreateVisitUseCase(
+      visitRepo,
+      visitIntegrity,
+      prisma,
+      nullNotification as any,
+      audit,
+      clinicalTrust,
+    );
 
     const clinicalRepo = new PrismaClinicalDecisionRepository(prisma);
     const clinicalAnchor = new BlockchainMedicalConclusionIntegrityAnchor(prisma, audit, anchor);
     const clinicalPolicy = new ClinicalDecisionPolicy();
-    const createMedicalConclusionUseCase = new CreateMedicalConclusionUseCase(clinicalRepo, clinicalAnchor, clinicalPolicy, audit);
+    const createMedicalConclusionUseCase = new CreateMedicalConclusionUseCase(
+      clinicalRepo,
+      clinicalAnchor,
+      clinicalPolicy,
+      visitIntegrity,
+      clinicalTrust,
+    );
 
     const rateAiModelUseCase = new RateAiModelUseCase(prisma, audit);
     const getAiModelStatsUseCase = new GetAiModelStatsUseCase(prisma, audit, anchor);
@@ -1697,13 +1743,29 @@ describeIntegration('Audit tamper and recovery integration', () => {
     const createPatientUseCase = new CreatePatientUseCase(patientRepo, patientAnchor);
 
     const visitRepo = new PrismaVisitRepository(prisma);
+    const pageIntegrity = new AuditPageIntegrityService(prisma, blockchain);
+    const visitIntegrity = new BlockchainVisitIntegrityAnchor(prisma, audit, pageIntegrity);
     const nullNotification = { createNotification: async () => {} };
-    const createVisitUseCase = new CreateVisitUseCase(visitRepo, prisma, nullNotification as any, audit);
+    const clinicalTrust = new ClinicalAuditTrustService(prisma, anchor);
+    const createVisitUseCase = new CreateVisitUseCase(
+      visitRepo,
+      visitIntegrity,
+      prisma,
+      nullNotification as any,
+      audit,
+      clinicalTrust,
+    );
 
     const clinicalRepo = new PrismaClinicalDecisionRepository(prisma);
     const clinicalAnchor = new BlockchainMedicalConclusionIntegrityAnchor(prisma, audit, anchor);
     const clinicalPolicy = new ClinicalDecisionPolicy();
-    const createMedicalConclusionUseCase = new CreateMedicalConclusionUseCase(clinicalRepo, clinicalAnchor, clinicalPolicy, audit);
+    const createMedicalConclusionUseCase = new CreateMedicalConclusionUseCase(
+      clinicalRepo,
+      clinicalAnchor,
+      clinicalPolicy,
+      visitIntegrity,
+      clinicalTrust,
+    );
 
     const rateAiModelUseCase = new RateAiModelUseCase(prisma, audit);
 
