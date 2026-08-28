@@ -1,4 +1,4 @@
-# Hệ Thống Quản Lý Bệnh Viện Thông Minh Tích Hợp Bảo Mật Sinh Trắc Học & Chuỗi Nhật Ký Kiểm Toán Chống Can Thiệp
+# Hệ Thống Lưu Trữ Kết Quả Chẩn Đoán AI Có Khả Năng Kiểm Chứng Bằng Blockchain
 
 [![NestJS](https://img.shields.io/badge/Backend-NestJS%2010-E0234E?logo=nestjs&logoColor=white)](apps/hospital-api)
 [![React](https://img.shields.io/badge/Frontend-React%20%2B%20Vite-61DAFB?logo=react&logoColor=black)](apps/hospital-web)
@@ -9,42 +9,45 @@
 
 > 🌐 **Ngôn ngữ / Language:** **[Tiếng Việt](README.md)** | **[English](README.en.md)**
 
+> 📌 **Ghi chú về phạm vi đề tài:**
+> Trọng tâm nghiên cứu cốt lõi của đề tài là **lưu trữ và kiểm chứng tính toàn vẹn của các kết quả chẩn đoán y tế có sự tham vấn AI bằng công nghệ Blockchain**. Do luồng dữ liệu AI đơn lẻ có phạm vi hẹp, dự án đã mở rộng mô hình hóa thành một **hệ thống quản lý thông tin bệnh viện tinh gọn** (gồm đặt khám, tiếp đón QR, chỉ định xét nghiệm, kết luận lâm sàng) nhằm tạo môi trường dữ liệu đầu vào thực tế cho chu trình kiểm toán. Hệ thống đóng vai trò như một môi trường mô phỏng thực nghiệm phục vụ đề tài, không nhằm mục đích thay thế toàn bộ quy trình vận hành phức tạp của một bệnh viện thực tế.
+
 ---
 
-## 🏥 1. Dự Án Này Để Làm Gì & Giải Quyết Vấn Đề Gì?
+## 🏥 1. Mục Tiêu Đề Tài & Bài Toán Giải Quyết
 
-### ❓ Bài toán thực tế trong quản lý hồ sơ y tế:
-Trong các hệ thống quản lý bệnh viện truyền thống:
-- Hồ sơ bệnh án, kết quả xét nghiệm và đơn thuốc được lưu trữ tập trung tại cơ sở dữ liệu (như PostgreSQL, MySQL).
-- **Vấn đề tồn tại:** Cơ sở dữ liệu tập trung có nguy cơ bị can thiệp trực tiếp bởi quản trị viên, người dùng nội bộ có quyền truy cập cao, hoặc kẻ tấn công xâm nhập máy chủ. Các thao tác chỉnh sửa hoặc xóa dữ liệu trực tiếp trong CSDL có thể làm thay đổi lịch sử khám chữa bệnh mà không để lại bằng chứng toán học độc lập.
-- Khi cần đối soát hoặc giải quyết tranh chấp pháp lý, các bên liên quan khó có thể xác minh độc lập tính nguyên bản của dữ liệu nếu chỉ dựa vào hệ thống lưu trữ nội bộ của bệnh viện.
+### ❓ Bài toán thực tế:
+Khi áp dụng Trí tuệ nhân tạo (AI) vào hỗ trợ chẩn đoán y khoa:
+- Các mô hình AI (như Claude, GPT, Gemini) đưa ra các gợi ý chẩn đoán và phác đồ điều trị. Bác sĩ là người xem xét, chỉnh sửa hoặc phê duyệt kết quả cuối cùng.
+- **Vấn đề tồn tại:** Nếu kết quả chẩn đoán và quá trình tham vấn AI chỉ được lưu trữ trong cơ sở dữ liệu nội bộ thông thường, dữ liệu có thể bị chỉnh sửa hoặc xóa bỏ mà không để lại bằng chứng toán học độc lập. Khi xảy ra sự cố y khoa hoặc tranh chấp chuyên môn, rất khó xác minh lại bác sĩ đã nhận gợi ý gì từ AI và đã chỉnh sửa những gì tại thời điểm đưa ra kết luận.
+- **Yêu cầu đặt ra:** Cần một cơ chế lưu trữ có khả năng **chống chối bỏ, kiểm chứng được tính nguyên bản** của cả kết quả chẩn đoán lẫn lịch sử tham vấn AI, đồng thời đảm bảo bảo mật thông tin riêng tư của người bệnh.
 
-### 💡 Mục tiêu của dự án:
-Dự án xây dựng **Hệ Thống Quản Lý Bệnh Viện (HIS)** kết hợp **Blockchain**, **IPFS** và **Cây Merkle (Merkle Tree)** nhằm:
-1. **Đảm bảo tính toàn vẹn của nhật ký kiểm toán:** Mọi thao tác chuyên môn (khám bệnh, chỉ định xét nghiệm, kê đơn, kết luận bệnh án) đều được tạo mã băm mật mã học và neo mốc kiểm toán lên Blockchain.
-2. **Phát hiện sai lệch & hỗ trợ phục hồi dữ liệu (Self-Healing):** Nếu dữ liệu trong cơ sở dữ liệu bị chỉnh sửa không khớp với mốc đã neo, hệ thống sẽ phát hiện vị trí sai lệch và hỗ trợ phục hồi lại bản ghi gốc từ kho lưu trữ IPFS.
-3. **Tích hợp Trợ lý AI hỗ trợ lâm sàng:** Cung cấp gợi ý chẩn đoán dựa trên triệu chứng và kết quả xét nghiệm, đồng thời ghi vết kiểm toán minh bạch toàn bộ quyết định phê duyệt của bác sĩ.
+### 💡 Giải pháp của đề tài:
+Dự án xây dựng một giải pháp kết hợp **Blockchain**, **IPFS** và **Cây Merkle (Merkle Tree)** để:
+1. **Lưu trữ kiểm chứng kết quả chẩn đoán & AI:** Toàn bộ dữ liệu lâm sàng, kết quả gợi ý của AI và quyết định ký duyệt của bác sĩ được tạo chuỗi băm mật mã học (Hash Chain) và neo mốc (Checkpoint) lên Blockchain.
+2. **Kiểm tra tính toàn vẹn độc lập (Merkle Proof):** Bất kỳ bên thứ ba nào (bệnh nhân, hội đồng chuyên môn, cơ quan bảo hiểm) đều có thể đối soát dữ liệu với mốc trên chuỗi khối mà không cần truy cập trực tiếp vào CSDL nội bộ.
+3. **Phát hiện sai lệch & phục hồi dữ liệu (Self-Healing):** Nếu dữ liệu trong cơ sở dữ liệu bị chỉnh sửa ngoài ý muốn, hệ thống phát hiện vị trí sai lệch và hỗ trợ phục hồi lại từ kho lưu trữ IPFS.
 
 ---
 
 ## ⚠️ 2. Hạn Chế Khi Lưu Trữ Trực Tiếp Dữ Liệu Y Tế Lên Blockchain
 
-Việc lưu trữ toàn bộ hồ sơ y tế trực tiếp lên chuỗi khối (On-Chain) gặp phải các rào cản kỹ thuật:
+Việc lưu trữ toàn bộ hồ sơ chẩn đoán trực tiếp lên chuỗi khối (On-Chain) gặp các hạn chế kỹ thuật:
 
 | Hạn chế của Blockchain | Phân tích kỹ thuật |
 |---|---|
-| 💸 **Chi phí lưu trữ (Gas fee)** | Chi phí lưu trữ dữ liệu trạng thái trên Blockchain tỉ lệ thuận với dung lượng. Các tệp dữ liệu y tế như ảnh X-quang, MRI, kết quả xét nghiệm chi tiết có dung lượng lớn, dẫn đến chi phí duy trì cao nếu ghi trực tiếp. |
-| 🔓 **Quy định quyền riêng tư (Privacy & PII)** | Dữ liệu trên Blockchain có tính chất công khai và không thể xóa bỏ. Lưu trữ trực tiếp thông tin định danh cá nhân (PII) và lịch sử bệnh lý của bệnh nhân vi phạm các quy định bảo vệ dữ liệu y tế (HIPAA, GDPR). |
-| ⏳ **Băng thông và độ trễ giao dịch** | Tốc độ xử lý khối và giới hạn gas mỗi khối của Blockchain không phù hợp với tần suất giao dịch cao trong quy trình khám chữa bệnh hàng ngày. |
+| 💸 **Chi phí lưu trữ (Gas fee)** | Chi phí lưu trữ dữ liệu trạng thái trên Blockchain tăng theo dung lượng. Các tệp dữ liệu y tế, ảnh xét nghiệm và nội dung prompt AI chi tiết có dung lượng lớn, tạo chi phí gas cao nếu lưu trữ trực tiếp. |
+| 🔓 **Quy định quyền riêng tư (Privacy & PII)** | Dữ liệu trên Blockchain có tính công khai và không thể xóa bỏ. Lưu trữ trực tiếp thông tin định danh cá nhân (PII) của bệnh nhân sẽ vi phạm các quy định bảo vệ dữ liệu y tế (HIPAA, GDPR). |
+| ⏳ **Băng thông và độ trễ giao dịch** | Tốc độ xử lý khối của Blockchain không phù hợp để ghi nhận từng lượt thao tác nghiệp vụ tức thời. |
 
 ---
 
 ## 💡 3. Giải Pháp Áp Dụng: Cây Merkle (Merkle Tree) & Mô Hình Lai (Hybrid Architecture)
 
-Để cân bằng giữa chi phí, quyền riêng tư và tính toàn vẹn dữ liệu, hệ thống triển khai **Mô hình kiến trúc lai (Hybrid On-chain / Off-chain)** sử dụng **Cây Merkle (Merkle Tree)**.
+Để giải quyết các hạn chế trên, hệ thống sử dụng **Mô hình kiến trúc lai (Hybrid On-chain / Off-chain)** kết hợp **Cây Merkle**.
 
 ### 🌳 Nguyên lý hoạt động:
-1. Dữ liệu chi tiết của từng sự kiện kiểm toán được lưu tại cơ sở dữ liệu nội bộ và đóng gói mã hóa lên mạng lưu trữ IPFS.
+1. Dữ liệu chi tiết của từng ca chẩn đoán (kèm log AI) được lưu trữ tại cơ sở dữ liệu nội bộ và đóng gói mã hóa lên IPFS.
 2. Mỗi bản ghi được băm thành một mã băm lá (Leaf Hash) 32 bytes theo chuỗi tuần tự (Hash Chain).
 3. Các mã băm lá được ghép cặp và băm phân cấp thành Cây Merkle để tạo ra một **Merkle Root (32 bytes)** đại diện cho toàn bộ lô dữ liệu.
 4. Hệ thống chỉ gửi duy nhất **mã Merkle Root 32 bytes** lên Smart Contract trên Blockchain để làm mốc đối soát.
@@ -77,11 +80,11 @@ graph TD
         H_CD --- H_D
     end
 
-    subgraph D["🏥 Dữ Liệu Y Tế (Lưu tại CSDL Bệnh Viện & IPFS)"]
-        DocA["📄 Sự kiện 1: Khám bệnh (BN A)"] --> H_A
-        DocB["📄 Sự kiện 2: Chỉ định xét nghiệm (BN B)"] --> H_B
-        DocC["📄 Sự kiện 3: Kết quả xét nghiệm (BN C)"] --> H_C
-        DocD["📄 Sự kiện 4: Ký kết luận bệnh án (BN D)"] --> H_D
+    subgraph D["🏥 Dữ Liệu Y Tế & Chẩn Đoán AI (Lưu tại CSDL & IPFS)"]
+        DocA["📄 Ca 1: Chẩn đoán AI + Bác sĩ duyệt (BN A)"] --> H_A
+        DocB["📄 Ca 2: Chỉ định xét nghiệm (BN B)"] --> H_B
+        DocC["📄 Ca 3: Kết quả xét nghiệm (BN C)"] --> H_C
+        DocD["📄 Ca 4: Kết luận bệnh án (BN D)"] --> H_D
     end
 
     classDef rootStyle fill:#22c55e,stroke:#15803d,stroke-width:2px,color:#ffffff,font-weight:bold;
@@ -97,15 +100,15 @@ graph TD
 
 ### 🔍 Quy trình xác thực tính toàn vẹn (Merkle Proof)
 
-Khi cần xác minh một bản ghi bất kỳ (ví dụ: Bản ghi B):
+Khi cần xác minh một bản ghi chẩn đoán bất kỳ (ví dụ: Bản ghi B):
 1. Hệ thống tính mã băm của bản ghi: $H_B$.
 2. Sử dụng đường dẫn chứng thực Merkle Proof gồm các mã băm liền kề ($H_A$ và $H_{CD}$).
 3. Tính toán lại mã gốc:
    $$H_B + H_A \xrightarrow{\text{SHA-256}} H_{AB}$$
    $$H_{AB} + H_{CD} \xrightarrow{\text{SHA-256}} \text{Merkle Root}$$
 4. So khớp kết quả với **Merkle Root đã lưu trên Blockchain**:
-   - Nếu **Trùng khớp**: Dữ liệu đảm bảo tính toàn vẹn, không bị sửa đổi.
-   - Nếu **Sai lệch**: Bản ghi đã bị can thiệp trái phép so với thời điểm neo mốc.
+   - Nếu **Trùng khớp**: Dữ liệu chẩn đoán và quyết định của bác sĩ được xác thực nguyên bản, không bị can thiệp.
+   - Nếu **Sai lệch**: Bản ghi đã bị chỉnh sửa so với thời điểm neo mốc.
 
 ---
 
@@ -121,7 +124,7 @@ Khi cần xác minh một bản ghi bất kỳ (ví dụ: Bản ghi B):
 
 ---
 
-## 🛠️ 4. Quy Trình Nghiệp Vụ & Chu Ký Kiểm Toán
+## 🛠️ 4. Quy Trình Nghiệp Vụ & Chu Kỳ Kiểm Toán
 
 ```mermaid
 sequenceDiagram
@@ -129,7 +132,7 @@ sequenceDiagram
     actor P as 📱 Bệnh nhân (Mobile App)
     actor D as 👨‍⚕️ Bác sĩ / Kỹ thuật viên (Web Portal)
     participant API as ⚙️ Backend Core (NestJS API)
-    participant AI as 🤖 Trợ lý AI
+    participant AI as 🤖 Trợ lý AI Chẩn đoán
     participant IPFS as 📦 Mạng Lưu Trữ IPFS
     participant SC as ⛓️ Smart Contract (AuditAnchor)
 
@@ -138,12 +141,12 @@ sequenceDiagram
     API-->>P: Cấp mã QR Check-in
     P->>D: Quét mã QR tại quầy tiếp đón -> Mở Ca khám (Visit)
 
-    Note over D,AI: 2. Khám bệnh & Hỗ trợ lâm sàng
+    Note over D,AI: 2. Khám bệnh & Tham vấn AI
     D->>API: Nhập triệu chứng & Xem kết quả xét nghiệm
-    D->>API: Gửi yêu cầu phân tích chẩn đoán
-    API->>AI: Gửi dữ liệu đã ẩn danh định danh
+    D->>API: Gửi yêu cầu phân tích chẩn đoán tới AI
+    API->>AI: Gửi dữ liệu lâm sàng đã ẩn danh định danh
     AI-->>D: Trả về đề xuất phác đồ & mã ICD-10
-    D->>API: Bác sĩ ký kết luận bệnh án (Kèm lịch sử tham vấn AI)
+    D->>API: Bác sĩ ký kết luận bệnh án (Ghi nhận quyết định phê duyệt AI)
 
     Note over API,SC: 3. Đóng gói kiểm toán & Neo mốc
     API->>API: Mã hóa AES-256-GCM, tính Hash Chain, dựng Cây Merkle
