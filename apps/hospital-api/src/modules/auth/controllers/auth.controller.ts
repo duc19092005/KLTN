@@ -1,12 +1,11 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, Res, UseGuards } from '@nestjs/common';
+﻿import { Body, Controller, Get, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
+import { ApiTags } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
 import { AuthRateLimiterService } from '../services/auth-rate-limiter.service';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import { Roles } from '../../../common/decorators/roles.decorator';
 import { AuthUser } from '../../../common/types/auth-user.type';
-import { RolesGuard } from '../guards/roles.guard';
 import {
   BootstrapAdminDto,
   FaceDescriptorDto,
@@ -18,18 +17,13 @@ import {
   StaffLoginDto,
   ChangePasswordDto,
   StepUpFaceDto,
-  ForgotPasswordChallengeDto,
-  ForgotPasswordVerifyFaceDto,
-  ForgotPasswordResetDto,
-  AdminWalletRecoveryVerifyFaceDto,
-  AdminWalletRecoveryChallengeDto,
-  AdminWalletRecoveryConfirmDto,
-  AdminFaceRecoveryRestoreDto,
   FaceLoginChallengeDto,
   FaceLoginDto,
 } from '../dto/auth.dto';
-import { getAuthCookieOptions, getClearAuthCookieOptions } from '../constants/auth-security';
+import { getClearAuthCookieOptions } from '../constants/auth-security';
+import { clientIp, rateLimitKey, setAuthCookie, stripToken } from './auth-controller.helper';
 
+@ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -54,14 +48,14 @@ export class AuthController {
     @Req() req,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const key = this.rateLimitKey(req, 'invite', body.inviteToken.slice(0, 16));
+    const key = rateLimitKey(req, 'invite', body.inviteToken.slice(0, 16));
     this.rateLimiter.assertAllowed(key);
 
     try {
       const result = await this.authService.loginWithInviteToken(body.inviteToken);
       this.rateLimiter.reset(key);
-      this.setAuthCookie(res, result.access_token);
-      return this.stripToken(result);
+      setAuthCookie(res, result.access_token);
+      return stripToken(result);
     } catch (error) {
       this.rateLimiter.recordFailure(key);
       throw error;
@@ -74,13 +68,13 @@ export class AuthController {
     @Req() req,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const key = this.rateLimitKey(req, 'staff-login', body.username.toLowerCase());
+    const key = rateLimitKey(req, 'staff-login', body.username.toLowerCase());
     this.rateLimiter.assertAllowed(key);
     try {
       const result = await this.authService.loginWithPassword(body.username, body.password);
       this.rateLimiter.reset(key);
-      this.setAuthCookie(res, result.access_token);
-      return this.stripToken(result);
+      setAuthCookie(res, result.access_token);
+      return stripToken(result);
     } catch (error) {
       this.rateLimiter.recordFailure(key);
       throw error;
@@ -95,15 +89,10 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.changePassword(user.sub, body.currentPassword, body.newPassword);
-    // Activation path: the use case mints a verified access_token + step-up session
-    // because the user just enrolled their face moments ago. Persist the new JWT as
-    // an HttpOnly cookie so subsequent requests (auth/me, ProtectedRoute, etc.) see
-    // verified=true and firstLogin=false. Without this, the stale cookie keeps
-    // bouncing the user back to /change-password.
     if ('access_token' in result && result.access_token) {
-      this.setAuthCookie(res, result.access_token);
+      setAuthCookie(res, result.access_token);
     }
-    return this.stripToken(result as any);
+    return stripToken(result as any);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -131,8 +120,8 @@ export class AuthController {
       body.signature,
       body.message,
     );
-    this.setAuthCookie(res, result.access_token);
-    return this.stripToken(result);
+    setAuthCookie(res, result.access_token);
+    return stripToken(result);
   }
 
   @Get('wallet-challenge/:address')
@@ -146,7 +135,7 @@ export class AuthController {
     @Req() req,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const key = this.rateLimitKey(req, 'wallet', body.walletAddress.toLowerCase());
+    const key = rateLimitKey(req, 'wallet', body.walletAddress.toLowerCase());
     this.rateLimiter.assertAllowed(key);
 
     try {
@@ -156,8 +145,8 @@ export class AuthController {
         body.message,
       );
       this.rateLimiter.reset(key);
-      this.setAuthCookie(res, result.access_token);
-      return this.stripToken(result);
+      setAuthCookie(res, result.access_token);
+      return stripToken(result);
     } catch (error) {
       this.rateLimiter.recordFailure(key);
       throw error;
@@ -178,7 +167,7 @@ export class AuthController {
     @Req() request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const key = this.rateLimitKey(request, 'face', user.sub);
+    const key = rateLimitKey(request, 'face', user.sub);
     this.rateLimiter.assertAllowed(key, 5, 10 * 60 * 1000);
 
     try {
@@ -187,11 +176,11 @@ export class AuthController {
         body.embedding as number[],
         body.challenge,
         user.walletAddress,
-        this.clientIp(request),
+        clientIp(request),
       );
       this.rateLimiter.reset(key);
-      this.setAuthCookie(res, result.access_token);
-      return this.stripToken(result);
+      setAuthCookie(res, result.access_token);
+      return stripToken(result);
     } catch (error) {
       this.rateLimiter.recordFailure(key, 10 * 60 * 1000);
       throw error;
@@ -201,8 +190,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('face-stepup')
   async faceStepUp(@CurrentUser() user: AuthUser, @Body() body: StepUpFaceDto, @Req() request) {
-    // Reuse the biometric rate limiter, keyed per user + action, to throttle scan abuse.
-    const key = this.rateLimitKey(request, 'face-stepup', `${user.sub}:${body.action}`);
+    const key = rateLimitKey(request, 'face-stepup', `${user.sub}:${body.action}`);
     this.rateLimiter.assertAllowed(key, 5, 10 * 60 * 1000);
 
     try {
@@ -212,7 +200,7 @@ export class AuthController {
         body.challenge,
         body.action,
         body.resourceId ?? null,
-        this.clientIp(request),
+        clientIp(request),
       );
       this.rateLimiter.reset(key);
       return ticket;
@@ -226,8 +214,8 @@ export class AuthController {
   @Post('generate-secret')
   async generateMfaSecret(@CurrentUser() user: AuthUser, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.generateMfaSecret(user.sub);
-    this.setAuthCookie(res, result.access_token);
-    return this.stripToken(result);
+    setAuthCookie(res, result.access_token);
+    return stripToken(result);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -250,193 +238,9 @@ export class AuthController {
     return { success: true };
   }
 
-  private setAuthCookie(res: Response, token?: string) {
-    if (!token) return;
-    res.cookie('token', token, getAuthCookieOptions());
-  }
-
-  private stripToken<T extends { access_token?: string }>(result: T): Omit<T, 'access_token'> {
-    const { access_token, ...publicResult } = result;
-    return publicResult;
-  }
-
-  private rateLimitKey(req: any, action: string, subject: string) {
-    const ip = this.clientIp(req);
-    return `${action}:${ip}:${subject}`;
-  }
-
-  @Post('forgot-password/challenge')
-  async forgotPasswordChallenge(@Body() body: ForgotPasswordChallengeDto, @Req() req) {
-    const key = this.rateLimitKey(req, 'forgot-challenge', body.username.toLowerCase());
-    this.rateLimiter.assertAllowed(key, 5, 5 * 60 * 1000);
-    try {
-      const result = await this.authService.forgotPasswordChallenge(body.username);
-      this.rateLimiter.reset(key);
-      return result;
-    } catch (error) {
-      this.rateLimiter.recordFailure(key, 5 * 60 * 1000);
-      throw error;
-    }
-  }
-
-  @Post('forgot-password/verify-face')
-  async forgotPasswordVerifyFace(@Body() body: ForgotPasswordVerifyFaceDto, @Req() req) {
-    const key = this.rateLimitKey(req, 'forgot-verify', body.userId);
-    this.rateLimiter.assertAllowed(key, 5, 5 * 60 * 1000);
-    try {
-      const result = await this.authService.forgotPasswordVerifyFace(
-        body.userId,
-        body.embedding,
-        body.challenge,
-        this.clientIp(req),
-      );
-      this.rateLimiter.reset(key);
-      return result;
-    } catch (error) {
-      this.rateLimiter.recordFailure(key, 5 * 60 * 1000);
-      throw error;
-    }
-  }
-
-  @Post('forgot-password/reset')
-  async forgotPasswordReset(@Body() body: ForgotPasswordResetDto, @Req() req) {
-    const key = this.rateLimitKey(req, 'forgot-reset', 'global');
-    this.rateLimiter.assertAllowed(key, 10, 5 * 60 * 1000);
-    try {
-      const result = await this.authService.forgotPasswordReset(
-        body.resetToken,
-        body.newPassword,
-        this.clientIp(req),
-      );
-      this.rateLimiter.reset(key);
-      return result;
-    } catch (error) {
-      this.rateLimiter.recordFailure(key, 5 * 60 * 1000);
-      throw error;
-    }
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
-  @Post('admin-face-recovery/challenge')
-  async adminFaceRecoveryChallenge(@CurrentUser() user: AuthUser, @Req() req) {
-    const key = this.rateLimitKey(req, 'admin-face-recovery-challenge', user.sub);
-    this.rateLimiter.assertAllowed(key, 3, 10 * 60 * 1000);
-    try {
-      const result = await this.authService.adminFaceRecoveryChallenge(user.sub, user.walletAddress);
-      this.rateLimiter.recordAttempt(key, 10 * 60 * 1000);
-      return result;
-    } catch (error) {
-      this.rateLimiter.recordFailure(key, 10 * 60 * 1000);
-      throw error;
-    }
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
-  @Post('admin-face-recovery/restore')
-  async adminFaceRecoveryRestore(
-    @CurrentUser() user: AuthUser,
-    @Body() body: AdminFaceRecoveryRestoreDto,
-    @Req() req,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const key = this.rateLimitKey(req, 'admin-face-recovery-restore', user.sub);
-    this.rateLimiter.assertAllowed(key, 5, 15 * 60 * 1000);
-    try {
-      const result = await this.authService.adminFaceRecoveryRestore(
-        user.sub,
-        body.embedding,
-        body.challenge,
-        user.walletAddress,
-        this.clientIp(req),
-      );
-      this.rateLimiter.reset(key);
-      this.setAuthCookie(res, result.access_token);
-      return this.stripToken(result);
-    } catch (error) {
-      this.rateLimiter.recordFailure(key, 15 * 60 * 1000);
-      throw error;
-    }
-  }
-
-  @Post('admin-account-recovery/challenge')
-  async adminWalletRecoveryChallenge(@Req() req) {
-    const key = this.rateLimitKey(req, 'admin-recovery-challenge', 'single-admin');
-    this.rateLimiter.assertAllowed(key, 3, 10 * 60 * 1000);
-    try {
-      const result = await this.authService.adminWalletRecoveryChallenge();
-      this.rateLimiter.recordAttempt(key, 10 * 60 * 1000);
-      return result;
-    } catch (error) {
-      this.rateLimiter.recordFailure(key, 10 * 60 * 1000);
-      throw error;
-    }
-  }
-
-  @Post('admin-account-recovery/verify-face')
-  async adminWalletRecoveryVerifyFace(@Body() body: AdminWalletRecoveryVerifyFaceDto, @Req() req) {
-    const key = this.rateLimitKey(req, 'admin-recovery-face', 'single-admin');
-    this.rateLimiter.assertAllowed(key, 5, 15 * 60 * 1000);
-    try {
-      const result = await this.authService.adminWalletRecoveryVerifyFace(
-        body.embedding,
-        body.challenge,
-        this.clientIp(req),
-      );
-      this.rateLimiter.reset(key);
-      return result;
-    } catch (error) {
-      this.rateLimiter.recordFailure(key, 15 * 60 * 1000);
-      throw error;
-    }
-  }
-
-  @Post('admin-account-recovery/wallet-challenge')
-  async adminWalletRecoveryWalletChallenge(@Body() body: AdminWalletRecoveryChallengeDto, @Req() req) {
-    const key = this.rateLimitKey(req, 'admin-recovery-wallet', body.address.toLowerCase());
-    this.rateLimiter.assertAllowed(key, 5, 10 * 60 * 1000);
-    try {
-      const result = await this.authService.adminWalletRecoveryWalletChallenge(
-        body.recoveryToken,
-        body.address,
-      );
-      this.rateLimiter.reset(key);
-      return result;
-    } catch (error) {
-      this.rateLimiter.recordFailure(key, 10 * 60 * 1000);
-      throw error;
-    }
-  }
-
-  @Post('admin-account-recovery/confirm-wallet')
-  async adminWalletRecoveryConfirm(
-    @Body() body: AdminWalletRecoveryConfirmDto,
-    @Req() req,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const key = this.rateLimitKey(req, 'admin-recovery-confirm', body.address.toLowerCase());
-    this.rateLimiter.assertAllowed(key, 5, 10 * 60 * 1000);
-    try {
-      const result = await this.authService.adminWalletRecoveryConfirm(
-        body.recoveryToken,
-        body.address,
-        body.signature,
-        body.message,
-        this.clientIp(req),
-      );
-      this.rateLimiter.reset(key);
-      res.clearCookie('token', getClearAuthCookieOptions());
-      return result;
-    } catch (error) {
-      this.rateLimiter.recordFailure(key, 10 * 60 * 1000);
-      throw error;
-    }
-  }
-
   @Post('face-login/challenge')
   async faceLoginChallenge(@Body() body: FaceLoginChallengeDto, @Req() req) {
-    const key = this.rateLimitKey(req, 'face-login-challenge', body.username.toLowerCase());
+    const key = rateLimitKey(req, 'face-login-challenge', body.username.toLowerCase());
     this.rateLimiter.assertAllowed(key, 5, 5 * 60 * 1000);
     try {
       const result = await this.authService.faceLoginChallenge(body.username);
@@ -454,26 +258,21 @@ export class AuthController {
     @Req() req,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const key = this.rateLimitKey(req, 'face-login-verify', body.userId);
+    const key = rateLimitKey(req, 'face-login-verify', body.userId);
     this.rateLimiter.assertAllowed(key, 5, 5 * 60 * 1000);
     try {
       const result = await this.authService.faceLogin(
         body.userId,
         body.embedding,
         body.challenge,
-        this.clientIp(req),
+        clientIp(req),
       );
       this.rateLimiter.reset(key);
-      this.setAuthCookie(res, result.access_token);
-      return this.stripToken(result);
+      setAuthCookie(res, result.access_token);
+      return stripToken(result);
     } catch (error) {
       this.rateLimiter.recordFailure(key, 5 * 60 * 1000);
       throw error;
     }
-  }
-
-  private clientIp(req: any): string {
-    const forwarded = String(req.headers?.['x-forwarded-for'] || '').split(',')[0].trim();
-    return forwarded || req.ip || req.socket?.remoteAddress || 'unknown';
   }
 }

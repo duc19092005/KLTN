@@ -1,182 +1,277 @@
-# Hệ Thống Quản Lý Bệnh Viện KLTN (Hospital Management System)
+# Hệ Thống Lưu Trữ Kết Quả Chẩn Đoán AI Có Khả Năng Kiểm Chứng Bằng Blockchain
 
-Hệ thống quản lý bệnh viện full-stack xây dựng trên NestJS, React, PostgreSQL, hỗ trợ chẩn đoán hình ảnh và tư vấn Y tế bằng AI, xác thực sinh trắc học khuôn mặt và chuỗi bằng chứng kiểm toán (Audit Trail) bảo mật trên Blockchain.
+[![NestJS](https://img.shields.io/badge/Backend-NestJS%2010-E0234E?logo=nestjs&logoColor=white)](apps/hospital-api)
+[![React](https://img.shields.io/badge/Frontend-React%20%2B%20Vite-61DAFB?logo=react&logoColor=black)](apps/hospital-web)
+[![React Native](https://img.shields.io/badge/Mobile-Expo%20React%20Native-000020?logo=expo&logoColor=white)](apps/hospital-mobile)
+[![Solidity](https://img.shields.io/badge/Blockchain-Solidity%20%2B%20Hardhat-363636?logo=solidity&logoColor=white)](apps/audit-contracts)
+[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%20%2B%20Prisma-4169E1?logo=postgresql&logoColor=white)](apps/hospital-api)
+[![Tests](https://img.shields.io/badge/Unit%20Tests-308%20Passed%20(100%25)-brightgreen)](apps/hospital-api)
 
-> [!IMPORTANT]
-> Blockchain trong dự án này chỉ dùng để neo hash / Merkle root phục vụ kiểm chứng tính toàn vẹn dữ liệu. Tuyệt đối không đưa thông tin định danh bệnh nhân (PII), nội dung bệnh án, file PDF, X-Ray, ảnh y tế, S3 object key hay file tĩnh lên Blockchain.
+> 🌐 **Ngôn ngữ / Language:** **[Tiếng Việt](README.md)** | **[English](README.en.md)**
+
+> 📌 **Ghi chú về phạm vi đề tài:**
+> Trọng tâm nghiên cứu cốt lõi của đề tài là **lưu trữ và kiểm chứng tính toàn vẹn của các kết quả chẩn đoán y tế có sự tham vấn AI bằng công nghệ Blockchain**. Do luồng dữ liệu AI đơn lẻ có phạm vi hẹp, dự án đã mở rộng mô hình hóa thành một **hệ thống quản lý thông tin bệnh viện tinh gọn** (gồm đặt khám, tiếp đón QR, chỉ định xét nghiệm, kết luận lâm sàng) nhằm tạo môi trường dữ liệu đầu vào thực tế cho chu trình kiểm toán. Hệ thống đóng vai trò như một môi trường mô phỏng thực nghiệm phục vụ đề tài, không nhằm mục đích thay thế toàn bộ quy trình vận hành phức tạp của một bệnh viện thực tế.
 
 ---
 
-## Cấu Trúc Monorepo
+## 🏥 1. Mục Tiêu Đề Tài & Bài Toán Giải Quyết
+
+### ❓ Bài toán thực tế:
+Khi áp dụng Trí tuệ nhân tạo (AI) vào hỗ trợ chẩn đoán y khoa:
+- Các mô hình AI (như Claude, GPT, Gemini) đưa ra các gợi ý chẩn đoán và phác đồ điều trị. Bác sĩ là người xem xét, chỉnh sửa hoặc phê duyệt kết quả cuối cùng.
+- **Vấn đề tồn tại:** Nếu kết quả chẩn đoán và quá trình tham vấn AI chỉ được lưu trữ trong cơ sở dữ liệu nội bộ thông thường, dữ liệu có thể bị chỉnh sửa hoặc xóa bỏ mà không để lại bằng chứng toán học độc lập. Khi xảy ra sự cố y khoa hoặc tranh chấp chuyên môn, rất khó xác minh lại bác sĩ đã nhận gợi ý gì từ AI và đã chỉnh sửa những gì tại thời điểm đưa ra kết luận.
+- **Yêu cầu đặt ra:** Cần một cơ chế lưu trữ có khả năng **chống chối bỏ, kiểm chứng được tính nguyên bản** của cả kết quả chẩn đoán lẫn lịch sử tham vấn AI, đồng thời đảm bảo bảo mật thông tin riêng tư của người bệnh.
+
+### 💡 Giải pháp của đề tài:
+Dự án xây dựng một giải pháp kết hợp **Blockchain**, **IPFS** và **Cây Merkle (Merkle Tree)** để:
+1. **Lưu trữ kiểm chứng kết quả chẩn đoán & AI:** Toàn bộ dữ liệu lâm sàng, kết quả gợi ý của AI và quyết định ký duyệt của bác sĩ được tạo chuỗi băm mật mã học (Hash Chain) và neo mốc (Checkpoint) lên Blockchain.
+2. **Kiểm tra tính toàn vẹn độc lập (Merkle Proof):** Bất kỳ bên thứ ba nào (bệnh nhân, hội đồng chuyên môn, cơ quan bảo hiểm) đều có thể đối soát dữ liệu với mốc trên chuỗi khối mà không cần truy cập trực tiếp vào CSDL nội bộ.
+3. **Phát hiện sai lệch & phục hồi dữ liệu (Self-Healing):** Nếu dữ liệu trong cơ sở dữ liệu bị chỉnh sửa ngoài ý muốn, hệ thống phát hiện vị trí sai lệch và hỗ trợ phục hồi lại từ kho lưu trữ IPFS.
+
+---
+
+## ⚠️ 2. Hạn Chế Khi Lưu Trữ Trực Tiếp Dữ Liệu Y Tế Lên Blockchain
+
+Việc lưu trữ toàn bộ hồ sơ chẩn đoán trực tiếp lên chuỗi khối (On-Chain) gặp các hạn chế kỹ thuật:
+
+| Hạn chế của Blockchain | Phân tích kỹ thuật |
+|---|---|
+| 💸 **Chi phí lưu trữ (Gas fee)** | Chi phí lưu trữ dữ liệu trạng thái trên Blockchain tăng theo dung lượng. Các tệp dữ liệu y tế, ảnh xét nghiệm và nội dung prompt AI chi tiết có dung lượng lớn, tạo chi phí gas cao nếu lưu trữ trực tiếp. |
+| 🔓 **Quy định quyền riêng tư (Privacy & PII)** | Dữ liệu trên Blockchain có tính công khai và không thể xóa bỏ. Lưu trữ trực tiếp thông tin định danh cá nhân (PII) của bệnh nhân sẽ vi phạm các quy định bảo vệ dữ liệu y tế (HIPAA, GDPR). |
+| ⏳ **Băng thông và độ trễ giao dịch** | Tốc độ xử lý khối của Blockchain không phù hợp để ghi nhận từng lượt thao tác nghiệp vụ tức thời. |
+
+---
+
+## 💡 3. Giải Pháp Áp Dụng: Cây Merkle (Merkle Tree) & Mô Hình Lai (Hybrid Architecture)
+
+Để giải quyết các hạn chế trên, hệ thống sử dụng **Mô hình kiến trúc lai (Hybrid On-chain / Off-chain)** kết hợp **Cây Merkle**.
+
+### 🌳 Nguyên lý hoạt động:
+1. Dữ liệu chi tiết của từng ca chẩn đoán (kèm log AI) được lưu trữ tại cơ sở dữ liệu nội bộ và đóng gói mã hóa lên IPFS.
+2. Mỗi bản ghi được băm thành một mã băm lá (Leaf Hash) 32 bytes theo chuỗi tuần tự (Hash Chain).
+3. Các mã băm lá được ghép cặp và băm phân cấp thành Cây Merkle để tạo ra một **Merkle Root (32 bytes)** đại diện cho toàn bộ lô dữ liệu.
+4. Hệ thống chỉ gửi duy nhất **mã Merkle Root 32 bytes** lên Smart Contract trên Blockchain để làm mốc đối soát.
+
+---
+
+### 🖼️ Sơ Đồ Cấu Trúc Cây Merkle & Mốc Neo Dữ Liệu
+
+```mermaid
+graph TD
+    subgraph S["🌐 Smart Contract Trên Blockchain (Lưu trữ 32 bytes)"]
+        Root["🌳 MERKLE ROOT (Mã gốc đại diện lô dữ liệu: 0x7f9a...c3b1)"]
+    end
+
+    subgraph M["⚡ Cấu Trúc Cây Merkle (Tính toán Off-Chain)"]
+        H_AB["Mã băm kết hợp (H_AB)"]
+        H_CD["Mã băm kết hợp (H_CD)"]
+        
+        Root --- H_AB
+        Root --- H_CD
+
+        H_A["Mã băm lá H_A"]
+        H_B["Mã băm lá H_B"]
+        H_C["Mã băm lá H_C"]
+        H_D["Mã băm lá H_D"]
+
+        H_AB --- H_A
+        H_AB --- H_B
+        H_CD --- H_C
+        H_CD --- H_D
+    end
+
+    subgraph D["🏥 Dữ Liệu Y Tế & Chẩn Đoán AI (Lưu tại CSDL & IPFS)"]
+        DocA["📄 Ca 1: Chẩn đoán AI + Bác sĩ duyệt (BN A)"] --> H_A
+        DocB["📄 Ca 2: Chỉ định xét nghiệm (BN B)"] --> H_B
+        DocC["📄 Ca 3: Kết quả xét nghiệm (BN C)"] --> H_C
+        DocD["📄 Ca 4: Kết luận bệnh án (BN D)"] --> H_D
+    end
+
+    classDef rootStyle fill:#22c55e,stroke:#15803d,stroke-width:2px,color:#ffffff,font-weight:bold;
+    classDef nodeStyle fill:#38bdf8,stroke:#0284c7,stroke-width:1.5px,color:#000000;
+    classDef docStyle fill:#f8fafc,stroke:#94a3b8,stroke-width:1.5px,color:#000000;
+    
+    class Root rootStyle;
+    class H_AB,H_CD,H_A,H_B,H_C,H_D nodeStyle;
+    class DocA,DocB,DocC,DocD docStyle;
+```
+
+---
+
+### 🔍 Quy trình xác thực tính toàn vẹn (Merkle Proof)
+
+Khi cần xác minh một bản ghi chẩn đoán bất kỳ (ví dụ: Bản ghi B):
+1. Hệ thống tính mã băm của bản ghi: $H_B$.
+2. Sử dụng đường dẫn chứng thực Merkle Proof gồm các mã băm liền kề ($H_A$ và $H_{CD}$).
+3. Tính toán lại mã gốc:
+   $$H_B + H_A \xrightarrow{\text{SHA-256}} H_{AB}$$
+   $$H_{AB} + H_{CD} \xrightarrow{\text{SHA-256}} \text{Merkle Root}$$
+4. So khớp kết quả với **Merkle Root đã lưu trên Blockchain**:
+   - Nếu **Trùng khớp**: Dữ liệu chẩn đoán và quyết định của bác sĩ được xác thực nguyên bản, không bị can thiệp.
+   - Nếu **Sai lệch**: Bản ghi đã bị chỉnh sửa so với thời điểm neo mốc.
+
+---
+
+### 📊 Bảng So Sánh Các Mô Hình Tiếp Cận
+
+| Tiêu chí | Ghi trực tiếp On-Chain | CSDL truyền thống | Mô hình Lai (Merkle + IPFS + Chuỗi) |
+|---|:---:|:---:|:---:|
+| **Tính toàn vẹn & Chống sửa đổi** | Cao | Phụ thuộc quyền admin | **Cao (Nhờ Merkle Root on-chain)** |
+| **Bảo vệ dữ liệu riêng tư (PII)** | Thấp (Dữ liệu công khai) | Nội bộ | **Đảm bảo (Zero PII on-chain)** |
+| **Chi phí Gas lưu trữ** | Cao | Thấp | **Tối ưu (32 bytes mỗi lô)** |
+| **Hiệu năng xử lý nghiệp vụ** | Chậm (Phụ thuộc block time) | Nhanh | **Nhanh (Xử lý tức thì tại backend)** |
+| **Khả năng đối soát & Phục hồi** | Thủ công | Phục hồi từ backup CSDL | **Tự động đối soát và khôi phục từ IPFS** |
+
+---
+
+## 🛠️ 4. Quy Trình Nghiệp Vụ & Chu Kỳ Kiểm Toán
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as 📱 Bệnh nhân (Mobile App)
+    actor D as 👨‍⚕️ Bác sĩ / Kỹ thuật viên (Web Portal)
+    participant API as ⚙️ Backend Core (NestJS API)
+    participant AI as 🤖 Trợ lý AI Chẩn đoán
+    participant IPFS as 📦 Mạng Lưu Trữ IPFS
+    participant SC as ⛓️ Smart Contract (AuditAnchor)
+
+    Note over P,API: 1. Tiếp đón & Mở ca khám
+    P->>API: Đăng nhập & Đặt lịch khám
+    API-->>P: Cấp mã QR Check-in
+    P->>D: Quét mã QR tại quầy tiếp đón -> Mở Ca khám (Visit)
+
+    Note over D,AI: 2. Khám bệnh & Tham vấn AI
+    D->>API: Nhập triệu chứng & Xem kết quả xét nghiệm
+    D->>API: Gửi yêu cầu phân tích chẩn đoán tới AI
+    API->>AI: Gửi dữ liệu lâm sàng đã ẩn danh định danh
+    AI-->>D: Trả về đề xuất phác đồ & mã ICD-10
+    D->>API: Bác sĩ ký kết luận bệnh án (Ghi nhận quyết định phê duyệt AI)
+
+    Note over API,SC: 3. Đóng gói kiểm toán & Neo mốc
+    API->>API: Mã hóa AES-256-GCM, tính Hash Chain, dựng Cây Merkle
+    API->>IPFS: Đóng gói lô kiểm toán -> Lưu lên IPFS
+    API->>SC: Neo Merkle Root (32 bytes) & IPFS CID lên Smart Contract
+
+    Note over P,SC: 4. Tra cứu & Đối soát
+    P->>API: Tra cứu hồ sơ & kiểm tra Merkle Proof
+    alt Phát hiện dữ liệu CSDL sai lệch
+        API->>SC: Đối soát Merkle Root trên Smart Contract
+        API->>IPFS: Tải gói gốc từ IPFS -> Khôi phục bản ghi hợp lệ (Self-Healing)
+    end
+```
+
+---
+
+## ⚡ 5. Thực Nghiệm & Đánh Giá Hiệu Năng (Empirical Benchmarks)
+
+Đo kiểm thực nghiệm được thực hiện trên môi trường Hardhat EVM Cancun Node với **1.000 bản ghi nhật ký y tế**:
+
+> 📖 **Xem báo cáo kỹ thuật chi tiết:** [docs/benchmarks/README.md](docs/benchmarks/README.md)
+
+### 📊 Benchmark 1: So sánh Tiêu thụ Gas & Thời gian xử lý (1.000 Logs)
+
+| Chỉ Số Đo Lường | Ghi Raw On-Chain | Cây Merkle (KLTN) | Mức Độ Cải Thiện |
+|---|:---:|:---:|:---:|
+| **Số lượng giao dịch (Transactions)** | 1.000 transactions | **1 transaction** | 📉 **Giảm 1.000 lần (99,9%)** |
+| **Tổng lượng Gas tiêu thụ** | 236.626.908 gas | **300.883 gas** | ⚡ **Tiết kiệm 99,87% Gas** |
+| **Chi phí Gas / 1 log** | 236.627 gas / log | **300,88 gas / log** | 💡 **Tối ưu hơn 786,4 lần** |
+| **Thời gian xử lý local** | 2.021 ms (~2,02s) | **22 ms** (~0,022s) | ⏱️ **Nhanh hơn 91,9 lần** |
+| **Thời gian xác nhận On-Chain** | 2 – 3,5 phút *(8–10 khối)* | **12 giây** *(1 khối duy nhất)* | 🎯 **Không phát sinh nghẽn mạng** |
+
+<p align="center">
+  <img src="docs/assets/benchmark_gas_and_time_comparison.png" alt="Benchmark Gas & Time Comparison" width="100%" />
+</p>
+
+---
+
+### 🛡️ Benchmark 2: Khả Năng Phát Hiện Sai Sót Dữ Liệu (Tamper Detection)
+
+Thực nghiệm 4 kịch bản can thiệp dữ liệu: sửa 1 trường dữ liệu, xóa bản ghi, tráo đổi thứ tự và chèn bản ghi mới:
+
+| Kịch Bản Can Thiệp / Sai Lệch | Ghi Raw On-Chain | Cây Merkle (KLTN) | So Sánh Hiệu Quả |
+|---|:---:|:---:|:---:|
+| **1. Sửa 1 trường dữ liệu (#450)** | Phát hiện *(307 ms, 451 RPC)* | **Phát hiện (5,3 ms, 1 RPC)** | ⚡ Merkle nhanh hơn **57 lần** |
+| **2. Xóa bản ghi kiểm toán (#720)** | Phát hiện *(453 ms, 721 RPC)* | **Phát hiện (4,9 ms, 1 RPC)** | 🎯 Merkle nhanh hơn **92 lần** |
+| **3. Tráo đổi thứ tự (#300 ⇄ #301)** | Phát hiện *(190 ms, 301 RPC)* | **Phát hiện (4,9 ms, 1 RPC)** | ⚡ Merkle nhanh hơn **38 lần** |
+| **4. Chèn bản ghi giả mạo (#151)** | Phát hiện *(98 ms, 152 RPC)* | **Phát hiện (4,7 ms, 1 RPC)** | 🎯 Merkle nhanh hơn **21 lần** |
+| **Số lượng RPC Request cần gọi** | 152 – 721 requests | **1 request duy nhất** | 📉 Giảm tới **721 lần** số request RPC |
+| **Băng thông tải về (Bandwidth)** | 37 KB – 180 KB | **0,06 KB (32 bytes hash)** | 📉 Tiết kiệm tới **3.000 lần** băng thông |
+
+<p align="center">
+  <img src="docs/assets/benchmark_tamper_detection.png" alt="Benchmark Tamper Detection" width="100%" />
+</p>
+
+---
+
+## 🏛️ 6. Cấu Trúc Toàn Bộ Dự Án (Monorepo)
 
 ```text
 KLTN/
 ├── apps/
-│   ├── hospital-api/       Backend NestJS + Prisma ORM + PostgreSQL
-│   ├── hospital-web/       Frontend React + Vite + Tailwind CSS
-│   ├── hospital-mobile/    Ứng dụng bệnh nhân Expo React Native
-│   └── audit-contracts/    Smart Contracts Solidity + Hardhat
-├── infrastructure/
-│   ├── compose/            Cấu hình Docker Compose (Dev, Prod, Test)
-│   ├── nginx/              Cấu hình Reverse Proxy Nginx
-│   └── scripts/            Script triển khai, sao lưu, khôi phục và kiểm thử
-├── docs/                   Tài liệu trung tâm của dự án
-├── .env.example            Mẫu biến môi trường Docker Compose
-└── README.md               Tệp tài liệu chính dự án
+│   ├── hospital-api/              # Máy chủ Backend (NestJS 10, Prisma, PostgreSQL, Multi-AI Gateway)
+│   ├── hospital-web/              # Giao diện Web Bác sĩ, Quản trị viên & Kỹ thuật viên (React + Vite)
+│   ├── hospital-mobile/           # Ứng dụng Bệnh nhân Di động (Expo React Native, QR Check-in)
+│   └── audit-contracts/           # Bộ Hợp đồng thông minh Smart Contracts (Solidity v0.8.20 + Hardhat)
+│
+├── infrastructure/                # Cấu hình Docker Compose, Nginx Reverse Proxy, Script triển khai
+├── docs/                          # Kho tài liệu kỹ thuật & kiến trúc chuyên sâu
+└── README.md                      # Tài liệu tổng quan dự án
 ```
 
 ---
 
-## Mô Hình Biến Môi Trường (Environment Model)
+## 🚀 7. Hướng Dẫn Cài Đặt & Khởi Chạy Nhanh (Quick Start)
 
-Tệp `.env` tại thư mục gốc không còn là tập hợp biến dùng chung cho tất cả các dịch vụ Docker Compose. Mỗi ứng dụng quản lý cấu hình riêng:
+### Yêu cầu môi trường:
+- Node.js $\ge 20.x$, Docker & Docker Compose, Git.
 
-- `apps/hospital-api/.env`: Backend runtime, Database, JWT secret, thuật toán mã hóa, Audit Crypto, S3, Cloudinary avatar, RPC/Contract/Relayer Blockchain runtime.
-- `apps/hospital-web/.env`: Cấu hình công khai `VITE_*` dành cho frontend.
-- `apps/audit-contracts/.env`: Cấu hình triển khai và quản trị (deploy & governance) cho các script Hardhat.
-
-Khởi tạo cấu hình ban đầu:
-
-```bash
-cp apps/hospital-api/.env.example apps/hospital-api/.env
-cp apps/hospital-web/.env.example apps/hospital-web/.env
-cd apps/audit-contracts
-cp .env.example .env
-```
-
-> [!WARNING]
-> Không bao giờ commit các tệp `.env` chứa bí mật thực tế lên Git repository.
-
----
-
-## Luồng Hoạt Động Blockchain (Blockchain Flow)
-
-Hệ thống phân định 3 vai trò rõ ràng trên Blockchain:
-
-| Vai trò | Vị trí lưu trữ | Chức năng & Nhiệm vụ |
-|---|---|---|
-| **Owner / Root Governance** | `BLOCKCHAIN_OWNER_PRIVATE_KEY` trong `apps/audit-contracts/.env` (Production nên dùng ví lạnh / Multisig) | Cấp quyền hoặc thu hồi ví Admin, thêm/xóa ví Relayer, chuyển quyền sở hữu hợp đồng. |
-| **Relayer / Backend Writer** | `BLOCKCHAIN_RELAYER_PRIVATE_KEY` trong `apps/hospital-api/.env` hoặc Secret Manager | Tự động ký và gửi giao dịch: `AuditAnchor.commitRoot`, `FaceRegistry.setFaceHash`, `recordAction`. |
-| **Admin Wallet** | Ví cá nhân của Quản trị viên (MetaMask) | Ký các thử thách xác thực (Challenge) để chứng minh danh tính khi khôi phục hoặc thay đổi nhạy cảm. |
-
-Backend không sử dụng ví Admin để trả phí gas cho các giao dịch audit thường nhật. Admin chỉ ký thử thách xác thực; ví Relayer của backend mới là bên gửi giao dịch vận hành lên chuỗi.
-
-Hợp đồng `IdentityRegistry` đóng vai trò là nguồn xác thực quyền lực trung tâm:
-
-```text
-IdentityRegistry.owner()
-├── Quản trị danh sách ví Admin
-├── Quản trị danh sách ví Relayer backend
-└── Chuyển quyền sở hữu (transferOwnership)
-
-IdentityRegistry.isRelayerOrOwner(address)
-├── Cho phép FaceRegistry ghi hash khuôn mặt
-├── Cho phép AuditAnchor commit Merkle root
-└── Cho phép ghi nhận hành động recordAction
-```
-
-`FaceRegistry` và `AuditAnchor` không duy trì danh sách Relayer riêng mà truy vấn trực tiếp từ `IdentityRegistry`. Do đó, khi cần xoay vòng (rotate) Relayer chỉ cần cập nhật tại một nơi duy nhất.
-
----
-
-## Quy Trình Xử Lý Khi Mất Khóa Khóa Bí Mật (Key Recovery)
-
-| Sự cố | Hậu quả | Phương án xử lý |
-|---|---|---|
-| **Mất `BLOCKCHAIN_RELAYER_PRIVATE_KEY`** | Không thể ghi Merkle root hoặc hash mới; nhật ký có thể bị dồn ở trạng thái `UNANCHORED` | Owner gọi `removeRelayer(old)` và `addRelayer(new)`, sau đó thay khóa relayer mới ở backend. |
-| **Lộ `BLOCKCHAIN_RELAYER_PRIVATE_KEY`** | Kẻ xấu có thể gửi giao dịch vận hành trong phạm vi quyền Relayer | Owner lập tức thu hồi Relayer cũ, cấp quyền Relayer mới và kiểm toán lại các lô dữ liệu nghi ngờ. |
-| **Mất ví Admin** | Admin đó không thể đăng nhập, thực hiện xác thực nâng cao (step-up) hoặc khôi phục dữ liệu | Owner thu hồi ví cũ và cấp quyền cho ví Admin mới. |
-| **Mất khóa Owner duy nhất** | Toàn bộ quản trị bị khóa; không thể thêm/xóa Relayer hay Admin mới | Nếu hợp đồng không có cơ chế khôi phục đa chữ ký, dữ liệu không thể cứu. **Môi trường Production bắt buộc dùng Multisig / Ví lạnh.** |
-
----
-
-## Chạy Blockchain Trên Môi Trường Local
-
-**Terminal 1 (Khởi tạo Hardhat Node):**
-
+### Bước 1: Khởi động Blockchain Local & Deploy Smart Contracts
 ```bash
 cd apps/audit-contracts
 npm install
 npm run node
-```
-
-**Terminal 2 (Deploy Smart Contracts):**
-
-```bash
-cd apps/audit-contracts
+# Mở một cửa sổ terminal khác:
 npm run deploy:local
 ```
 
-Sau khi deploy thành công, sao chép chính xác địa chỉ hợp đồng và thông số được in ra terminal vào tệp `.env` tương ứng của từng ứng dụng (`apps/audit-contracts/.env`, `apps/hospital-api/.env`, `apps/hospital-web/.env`).
-
-Các lệnh hữu ích:
-
+### Bước 2: Khởi chạy Backend API
 ```bash
-cd apps/audit-contracts
-npm run compile           # Biên dịch hợp đồng
-npm test                  # Chạy kiểm thử tự động
-npm run deploy:custom     # Deploy lên mạng tùy chỉnh
-npm run deploy:audit:local # Deploy nhanh bộ hợp đồng audit
+cd apps/hospital-api
+npm install
+cp .env.example .env
+npx prisma generate
+npx prisma db push
+npm run start:dev
 ```
+*API sẽ chạy tại:* `http://localhost:3001/api`
 
----
-
-## Chạy Bằng Docker Compose
-
-Dịch vụ Docker Compose không còn tự động khởi chạy container blockchain riêng. Trước khi thực hiện `docker compose up`, hãy khởi chạy node Hardhat tại `apps/audit-contracts/` theo hướng dẫn trên.
-
+### Bước 3: Khởi chạy Giao diện Web Quản trị & Bác sĩ
 ```bash
-docker compose -f infrastructure/compose/compose.yml up -d
+cd apps/hospital-web
+npm install
+cp .env.example .env
+npm run dev
 ```
+*Web Portal sẽ chạy tại:* `http://localhost:5173`
 
-Các đường dẫn dịch vụ mặc định:
-
-- **Backend API:** `http://localhost:3001/api`
-- **Frontend Web:** `http://localhost:5173`
-- **PostgreSQL:** `localhost:5432`
-- **Hardhat Node:** `http://localhost:8545`
-
----
-
-## Lưu Trữ Tệp Y Tế & Quyền Truy Cập (File Storage)
-
-Tệp kết quả cận lâm sàng được lưu trữ tại private bucket của AWS S3:
-- Báo cáo PDF, ảnh X-Ray / MRI / CT / Siêu âm, điện tâm đồ (ECG), tệp đính kèm xét nghiệm.
-- Ảnh phân tích AI: Backend tải ảnh riêng tư từ S3, chuyển đổi mã hóa base64 và gửi an toàn sang nhà cung cấp AI.
-
-Ảnh đại diện (avatar) của bác sĩ và nhân viên không lưu ở S3 private mà sử dụng URL tĩnh / public trên Cloudinary để Frontend hiển thị trực tiếp.
-
-Database PostgreSQL quản lý metadata và quyền truy cập (`storageProvider`, `bucket`, `objectKey`, `sha256`, `etag`). S3 chỉ giữ dữ liệu thô. Blockchain chỉ lưu vết Audit hash / Merkle root đã làm sạch định danh.
-
-Đường dẫn tải tệp y tế:
-```text
-GET /api/medical-orders/results/files/:fileId/download
+### Bước 4: Khởi chạy Ứng dụng Mobile Bệnh nhân
+```bash
+cd apps/hospital-mobile
+npm install
+cp .env.example .env
+npx expo start
 ```
-Backend kiểm tra phân quyền RBAC thành công mới tạo Pre-signed URL có thời hạn ngắn để ứng dụng tải tệp.
+*Dùng ứng dụng **Expo Go** trên điện thoại để quét mã QR và trải nghiệm.*
 
 ---
 
-## Cổng Thông Tin Bệnh Nhân Trên Mobile
+## 📖 8. Danh Mục Tài Liệu Kỹ Thuật Chuyên Sâu
 
-Ứng dụng `apps/hospital-mobile/` chứa cổng thông tin bệnh nhân xây dựng bằng Expo React Native. Bệnh nhân có thể đăng nhập bằng số điện thoại OTP hoặc mật khẩu lần đầu, chọn hồ sơ liên kết và tra cứu lịch sử khám chữa bệnh minh bạch.
-
-Xem chi tiết tại: [docs/applications/hospital-mobile/README.md](docs/applications/hospital-mobile/README.md).
-
----
-
-## Tài Liệu Tham Khảo Liên Quan
-
-- [AGENTS.md](./docs/agents/AGENTS.md) - Hướng dẫn quy tắc cho AI coding agents
-- [Hướng dẫn Hợp đồng Smart Contracts](docs/applications/audit-contracts/README.md)
-- [Quy trình Kiểm toán Audit Logging](docs/security/audit-logging.md)
-- [Chính sách Phân tầng Dữ liệu & Anchoring](docs/security/tiers-and-anchoring.md)
-
----
-
-## Quy Ước Phát Triển (Development Standards)
-
-- Backend phát triển theo kiến trúc mô-đun chức năng (feature-based modules), kiểm tra DTO bằng `class-validator`, logic nghiệp vụ nằm ở Service / Use Case.
-- Các quy trình đa bước (Multi-step workflow) bắt buộc phải bọc trong Database Transaction.
-- Tất cả thay đổi đối với Entity quan trọng phải ghi log Audit và tạo Hash / Merkle root neo lên Blockchain.
-- Blockchain không chứa PII, nội dung bệnh án hay tệp dữ liệu lớn.
-- Tệp `.env` không được commit lên repo; luôn cập nhật tệp mẫu `.env.example` khi thêm biến mới.
+- ⚡ **[Báo Cáo Benchmark Hiệu Năng & Khả Năng Phát Hiện Sai Sót](docs/benchmarks/README.md)**
+- 🎮 **[Tài Liệu Chi Tiết 16 Controllers Backend & Endpoints](docs/applications/hospital-api/vi/controllers.md)**
+- 🎯 **[Tài Liệu Chi Tiết 59 Use Cases Nghiệp Vụ Backend](docs/applications/hospital-api/vi/use-cases.md)**
+- 🏗️ **[Tài Liệu Cấu Trúc Hạ Tầng (Audit Engine, Blockchain, Multi-AI)](docs/applications/hospital-api/vi/infrastructure.md)**
+- ⛓️ **[Hướng Dẫn Hợp Đồng Thông Minh Smart Contracts](apps/audit-contracts/README.md)**
+- 💻 **[Hướng Dẫn Giao Diện Web Quản Trị](apps/hospital-web/README.md)**
+- 📱 **[Hướng Dẫn Cổng Bệnh Nhân Mobile](apps/hospital-mobile/README.md)**

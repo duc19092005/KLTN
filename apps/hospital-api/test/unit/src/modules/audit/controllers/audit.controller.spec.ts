@@ -1,4 +1,8 @@
 import { AuditController } from '../../../../../../src/modules/audit/controllers/audit.controller';
+import { AuditSubjectResolverService } from '../../../../../../src/modules/audit/application/services/audit-subject-resolver.service';
+import { AuditPresenter } from '../../../../../../src/modules/audit/application/presenters/audit.presenter';
+import { ListAuditLogsQuery } from '../../../../../../src/modules/audit/application/queries/list-audit-logs.query';
+import { ListAuditBatchesQuery } from '../../../../../../src/modules/audit/application/queries/list-audit-batches.query';
 import {
   AUDIT_ENTRY_V2,
   canonicalize,
@@ -134,13 +138,17 @@ describe('AuditController readable V2 diff', () => {
         findUnique: jest.fn().mockResolvedValue(null),
       },
     };
+    const resolver = new AuditSubjectResolverService(prisma as any);
+    const presenter = new AuditPresenter(resolver);
+    const logsQuery = new ListAuditLogsQuery(prisma as any, presenter, resolver);
+    const batchesQuery = new ListAuditBatchesQuery(prisma as any, {} as any, presenter, resolver);
     const controller = new AuditController(
       {} as any,
       { getInclusionProof: jest.fn(), anchorNow: jest.fn() } as any,
-      prisma as any,
       { recover: jest.fn() } as any,
       { listWarnings: jest.fn(), recoverMany: jest.fn() } as any,
-      {} as any,
+      logsQuery,
+      batchesQuery,
     );
     return { controller, row };
   }
@@ -256,13 +264,18 @@ describe('AuditController incomplete audit batch regression', () => {
       },
     };
 
+    const resolver = new AuditSubjectResolverService(prisma as any);
+    const presenter = new AuditPresenter(resolver);
+    const logsQuery = new ListAuditLogsQuery(prisma as any, presenter, resolver);
+    const batchesQuery = new ListAuditBatchesQuery(prisma as any, { getLatestAuditBatchId: jest.fn().mockResolvedValue(0) } as any, presenter, resolver);
+
     const controller = new AuditController(
       {} as any,
       {} as any,
-      prisma as any,
       {} as any,
       {} as any,
-      {} as any,
+      logsQuery,
+      batchesQuery,
     );
 
     const result = await controller.batches('1', '10', 'batchId', 'desc');

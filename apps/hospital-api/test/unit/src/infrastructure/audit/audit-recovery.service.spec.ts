@@ -1,6 +1,6 @@
 import { AuditArtifactService, AuditRecoveryBundleRow } from '../../../../../src/infrastructure/audit';
 import { AuditRecoveryCryptoService } from '../../../../../src/infrastructure/audit';
-import { AuditRecoveryService } from '../../../../../src/infrastructure/audit';
+import { AuditRecoveryService, VerifiedAuditBundleReader, AuditDeepScanService } from '../../../../../src/infrastructure/audit';
 import {
   AUDIT_ENTRY_V2,
   canonicalize,
@@ -89,7 +89,8 @@ describe('AuditRecoveryService verified IPFS reader', () => {
       committed: true, root: rootToBytes32(root), leafCount: 1, fromSeq: 1, toSeq: 1,
       artifactUri: uploaded.artifactUri, artifactHash: uploaded.artifactHash,
     }) };
-    const service = new AuditRecoveryService(prisma as never, blockchain as never, artifacts, {} as never, {} as never);
+    const verifiedReader = new VerifiedAuditBundleReader(blockchain as never, artifacts as never, prisma as never);
+    const service = new AuditRecoveryService(prisma as never, blockchain as never, verifiedReader, {} as never, {} as never, {} as never);
     return { service, row, ipfs, corrupt: () => { stored[stored.length - 1] ^= 1; } };
   }
 
@@ -117,9 +118,6 @@ describe('AuditRecoveryService verified IPFS reader', () => {
 
   it('successfully loads verified bundle even when PostgreSQL AuditBatch is missing (DB Wipe scenario)', async () => {
     const { service, row } = await setup();
-    // Simulate DB wipe: prisma.auditBatch.findUnique returns null
-    (service['prisma'] as any).auditBatch.findUnique.mockResolvedValue(null);
-
     const result = await service.loadVerifiedBundle(1);
     expect(result.logs).toHaveLength(1);
     expect(result.logs[0].entryHash).toBe(row.entryHash);
@@ -127,7 +125,8 @@ describe('AuditRecoveryService verified IPFS reader', () => {
   });
 
   it('tracks deep scan progress and state', () => {
-    const service = new AuditRecoveryService({} as never, {} as never, {} as never, {} as never, {} as never);
+    const deepScan = new AuditDeepScanService({} as never, {} as never, {} as never);
+    const service = new AuditRecoveryService({} as never, {} as never, {} as never, {} as never, deepScan, {} as never);
     const initialStatus = service.getDeepScanStatus();
     expect(initialStatus.active).toBe(false);
     expect(initialStatus.progressPercent).toBe(0);
