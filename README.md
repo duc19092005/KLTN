@@ -13,64 +13,63 @@
 
 ## 🏥 1. Dự Án Này Để Làm Gì & Giải Quyết Vấn Đề Gì?
 
-### ❓ Bài toán thực tế trong ngành y tế:
-Hãy tưởng tượng một tình huống thực tế tại bệnh viện:
-- Một bệnh nhân đi khám, được bác sĩ chẩn đoán và chỉ định điều trị. Toàn bộ hồ sơ được lưu vào máy tính bệnh viện (Cơ sở dữ liệu truyền thống như MySQL, PostgreSQL).
-- **Vấn đề nguy hiểm:** Cơ sở dữ liệu truyền thống hoàn toàn có thể bị chỉnh sửa bởi một quản trị viên (DBA) thoái hóa biến chất, một nhân viên y tế muốn che giấu sai sót chuyên môn, hoặc một hacker tấn công vào máy chủ. Họ có thể sửa ngày giờ, đổi loại thuốc đã kê, sửa kết quả xét nghiệm nhằm trục lợi bảo hiểm hoặc trốn tránh trách nhiệm pháp lý.
-- Khi xảy ra tranh chấp, tòa án hoặc cơ quan bảo hiểm y tế **không có cách nào chắc chắn 100%** rằng bệnh án đang xem có phải là bản gốc ban đầu hay đã bị chỉnh sửa lén trong cơ sở dữ liệu.
+### ❓ Bài toán thực tế trong quản lý hồ sơ y tế:
+Trong các hệ thống quản lý bệnh viện truyền thống:
+- Hồ sơ bệnh án, kết quả xét nghiệm và đơn thuốc được lưu trữ tập trung tại cơ sở dữ liệu (như PostgreSQL, MySQL).
+- **Vấn đề tồn tại:** Cơ sở dữ liệu tập trung có nguy cơ bị can thiệp trực tiếp bởi quản trị viên, người dùng nội bộ có quyền truy cập cao, hoặc kẻ tấn công xâm nhập máy chủ. Các thao tác chỉnh sửa hoặc xóa dữ liệu trực tiếp trong CSDL có thể làm thay đổi lịch sử khám chữa bệnh mà không để lại bằng chứng toán học độc lập.
+- Khi cần đối soát hoặc giải quyết tranh chấp pháp lý, các bên liên quan khó có thể xác minh độc lập tính nguyên bản của dữ liệu nếu chỉ dựa vào hệ thống lưu trữ nội bộ của bệnh viện.
 
-### 💡 Mục tiêu của dự án này:
-Dự án xây dựng một **Hệ Thống Quản Lý Bệnh Viện Thông Minh Toàn Diện (Hospital Information System - HIS)** kết hợp công nghệ **Blockchain**, **IPFS** và **Mật mã học (Cây Merkle)** nhằm giải quyết 3 bài toán lớn:
-1. **Chống sửa đổi / xóa lén bệnh án (Bất biến 100%):** Mọi hành động của bác sĩ, kỹ thuật viên, điều dưỡng đều được "khóa" bằng mật mã toán học không thể chối bỏ.
-2. **Tự động phát hiện & phục hồi dữ liệu (Self-Healing):** Nếu hacker xâm nhập cơ sở dữ liệu và sửa lén một kết quả xét nghiệm, hệ thống sẽ **ngay lập tức phát hiện vết sửa** và cho phép quản trị viên bấm nút khôi phục lại dữ liệu gốc từ Blockchain/IPFS chỉ trong 1 giây.
-3. **Trợ lý Bác sĩ bằng AI đa mô hình (Claude 3.5, GPT-4o, Gemini 1.5):** Hỗ trợ bác sĩ gợi ý chẩn đoán dựa trên triệu chứng và kết quả xét nghiệm, nhưng toàn bộ quá trình bác sĩ duyệt / sửa / từ chối đề xuất của AI đều được ghi vết minh bạch để phục vụ y đức.
+### 💡 Mục tiêu của dự án:
+Dự án xây dựng **Hệ Thống Quản Lý Bệnh Viện (HIS)** kết hợp **Blockchain**, **IPFS** và **Cây Merkle (Merkle Tree)** nhằm:
+1. **Đảm bảo tính toàn vẹn của nhật ký kiểm toán:** Mọi thao tác chuyên môn (khám bệnh, chỉ định xét nghiệm, kê đơn, kết luận bệnh án) đều được tạo mã băm mật mã học và neo mốc kiểm toán lên Blockchain.
+2. **Phát hiện sai lệch & hỗ trợ phục hồi dữ liệu (Self-Healing):** Nếu dữ liệu trong cơ sở dữ liệu bị chỉnh sửa không khớp với mốc đã neo, hệ thống sẽ phát hiện vị trí sai lệch và hỗ trợ phục hồi lại bản ghi gốc từ kho lưu trữ IPFS.
+3. **Tích hợp Trợ lý AI hỗ trợ lâm sàng:** Cung cấp gợi ý chẩn đoán dựa trên triệu chứng và kết quả xét nghiệm, đồng thời ghi vết kiểm toán minh bạch toàn bộ quyết định phê duyệt của bác sĩ.
 
 ---
 
-## ⚠️ 2. Nhược Điểm Của Blockchain Là Gì Khi Áp Dụng Vào Y Tế?
+## ⚠️ 2. Hạn Chế Khi Lưu Trữ Trực Tiếp Dữ Liệu Y Tế Lên Blockchain
 
-Nhiều người thường nghĩ: *"Muốn dữ liệu không bị sửa, cứ lưu thẳng toàn bộ bệnh án lên Blockchain là xong!"* — **Đây là sai lầm rất lớn trong thực tế** vì Blockchain có 3 nhược điểm chết người:
+Việc lưu trữ toàn bộ hồ sơ y tế trực tiếp lên chuỗi khối (On-Chain) gặp phải các rào cản kỹ thuật:
 
-| Nhược điểm của Blockchain | Giải thích vì sao KHÔNG THỂ lưu thẳng bệnh án lên Blockchain |
+| Hạn chế của Blockchain | Phân tích kỹ thuật |
 |---|---|
-| 💸 **Chi phí cực kỳ đắt đỏ (Gas fee cao)** | Lưu 1MB dữ liệu lên mạng lưới Blockchain (như Ethereum) có thể tốn hàng trăm đến hàng ngàn USD. Một tệp ảnh chụp X-quang hay MRI dung lượng 20MB–50MB nếu lưu lên chuỗi sẽ khiến bệnh viện phá sản vì chi phí. |
-| 🔓 **Vi phạm nghiêm trọng quyền riêng tư (Privacy)** | Bản chất của Blockchain là **sổ cái công khai và vĩnh viễn không thể xóa**. Nếu đưa tên tuổi, số CCCD, hình ảnh và bệnh án nhạy cảm của bệnh nhân lên chuỗi, bất kỳ ai cũng có thể đọc được và vi phạm nghiêm trọng luật bảo mật thông tin y tế (Luật Khám chữa bệnh, HIPAA, GDPR). |
-| ⏳ **Tốc độ xử lý chậm (Không mở rộng được)** | Mỗi ngày bệnh viện có hàng chục ngàn lượt khám, xét nghiệm, kê đơn. Blockchain chỉ xử lý được vài chục giao dịch/giây, nếu mỗi cú click chuột của bác sĩ phải đợi Blockchain xác nhận thì bệnh viện sẽ bị nghẽn tắc hoàn toàn. |
+| 💸 **Chi phí lưu trữ (Gas fee)** | Chi phí lưu trữ dữ liệu trạng thái trên Blockchain tỉ lệ thuận với dung lượng. Các tệp dữ liệu y tế như ảnh X-quang, MRI, kết quả xét nghiệm chi tiết có dung lượng lớn, dẫn đến chi phí duy trì cao nếu ghi trực tiếp. |
+| 🔓 **Quy định quyền riêng tư (Privacy & PII)** | Dữ liệu trên Blockchain có tính chất công khai và không thể xóa bỏ. Lưu trữ trực tiếp thông tin định danh cá nhân (PII) và lịch sử bệnh lý của bệnh nhân vi phạm các quy định bảo vệ dữ liệu y tế (HIPAA, GDPR). |
+| ⏳ **Băng thông và độ trễ giao dịch** | Tốc độ xử lý khối và giới hạn gas mỗi khối của Blockchain không phù hợp với tần suất giao dịch cao trong quy trình khám chữa bệnh hàng ngày. |
 
 ---
 
-## 💡 3. Kỹ Thuật Đột Phá Của Dự Án: Cây Merkle (Merkle Tree) & Mô Hình Lai (Hybrid)
+## 💡 3. Giải Pháp Áp Dụng: Cây Merkle (Merkle Tree) & Mô Hình Lai (Hybrid Architecture)
 
-Để khắc phục hoàn toàn 3 nhược điểm trên, dự án áp dụng **Mô hình kiến trúc lai (Hybrid On-chain / Off-chain)** kết hợp cấu trúc dữ liệu kinh điển **Cây Merkle (Merkle Tree)**.
+Để cân bằng giữa chi phí, quyền riêng tư và tính toàn vẹn dữ liệu, hệ thống triển khai **Mô hình kiến trúc lai (Hybrid On-chain / Off-chain)** sử dụng **Cây Merkle (Merkle Tree)**.
 
-### 🌳 Cây Merkle hoạt động như thế nào? (Giải thích trực quan)
-Thay vì lưu từng bệnh án cồng kềnh lên Blockchain, hệ thống làm như sau:
-1. Mỗi ca khám bệnh hoặc kết quả xét nghiệm được máy chủ mã hóa và băm thành một chuỗi ký tự duy nhất gọi là **Mã băm lá (Leaf Hash)** (giống như lấy dấu vân tay của một tài liệu).
-2. Hệ thống ghép từng cặp dấu vân tay lại với nhau rồi băm tiếp lên tầng trên.
-3. Cứ ghép đôi liên tiếp như vậy cho đến khi thu được **một mã băm duy nhất đại diện cho toàn bộ hàng ngàn ca khám**, gọi là **Merkle Root (Gốc Merkle - chỉ dài vỏn vẹn 32 bytes)**.
-4. Hệ thống chỉ gửi đúng **mã Merkle Root 32 bytes này lên Smart Contract trên Blockchain**.
+### 🌳 Nguyên lý hoạt động:
+1. Dữ liệu chi tiết của từng sự kiện kiểm toán được lưu tại cơ sở dữ liệu nội bộ và đóng gói mã hóa lên mạng lưu trữ IPFS.
+2. Mỗi bản ghi được băm thành một mã băm lá (Leaf Hash) 32 bytes theo chuỗi tuần tự (Hash Chain).
+3. Các mã băm lá được ghép cặp và băm phân cấp thành Cây Merkle để tạo ra một **Merkle Root (32 bytes)** đại diện cho toàn bộ lô dữ liệu.
+4. Hệ thống chỉ gửi duy nhất **mã Merkle Root 32 bytes** lên Smart Contract trên Blockchain để làm mốc đối soát.
 
 ---
 
-### 🖼️ Sơ Đồ Minh Họa Cách Hoạt Động Của Cây Merkle
+### 🖼️ Sơ Đồ Cấu Trúc Cây Merkle & Mốc Neo Dữ Liệu
 
 ```mermaid
 graph TD
-    subgraph S["🌐 Smart Contract Trên Blockchain (Chi phí siêu rẻ - Chỉ lưu 32 bytes)"]
-        Root["🌳 MERKLE ROOT (Mã gốc đại diện duy nhất: 0x7f9a...c3b1)"]
+    subgraph S["🌐 Smart Contract Trên Blockchain (Lưu trữ 32 bytes)"]
+        Root["🌳 MERKLE ROOT (Mã gốc đại diện lô dữ liệu: 0x7f9a...c3b1)"]
     end
 
-    subgraph M["⚡ Tầng Tính Toán Mật Mã Toán Học (Cây Merkle)"]
+    subgraph M["⚡ Cấu Trúc Cây Merkle (Tính toán Off-Chain)"]
         H_AB["Mã băm kết hợp (H_AB)"]
         H_CD["Mã băm kết hợp (H_CD)"]
         
         Root --- H_AB
         Root --- H_CD
 
-        H_A["Mã băm H_A"]
-        H_B["Mã băm H_B"]
-        H_C["Mã băm H_C"]
-        H_D["Mã băm H_D"]
+        H_A["Mã băm lá H_A"]
+        H_B["Mã băm lá H_B"]
+        H_C["Mã băm lá H_C"]
+        H_D["Mã băm lá H_D"]
 
         H_AB --- H_A
         H_AB --- H_B
@@ -78,16 +77,16 @@ graph TD
         H_CD --- H_D
     end
 
-    subgraph D["🏥 Dữ Liệu Thực Tế Tại Bệnh Viện (Lưu tại CSDL & IPFS Riêng Tư)"]
-        DocA["📄 Ca khám 1<br>(Bệnh nhân Nguyễn Văn A)"] --> H_A
-        DocB["📄 Ca khám 2<br>(Bệnh nhân Trần Thị B)"] --> H_B
-        DocC["📄 Kết quả Xét nghiệm 3<br>(Bệnh nhân Lê Văn C)"] --> H_C
-        DocD["📄 Kết luận Bác sĩ 4<br>(Bệnh nhân Phạm Thị D)"] --> H_D
+    subgraph D["🏥 Dữ Liệu Y Tế (Lưu tại CSDL Bệnh Viện & IPFS)"]
+        DocA["📄 Sự kiện 1: Khám bệnh (BN A)"] --> H_A
+        DocB["📄 Sự kiện 2: Chỉ định xét nghiệm (BN B)"] --> H_B
+        DocC["📄 Sự kiện 3: Kết quả xét nghiệm (BN C)"] --> H_C
+        DocD["📄 Sự kiện 4: Ký kết luận bệnh án (BN D)"] --> H_D
     end
 
-    classDef rootStyle fill:#22c55e,stroke:#15803d,stroke-width:3px,color:#ffffff,font-weight:bold;
-    classDef nodeStyle fill:#38bdf8,stroke:#0284c7,stroke-width:2px,color:#000000;
-    classDef docStyle fill:#f8fafc,stroke:#94a3b8,stroke-width:2px,color:#000000;
+    classDef rootStyle fill:#22c55e,stroke:#15803d,stroke-width:2px,color:#ffffff,font-weight:bold;
+    classDef nodeStyle fill:#38bdf8,stroke:#0284c7,stroke-width:1.5px,color:#000000;
+    classDef docStyle fill:#f8fafc,stroke:#94a3b8,stroke-width:1.5px,color:#000000;
     
     class Root rootStyle;
     class H_AB,H_CD,H_A,H_B,H_C,H_D nodeStyle;
@@ -96,35 +95,33 @@ graph TD
 
 ---
 
-### 🔍 Làm sao để biết 1 ca khám có bị sửa đổi hay không? (Merkle Proof)
+### 🔍 Quy trình xác thực tính toàn vẹn (Merkle Proof)
 
-Giả sử bạn là Bệnh nhân B muốn kiểm tra xem hồ sơ của mình có bị ai sửa lén không:
-1. Hệ thống lấy dữ liệu ca khám của bạn và tính ra mã `H_B`.
-2. Hệ thống chỉ cần cung cấp thêm cho bạn 2 "mảnh ghép" nhỏ (gọi là **Sibling Hashes**): mã `H_A` của người bên cạnh và mã `H_CD` của nhánh đối diện.
-3. Ứng dụng của bạn tự tính:
+Khi cần xác minh một bản ghi bất kỳ (ví dụ: Bản ghi B):
+1. Hệ thống tính mã băm của bản ghi: $H_B$.
+2. Sử dụng đường dẫn chứng thực Merkle Proof gồm các mã băm liền kề ($H_A$ và $H_{CD}$).
+3. Tính toán lại mã gốc:
    $$H_B + H_A \xrightarrow{\text{SHA-256}} H_{AB}$$
    $$H_{AB} + H_{CD} \xrightarrow{\text{SHA-256}} \text{Merkle Root}$$
-4. Bạn lấy mã tính được đem so khớp với **Merkle Root đã lưu trên Blockchain**:
-   - Nếu **TRÙNG KHỚP 100%**: Đảm bảo tuyệt đối ca khám của bạn nguyên vẹn, không ai sửa đổi được dù chỉ 1 dấu chấm!
-   - Nếu **LỆCH MÃ**: Phát hiện ngay lập tức dữ liệu trong cơ sở dữ liệu đã bị sửa trái phép!
+4. So khớp kết quả với **Merkle Root đã lưu trên Blockchain**:
+   - Nếu **Trùng khớp**: Dữ liệu đảm bảo tính toàn vẹn, không bị sửa đổi.
+   - Nếu **Sai lệch**: Bản ghi đã bị can thiệp trái phép so với thời điểm neo mốc.
 
 ---
 
-### 📊 Bảng So Sánh Tổng Quan: Các Cách Tiếp Cận
+### 📊 Bảng So Sánh Các Mô Hình Tiếp Cận
 
-| Tiêu chí | Lưu trực tiếp lên Blockchain | Lưu CSDL truyền thống (MySQL) | **Giải pháp của Dự án (Merkle + Blockchain + IPFS)** |
+| Tiêu chí | Ghi trực tiếp On-Chain | CSDL truyền thống | Mô hình Lai (Merkle + IPFS + Chuỗi) |
 |---|:---:|:---:|:---:|
-| **Khả năng chống sửa/xóa dữ liệu** | ✅ Tuyệt đối | ❌ Dễ bị DBA/Hacker sửa | ✅ **Tuyệt đối (Nhờ Merkle Root on-chain)** |
-| **Bảo vệ quyền riêng tư người bệnh** | ❌ Vi phạm (Lộ thông tin) | ⚠️ Tùy thuộc admin | ✅ **Bảo mật 100% (Zero PII on-chain)** |
-| **Chi phí lưu trữ & Phí gas** | ❌ Cực kỳ đắt đỏ | ✅ Rẻ | ✅ **Siêu rẻ (Chỉ tốn phí cho 32 bytes)** |
-| **Tốc độ xử lý khám bệnh** | ❌ Chậm chạp (Vài giây/ca) | ✅ Rất nhanh | ✅ **Tức thì (Hàng ngàn ca/giây)** |
-| **Tự động phục hồi khi bị tấn công** | ❌ Không có | ❌ Phải phục hồi backup thủ công | ✅ **Tự động phục hồi tức thì từ IPFS** |
+| **Tính toàn vẹn & Chống sửa đổi** | Cao | Phụ thuộc quyền admin | **Cao (Nhờ Merkle Root on-chain)** |
+| **Bảo vệ dữ liệu riêng tư (PII)** | Thấp (Dữ liệu công khai) | Nội bộ | **Đảm bảo (Zero PII on-chain)** |
+| **Chi phí Gas lưu trữ** | Cao | Thấp | **Tối ưu (32 bytes mỗi lô)** |
+| **Hiệu năng xử lý nghiệp vụ** | Chậm (Phụ thuộc block time) | Nhanh | **Nhanh (Xử lý tức thì tại backend)** |
+| **Khả năng đối soát & Phục hồi** | Thủ công | Phục hồi từ backup CSDL | **Tự động đối soát và khôi phục từ IPFS** |
 
 ---
 
-## 🛠️ 4. Quy Trình Khám Chữa Bệnh & Kiểm Toán Trong Thực Tế
-
-Hệ thống kết nối mượt mà từ lúc bệnh nhân bước chân vào viện đến khi kết thúc điều trị:
+## 🛠️ 4. Quy Trình Nghiệp Vụ & Chu Ký Kiểm Toán
 
 ```mermaid
 sequenceDiagram
@@ -132,32 +129,32 @@ sequenceDiagram
     actor P as 📱 Bệnh nhân (Mobile App)
     actor D as 👨‍⚕️ Bác sĩ / Kỹ thuật viên (Web Portal)
     participant API as ⚙️ Backend Core (NestJS API)
-    participant AI as 🤖 Trợ lý AI (Claude / GPT / Gemini)
+    participant AI as 🤖 Trợ lý AI
     participant IPFS as 📦 Mạng Lưu Trữ IPFS
     participant SC as ⛓️ Smart Contract (AuditAnchor)
 
-    Note over P,API: 1. Đặt lịch & Check-in Tiếp đón
-    P->>API: Đăng nhập OTP SMS & Đặt lịch khám trực tuyến
-    API-->>P: Cấp Mã QR Check-in mã hóa
-    P->>D: Quét mã QR tại quầy tiếp đón -> Tự động mở Ca khám (Visit)
+    Note over P,API: 1. Tiếp đón & Mở ca khám
+    P->>API: Đăng nhập & Đặt lịch khám
+    API-->>P: Cấp mã QR Check-in
+    P->>D: Quét mã QR tại quầy tiếp đón -> Mở Ca khám (Visit)
 
-    Note over D,AI: 2. Khám bệnh & Tham vấn AI
-    D->>API: Nhập triệu chứng lâm sàng & Xem kết quả xét nghiệm
-    D->>API: Yêu cầu AI phân tích hỗ trợ chẩn đoán
-    API->>AI: Gửi dữ liệu đã làm sạch thông tin cá nhân (Anonymized)
-    AI-->>D: Đề xuất phác đồ điều trị & mã ICD-10
-    D->>API: Bác sĩ ký kết luận bệnh án chính thức (Kèm xác nhận ý kiến AI)
+    Note over D,AI: 2. Khám bệnh & Hỗ trợ lâm sàng
+    D->>API: Nhập triệu chứng & Xem kết quả xét nghiệm
+    D->>API: Gửi yêu cầu phân tích chẩn đoán
+    API->>AI: Gửi dữ liệu đã ẩn danh định danh
+    AI-->>D: Trả về đề xuất phác đồ & mã ICD-10
+    D->>API: Bác sĩ ký kết luận bệnh án (Kèm lịch sử tham vấn AI)
 
-    Note over API,SC: 3. Khóa bảo mật & Neo Blockchain
-    API->>API: Mã hóa AES-256-GCM, băm V2, dựng Cây Merkle
-    API->>IPFS: Đóng gói toàn bộ hồ sơ lô kiểm toán -> Lưu lên IPFS
-    API->>SC: Neo Merkle Root (32 bytes) & Mã IPFS lên Smart Contract
+    Note over API,SC: 3. Đóng gói kiểm toán & Neo mốc
+    API->>API: Mã hóa AES-256-GCM, tính Hash Chain, dựng Cây Merkle
+    API->>IPFS: Đóng gói lô kiểm toán -> Lưu lên IPFS
+    API->>SC: Neo Merkle Root (32 bytes) & IPFS CID lên Smart Contract
 
-    Note over P,SC: 4. Tra cứu minh bạch & Tự phục hồi dữ liệu
-    P->>API: Tra cứu kết quả xét nghiệm & xem bằng chứng Merkle Proof
-    alt Có kẻ xấu tấn công sửa CSDL bệnh viện
-        API->>SC: Đối soát với Merkle Root trên chuỗi khối
-        API->>IPFS: Tải lại hồ sơ gốc từ IPFS -> Tự động ghi đè khôi phục (Self-Healing)
+    Note over P,SC: 4. Tra cứu & Đối soát
+    P->>API: Tra cứu hồ sơ & kiểm tra Merkle Proof
+    alt Phát hiện dữ liệu CSDL sai lệch
+        API->>SC: Đối soát Merkle Root trên Smart Contract
+        API->>IPFS: Tải gói gốc từ IPFS -> Khôi phục bản ghi hợp lệ (Self-Healing)
     end
 ```
 
@@ -165,9 +162,9 @@ sequenceDiagram
 
 ## ⚡ 5. Thực Nghiệm & Đánh Giá Hiệu Năng (Empirical Benchmarks)
 
-Dự án đã tiến hành đo kiểm thực nghiệm độc lập trên môi trường máy ảo EVM cục bộ (Hardhat EVM Cancun Node) với **1.000 bản ghi nhật ký y tế thực tế** trên 2 phương diện: (1) Tiêu thụ Gas & Độ trễ mở rộng quy mô và (2) Khả năng phát hiện sai sót dữ liệu khi bị tấn công.
+Đo kiểm thực nghiệm được thực hiện trên môi trường Hardhat EVM Cancun Node với **1.000 bản ghi nhật ký y tế**:
 
-> 📖 **Xem báo cáo kỹ thuật thực nghiệm chi tiết:** [docs/benchmarks/README.md](docs/benchmarks/README.md)
+> 📖 **Xem báo cáo kỹ thuật chi tiết:** [docs/benchmarks/README.md](docs/benchmarks/README.md)
 
 ### 📊 Benchmark 1: So sánh Tiêu thụ Gas & Thời gian xử lý (1.000 Logs)
 
@@ -175,9 +172,9 @@ Dự án đã tiến hành đo kiểm thực nghiệm độc lập trên môi tr
 |---|:---:|:---:|:---:|
 | **Số lượng giao dịch (Transactions)** | 1.000 transactions | **1 transaction** | 📉 **Giảm 1.000 lần (99,9%)** |
 | **Tổng lượng Gas tiêu thụ** | 236.626.908 gas | **300.883 gas** | ⚡ **Tiết kiệm 99,87% Gas** |
-| **Chi phí Gas / 1 log** | 236.627 gas / log | **300,88 gas / log** | 💡 **Tối ưu hơn 786,4 LẦN** |
-| **Thời gian xử lý local** | 2.021 ms (~2,02s) | **22 ms** (~0,022s) | ⏱️ **Nhanh gấp 91,9 lần** |
-| **Thời gian chờ xác nhận On-Chain** | 2 – 3,5 phút *(8–10 khối)* | **12 giây** *(1 khối duy nhất)* | 🎯 **Tức thì, 0 nguy cơ nghẽn mạng** |
+| **Chi phí Gas / 1 log** | 236.627 gas / log | **300,88 gas / log** | 💡 **Tối ưu hơn 786,4 lần** |
+| **Thời gian xử lý local** | 2.021 ms (~2,02s) | **22 ms** (~0,022s) | ⏱️ **Nhanh hơn 91,9 lần** |
+| **Thời gian xác nhận On-Chain** | 2 – 3,5 phút *(8–10 khối)* | **12 giây** *(1 khối duy nhất)* | 🎯 **Không phát sinh nghẽn mạng** |
 
 <p align="center">
   <img src="docs/assets/benchmark_gas_and_time_comparison.png" alt="Benchmark Gas & Time Comparison" width="100%" />
@@ -187,16 +184,16 @@ Dự án đã tiến hành đo kiểm thực nghiệm độc lập trên môi tr
 
 ### 🛡️ Benchmark 2: Khả Năng Phát Hiện Sai Sót Dữ Liệu (Tamper Detection)
 
-Hệ thống mô phỏng 4 kịch bản tấn công thực tế vào cơ sở dữ liệu bệnh viện: sửa 1 trường thông tin bệnh án, xóa lén bản ghi, tráo đổi thứ tự thời gian và chèn bản ghi khống:
+Thực nghiệm 4 kịch bản can thiệp dữ liệu: sửa 1 trường dữ liệu, xóa bản ghi, tráo đổi thứ tự và chèn bản ghi mới:
 
-| Kịch Bản Tấn Công / Sai Lệch | Ghi Raw On-Chain | Cây Merkle (KLTN) | So Sánh Hiệu Quả |
+| Kịch Bản Can Thiệp / Sai Lệch | Ghi Raw On-Chain | Cây Merkle (KLTN) | So Sánh Hiệu Quả |
 |---|:---:|:---:|:---:|
-| **1. Sửa 1 trường dữ liệu (#450)** | Phát hiện *(307 ms, 451 RPC)* | **Phát hiện (5,3 ms, 1 RPC)** | ⚡ Merkle **nhanh gấp 57 LẦN** |
-| **2. Xóa lén bản ghi kiểm toán (#720)** | Phát hiện *(453 ms, 721 RPC)* | **Phát hiện (4,9 ms, 1 RPC)** | 🎯 Merkle **nhanh gấp 92 LẦN** |
-| **3. Tráo đổi thứ tự bản ghi (#300 ⇄ #301)** | Phát hiện *(190 ms, 301 RPC)* | **Phát hiện (4,9 ms, 1 RPC)** | ⚡ Merkle **nhanh gấp 38 LẦN** |
-| **4. Chèn bản ghi giả mạo (#151)** | Phát hiện *(98 ms, 152 RPC)* | **Phát hiện (4,7 ms, 1 RPC)** | 🎯 Merkle **nhanh gấp 21 LẦN** |
-| **Số lượng RPC Request cần gọi** | 152 – 721 requests | **1 request duy nhất** | 📉 **Giảm tới 721 lần tải mạng RPC** |
-| **Băng thông tải về (Bandwidth)** | 37 KB – 180 KB | **0,06 KB (32 bytes hash)** | 📉 **Tiết kiệm tới 3.000 lần băng thông** |
+| **1. Sửa 1 trường dữ liệu (#450)** | Phát hiện *(307 ms, 451 RPC)* | **Phát hiện (5,3 ms, 1 RPC)** | ⚡ Merkle nhanh hơn **57 lần** |
+| **2. Xóa bản ghi kiểm toán (#720)** | Phát hiện *(453 ms, 721 RPC)* | **Phát hiện (4,9 ms, 1 RPC)** | 🎯 Merkle nhanh hơn **92 lần** |
+| **3. Tráo đổi thứ tự (#300 ⇄ #301)** | Phát hiện *(190 ms, 301 RPC)* | **Phát hiện (4,9 ms, 1 RPC)** | ⚡ Merkle nhanh hơn **38 lần** |
+| **4. Chèn bản ghi giả mạo (#151)** | Phát hiện *(98 ms, 152 RPC)* | **Phát hiện (4,7 ms, 1 RPC)** | 🎯 Merkle nhanh hơn **21 lần** |
+| **Số lượng RPC Request cần gọi** | 152 – 721 requests | **1 request duy nhất** | 📉 Giảm tới **721 lần** số request RPC |
+| **Băng thông tải về (Bandwidth)** | 37 KB – 180 KB | **0,06 KB (32 bytes hash)** | 📉 Tiết kiệm tới **3.000 lần** băng thông |
 
 <p align="center">
   <img src="docs/assets/benchmark_tamper_detection.png" alt="Benchmark Tamper Detection" width="100%" />

@@ -13,54 +13,53 @@
 
 ## 🏥 1. What Is This Project & What Problem Does It Solve?
 
-### ❓ The Real-World Healthcare Challenge:
-Imagine an everyday hospital scenario:
-- A patient visits a clinic, receives a consultation, and undergoes laboratory tests. All medical records are stored in a standard hospital database (e.g., PostgreSQL, MySQL).
-- **The Critical Vulnerability:** Traditional databases can be silently altered or deleted by malicious insiders, compromised Database Administrators (DBAs), or external hackers. Records could be backdated, prescriptions swapped, or test results manipulated to commit insurance fraud or conceal medical malpractice.
-- When legal disputes or insurance audits arise, courts **have no mathematical guarantee** that the displayed medical record has not been secretly tampered with.
+### ❓ Clinical Data Management Challenge:
+In traditional hospital information systems:
+- Medical records, diagnostic reports, and prescriptions are stored in centralized relational databases (e.g., PostgreSQL, MySQL).
+- **Core Problem:** Centralized databases can be modified or deleted by privileged administrators, internal users, or compromised credentials without leaving verifiable cryptographic audit trails.
+- During medical dispute resolution or external audits, third parties cannot independently verify the historical authenticity of a record without relying solely on internal database trust.
 
-### 💡 Project Mission & Breakthrough Objectives:
-This project delivers a comprehensive **Smart Hospital Information System (HIS)** combining **Blockchain**, **IPFS**, and **Merkle Tree Cryptography** to solve three fundamental challenges:
-1. **Absolute Tamper-Resistance (100% Immutability):** Every clinical action taken by doctors, nurses, and lab technicians is sealed with cryptographic proofs that cannot be repudiated or modified.
-2. **Automated Self-Healing & Instant Recovery:** If an attacker modifies a lab result directly in the database, the system **instantly detects the discrepancy** and allows administrators to restore the authentic record from decentralized IPFS storage in one second.
-3. **Multi-AI Clinical Assistant with Ethical Auditing:** Integrates Claude 3.5 Sonnet, GPT-4o, and Gemini 1.5 Pro to assist physicians with diagnostic suggestions while logging every doctor review decision (Accept / Reject / Modify) for ethical accountability.
+### 💡 Project Objectives:
+This project delivers a **Hospital Information System (HIS)** integrating **Blockchain**, **IPFS**, and **Merkle Trees** to achieve:
+1. **Cryptographic Audit Integrity:** Every clinical action (consultation, lab order, prescription, medical conclusion) is cryptographically hashed and anchored to a blockchain checkpoint.
+2. **Discrepancy Detection & Data Recovery (Self-Healing):** If database records are altered off-chain, the system detects the discrepancy and facilitates recovery using the authentic archive preserved on IPFS.
+3. **Clinical AI Assistance with Audit Tracking:** Provides diagnostic support based on clinical symptoms and lab findings, while logging full practitioner review history for accountability.
 
 ---
 
-## ⚠️ 2. Why Can't We Just Put Medical Records Directly On Blockchain?
+## ⚠️ 2. Technical Limitations of Direct On-Chain Storage
 
-A common misconception is: *"If we want records to be immutable, why not simply store all medical files directly on the blockchain?"* — **In practice, this is catastrophic** due to three fatal limitations:
+Storing full medical records directly on a blockchain ledger presents practical constraints:
 
-| Blockchain Limitation | Why Medical Records CANNOT Be Stored Directly On-Chain |
+| Limitation | Technical Context |
 |---|---|
-| 💸 **Exorbitant Storage Costs (High Gas Fees)** | Storing 1MB of raw data on Ethereum can cost hundreds to thousands of dollars. Storing large medical imaging files (X-Rays, MRI, CT scans at 20MB–50MB each) would bankrupt the hospital. |
-| 🔓 **Severe Patient Privacy Violations** | Blockchains are **public, permanent, and irrevocable ledgers**. Publishing patient names, citizen IDs, and confidential health conditions on-chain violates fundamental medical privacy laws (HIPAA, GDPR, National Health Data Regulations). |
-| ⏳ **Slow Throughput & Scalability Bottlenecks** | Hospitals process thousands of clinical actions every hour. Blockchains process only dozens of transactions per second. Requiring on-chain confirmation for every single doctor click would completely paralyze hospital operations. |
+| 💸 **Storage Cost (Gas Fees)** | On-chain storage is priced per word of state. Large medical files (X-rays, MRI scans, unstructured clinical notes) incur significant overhead if stored directly on-chain. |
+| 🔓 **Privacy & Data Protection (PII)** | Public blockchain ledgers are transparent and immutable. Direct on-chain storage of Personally Identifiable Information (PII) and health records conflicts with healthcare privacy regulations (HIPAA, GDPR). |
+| ⏳ **Throughput & Block Latency** | Blockchain block generation intervals and block gas limits do not match the real-time transaction throughput required during daily hospital operations. |
 
 ---
 
-## 💡 3. The Breakthrough Architecture: Merkle Trees & Hybrid Design
+## 💡 3. Proposed Solution: Merkle Tree & Hybrid Architecture
 
-To overcome these three limitations, the system employs a **Hybrid On-chain / Off-chain Architecture** powered by the classic **Merkle Tree** data structure.
+To address these constraints, the system implements a **Hybrid On-chain / Off-chain Architecture** using **Merkle Trees**.
 
-### 🌳 How Does a Merkle Tree Work? (Intuitive Explanation)
-Instead of putting bulky medical records on the blockchain:
-1. Each patient consultation or lab result is mathematically hashed into a unique compact string called a **Leaf Hash** (like taking a digital fingerprint of a document).
-2. Adjacent digital fingerprints are combined in pairs and hashed together.
-3. This pairing process repeats in a binary tree hierarchy until only **a single 32-byte hash remains, representing thousands of records**: the **Merkle Root**.
-4. The hospital only transmits this **single 32-byte Merkle Root to the Blockchain Smart Contract**.
+### 🌳 Operational Overview:
+1. Full clinical audit payloads are maintained in the local database and archived in encrypted form on IPFS.
+2. Each record is converted into a 32-byte leaf hash within a sequential hash chain.
+3. Leaf hashes are hierarchically paired and hashed into a binary tree, producing a single **32-byte Merkle Root** for the batch.
+4. Only this **32-byte Merkle Root** is submitted to the on-chain smart contract as an immutable checkpoint.
 
 ---
 
-### 🖼️ Visual Diagram: How the Merkle Tree Operates
+### 🖼️ Merkle Tree Structure & Checkpoint Diagram
 
 ```mermaid
 graph TD
-    subgraph S["🌐 Smart Contract on Blockchain (Ultra Low Cost - Only Stores 32 Bytes)"]
-        Root["🌳 MERKLE ROOT (Unique 32-Byte Fingerprint: 0x7f9a...c3b1)"]
+    subgraph S["🌐 Smart Contract on Blockchain (Stores 32 Bytes)"]
+        Root["🌳 MERKLE ROOT (Unique 32-Byte Checkpoint: 0x7f9a...c3b1)"]
     end
 
-    subgraph M["⚡ Mathematical Cryptographic Layer (Merkle Tree)"]
+    subgraph M["⚡ Merkle Tree Structure (Off-Chain Computation)"]
         H_AB["Combined Hash (H_AB)"]
         H_CD["Combined Hash (H_CD)"]
         
@@ -78,16 +77,16 @@ graph TD
         H_CD --- H_D
     end
 
-    subgraph D["🏥 Actual Hospital Data (Private Database & Encrypted IPFS)"]
-        DocA["📄 Visit Episode 1<br>(Patient Alice)"] --> H_A
-        DocB["📄 Visit Episode 2<br>(Patient Bob)"] --> H_B
-        DocC["📄 Lab Result 3<br>(Patient Charlie)"] --> H_C
-        DocD["📄 Prescription 4<br>(Patient David)"] --> H_D
+    subgraph D["🏥 Clinical Data (Hospital DB & Encrypted IPFS)"]
+        DocA["📄 Event 1: Consultation (Patient A)"] --> H_A
+        DocB["📄 Event 2: Lab Order (Patient B)"] --> H_B
+        DocC["📄 Event 3: Lab Result (Patient C)"] --> H_C
+        DocD["📄 Event 4: Medical Conclusion (Patient D)"] --> H_D
     end
 
-    classDef rootStyle fill:#22c55e,stroke:#15803d,stroke-width:3px,color:#ffffff,font-weight:bold;
-    classDef nodeStyle fill:#38bdf8,stroke:#0284c7,stroke-width:2px,color:#000000;
-    classDef docStyle fill:#f8fafc,stroke:#94a3b8,stroke-width:2px,color:#000000;
+    classDef rootStyle fill:#22c55e,stroke:#15803d,stroke-width:2px,color:#ffffff,font-weight:bold;
+    classDef nodeStyle fill:#38bdf8,stroke:#0284c7,stroke-width:1.5px,color:#000000;
+    classDef docStyle fill:#f8fafc,stroke:#94a3b8,stroke-width:1.5px,color:#000000;
     
     class Root rootStyle;
     class H_AB,H_CD,H_A,H_B,H_C,H_D nodeStyle;
@@ -96,29 +95,29 @@ graph TD
 
 ---
 
-### 🔍 How to Verify a Single Record Without Trusting the Server (Merkle Proof)
+### 🔍 Verification Workflow (Merkle Proof)
 
-Suppose Patient Bob wants to independently verify that his medical record was never tampered with:
-1. The client app calculates Bob's leaf hash `H_B`.
-2. The server supplies only 2 sibling hashes (`H_A` and `H_CD`).
-3. The client reconstructs the root:
+To verify any individual record (e.g., Record B):
+1. Compute the record's leaf hash: $H_B$.
+2. Retrieve the compact Merkle Proof sibling hashes ($H_A$ and $H_{CD}$).
+3. Compute the reconstructed root:
    $$H_B + H_A \xrightarrow{\text{SHA-256}} H_{AB}$$
    $$H_{AB} + H_{CD} \xrightarrow{\text{SHA-256}} \text{Merkle Root}$$
-4. The client compares the result against the **immutable Merkle Root stored on-chain**:
-   - If **MATCH (100%)**: Guarantees the medical record is authentic down to the exact punctuation mark.
-   - If **MISMATCH**: Instantly flags unauthorized database tampering!
+4. Compare against the **on-chain Merkle Root**:
+   - If **Match**: The record is authentic and unaltered.
+   - If **Mismatch**: The record has been modified after checkpoint commitment.
 
 ---
 
-### 📊 Comparison Matrix: Architectural Paradigms
+### 📊 Architecture Comparison Matrix
 
-| Feature | Raw On-Chain Storage | Standard Database (MySQL) | **Our Hybrid Architecture (Merkle + IPFS + Chain)** |
+| Evaluation Criteria | Direct On-Chain Storage | Standard Database | Hybrid Model (Merkle + IPFS + Chain) |
 |---|:---:|:---:|:---:|
-| **Tamper Resistance** | ✅ Absolute | ❌ Vulnerable to DBAs/Hackers | ✅ **Absolute (Via On-Chain Merkle Root)** |
-| **Patient Privacy** | ❌ Severe Violation (Public PII) | ⚠️ Depends on Admin | ✅ **100% Zero PII On-Chain** |
-| **Gas Cost & Storage Fee** | ❌ Prohibitive ($ Millions/year) | ✅ Low | ✅ **Ultra Low (32 bytes per batch)** |
-| **Transaction Latency** | ❌ Very Slow (Seconds/action) | ✅ Instant | ✅ **Instant (Thousands of ops/sec)** |
-| **Self-Healing Recovery** | ❌ None | ❌ Manual DB Restores | ✅ **Instant Automated Recovery via IPFS** |
+| **Integrity & Immutability** | High | Subject to admin access | **High (Via on-chain Merkle Root)** |
+| **Privacy Protection (PII)** | Low (Public ledger) | Internal only | **Preserved (Zero PII on-chain)** |
+| **Storage Gas Cost** | High | Low | **Low (32 bytes per batch)** |
+| **Operational Throughput** | Low (Block-dependent) | High | **High (Processed off-chain)** |
+| **Audit & Recovery** | Manual | DB backup restore | **Automated audit and IPFS recovery** |
 
 ---
 
@@ -130,32 +129,32 @@ sequenceDiagram
     actor P as 📱 Patient (Mobile App)
     actor D as 👨‍⚕️ Clinician / Lab Tech (Web Portal)
     participant API as ⚙️ Core Backend (NestJS API)
-    participant AI as 🤖 AI Diagnostic Gateway
+    participant AI as 🤖 AI Diagnostic Service
     participant IPFS as 📦 IPFS Decentralized Storage
     participant SC as ⛓️ Smart Contract (AuditAnchor)
 
-    Note over P,API: 1. Appointment & Reception Check-in
-    P->>API: Login via SMS OTP & Book Appointment
+    Note over P,API: 1. Appointment & Check-in
+    P->>API: Authenticate & Schedule Appointment
     API-->>P: Generate Encrypted QR Check-in Code
     P->>D: Scan QR at Reception -> Initialize Clinical Visit
 
-    Note over D,AI: 2. Consultation & AI Consultation
-    D->>API: Record Symptoms & Review Lab Diagnostics
-    D->>API: Request Multi-AI Differential Diagnosis
+    Note over D,AI: 2. Consultation & Clinical Assistance
+    D->>API: Record Symptoms & Review Diagnostic Reports
+    D->>API: Request AI Differential Diagnosis Analysis
     API->>AI: Send Anonymized Clinical Data
-    AI-->>D: Return Suggested Treatment & ICD-10 Coding
-    D->>API: Clinician Signs Medical Conclusion (with AI audit trail)
+    AI-->>D: Return Treatment Suggestions & ICD-10 Coding
+    D->>API: Clinician Signs Medical Conclusion (with AI history)
 
-    Note over API,SC: 3. Cryptographic Sealing & On-Chain Anchoring
-    API->>API: Encrypt AES-256-GCM, Compute Hash Chain, Build Merkle Tree
-    API->>IPFS: Archive Encrypted Audit Batch Artifact to IPFS
-    API->>SC: Anchor 32-Byte Merkle Root & IPFS CID to Smart Contract
+    Note over API,SC: 3. Batch Construction & Checkpoint Commitment
+    API->>API: Encrypt Payload, Calculate Hash Chain, Build Merkle Tree
+    API->>IPFS: Archive Encrypted Audit Batch to IPFS
+    API->>SC: Commit 32-Byte Merkle Root & IPFS CID to Contract
 
-    Note over P,SC: 4. Transparent Verification & Self-Healing
-    P->>API: Query Lab Result & Verify Cryptographic Merkle Proof
-    alt Unauthorized Database Tampering Detected
-        API->>SC: Audit mismatch against immutable on-chain root
-        API->>IPFS: Fetch authentic batch -> Self-heal database record in 1 second
+    Note over P,SC: 4. Verification & Recovery
+    P->>API: Query Record & Verify Merkle Proof
+    alt Database Discrepancy Detected
+        API->>SC: Cross-check against on-chain root
+        API->>IPFS: Retrieve authentic batch -> Self-heal database record
     end
 ```
 
@@ -163,9 +162,9 @@ sequenceDiagram
 
 ## ⚡ 5. Empirical Benchmarks & Performance Evaluation
 
-The hybrid architecture was benchmarked on an isolated Hardhat EVM Cancun Node over **1,000 realistic clinical audit logs** across two dimensions: (1) Gas Consumption & Scalability Latency, and (2) Adversarial Tamper Detection Capability.
+The architecture was evaluated on an isolated Hardhat EVM Cancun Node using **1,000 clinical audit records**:
 
-> 📖 **Read the in-depth technical benchmark report:** [docs/benchmarks/README.en.md](docs/benchmarks/README.en.md)
+> 📖 **Full technical report:** [docs/benchmarks/README.en.md](docs/benchmarks/README.en.md)
 
 ### 📊 Benchmark 1: Gas Consumption & Processing Latency (1,000 Logs)
 
@@ -175,7 +174,7 @@ The hybrid architecture was benchmarked on an isolated Hardhat EVM Cancun Node o
 | **Total Gas Consumed** | 236,626,908 gas | **300,883 gas** | ⚡ **99.87% Gas Savings** |
 | **Average Gas / Log** | 236,627 gas / log | **300.88 gas / log** | 💡 **786.4x More Cost-Effective** |
 | **Local Processing Time** | 2,021 ms (~2.02s) | **22 ms** (~0.022s) | ⏱️ **91.9x Faster** |
-| **Blockchain Confirmation** | 2 – 3.5 minutes *(8–10 blocks)* | **12 seconds** *(1 single block)* | 🎯 **Instant, Zero Congestion Risk** |
+| **Blockchain Confirmation** | 2 – 3.5 minutes *(8–10 blocks)* | **12 seconds** *(1 single block)* | 🎯 **Zero network congestion** |
 
 <p align="center">
   <img src="docs/assets/benchmark_gas_and_time_comparison.png" alt="Benchmark Gas & Time Comparison" width="100%" />
@@ -185,15 +184,15 @@ The hybrid architecture was benchmarked on an isolated Hardhat EVM Cancun Node o
 
 ### 🛡️ Benchmark 2: Tamper Detection & Adversarial Attack Simulation
 
-Four realistic database attack vectors were simulated: single field modification, unauthorized deletion, event reordering, and fraudulent record injection:
+Four database tampering scenarios were evaluated: single-field modification, record deletion, event reordering, and fake record injection:
 
-| Attack Vector / Tamper Scenario | Raw On-Chain Baseline | Merkle Tree Hybrid (KLTN) | Architectural Advantage |
+| Tamper Scenario | Raw On-Chain Baseline | Merkle Tree Hybrid (KLTN) | Comparison |
 |---|:---:|:---:|:---:|
-| **1. Single Field Tamper (#450)** | Detected *(307 ms, 451 RPC)* | **Detected (5.3 ms, 1 RPC)** | ⚡ Merkle is **57x FASTER** |
-| **2. Log Deletion (#720)** | Detected *(453 ms, 721 RPC)* | **Detected (4.9 ms, 1 RPC)** | 🎯 Merkle is **92x FASTER** |
-| **3. Reorder Attack (#300 ⇄ #301)** | Detected *(190 ms, 301 RPC)* | **Detected (4.9 ms, 1 RPC)** | ⚡ Merkle is **38x FASTER** |
-| **4. Fake Log Injection (#151)** | Detected *(98 ms, 152 RPC)* | **Detected (4.7 ms, 1 RPC)** | 🎯 Merkle is **21x FASTER** |
-| **Total RPC Requests Required** | 152 – 721 requests | **1 single request** | 📉 **Up to 721x lower RPC load** |
+| **1. Single Field Tamper (#450)** | Detected *(307 ms, 451 RPC)* | **Detected (5.3 ms, 1 RPC)** | ⚡ Merkle is **57x faster** |
+| **2. Log Deletion (#720)** | Detected *(453 ms, 721 RPC)* | **Detected (4.9 ms, 1 RPC)** | 🎯 Merkle is **92x faster** |
+| **3. Reorder Attack (#300 ⇄ #301)** | Detected *(190 ms, 301 RPC)* | **Detected (4.9 ms, 1 RPC)** | ⚡ Merkle is **38x faster** |
+| **4. Fake Log Injection (#151)** | Detected *(98 ms, 152 RPC)* | **Detected (4.7 ms, 1 RPC)** | 🎯 Merkle is **21x faster** |
+| **Total RPC Requests Required** | 152 – 721 requests | **1 single request** | 📉 Up to **721x lower RPC load** |
 | **Network Bandwidth Incurred** | 37 KB – 180 KB | **0.06 KB (32 bytes hash)** | 📉 **3,000x lower bandwidth overhead** |
 
 <p align="center">
