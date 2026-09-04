@@ -14,8 +14,8 @@
     "compile-circuit": "node scripts/compile-circuit.js"
   },
   "devDependencies": {
-    "hardhat": "^2.22.0",
-    "@nomicfoundation/hardhat-toolbox": "^4.0.0"
+    "hardhat": "^3.15.0",
+    "@nomicfoundation/hardhat-toolbox": "^7.0.0"
   },
   "dependencies": {
     "circomlib": "^2.0.5",
