@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@vladmandic/human": "^3.3.6",
-    "axios": "^1.6.7",
+    "axios": "^1.20.0",
     "ethers": "^6.11.0",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.469.0",
